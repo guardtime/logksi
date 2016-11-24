@@ -1,0 +1,85 @@
+#
+# Copyright 2013-2016 Guardtime, Inc.
+#
+# This file is part of the Guardtime client SDK.
+#
+# Licensed under the Apache License, Version 2.0 (the "License").
+# You may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#     http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES, CONDITIONS, OR OTHER LICENSES OF ANY KIND, either
+# express or implied. See the License for the specific language governing
+# permissions and limitations under the License.
+# "Guardtime" and "KSI" are trademarks or registered trademarks of
+# Guardtime, Inc., and no license to trademarks is granted; Guardtime
+# reserves and retains all trademark rights.
+
+# Publications file test.
+
+# Verify pubfile without saving it.
+EXECUTABLE pubfile --conf test/test.cfg -v -d 
+>>>2 /(Receiving publications file)(.*ok.*)
+(.*)
+(.*)
+(.*)(Verifying publications file)(.*ok.*)/
+>>>= 0
+
+# Download and verify pubfile.
+EXECUTABLE pubfile --conf test/test.cfg -d -o test/out/pubfile/pubfile.bin
+>>>2 /(Receiving publications file)(.*ok.*)
+(.*)
+(.*)
+(.*)(Verifying publications file)(.*ok.*)
+(Saving publications file)(.*ok.*)/
+>>>= 0
+
+# Download and dump publications file without verifying it.
+EXECUTABLE pubfile --conf test/test.cfg -d --dump
+>>> /(KSI Publications file dump)(.*)
+(.*)(Publication Records)(.*)/
+>>>2 /(Receiving publications file)(.*ok.*)
+(Extracting latest publication time)(.*ok.*)/
+>>>= 0
+
+# Download, verify and dump publications file.
+EXECUTABLE pubfile --conf test/test.cfg -d -v --dump
+>>> /(KSI Publications file dump)(.*)
+(.*)(Publication Records)(.*)/
+>>>2 /(Receiving publications file)(.*ok.*)
+(Extracting latest publication time)(.*ok.*)
+(.*)
+(.*)(Verifying publications file)(.*ok.*)/
+>>>= 0
+
+# Verify publications file with specified constraints (use short names).
+EXECUTABLE pubfile --conf test/test.cfg -d -v --dump --cnstr E=publications@guardtime.com --cnstr CN="Persona Not Validated - 1454602964718"
+>>> /(KSI Publications file dump)(.*)
+(.*)(Publication Records)(.*)/
+>>>2 /(Receiving publications file)(.*ok.*)
+(.*)
+(.*)
+(.*)(Verifying publications file)(.*ok.*)/
+>>>= 0
+
+# Verify publications file with specified constraints (use long names).
+EXECUTABLE pubfile --conf test/test.cfg -d -v --dump --cnstr email=publications@guardtime.com --cnstr "common_name=Persona Not Validated - 1454602964718"
+>>> /(KSI Publications file dump)(.*)
+(.*)(Publication Records)(.*)/
+>>>2 /(Receiving publications file)(.*ok.*)
+(.*)
+(.*)
+(.*)(Verifying publications file)(.*ok.*)/
+>>>= 0
+
+# Verify publications file with specified constraints (use OID).
+EXECUTABLE pubfile --conf test/test.cfg -d -v --dump --cnstr 1.2.840.113549.1.9.1=publications@guardtime.com --cnstr "2.5.4.3=Persona Not Validated - 1454602964718"
+>>> /(KSI Publications file dump)(.*)
+(.*)(Publication Records)(.*)/
+>>>2 /(Receiving publications file)(.*ok.*)
+(.*)
+(.*)
+(.*)(Verifying publications file)(.*ok.*)/
+>>>= 0
+

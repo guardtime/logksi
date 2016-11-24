@@ -1,0 +1,68 @@
+#
+# Copyright 2013-2016 Guardtime, Inc.
+#
+# This file is part of the Guardtime client SDK.
+#
+# Licensed under the Apache License, Version 2.0 (the "License").
+# You may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#     http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES, CONDITIONS, OR OTHER LICENSES OF ANY KIND, either
+# express or implied. See the License for the specific language governing
+# permissions and limitations under the License.
+# "Guardtime" and "KSI" are trademarks or registered trademarks of
+# Guardtime, Inc., and no license to trademarks is granted; Guardtime
+# reserves and retains all trademark rights.
+
+# Extend test result verification.
+
+# Verify signature extended to the nearest publication.
+# Publication string: AAAAAA-CT5VGY-AAPUCF-L3EKCC-NRSX56-AXIDFL-VZJQK4-WDCPOE-3KIWGB-XGPPM3-O5BIMW-REOVR4
+# Publication date: 2014-08-15 00:00:00 UTC
+EXECUTABLE verify --ver-pub --conf test/test.cfg -i test/out/extend/nearest.pub.ext.ksig -d --pub-str AAAAAA-CT5VGY-AAPUCF-L3EKCC-NRSX56-AXIDFL-VZJQK4-WDCPOE-3KIWGB-XGPPM3-O5BIMW-REOVR4
+>>>2 /(Signature publication-based verification with user publication string)(.*ok.*)/
+>>>= 0
+
+# Verify signature extended and written to stdout.
+# Publication string: AAAAAA-CT5VGY-AAPUCF-L3EKCC-NRSX56-AXIDFL-VZJQK4-WDCPOE-3KIWGB-XGPPM3-O5BIMW-REOVR4
+# Publication date: 2014-08-15 00:00:00 UTC
+EXECUTABLE verify --ver-pub --conf test/test.cfg -i test/out/extend/piped.nearest.pub.ext.ksig -d --pub-str AAAAAA-CT5VGY-AAPUCF-L3EKCC-NRSX56-AXIDFL-VZJQK4-WDCPOE-3KIWGB-XGPPM3-O5BIMW-REOVR4
+>>>2 /(Signature publication-based verification with user publication string)(.*ok.*)/
+>>>= 0
+
+# Verify signature extended to the specified publication (that is the nearest).
+# Publication string: AAAAAA-CT5VGY-AAPUCF-L3EKCC-NRSX56-AXIDFL-VZJQK4-WDCPOE-3KIWGB-XGPPM3-O5BIMW-REOVR4
+# Publication date: 2014-08-15 00:00:00 UTC UTC
+EXECUTABLE verify --ver-pub --conf test/test.cfg -i test/out/extend/specified.nearest.pub.ext.ksig -d --pub-str AAAAAA-CT5VGY-AAPUCF-L3EKCC-NRSX56-AXIDFL-VZJQK4-WDCPOE-3KIWGB-XGPPM3-O5BIMW-REOVR4
+>>>2 /(Signature publication-based verification with user publication string)(.*ok.*)/
+>>>= 0
+
+# Verify signature extended to the specified publication (that is not the nearest publication).
+# Publication string: AAAAAA-CWN5MA-AAK3AP-WSCETA-RKKP5V-OIITKT-XODBUJ-RQVGAI-DL7PHU-V6M2UY-DCTGDK-B47JCA
+# Publication date: 2015-12-15 00:00:00 UTC
+EXECUTABLE verify --ver-pub --conf test/test.cfg -i test/out/extend/specified.pub.ext.ksig -d --pub-str AAAAAA-CWN5MA-AAK3AP-WSCETA-RKKP5V-OIITKT-XODBUJ-RQVGAI-DL7PHU-V6M2UY-DCTGDK-B47JCA
+>>>2 /(Signature publication-based verification with user publication string)(.*ok.*)/
+>>>= 0
+
+# Verify signature extended to the specified time without no publication record.
+# Publication string: AAAAAA-CVWIVC-QAIVKJ-SIRUQZ-MZBJPS-T7P2UX-DDX4JF-KLMCXI-TXIKGF-B6MAJQ-JIJPTD-C2EDEO
+# Publication date: (1437739560) 2015-07-24 12:06:00 UTC
+EXECUTABLE verify --ver-pub --conf test/test.cfg -i test/out/extend/specified.no-pub.ext.ksig -d --pub-str AAAAAA-CVWIVC-QAIVKJ-SIRUQZ-MZBJPS-T7P2UX-DDX4JF-KLMCXI-TXIKGF-B6MAJQ-JIJPTD-C2EDEO -x
+>>>2 /(Signature publication-based verification with user publication string)(.*ok.*)/
+>>>= 0
+
+# Verify signature extended to the specified time without no publication record.
+# Publication string: AAAAAA-CVWIVC-QAIVKJ-SIRUQZ-MZBJPS-T7P2UX-DDX4JF-KLMCXI-TXIKGF-B6MAJQ-JIJPTD-C2EDEO
+# Publication date: (1437739560) 2015-07-24 12:06:00 UTC
+EXECUTABLE verify --ver-cal --conf test/test.cfg -i test/out/extend/specified.no-pub.ext.ksig -d
+>>>2 /(Signature calendar-based verification)(.*ok.*)/
+>>>= 0
+
+# Verify signature extended to the specified publication (that is not the nearest publication).
+# Publication string: AAAAAA-CWN5MA-AAK3AP-WSCETA-RKKP5V-OIITKT-XODBUJ-RQVGAI-DL7PHU-V6M2UY-DCTGDK-B47JCA
+# Publication date: 2015-12-15 00:00:00 UTC
+EXECUTABLE verify --ver-cal --conf test/test.cfg -i test/out/extend/specified.pub.ext.ksig -d
+>>>2 /(Signature calendar-based verification)(.*ok.*)/
+>>>= 0

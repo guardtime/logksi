@@ -1,0 +1,79 @@
+#
+# Copyright 2013-2016 Guardtime, Inc.
+#
+# This file is part of the Guardtime client SDK.
+#
+# Licensed under the Apache License, Version 2.0 (the "License").
+# You may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#     http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES, CONDITIONS, OR OTHER LICENSES OF ANY KIND, either
+# express or implied. See the License for the specific language governing
+# permissions and limitations under the License.
+# "Guardtime" and "KSI" are trademarks or registered trademarks of
+# Guardtime, Inc., and no license to trademarks is granted; Guardtime
+# reserves and retains all trademark rights.
+
+bin_PROGRAMS = logksi
+man_MANS = \
+	../doc/logksi.1 \
+	../doc/logksi-conf.5 \
+	../doc/logksi-sign.1 \
+	../doc/logksi-extend.1 \
+	../doc/logksi-pubfile.1 \
+	../doc/logksi-verify.1
+
+dist_doc_DATA = ../LICENSE ../doc/ChangeLog
+
+EXTRA_DIST = ../VERSION $(man_MANS) $(dist_doc_DATA)
+logksi_LDADD = -lm
+logksi_SOURCES = \
+	main.c	\
+	smart_file.c \
+	smart_file.h \
+	tool_box/param_control.c \
+	tool_box/param_control.h \
+	tool_box/ksi_init.c \
+	tool_box/ksi_init.h \
+	err_trckr.c \
+	err_trckr.h \
+	tool_box.c \
+	tool_box.h \
+	tool_box/pubfile.c \
+	tool_box/sign.c \
+	tool_box/verify.c \
+	tool_box/extend.c \
+	tool_box/conf.c \
+	tool_box/default_tasks.h \
+	component.c \
+	component.h \
+	tool_box/task_initializer.c \
+	tool_box/task_initializer.h \
+	param_set/param_set_obj_impl.h \
+	param_set/param_value.c \
+	param_set/param_value.h \
+	param_set/parameter.c \
+	param_set/parameter.h \
+	param_set/param_set.c \
+	param_set/param_set.h \
+	param_set/task_def.c \
+	param_set/task_def.h \
+	param_set/strn.c \
+	param_set/strn.h \
+	tool.h \
+	common.h \
+	conf_file.c \
+	conf_file.h \
+	printer.c \
+	printer.h \
+	ksitool_err.c \
+	ksitool_err.h \
+	api_wrapper.c \
+	api_wrapper.h \
+	obj_printer.c \
+	obj_printer.h \
+	debug_print.c \
+	debug_print.h
+

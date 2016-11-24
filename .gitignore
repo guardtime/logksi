@@ -1,0 +1,42 @@
+#Packages
+*.rpm
+*.gz
+
+# Object files, executable, build files
+*.obj
+*.o
+/bin
+/obj
+*.exe
+src/ksi
+*.deps
+*.def
+*.pdb
+*.dirstamp
+
+# Test files, temp files
+test/out
+*.ksig
+*~
+*.lnk
+*.ps
+packaging/redhat/ksi.spec
+
+# Ide project files
+IDE/
+
+
+
+
+
+config.[*hls]*
+configure
+GNUmakefile
+*.log
+*.in
+aclocal.m4
+autom4te.cache
+build-aux
+stamp-h1
+
+/src/.libs/
