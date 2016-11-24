@@ -37,15 +37,29 @@
 #include "debug_print.h"
 #include "conf_file.h"
 #include "tool.h"
+#include <ksi/tlv_element.h>
+
+typedef struct {
+	char *inName;
+	char *outName;
+	char *backupName;
+	char *tempName;
+	FILE *inFile;
+	FILE *outFile;
+} IO_FILES;
 
 static int extend_to_nearest_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_Signature **ext);
 static int extend_to_specified_time(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, COMPOSITE *extra, KSI_Signature *sig, KSI_Signature **ext);
 static int extend_to_specified_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_Signature **ext);
 static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
-static char* get_output_file_name_if_not_defined(PARAM_SET *set, ERR_TRCKR *err, char *buf, size_t buf_len);
 static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err);
-static char* get_output_name(PARAM_SET *set, ERR_TRCKR *err, char *buf, size_t buf_len, char *mode);
-static int verify_and_save(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *ext, const char *fname, char *mode, KSI_PublicationData *pub_data, KSI_PolicyVerificationResult **result);
+static int get_backup_name(char *org, char **backup);
+static int get_temp_name(char **name);
+static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files);
+static void close_input_and_output_files(int result, IO_FILES *files);
+static int process_magic_number(ERR_TRCKR *err, FILE *inFile, FILE *outFile);
+static size_t buf_to_int(unsigned char *buf, size_t len);
+static void adjust_tlv_length_in_buffer(unsigned char *raw, KSI_FTLV *ftlv);
 
 int extend_run(int argc, char** argv, char **envp) {
 	int res;
@@ -57,14 +71,15 @@ int extend_run(int argc, char** argv, char **envp) {
 	ERR_TRCKR *err = NULL;
 	KSI_Signature *sig = NULL;
 	KSI_Signature *ext = NULL;
-	KSI_PublicationData *pub_data = NULL;
-	KSI_PolicyVerificationResult *result_sig = NULL;
-	KSI_PolicyVerificationResult *result_ext = NULL;
 	COMPOSITE extra;
-	char fnmae[2048];
-	char mode[5] = "wbs";
 	char buf[2048];
 	int d = 0;
+	size_t blockNo = 0;
+	size_t sigNo = 0;
+	size_t nof_record_hashes = 0;
+	IO_FILES files;
+
+	memset(&files, 0, sizeof(files));
 
 	/**
 	 * Extract command line parameters.
@@ -97,72 +112,202 @@ int extend_run(int argc, char** argv, char **envp) {
 	extra.ctx = ksi;
 	extra.err = err;
 
-	print_progressDesc(d, "Reading signature... ");
-	res = PARAM_SET_getObjExtended(set, "i", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &extra, (void**)&sig);
-	if (res != PST_OK) goto cleanup;
-	print_progressResult(res);
+	res = PARAM_SET_getStr(set, "i", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.inName);
+	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
 
-	/* Make sure the signature is ok. */
-	print_progressDesc(d, "Verifying old signature... ");
-	res = KSITOOL_SignatureVerify_internally(err, sig, ksi, NULL, &result_sig);
-	ERR_CATCH_MSG(err, res, "Error: Unable to verify signature.");
-	print_progressResult(res);
+	res = PARAM_SET_getStr(set, "o", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.outName);
+	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
 
-	if (get_output_name(set, err, fnmae, sizeof(fnmae), mode + strlen(mode)) == NULL) goto cleanup;
-
-	switch(TASK_getID(task)) {
-		case 0:
-			res = extend_to_nearest_publication(set, err, ksi, sig, &ext);
-		break;
-
-		case 1:
-			res = extend_to_specified_time(set, err, ksi, &extra, sig, &ext);
-		break;
-
-		case 2:
-			res = extend_to_specified_publication(set, err, ksi, sig, &ext);
-		break;
-
-		default:
-			res = KT_UNKNOWN_ERROR;
-			goto cleanup;
-		break;
-	}
-
+	res = open_input_and_output_files(err, &files);
 	if (res != KT_OK) goto cleanup;
 
-	res = verify_and_save(set, err, ksi, ext, fnmae, mode, pub_data, &result_ext);
-	if (res != KT_OK) goto cleanup;
+	print_progressDesc(d, "Copying magic number... ");
+	res = process_magic_number(err, files.inFile, files.outFile);
+	ERR_CATCH_MSG(err, res, "Error: Unable to copy magic number.");
+	print_progressResult(res);
+
+	while (!feof(files.inFile)) {
+		KSI_FTLV ftlv;
+		size_t ftlv_len = 0;
+		unsigned char ftlv_raw[0xffff + 4];
+
+		res = KSI_FTLV_fileRead(files.inFile, ftlv_raw, sizeof(ftlv_raw), &ftlv_len, &ftlv);
+		if (res == KSI_OK) {
+			switch (ftlv.tag) {
+				case 0x901:
+					/* Block header. */
+					if (blockNo > sigNo) {
+						res = KT_INVALID_INPUT_FORMAT;
+						ERR_CATCH_MSG(err, res, "Error: Block no. %3d: block signature data missing.", blockNo);
+					}
+					blockNo++;
+					nof_record_hashes = 0;
+					print_progressDesc(d, "Block no. %3d: copying block header and hashes... ", blockNo);
+					if (fwrite(ftlv_raw, 1, ftlv_len, files.outFile) != ftlv_len) {
+						res = KT_IO_ERROR;
+						ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to copy block header.", blockNo);
+					}
+				break;
+
+				case 0x902:
+					/* Record hash. */
+					if (blockNo == sigNo) {
+						res = KT_INVALID_INPUT_FORMAT;
+						ERR_CATCH_MSG(err, res, "Error: Block no. %3d: record hash without preceding block header found.", blockNo + 1);
+					}
+					nof_record_hashes++;
+
+				case 0x903:
+					/* Intermediate hash. */
+					if (blockNo == sigNo) {
+						res = KT_INVALID_INPUT_FORMAT;
+						ERR_CATCH_MSG(err, res, "Error: Block no. %3d: intermediate hash without preceding block header found.", blockNo + 1);
+					}
+					if (fwrite(ftlv_raw, 1, ftlv_len, files.outFile) != ftlv_len) {
+						res = KT_IO_ERROR;
+						ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to copy TLV %04X to extended log signature file.", ftlv.tag, blockNo);
+					}
+				break;
+
+				case 0x904:
+				{
+					/* Block signature. */
+					KSI_FTLV sub_ftlv[2];
+					size_t nof_sub_ftlvs = 0;
+					unsigned char *sub_ftlv_raw = NULL;
+
+					print_progressResult(res); /* Done with header and hashes. */
+
+					sigNo++;
+					if (sigNo > blockNo) {
+						res = KT_INVALID_INPUT_FORMAT;
+						ERR_CATCH_MSG(err, res, "Error: Block no. %3d: block signature data without preceding block header found.", sigNo);
+					}
+
+					print_progressDesc(d, "Block no. %3d: parsing block signature data... ", blockNo);
+					sub_ftlv_raw = ftlv_raw + ftlv.hdr_len;
+					res = KSI_FTLV_memReadN(sub_ftlv_raw, ftlv_len - ftlv.hdr_len, sub_ftlv, 2, &nof_sub_ftlvs);
+					ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse block signature data.", blockNo);
+					if (nof_sub_ftlvs != 2) {
+						res = KT_INVALID_INPUT_FORMAT;
+						ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse block signature data.", blockNo);
+					} else if (sub_ftlv[0].tag != 0x01) {
+						res = KT_INVALID_INPUT_FORMAT;
+						ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse record count.", blockNo);
+					} else if (sub_ftlv[1].tag != 0x0905) {
+						res = KT_INVALID_INPUT_FORMAT;
+						ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unsupported block signature type %04X found.", blockNo, sub_ftlv[1].tag);
+					} else {
+						unsigned char *sig_raw = NULL;
+						size_t sig_raw_len = 0;
+						unsigned char *ext_raw = NULL;
+						size_t ext_raw_len = 0;
+						size_t record_count = 0;
+
+						record_count = buf_to_int(sub_ftlv_raw + sub_ftlv[0].off + sub_ftlv[0].hdr_len, sub_ftlv[0].dat_len);
+						if (record_count != nof_record_hashes) {
+							res = KT_INVALID_INPUT_FORMAT;
+							ERR_CATCH_MSG(err, res, "Error: Block no. %3d: expected %d record hashes, but found %d.", blockNo, record_count, nof_record_hashes);
+						}
+						print_progressResult(res); /* Done with parsing block signature data. */
+
+						print_progressDesc(d, "Block no. 3%d: parsing and verifying KSI signature... ", blockNo);
+						sig_raw = sub_ftlv_raw + sub_ftlv[1].off + sub_ftlv[1].hdr_len;
+						sig_raw_len = sub_ftlv[1].dat_len;
+						res = KSI_Signature_parseWithPolicy(ksi, sig_raw, sig_raw_len, KSI_VERIFICATION_POLICY_INTERNAL, NULL, &sig);
+						ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse KSI signature.", blockNo);
+						print_progressResult(res);
 
 
-	if (PARAM_SET_isSetByName(set, "dump")) {
-		print_result("\n");
-		print_result("=== Old signature ===\n");
-		OBJPRINT_signatureDump(sig, print_result);
-		print_result("\n");
-		print_result("=== Extended signature ===\n");
-		OBJPRINT_signatureDump(ext, print_result);
-		print_result("\n");
-		print_result("=== Extended signature verification ===\n");
-		OBJPRINT_signatureVerificationResultDump(result_ext , print_result);
+						switch(TASK_getID(task)) {
+							case 0:
+								res = extend_to_nearest_publication(set, err, ksi, sig, &ext);
+							break;
+
+							case 1:
+								res = extend_to_specified_time(set, err, ksi, &extra, sig, &ext);
+							break;
+
+							case 2:
+								res = extend_to_specified_publication(set, err, ksi, sig, &ext);
+							break;
+
+							default:
+								res = KT_UNKNOWN_ERROR;
+								goto cleanup;
+							break;
+						}
+
+						ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to extend KSI signature.", blockNo);
+						KSI_Signature_free(sig);
+						sig = NULL;
+
+						print_progressDesc(d, "Block no. 3%d: serializing extended KSI signature... ", blockNo);
+						res = KSI_Signature_serialize(ext, &ext_raw, &ext_raw_len);
+						ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to serialize extended KSI signature.", blockNo);
+						KSI_Signature_free(ext);
+						ext = NULL;
+						print_progressResult(res);
+
+						print_progressDesc(d, "Block no. 3%d: writing extended KSI signature to file... ", blockNo);
+						memcpy(sig_raw, ext_raw, ext_raw_len);
+						KSI_free(ext_raw);
+						ext_raw = NULL;
+
+						ftlv.dat_len = ftlv.dat_len - sig_raw_len + ext_raw_len;
+						sub_ftlv[1].dat_len = ext_raw_len;
+						adjust_tlv_length_in_buffer(sub_ftlv_raw + sub_ftlv[1].off, &sub_ftlv[1]);
+						adjust_tlv_length_in_buffer(ftlv_raw, &ftlv);
+						ftlv_len = ftlv.hdr_len + ftlv.dat_len;
+						if (fwrite(ftlv_raw, 1, ftlv_len, files.outFile) != ftlv_len) {
+							res = KT_IO_ERROR;
+							ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to write extended signature to extended log signature file.");
+						}
+					}
+				}
+				break;
+
+				default:
+					/* TODO: unknown TLV found. Either
+					 * 1) Warn user and skip TLV
+					 * 2) Copy TLV (maybe warn user)
+					 * 3) Abort extending with an error
+					 */
+				break;
+			}
+		} else {
+			if (feof(files.inFile)) {
+				res = KT_OK;
+				break;
+			} else {
+				/* File reading failed. */
+				res = KT_IO_ERROR;
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to read next TLV.");
+			}
+		}
 	}
+
+	/* Check consistency of log signature file. */
+	if (blockNo == 0) {
+		res = KT_INVALID_INPUT_FORMAT;
+		ERR_CATCH_MSG(err, res, "Error: no blocks found.");
+	} else if (blockNo > sigNo) {
+		res = KT_INVALID_INPUT_FORMAT;
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: block signature data missing.", blockNo);
+	}
+
+	res = KT_OK;
 
 cleanup:
+
+	close_input_and_output_files(res, &files);
+
 	print_progressResult(res);
 	KSITOOL_KSI_ERRTrace_save(ksi);
 
 	if (res != KT_OK) {
 		if (ERR_TRCKR_getErrCount(err) == 0) {ERR_TRCKR_ADD(err, res, NULL);}
 		KSITOOL_KSI_ERRTrace_LOG(ksi);
-		print_debug("\n");
-		if (ext == NULL) {
-			DEBUG_verifySignature(ksi, res, sig, result_sig, NULL);
-		} else {
-			print_debug("=== Old signature ===\n");
-			DEBUG_verifySignature(ksi, res, sig, NULL, NULL);
-			print_debug("=== Extended signature ===\n");
-			DEBUG_verifySignature(ksi, res, ext, result_ext, NULL);
-		}
 
 		print_errors("\n");
 		if (d) ERR_TRCKR_printExtendedErrors(err);
@@ -174,9 +319,6 @@ cleanup:
 	TASK_SET_free(task_set);
 	KSI_Signature_free(sig);
 	KSI_Signature_free(ext);
-	KSI_PublicationData_free(pub_data);
-	KSI_PolicyVerificationResult_free(result_ext);
-	KSI_PolicyVerificationResult_free(result_sig);
 	ERR_TRCKR_free(err);
 	KSI_CTX_free(ksi);
 
@@ -187,22 +329,22 @@ char *extend_help_toString(char*buf, size_t len) {
 
 	count += KSI_snprintf(buf + count, len - count,
 		"Usage:\n"
-		" %s extend -i <in.ksig> [-o <out.ksig>] -X <URL>\n"
+		" %s extend -i <in.ls11> [-o <out.ls11>] -X <URL>\n"
 		"    [--ext-user <user> --ext-key <key>] -P <URL> [--cnstr <oid=value>]... [more_options]\n"
-		" %s extend -i <in.ksig> [-o <out.ksig>] -X <URL>\n"
+		" %s extend -i <in.ls11> [-o <out.ls11>] -X <URL>\n"
 		"    [--ext-user <user> --ext-key <key>] -P <URL> [--cnstr <oid=value>]... [--pub-str <str>] [more_options]\n"
-		" %s extend -i <in.ksig> [-o <out.ksig>] -X <URL>\n"
+		" %s extend -i <in.ls11> [-o <out.ls11>] -X <URL>\n"
 		"    [--ext-user <user> --ext-key <key>] -T time [more_options]\n"
 		"\n"
-		" -i <in.ksig>\n"
-		"           - File path to the KSI signature file to be extended. Use '-' as the\n"
-		"             path to read the signature from stdin.\n"
-		" -o <out.ksig>\n"
-		"           - Output file path for the extended signature. Use '-' as the path to redirect\n"
-		"             the signature binary stream to stdout. If not specified, the signature is saved\n"
-		"             to <in.ksig>.ext.ksig (or <in.ksig>.ext_<nr>.ksig where <nr> is\n"
-		"             auto-incremented counter if the output file already exists). If specified,\n"
-		"             existing file is always overwritten.\n"
+		" -i <in.ls11>\n"
+		"           - File path to the log signature file to be extended. If not specified or '-',\n"
+		"             the log signature is read from stdin.\n"
+		" -o <out.ls11>\n"
+		"           - Output file path for the extended log signature file. Use '-' to redirect the extended\n"
+		"             log signature binary stream to stdout. If not specified, the log signature is saved\n"
+		"             to <in.ls11> while a backup of <in.ls11> is saved in <in.ls11>.bak.\n"
+		"             If specified, existing file is always overwritten.\n"
+		"             If both input and outpur or not specified, stdin and stdout are used resepectively.\n"
 		" -X <URL>  - Extending service (KSI Extender) URL.\n"
 		" --ext-user <user>\n"
 		"           - Username for extending service.\n"
@@ -240,68 +382,6 @@ char *extend_help_toString(char*buf, size_t len) {
 const char *extend_get_desc(void) {
 	return "Extends existing KSI signature to the given publication.";
 }
-
-static char* get_output_name(PARAM_SET *set, ERR_TRCKR *err, char *buf, size_t buf_len, char *mode) {
-	int res;
-	char *outSigFileName = NULL;
-
-	if (set == NULL || err == NULL || buf == NULL || buf_len == 0 || mode == NULL) {
-		return NULL;
-	}
-
-	buf[0] = '\0';
-
-	if (!PARAM_SET_isSetByName(set, "o")) {
-		mode[0] = 'i';
-		mode[1] = '\0';
-
-		outSigFileName = get_output_file_name_if_not_defined(set, err, buf, buf_len);
-		if (outSigFileName == NULL) {
-			ERR_TRCKR_ADD(err, res = KT_UNKNOWN_ERROR, "Error: Unable to generate output file name.");
-			return NULL;
-		}
-	} else {
-		res = PARAM_SET_getStr(set, "o", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &outSigFileName);
-		if (res != PST_OK) return NULL;
-
-		KSI_strncpy(buf, outSigFileName, buf_len);
-	}
-
-	return buf[0] == '\0' ? NULL : buf;
-}
-
-static int verify_and_save(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *ext, const char *fname, char *mode, KSI_PublicationData *pub_data, KSI_PolicyVerificationResult **result) {
-	int res;
-	char real_output_name[1024];
-	int d;
-
-	if (set == NULL || err == NULL || ksi == NULL || ext == NULL || fname == NULL || mode == NULL) {
-		ERR_TRCKR_ADD(err, res = KT_INVALID_ARGUMENT, NULL);
-		goto cleanup;
-	}
-
-
-	d = PARAM_SET_isSetByName(set, "d");
-
-	print_progressDesc(d, "Verifying extended signature... ");
-	res = KSITOOL_SignatureVerify_general(err, ext, ksi, NULL, pub_data, 1, result);
-	ERR_CATCH_MSG(err, res, "Error: Unable to verify extended signature.");
-	print_progressResult(res);
-
-	/* Save signature. */
-	print_progressDesc(d, "Saving signature... ");
-	res = KSI_OBJ_saveSignature(err, ksi, ext, mode, fname, real_output_name, sizeof(real_output_name));
-	if (res != KT_OK) goto cleanup;
-	print_progressResult(res);
-
-	print_debug("Signature saved to '%s'.\n", real_output_name);
-
-cleanup:
-	print_progressResult(res);
-
-	return res;
-}
-
 
 static int extend_to_nearest_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_Signature **ext) {
 	int res;
@@ -467,7 +547,7 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	 */
 	PARAM_SET_addControl(set, "{conf}", isFormatOk_inputFile, isContentOk_inputFileRestrictPipe, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{log}{o}", isFormatOk_path, NULL, convertRepair_path, NULL);
-	PARAM_SET_addControl(set, "{i}", isFormatOk_inputFile, isContentOk_inputFile, convertRepair_path, extract_inputSignature);
+	PARAM_SET_addControl(set, "{i}", isFormatOk_inputFile, isContentOk_inputFileWithPipe, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{T}", isFormatOk_utcTime, isContentOk_utcTime, NULL, extract_utcTime);
 	PARAM_SET_addControl(set, "{d}{dump}", isFormatOk_flag, NULL, NULL, NULL);
 	PARAM_SET_addControl(set, "{pub-str}", isFormatOk_pubString, NULL, NULL, extract_pubString);
@@ -476,42 +556,13 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	 * Define possible tasks.
 	 */
 	/*					  ID	DESC												MAN					ATL		FORBIDDEN		IGN	*/
-	TASK_SET_add(task_set, 0,	"Extend to the earliest available publication.",	"i,X,P",			NULL,	"T,pub-str",	NULL);
-	TASK_SET_add(task_set, 1,	"Extend to the specified time.",					"i,X,T",			NULL,	"pub-str",		NULL);
-	TASK_SET_add(task_set, 2,	"Extend to time specified in publications string.",	"i,X,P,pub-str",	NULL,	"T",			NULL);
+	TASK_SET_add(task_set, 0,	"Extend to the earliest available publication.",	"X,P",			NULL,	"T,pub-str",	NULL);
+	TASK_SET_add(task_set, 1,	"Extend to the specified time.",					"X,T",			NULL,	"pub-str",		NULL);
+	TASK_SET_add(task_set, 2,	"Extend to time specified in publications string.",	"X,P,pub-str",	NULL,	"T",			NULL);
 
 cleanup:
 
 	return res;
-}
-
-static char* get_output_file_name_if_not_defined(PARAM_SET *set, ERR_TRCKR *err, char *buf, size_t buf_len) {
-	char *ret = NULL;
-	int res;
-	char *in_file_name = NULL;
-	size_t count = 0;
-
-	if (set == NULL || err == NULL || buf == NULL || buf_len == 0) goto cleanup;
-
-	res = PARAM_SET_getStr(set, "i", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &in_file_name);
-	if (res != PST_OK) goto cleanup;
-
-	if (strcmp(in_file_name, "-") == 0) {
-		KSI_snprintf(buf, buf_len, "stdin.ext.ksig");
-	} else {
-		if (SMART_FILE_hasFileExtension(in_file_name, "ksig")) {
-			count += KSI_snprintf(buf + count, buf_len - count , "%s", in_file_name);
-			count += KSI_snprintf(buf + count - 4, buf_len - count, "ext.ksig");
-		} else {
-			KSI_snprintf(buf, buf_len, "%s.ext.ksig", in_file_name);
-		}
-	}
-
-	ret = buf;
-
-cleanup:
-
-	return ret;
 }
 
 static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err) {
@@ -525,4 +576,201 @@ static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err) {
 
 cleanup:
 	return res;
+}
+
+static int get_backup_name(char *org, char **backup) {
+	int res = KT_OUT_OF_MEMORY;
+	char *buf = NULL;
+
+	buf = (char*)KSI_malloc(strlen(org) + strlen(".bak") + 1);
+	if (buf == NULL) goto cleanup;
+	sprintf(buf, "%s%s", org, ".bak");
+	*backup = buf;
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
+
+static int get_temp_name(char **name) {
+	int res = KT_OUT_OF_MEMORY;
+	char *buf = NULL;
+
+	buf = (char*)KSI_malloc(strlen("stdout.tmp") + 1);
+	if (buf == NULL) goto cleanup;
+	strcpy(buf, "stdout.tmp");
+	*name = buf;
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
+
+static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
+	int res = KT_IO_ERROR;
+	IO_FILES tmp;
+	char *buf = NULL;
+
+	memset(&tmp, 0, sizeof(tmp));
+
+	/* Default input file is stdin. */
+	if (files->inName == NULL || !strcmp(files->inName, "-")) {
+		/* Default output file is a temporary file that is copied to stdout on success. */
+		if (files->outName == NULL || !strcmp(files->outName, "-")) {
+			res = get_temp_name(&tmp.tempName);
+			ERR_CATCH_MSG(err, res, "Error: out of memory.");
+			tmp.outName = tmp.tempName;
+		} else {
+			tmp.outName = files->outName;
+		}
+	} else {
+		/* Default output file is the same as input, but a backup of the input file is retained. */
+		if (files->outName == NULL || !strcmp(files->inName, files->outName)) {
+			res = get_backup_name(files->inName, &buf);
+			ERR_CATCH_MSG(err, res, "Error: out of memory.");
+			res = (rename(files->inName, buf) == 0) ? KT_OK : KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: could not rename file %s to %s.", files->inName, buf);
+			tmp.backupName = buf;
+			buf = NULL;
+			tmp.inName = tmp.backupName;
+			tmp.outName = files->inName;
+		} else if (!strcmp(files->outName, "-")) {
+			res = get_temp_name(&tmp.tempName);
+			ERR_CATCH_MSG(err, res, "Error: out of memory.");
+			tmp.inName = files->inName;
+			tmp.outName = tmp.tempName;
+		} else {
+			tmp.inName = files->inName;
+			tmp.outName = files->outName;
+		}
+	}
+
+	if (tmp.inName) {
+		tmp.inFile = fopen(tmp.inName, "rb");
+		res = (tmp.inFile == NULL) ? KT_IO_ERROR : KT_OK;
+		ERR_CATCH_MSG(err, res, "Error: could not open file %s.", tmp.inName);
+	} else {
+		tmp.inFile = stdin;
+	}
+
+	if (tmp.outName) {
+		tmp.outFile = fopen(tmp.outName, "wb");
+		res = (tmp.outFile == NULL) ? KT_IO_ERROR : KT_OK;
+		ERR_CATCH_MSG(err, res, "Error: could not create file %s.", tmp.outName);
+	} else {
+		tmp.outFile = stdout;
+	}
+
+	tmp.inName = files->inName;
+	tmp.outName = files->outName;
+	*files = tmp;
+	memset(&tmp, 0, sizeof(tmp));
+	res = KT_OK;
+
+cleanup:
+
+	if (tmp.inFile == stdin) tmp.inFile = NULL;
+	if (tmp.outFile == stdout) tmp.outFile = NULL;
+
+	if (tmp.backupName) {
+		if (tmp.inFile) fclose(tmp.inFile);
+		tmp.inFile = NULL;
+		rename(tmp.backupName, files->inName);
+		KSI_free(tmp.backupName);
+	}
+	if (tmp.tempName) {
+		if (tmp.outFile) fclose(tmp.outFile);
+		tmp.outFile = NULL;
+		KSI_free(tmp.tempName);
+	}
+	KSI_free(buf);
+
+	if (tmp.inFile) fclose(tmp.inFile);
+	if (tmp.outFile) fclose(tmp.outFile);
+
+	return res;
+}
+
+static void close_input_and_output_files(int result, IO_FILES *files) {
+	char buf[1024];
+	size_t count = 0;
+
+	if (files->inFile == stdin) files->inFile = NULL;
+	if (files->outFile == stdout) files->outFile = NULL;
+
+	if (files->tempName) {
+		if (result == KT_OK) {
+			freopen(NULL, "rb", files->outFile);
+			while (!feof(files->outFile)) {
+				count = fread(buf, 1, sizeof(buf), files->outFile);
+				fwrite(buf, 1, count, stdout);
+			}
+		}
+		fclose(files->outFile);
+		files->outFile = NULL;
+		remove(files->tempName);
+		KSI_free(files->tempName);
+	}
+
+	if (files->backupName) {
+		if (result != KT_OK) {
+			fclose(files->outFile);
+			remove(files->inName);
+			fclose(files->inFile);
+			rename(files->backupName, files->inName);
+		}
+		KSI_free(files->backupName);
+	}
+
+	if (files->inFile) fclose(files->inFile);
+	if (files->outFile) fclose(files->outFile);
+}
+
+static int process_magic_number(ERR_TRCKR *err, FILE *inFile, FILE *outFile) {
+	int res;
+	char buf[10];
+	size_t count = 0;
+	size_t magicLength = strlen("LOGSIG11");
+
+	if (inFile == NULL || outFile == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	count = fread(buf, 1, magicLength, inFile);
+	if (count != magicLength || strncmp(buf, "LOGSIG11", magicLength)) {
+		res = KT_INVALID_INPUT_FORMAT;
+		ERR_CATCH_MSG(err, res, "Error: Magic number not found at the beginning of log signature file.");
+	}
+	count = fwrite(buf, 1, magicLength, outFile);
+	if (count != magicLength) {
+		res = KT_IO_ERROR;
+		ERR_CATCH_MSG(err, res, "Error: %s", KSITOOL_errToString(res));
+	}
+
+	res = KT_OK;
+
+cleanup:
+	return res;
+}
+
+static size_t buf_to_int(unsigned char *buf, size_t len) {
+	size_t val = 0;
+
+	while (len--) {
+		val = val * 256  + *buf++;
+	}
+	return val;
+}
+
+static void adjust_tlv_length_in_buffer(unsigned char *raw, KSI_FTLV *ftlv) {
+	size_t val = ftlv->dat_len;
+	size_t i = ftlv->hdr_len;
+
+	while (i-- > ftlv->hdr_len / 2) {
+		raw[i] = val & 0xFF;
+		val = (val >> 8);
+	}
 }
