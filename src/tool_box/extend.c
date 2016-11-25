@@ -48,8 +48,20 @@ typedef struct {
 	FILE *outFile;
 } IO_FILES;
 
+typedef struct {
+	KSI_FTLV ftlv;
+	unsigned char *ftlv_raw;
+	size_t ftlv_len;
+	size_t blockNo;
+	size_t sigNo;
+	size_t nofRecordHashes;
+} BLOCK_INFO;
+
+typedef int (*EXTENDING_FUNCTION)(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_Signature **ext);
+
+
 static int extend_to_nearest_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_Signature **ext);
-static int extend_to_specified_time(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, COMPOSITE *extra, KSI_Signature *sig, KSI_Signature **ext);
+static int extend_to_specified_time(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_Signature **ext);
 static int extend_to_specified_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_Signature **ext);
 static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
 static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err);
@@ -57,7 +69,12 @@ static int get_backup_name(char *org, char **backup);
 static int get_temp_name(char **name);
 static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files);
 static void close_input_and_output_files(int result, IO_FILES *files);
-static int process_magic_number(ERR_TRCKR *err, FILE *inFile, FILE *outFile);
+static int process_magic_number(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files);
+static int process_block_header(PARAM_SET *set, ERR_TRCKR *err, BLOCK_INFO *blocks, IO_FILES *files);
+static int process_record_hash(PARAM_SET *set, ERR_TRCKR *err, BLOCK_INFO *blocks, IO_FILES *files);
+static int process_intermediate_hash(PARAM_SET *set, ERR_TRCKR *err, BLOCK_INFO *blocks, IO_FILES *files);
+static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_FUNCTION extend_signature, BLOCK_INFO *blocks, IO_FILES *files);
+static int finalize_log_signature(PARAM_SET *set, ERR_TRCKR *err, BLOCK_INFO *blocks);
 static size_t buf_to_int(unsigned char *buf, size_t len);
 static void adjust_tlv_length_in_buffer(unsigned char *raw, KSI_FTLV *ftlv);
 
@@ -69,17 +86,16 @@ int extend_run(int argc, char** argv, char **envp) {
 	KSI_CTX *ksi = NULL;
 	SMART_FILE *logfile = NULL;
 	ERR_TRCKR *err = NULL;
-	KSI_Signature *sig = NULL;
-	KSI_Signature *ext = NULL;
-	COMPOSITE extra;
 	char buf[2048];
 	int d = 0;
-	size_t blockNo = 0;
-	size_t sigNo = 0;
-	size_t nof_record_hashes = 0;
 	IO_FILES files;
+	BLOCK_INFO blocks;
+	unsigned char ftlv_raw[0xffff + 4];
+	EXTENDING_FUNCTION extend_signature = NULL;
 
 	memset(&files, 0, sizeof(files));
+	memset(&blocks, 0, sizeof(blocks));
+	blocks.ftlv_raw = ftlv_raw;
 
 	/**
 	 * Extract command line parameters.
@@ -109,161 +125,60 @@ int extend_run(int argc, char** argv, char **envp) {
 	res = check_pipe_errors(set, err);
 	if (res != KT_OK) goto cleanup;
 
-	extra.ctx = ksi;
-	extra.err = err;
-
 	res = PARAM_SET_getStr(set, "i", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.inName);
 	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
 
 	res = PARAM_SET_getStr(set, "o", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.outName);
 	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
 
+	switch(TASK_getID(task)) {
+		case 0:
+			extend_signature = extend_to_nearest_publication;
+		break;
+
+		case 1:
+			extend_signature = extend_to_specified_time;
+		break;
+
+		case 2:
+			extend_signature = extend_to_specified_publication;
+		break;
+
+		default:
+			res = KT_UNKNOWN_ERROR;
+			goto cleanup;
+		break;
+	}
+
 	res = open_input_and_output_files(err, &files);
 	if (res != KT_OK) goto cleanup;
 
-	print_progressDesc(d, "Copying magic number... ");
-	res = process_magic_number(err, files.inFile, files.outFile);
-	ERR_CATCH_MSG(err, res, "Error: Unable to copy magic number.");
-	print_progressResult(res);
+	res = process_magic_number(set, err, &files);
+	if (res != KT_OK) goto cleanup;
 
 	while (!feof(files.inFile)) {
-		KSI_FTLV ftlv;
-		size_t ftlv_len = 0;
-		unsigned char ftlv_raw[0xffff + 4];
-
-		res = KSI_FTLV_fileRead(files.inFile, ftlv_raw, sizeof(ftlv_raw), &ftlv_len, &ftlv);
+		res = KSI_FTLV_fileRead(files.inFile, blocks.ftlv_raw, sizeof(ftlv_raw), &blocks.ftlv_len, &blocks.ftlv);
 		if (res == KSI_OK) {
-			switch (ftlv.tag) {
+			switch (blocks.ftlv.tag) {
 				case 0x901:
-					/* Block header. */
-					if (blockNo > sigNo) {
-						res = KT_INVALID_INPUT_FORMAT;
-						ERR_CATCH_MSG(err, res, "Error: Block no. %3d: block signature data missing.", blockNo);
-					}
-					blockNo++;
-					nof_record_hashes = 0;
-					print_progressDesc(d, "Block no. %3d: copying block header and hashes... ", blockNo);
-					if (fwrite(ftlv_raw, 1, ftlv_len, files.outFile) != ftlv_len) {
-						res = KT_IO_ERROR;
-						ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to copy block header.", blockNo);
-					}
+					res = process_block_header(set, err, &blocks, &files);
+					if (res != KT_OK) goto cleanup;
 				break;
 
 				case 0x902:
-					/* Record hash. */
-					if (blockNo == sigNo) {
-						res = KT_INVALID_INPUT_FORMAT;
-						ERR_CATCH_MSG(err, res, "Error: Block no. %3d: record hash without preceding block header found.", blockNo + 1);
-					}
-					nof_record_hashes++;
+					res = process_record_hash(set, err, &blocks, &files);
+					if (res != KT_OK) goto cleanup;
+				break;
 
 				case 0x903:
-					/* Intermediate hash. */
-					if (blockNo == sigNo) {
-						res = KT_INVALID_INPUT_FORMAT;
-						ERR_CATCH_MSG(err, res, "Error: Block no. %3d: intermediate hash without preceding block header found.", blockNo + 1);
-					}
-					if (fwrite(ftlv_raw, 1, ftlv_len, files.outFile) != ftlv_len) {
-						res = KT_IO_ERROR;
-						ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to copy TLV %04X to extended log signature file.", ftlv.tag, blockNo);
-					}
+					res = process_intermediate_hash(set, err, &blocks, &files);
+					if (res != KT_OK) goto cleanup;
 				break;
 
 				case 0x904:
 				{
-					/* Block signature. */
-					KSI_FTLV sub_ftlv[2];
-					size_t nof_sub_ftlvs = 0;
-					unsigned char *sub_ftlv_raw = NULL;
-
-					print_progressResult(res); /* Done with header and hashes. */
-
-					sigNo++;
-					if (sigNo > blockNo) {
-						res = KT_INVALID_INPUT_FORMAT;
-						ERR_CATCH_MSG(err, res, "Error: Block no. %3d: block signature data without preceding block header found.", sigNo);
-					}
-
-					print_progressDesc(d, "Block no. %3d: parsing block signature data... ", blockNo);
-					sub_ftlv_raw = ftlv_raw + ftlv.hdr_len;
-					res = KSI_FTLV_memReadN(sub_ftlv_raw, ftlv_len - ftlv.hdr_len, sub_ftlv, 2, &nof_sub_ftlvs);
-					ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse block signature data.", blockNo);
-					if (nof_sub_ftlvs != 2) {
-						res = KT_INVALID_INPUT_FORMAT;
-						ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse block signature data.", blockNo);
-					} else if (sub_ftlv[0].tag != 0x01) {
-						res = KT_INVALID_INPUT_FORMAT;
-						ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse record count.", blockNo);
-					} else if (sub_ftlv[1].tag != 0x0905) {
-						res = KT_INVALID_INPUT_FORMAT;
-						ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unsupported block signature type %04X found.", blockNo, sub_ftlv[1].tag);
-					} else {
-						unsigned char *sig_raw = NULL;
-						size_t sig_raw_len = 0;
-						unsigned char *ext_raw = NULL;
-						size_t ext_raw_len = 0;
-						size_t record_count = 0;
-
-						record_count = buf_to_int(sub_ftlv_raw + sub_ftlv[0].off + sub_ftlv[0].hdr_len, sub_ftlv[0].dat_len);
-						if (record_count != nof_record_hashes) {
-							res = KT_INVALID_INPUT_FORMAT;
-							ERR_CATCH_MSG(err, res, "Error: Block no. %3d: expected %d record hashes, but found %d.", blockNo, record_count, nof_record_hashes);
-						}
-						print_progressResult(res); /* Done with parsing block signature data. */
-
-						print_progressDesc(d, "Block no. 3%d: parsing and verifying KSI signature... ", blockNo);
-						sig_raw = sub_ftlv_raw + sub_ftlv[1].off + sub_ftlv[1].hdr_len;
-						sig_raw_len = sub_ftlv[1].dat_len;
-						res = KSI_Signature_parseWithPolicy(ksi, sig_raw, sig_raw_len, KSI_VERIFICATION_POLICY_INTERNAL, NULL, &sig);
-						ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse KSI signature.", blockNo);
-						print_progressResult(res);
-
-
-						switch(TASK_getID(task)) {
-							case 0:
-								res = extend_to_nearest_publication(set, err, ksi, sig, &ext);
-							break;
-
-							case 1:
-								res = extend_to_specified_time(set, err, ksi, &extra, sig, &ext);
-							break;
-
-							case 2:
-								res = extend_to_specified_publication(set, err, ksi, sig, &ext);
-							break;
-
-							default:
-								res = KT_UNKNOWN_ERROR;
-								goto cleanup;
-							break;
-						}
-
-						ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to extend KSI signature.", blockNo);
-						KSI_Signature_free(sig);
-						sig = NULL;
-
-						print_progressDesc(d, "Block no. 3%d: serializing extended KSI signature... ", blockNo);
-						res = KSI_Signature_serialize(ext, &ext_raw, &ext_raw_len);
-						ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to serialize extended KSI signature.", blockNo);
-						KSI_Signature_free(ext);
-						ext = NULL;
-						print_progressResult(res);
-
-						print_progressDesc(d, "Block no. 3%d: writing extended KSI signature to file... ", blockNo);
-						memcpy(sig_raw, ext_raw, ext_raw_len);
-						KSI_free(ext_raw);
-						ext_raw = NULL;
-
-						ftlv.dat_len = ftlv.dat_len - sig_raw_len + ext_raw_len;
-						sub_ftlv[1].dat_len = ext_raw_len;
-						adjust_tlv_length_in_buffer(sub_ftlv_raw + sub_ftlv[1].off, &sub_ftlv[1]);
-						adjust_tlv_length_in_buffer(ftlv_raw, &ftlv);
-						ftlv_len = ftlv.hdr_len + ftlv.dat_len;
-						if (fwrite(ftlv_raw, 1, ftlv_len, files.outFile) != ftlv_len) {
-							res = KT_IO_ERROR;
-							ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to write extended signature to extended log signature file.");
-						}
-					}
+					res = process_block_signature(set, err, ksi, extend_signature, &blocks, &files);
+					if (res != KT_OK) goto cleanup;
 				}
 				break;
 
@@ -287,14 +202,8 @@ int extend_run(int argc, char** argv, char **envp) {
 		}
 	}
 
-	/* Check consistency of log signature file. */
-	if (blockNo == 0) {
-		res = KT_INVALID_INPUT_FORMAT;
-		ERR_CATCH_MSG(err, res, "Error: no blocks found.");
-	} else if (blockNo > sigNo) {
-		res = KT_INVALID_INPUT_FORMAT;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: block signature data missing.", blockNo);
-	}
+	res = finalize_log_signature(set, err, &blocks);
+	if (res != KT_OK) goto cleanup;
 
 	res = KT_OK;
 
@@ -317,8 +226,6 @@ cleanup:
 	SMART_FILE_close(logfile);
 	PARAM_SET_free(set);
 	TASK_SET_free(task_set);
-	KSI_Signature_free(sig);
-	KSI_Signature_free(ext);
 	ERR_TRCKR_free(err);
 	KSI_CTX_free(ksi);
 
@@ -427,23 +334,26 @@ cleanup:
 	return res;
 }
 
-static int extend_to_specified_time(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, COMPOSITE *extra, KSI_Signature *sig, KSI_Signature **ext) {
+static int extend_to_specified_time(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_Signature **ext) {
 	int res;
 	int d = 0;
 	KSI_Signature *tmp = NULL;
 	KSI_Integer *pubTime = NULL;
 	char buf[256];
+	COMPOSITE extra;
 
 
-	if (set == NULL || ksi == NULL || err == NULL || sig == NULL || extra == NULL || ext == NULL) {
+	if (set == NULL || ksi == NULL || err == NULL || sig == NULL || ext == NULL) {
 		ERR_TRCKR_ADD(err, res = KT_INVALID_ARGUMENT, NULL);
 		goto cleanup;
 	}
 
+	extra.ctx = ksi;
+	extra.err = err;
 
 	d = PARAM_SET_isSetByName(set, "d");
 
-	res = PARAM_SET_getObjExtended(set, "T", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, extra, (void**)&pubTime);
+	res = PARAM_SET_getObjExtended(set, "T", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &extra, (void**)&pubTime);
 	if (res != KT_OK) {
 		ERR_TRCKR_ADD(err, res, "Error: Unable to extract the time value to extend to.");
 		goto cleanup;
@@ -728,31 +638,261 @@ static void close_input_and_output_files(int result, IO_FILES *files) {
 	if (files->outFile) fclose(files->outFile);
 }
 
-static int process_magic_number(ERR_TRCKR *err, FILE *inFile, FILE *outFile) {
+static int process_magic_number(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files) {
 	int res;
 	char buf[10];
 	size_t count = 0;
 	size_t magicLength = strlen("LOGSIG11");
+	int d = 0;
 
-	if (inFile == NULL || outFile == NULL) {
+	if (set == NULL || err == NULL || files == NULL || files->inFile == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
 
-	count = fread(buf, 1, magicLength, inFile);
+	d = PARAM_SET_isSetByName(set, "d");
+
+	print_progressDesc(d, "Processing magic number... ");
+	count = fread(buf, 1, magicLength, files->inFile);
 	if (count != magicLength || strncmp(buf, "LOGSIG11", magicLength)) {
 		res = KT_INVALID_INPUT_FORMAT;
 		ERR_CATCH_MSG(err, res, "Error: Magic number not found at the beginning of log signature file.");
 	}
-	count = fwrite(buf, 1, magicLength, outFile);
-	if (count != magicLength) {
-		res = KT_IO_ERROR;
-		ERR_CATCH_MSG(err, res, "Error: %s", KSITOOL_errToString(res));
+
+	if (files->outFile) {
+		count = fwrite(buf, 1, magicLength, files->outFile);
+		if (count != magicLength) {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: Could not copy magic number to extended log signature file.");
+		}
 	}
 
 	res = KT_OK;
 
 cleanup:
+
+	print_progressResult(res);
+	return res;
+}
+
+static int process_block_header(PARAM_SET *set, ERR_TRCKR *err, BLOCK_INFO *blocks, IO_FILES *files) {
+	int res;
+	int d = 0;
+
+	if (set == NULL || err == NULL || files == NULL || blocks == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	d = PARAM_SET_isSetByName(set, "d");
+
+	print_progressDesc(d, "Block no. %3d: processing block header... ", blocks->blockNo + 1);
+	if (blocks->blockNo > blocks->sigNo) {
+		res = KT_INVALID_INPUT_FORMAT;
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: block signature data missing.", blocks->blockNo);
+	}
+	blocks->blockNo++;
+	blocks->nofRecordHashes = 0;
+
+	if (files->outFile) {
+		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->outFile) != blocks->ftlv_len) {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to copy block header.", blocks->blockNo);
+		}
+	}
+	res = KT_OK;
+
+cleanup:
+
+	print_progressResult(res);
+	return res;
+}
+
+static int process_record_hash(PARAM_SET *set, ERR_TRCKR *err, BLOCK_INFO *blocks, IO_FILES *files) {
+	int res;
+	int d = 0;
+
+	if (set == NULL || err == NULL || files == NULL || blocks == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	d = PARAM_SET_isSetByName(set, "d");
+
+	print_progressDesc(d, "Block no. %3d: processing record hash... ", blocks->blockNo);
+	if (blocks->blockNo == blocks->sigNo) {
+		res = KT_INVALID_INPUT_FORMAT;
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: record hash without preceding block header found.", blocks->blockNo + 1);
+	}
+	blocks->nofRecordHashes++;
+
+	if (files->outFile) {
+		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->outFile) != blocks->ftlv_len) {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to copy record hash.", blocks->blockNo);
+		}
+	}
+	res = KT_OK;
+
+cleanup:
+
+	print_progressResult(res);
+	return res;
+}
+
+static int process_intermediate_hash(PARAM_SET *set, ERR_TRCKR *err, BLOCK_INFO *blocks, IO_FILES *files) {
+	int res;
+	int d = 0;
+
+	if (set == NULL || err == NULL || files == NULL || blocks == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	d = PARAM_SET_isSetByName(set, "d");
+
+	print_progressDesc(d, "Block no. %3d: processing intermediate hash... ", blocks->blockNo);
+	if (blocks->blockNo == blocks->sigNo) {
+		res = KT_INVALID_INPUT_FORMAT;
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: intermediate hash without preceding block header found.", blocks->blockNo + 1);
+	}
+
+	if (files->outFile) {
+		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->outFile) != blocks->ftlv_len) {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to copy record hash.", blocks->blockNo);
+		}
+	}
+	res = KT_OK;
+
+cleanup:
+
+	print_progressResult(res);
+	return res;
+}
+
+static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_FUNCTION extend_signature, BLOCK_INFO *blocks, IO_FILES *files) {
+	int res;
+	int d = 0;
+	KSI_FTLV sub_ftlv[2];
+	size_t nof_sub_ftlvs = 0;
+	unsigned char *sub_ftlv_raw = NULL;
+	KSI_Signature *sig = NULL;
+	KSI_Signature *ext = NULL;
+
+	if (set == NULL || err == NULL || ksi == NULL || extend_signature == NULL || files == NULL || blocks == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	d = PARAM_SET_isSetByName(set, "d");
+
+	print_progressDesc(d, "Block no. %3d: processing block signature data... ", blocks->blockNo);
+
+	blocks->sigNo++;
+	if (blocks->sigNo > blocks->blockNo) {
+		res = KT_INVALID_INPUT_FORMAT;
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: block signature data without preceding block header found.", blocks->sigNo);
+	}
+
+	sub_ftlv_raw = blocks->ftlv_raw + blocks->ftlv.hdr_len;
+	res = KSI_FTLV_memReadN(sub_ftlv_raw, blocks->ftlv_len - blocks->ftlv.hdr_len, sub_ftlv, 2, &nof_sub_ftlvs);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse block signature data.", blocks->blockNo);
+	if (nof_sub_ftlvs != 2) {
+		res = KT_INVALID_INPUT_FORMAT;
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse block signature data.", blocks->blockNo);
+	} else if (sub_ftlv[0].tag != 0x01) {
+		res = KT_INVALID_INPUT_FORMAT;
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse record count.", blocks->blockNo);
+	} else if (sub_ftlv[1].tag != 0x0905) {
+		res = KT_INVALID_INPUT_FORMAT;
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unsupported block signature type %04X found.", blocks->blockNo, sub_ftlv[1].tag);
+	} else {
+		unsigned char *sig_raw = NULL;
+		size_t sig_raw_len = 0;
+		unsigned char *ext_raw = NULL;
+		size_t ext_raw_len = 0;
+		size_t record_count = 0;
+
+		record_count = buf_to_int(sub_ftlv_raw + sub_ftlv[0].off + sub_ftlv[0].hdr_len, sub_ftlv[0].dat_len);
+		if (record_count != blocks->nofRecordHashes) {
+			res = KT_INVALID_INPUT_FORMAT;
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: expected %d record hashes, but found %d.", blocks->blockNo, record_count, blocks->nofRecordHashes);
+		}
+		print_progressResult(res); /* Done with parsing block signature data. */
+
+		print_progressDesc(d, "Block no. %3d: parsing and verifying KSI signature... ", blocks->blockNo);
+		sig_raw = sub_ftlv_raw + sub_ftlv[1].off + sub_ftlv[1].hdr_len;
+		sig_raw_len = sub_ftlv[1].dat_len;
+		res = KSI_Signature_parseWithPolicy(ksi, sig_raw, sig_raw_len, KSI_VERIFICATION_POLICY_INTERNAL, NULL, &sig);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse KSI signature.", blocks->blockNo);
+		print_progressResult(res);
+
+		res = extend_signature(set, err, ksi, sig, &ext);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to extend KSI signature.", blocks->blockNo);
+		KSI_Signature_free(sig);
+		sig = NULL;
+
+		print_progressDesc(d, "Block no. %3d: serializing extended KSI signature... ", blocks->blockNo);
+		res = KSI_Signature_serialize(ext, &ext_raw, &ext_raw_len);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to serialize extended KSI signature.", blocks->blockNo);
+		KSI_Signature_free(ext);
+		ext = NULL;
+		print_progressResult(res);
+
+		print_progressDesc(d, "Block no. %3d: writing extended KSI signature to file... ", blocks->blockNo);
+		/* Reuse the raw buffer and adjust FTLV headers accordingly. */
+		memcpy(sig_raw, ext_raw, ext_raw_len);
+		KSI_free(ext_raw);
+		ext_raw = NULL;
+
+		blocks->ftlv.dat_len = blocks->ftlv.dat_len - sig_raw_len + ext_raw_len;
+		sub_ftlv[1].dat_len = ext_raw_len;
+		adjust_tlv_length_in_buffer(sub_ftlv_raw + sub_ftlv[1].off, &sub_ftlv[1]);
+		adjust_tlv_length_in_buffer(blocks->ftlv_raw, &blocks->ftlv);
+		blocks->ftlv_len = blocks->ftlv.hdr_len + blocks->ftlv.dat_len;
+		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->outFile) != blocks->ftlv_len) {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to write extended signature to extended log signature file.", blocks->blockNo);
+		}
+		print_progressResult(res);
+	}
+	res = KT_OK;
+
+cleanup:
+
+	print_progressResult(res);
+	KSI_Signature_free(sig);
+	KSI_Signature_free(ext);
+	return res;
+}
+
+static int finalize_log_signature(PARAM_SET *set, ERR_TRCKR *err, BLOCK_INFO *blocks) {
+	int res;
+	int d = 0;
+
+	if (set == NULL || err == NULL || blocks == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	d = PARAM_SET_isSetByName(set, "d");
+
+	print_progressDesc(d, "Finalizing log signature... ");
+
+	if (blocks->blockNo == 0) {
+		res = KT_INVALID_INPUT_FORMAT;
+		ERR_CATCH_MSG(err, res, "Error: no blocks found.");
+	} else if (blocks->blockNo > blocks->sigNo) {
+		res = KT_INVALID_INPUT_FORMAT;
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: block signature data missing.", blocks->blockNo);
+	}
+
+	res = KT_OK;
+
+cleanup:
+
+	print_progressResult(res);
 	return res;
 }
 
