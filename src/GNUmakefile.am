@@ -46,6 +46,8 @@ logksi_SOURCES = \
 	tool_box/verify.c \
 	tool_box/extend.c \
 	tool_box/conf.c \
+	tool_box/rsyslog.c \
+	tool_box/rsyslog.h \
 	tool_box/default_tasks.h \
 	component.c \
 	component.h \
