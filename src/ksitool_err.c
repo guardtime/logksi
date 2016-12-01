@@ -51,6 +51,7 @@ static int ksitool_ErrToExitcode(int error_code) {
 		case KT_INVALID_CONF:
 			return EXIT_INVALID_CONF;
 		case KT_KSI_SIG_VER_IMPOSSIBLE:
+		case KT_VERIFICATION_FAILURE:
 			return EXIT_VERIFY_ERROR;
 		case KT_PUBFILE_HAS_NO_PUBREC_TO_EXTEND_TO:
 			return EXIT_EXTEND_ERROR;
@@ -104,7 +105,7 @@ static const char* ksitoolErrToString(int error_code) {
 		case KSI_OK:
 			return "OK.";
 		case KT_OUT_OF_MEMORY:
-			return "KSI tool out of memory.";
+			return "Logksi tool out of memory.";
 		case KT_INVALID_ARGUMENT:
 			return "Invalid argument.";
 		case KT_UNABLE_TO_SET_STREAM_MODE:
@@ -127,6 +128,8 @@ static const char* ksitoolErrToString(int error_code) {
 			return "User has no privileges.";
 		case KT_KSI_SIG_VER_IMPOSSIBLE:
 			return "Verification can't be performed.";
+		case KT_VERIFICATION_FAILURE:
+			return "Log signature verification failed.";
 		case KT_PUBFILE_HAS_NO_PUBREC_TO_EXTEND_TO:
 			return "No publication record found to extend to.";
 		case KT_AGGR_LVL_LIMIT_TOO_SMALL:
