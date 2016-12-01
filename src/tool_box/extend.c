@@ -48,7 +48,6 @@ typedef struct {
 	char *backupName;
 	char *tempName;
 	FILE *inFile;
-	FILE *inFile2;
 	FILE *outFile;
 } IO_FILES;
 
@@ -193,10 +192,6 @@ int extend_run(int argc, char** argv, char **envp) {
 
 				case 0x904:
 				{
-					if (files.inFile2) {
-						res = KSI_FTLV_fileRead(files.inFile2, blocks.ftlv_raw, sizeof(ftlv_raw), &blocks.ftlv_len, &blocks.ftlv);
-						if (res != KT_OK) goto cleanup;
-					}
 					res = process_block_signature(set, err, ksi, extend_signature, &blocks, &files);
 					if (res != KT_OK) goto cleanup;
 				}
@@ -595,8 +590,6 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 		tmp.outFile = stdout;
 	}
 
-	tmp.inFile2 = fopen("block-signatures.dat", "rb");
-
 	tmp.inName = files->inName;
 	tmp.outName = files->outName;
 	*files = tmp;
@@ -662,7 +655,6 @@ static void close_input_and_output_files(int result, IO_FILES *files) {
 
 	if (files->inFile) fclose(files->inFile);
 	if (files->outFile) fclose(files->outFile);
-	if (files->inFile2) fclose(files->inFile2);
 }
 
 static void free_blocks(BLOCK_INFO *blocks) {
@@ -1044,7 +1036,6 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 	unsigned char *sub_ftlv_raw = NULL;
 	KSI_Signature *sig = NULL;
 	KSI_Signature *ext = NULL;
-	size_t sig_idx = 0;
 
 	if (set == NULL || err == NULL || ksi == NULL || extend_signature == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -1064,16 +1055,15 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 	sub_ftlv_raw = blocks->ftlv_raw + blocks->ftlv.hdr_len;
 	res = KSI_FTLV_memReadN(sub_ftlv_raw, blocks->ftlv_len - blocks->ftlv.hdr_len, sub_ftlv, 4, &nof_sub_ftlvs);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse block signature data.", blocks->blockNo);
-	sig_idx = nof_sub_ftlvs - 1;
 	if (nof_sub_ftlvs < 2) {
 		res = KT_INVALID_INPUT_FORMAT;
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse block signature data.", blocks->blockNo);
 	} else if (sub_ftlv[0].tag != 0x01) {
 		res = KT_INVALID_INPUT_FORMAT;
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse record count.", blocks->blockNo);
-	} else if (sub_ftlv[sig_idx].tag != 0x0905) {
+	} else if (sub_ftlv[1].tag != 0x0905) {
 		res = KT_INVALID_INPUT_FORMAT;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unsupported block signature type %04X found.", blocks->blockNo, sub_ftlv[sig_idx].tag);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unsupported block signature type %04X found.", blocks->blockNo, sub_ftlv[1].tag);
 	} else {
 		unsigned char *sig_raw = NULL;
 		size_t sig_raw_len = 0;
@@ -1090,28 +1080,26 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 		print_progressResult(res); /* Done with parsing block signature data. */
 
 		print_progressDesc(d, "Block no. %3d: parsing and verifying KSI signature... ", blocks->blockNo);
-		sig_raw = sub_ftlv_raw + sub_ftlv[sig_idx].off + sub_ftlv[sig_idx].hdr_len;
-		sig_raw_len = sub_ftlv[sig_idx].dat_len;
-		if (sig_raw_len > 0) {
-			KSI_VerificationContext_init(&context, ksi);
-			res = calculate_root_hash(ksi, blocks, &context.documentHash);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to get root hash for verification.", blocks->blockNo);
-			res = KSI_Signature_parseWithPolicy(ksi, sig_raw, sig_raw_len, KSI_VERIFICATION_POLICY_INTERNAL, &context, &sig);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse KSI signature.", blocks->blockNo);
-			KSI_DataHash_free(context.documentHash);
-			print_progressResult(res);
+		sig_raw = sub_ftlv_raw + sub_ftlv[1].off + sub_ftlv[1].hdr_len;
+		sig_raw_len = sub_ftlv[1].dat_len;
+		KSI_VerificationContext_init(&context, ksi);
+		res = calculate_root_hash(ksi, blocks, &context.documentHash);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to get root hash for verification.", blocks->blockNo);
+		res = KSI_Signature_parseWithPolicy(ksi, sig_raw, sig_raw_len, KSI_VERIFICATION_POLICY_INTERNAL, &context, &sig);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse KSI signature.", blocks->blockNo);
+		KSI_DataHash_free(context.documentHash);
+		print_progressResult(res);
 
-			res = extend_signature(set, err, ksi, sig, &ext);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to extend KSI signature.", blocks->blockNo);
-			KSI_Signature_free(sig);
-			sig = NULL;
+		res = extend_signature(set, err, ksi, sig, &ext);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to extend KSI signature.", blocks->blockNo);
+		KSI_Signature_free(sig);
+		sig = NULL;
 
-			print_progressDesc(d, "Block no. %3d: serializing extended KSI signature... ", blocks->blockNo);
-			res = KSI_Signature_serialize(ext, &ext_raw, &ext_raw_len);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to serialize extended KSI signature.", blocks->blockNo);
-			KSI_Signature_free(ext);
-			ext = NULL;
-		}
+		print_progressDesc(d, "Block no. %3d: serializing extended KSI signature... ", blocks->blockNo);
+		res = KSI_Signature_serialize(ext, &ext_raw, &ext_raw_len);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to serialize extended KSI signature.", blocks->blockNo);
+		KSI_Signature_free(ext);
+		ext = NULL;
 		print_progressResult(res);
 
 		print_progressDesc(d, "Block no. %3d: writing extended KSI signature to file... ", blocks->blockNo);
@@ -1121,8 +1109,8 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 		ext_raw = NULL;
 
 		blocks->ftlv.dat_len = blocks->ftlv.dat_len - sig_raw_len + ext_raw_len;
-		sub_ftlv[sig_idx].dat_len = ext_raw_len;
-		adjust_tlv_length_in_buffer(sub_ftlv_raw + sub_ftlv[sig_idx].off, &sub_ftlv[sig_idx]);
+		sub_ftlv[1].dat_len = ext_raw_len;
+		adjust_tlv_length_in_buffer(sub_ftlv_raw + sub_ftlv[1].off, &sub_ftlv[1]);
 		adjust_tlv_length_in_buffer(blocks->ftlv_raw, &blocks->ftlv);
 		blocks->ftlv_len = blocks->ftlv.hdr_len + blocks->ftlv.dat_len;
 		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->outFile) != blocks->ftlv_len) {
