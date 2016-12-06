@@ -19,6 +19,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <ksi/ksi.h>
 #include <ksi/compatibility.h>
 #include <ksi/policy.h>
@@ -35,6 +36,7 @@
 #include "obj_printer.h"
 #include "conf_file.h"
 #include "tool.h"
+#include "rsyslog.h"
 
 enum {
 	/* Trust anchor based verification. */
@@ -58,14 +60,14 @@ enum {
 
 static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
 
-static int signature_verify(int id, PARAM_SET *set, ERR_TRCKR *err, COMPOSITE *extra, KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_PolicyVerificationResult **out);
-static int signature_verify_general(PARAM_SET *set, ERR_TRCKR *err, COMPOSITE *extra, KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_PolicyVerificationResult **out);
+static int signature_verify_general(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_PolicyVerificationResult **out);
 static int signature_verify_internally(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_PolicyVerificationResult **out);
 static int signature_verify_key_based(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_PolicyVerificationResult **out);
-static int signature_verify_publication_based_with_user_pub(PARAM_SET *set, ERR_TRCKR *err, COMPOSITE *extra, KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_PolicyVerificationResult **out);
+static int signature_verify_publication_based_with_user_pub(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_PolicyVerificationResult **out);
 static int signature_verify_publication_based_with_pubfile(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,  KSI_Signature *sig, KSI_DataHash *hsh, KSI_PolicyVerificationResult **out);
 static int signature_verify_calendar_based(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_PolicyVerificationResult **out);
-static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err);
+static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files);
+static void close_log_and_signature_files(IO_FILES *files);
 
 int verify_run(int argc, char **argv, char **envp) {
 	int res;
@@ -77,17 +79,17 @@ int verify_run(int argc, char **argv, char **envp) {
 	ERR_TRCKR *err = NULL;
 	SMART_FILE *logfile = NULL;
 	int d = 0;
-	COMPOSITE extra;
-	KSI_DataHash *hsh = NULL;
 	KSI_Signature *sig = NULL;
-	KSI_PolicyVerificationResult *result = NULL;
-	KSI_HashAlgorithm alg = KSI_HASHALG_INVALID;
+	IO_FILES files;
+	VERIFYING_FUNCTION verify_signature = NULL;
+
+	memset(&files, 0, sizeof(files));
 
 	/**
 	 * Extract command line parameters and also add configuration specific parameters.
 	 */
 	res = PARAM_SET_new(
-			CONF_generate_param_set_desc("{i}{x}{f}{d}{pub-str}{ver-int}{ver-cal}{ver-key}{ver-pub}{dump}{conf}{log}{h|help}", "XP", buf, sizeof(buf)),
+			CONF_generate_param_set_desc("{i}{x}{s}{d}{pub-str}{ver-int}{ver-cal}{ver-key}{ver-pub}{dump}{conf}{log}{h|help}", "XP", buf, sizeof(buf)),
 			&set);
 	if (res != KT_OK) goto cleanup;
 
@@ -108,69 +110,65 @@ int verify_run(int argc, char **argv, char **envp) {
 
 	d = PARAM_SET_isSetByName(set, "d");
 
-	res = check_pipe_errors(set, err);
+	res = PARAM_SET_getStr(set, "i", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.inLogName);
+	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
+
+	res = PARAM_SET_getStr(set, "s", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.inSigName);
+	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
+
+	switch(TASK_getID(task)) {
+		case ANC_BASED_DEFAULT:
+		case ANC_BASED_PUB_FILE:
+		case ANC_BASED_PUB_FILE_X:
+		case ANC_BASED_PUB_SRT:
+		case ANC_BASED_PUB_SRT_X:
+			verify_signature = signature_verify_general;
+		break;
+
+		case INT_BASED:
+			verify_signature = signature_verify_internally;
+		break;
+
+		case CAL_BASED:
+			verify_signature = signature_verify_calendar_based;
+		break;
+
+		case KEY_BASED:
+			verify_signature = signature_verify_key_based;
+		break;
+
+		case PUB_BASED_FILE:
+		case PUB_BASED_FILE_X:
+			verify_signature = signature_verify_publication_based_with_pubfile;
+		break;
+
+		case PUB_BASED_STR:
+		case PUB_BASED_STR_X:
+			verify_signature = signature_verify_publication_based_with_user_pub;
+		break;
+
+		default:
+			res = KT_UNKNOWN_ERROR;
+			goto cleanup;
+		break;
+	}
+
+	res = open_log_and_signature_files(err, &files);
 	if (res != KT_OK) goto cleanup;
 
-
-	extra.ctx = ksi;
-	extra.err = err;
-	extra.fname_out = NULL;
-
-	print_progressDesc(d, "Reading signature... ");
-	res = PARAM_SET_getObjExtended(set, "i", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &extra, (void**)&sig);
-	if (res != PST_OK) goto cleanup;
-	print_progressResult(res);
-
-	/**
-	 * Get document hash if provided by user.
-	 */
-	if (PARAM_SET_isSetByName(set, "f")) {
-		res = KSI_Signature_getHashAlgorithm(sig, &alg);
-		if (res != KSI_OK) goto cleanup;
-		extra.h_alg = &alg;
-
-		print_progressDesc(d, "Reading documents hash... ");
-		/* TODO: fix hash extractor from file. */
-		res = PARAM_SET_getObjExtended(set, "f", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &extra, (void**)&hsh);
-		if (res != PST_OK) goto cleanup;
-		print_progressResult(res);
-	}
-
-	/**
-	 * Verify the signature accordingly to the selected method.
-	 */
-	res = signature_verify(TASK_getID(task), set, err, &extra, ksi, sig, hsh, &result);
-	/* Fall through: if (res != KT_OK) goto cleanup; */
-
-	if (PARAM_SET_isSetByName(set, "dump")) {
-		/**
-		 * Dump signature.
-		 */
-		print_result("\n");
-		OBJPRINT_signatureDump(sig, print_result);
-		/**
-		 * Dump verification result data.
-		 */
-		print_result("\n");
-		OBJPRINT_signatureVerificationResultDump(result, print_result);
-		/**
-		 * Dump document hash.
-		 */
-		if (PARAM_SET_isSetByName(set, "f")) {
-			print_result("\n");
-			OBJPRINT_Hash(hsh, "Document hash: ", print_result);
-		}
-	}
+	res = logsignature_verify(set, err, ksi, verify_signature, &files);
+	if (res != KT_OK) goto cleanup;
 
 cleanup:
+
+	close_log_and_signature_files(&files);
+
 	print_progressResult(res);
 	KSITOOL_KSI_ERRTrace_save(ksi);
 
 	if (res != KT_OK) {
 		if (ERR_TRCKR_getErrCount(err) == 0) {ERR_TRCKR_ADD(err, res, NULL);}
 		KSITOOL_KSI_ERRTrace_LOG(ksi);
-		print_debug("\n");
-		DEBUG_verifySignature(ksi, res, sig, result, hsh);
 
 		print_errors("\n");
 		if (d) ERR_TRCKR_printExtendedErrors(err);
@@ -180,9 +178,7 @@ cleanup:
 	SMART_FILE_close(logfile);
 	PARAM_SET_free(set);
 	TASK_SET_free(task_set);
-	KSI_DataHash_free(hsh);
 	KSI_Signature_free(sig);
-	KSI_PolicyVerificationResult_free(result);
 	ERR_TRCKR_free(err);
 	KSI_CTX_free(ksi);
 
@@ -194,27 +190,27 @@ char *verify_help_toString(char *buf, size_t len) {
 
 	count += KSI_snprintf(buf + count, len - count,
 		"Usage:"
-		" %s verify -i <in.ksig> [-f <data>] [more_options]\n"
-		" %s verify --ver-int -i <in.ksig> [-f <data>] [more_options]\n"
-		" %s verify --ver-cal -i <in.ksig> [-f <data>] -X <URL>\n"
+		" %s verify -i <log> [-s <logsignature.ls11>] [more_options]\n"
+		" %s verify --ver-int -i <log> [-s <logsignature.ls11>] [more_options]\n"
+		" %s verify --ver-cal -i <log> [-s <logsignature.ls11>] -X <URL>\n"
 		"     [--ext-user <user> --ext-key <key>] [more_options]\n"
-		" %s verify --ver-key -i <in.ksig> [-f <data>] -P <URL>\n"
+		" %s verify --ver-key -i <log> [-s <logsignature.ls11>] -P <URL>\n"
 		"     [--cnstr <oid=value>]... [more_options]\n"
-		" %s verify --ver-pub -i <in.ksig> [-f <data>] --pub-str <pubstring>\n"
+		" %s verify --ver-pub -i <log> [-s <logsignature.ls11>] --pub-str <pubstring>\n"
 		"     [-x -X <URL>  [--ext-user <user> --ext-key <key>]] [more_options]\n"
-		" %s verify --ver-pub -i <in.ksig> [-f <data>] -P <URL> [--cnstr <oid=value>]...\n"
+		" %s verify --ver-pub -i <log> [-s <logsignature.ls11>] -P <URL> [--cnstr <oid=value>]...\n"
 		"        [-x -X <URL>  [--ext-user <user> --ext-key <key>]] [more_options]\n"
 		"\n"
 		" --ver-int - Perform internal verification.\n"
 		" --ver-cal - Perform calendar-based verification (use extending service).\n"
 		" --ver-key - Perform key-based verification.\n"
 		" --ver-pub - Perform publication-based verification (use with -x to permit extending).\n"
-		" -i <in.ksig>\n"
-		"           - Signature file to be verified. Use '-' as file name to read\n"
-		"             the signature from stdin.\n"
-		" -f <data> - Path to file to be hashed or data hash imprint to extract the hash\n"
-		"             value that is going to be verified. Hash format: <alg>:<hash in hex>.\n"
-		"             Use '-' as file name to read data to be hashed from stdin.\n"
+		" -i <log>\n"
+		"           - Log file to be verified.\n"
+		" -s <logsignature.ls11>\n"
+		"             Log signature file to be verified. If omitted, the log signature file name is\n"
+		"             derived by adding .ls11 or .ksisig to <log>. It is expected to be found in the\n"
+		"             same folder as the <log> file.\n"
 		" -x        - Permit to use extender for publication-based verification.\n"
 		" -X <URL>  - Extending service (KSI Extender) URL.\n"
 		" --ext-user <user>\n"
@@ -251,7 +247,7 @@ char *verify_help_toString(char *buf, size_t len) {
 }
 
 const char *verify_get_desc(void) {
-	return "Verifies existing KSI signature.";
+	return "Verifies a signed log file using a log signature file.";
 }
 
 static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
@@ -270,8 +266,8 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 
 	PARAM_SET_addControl(set, "{conf}", isFormatOk_inputFile, isContentOk_inputFileRestrictPipe, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{log}", isFormatOk_path, NULL, convertRepair_path, NULL);
-	PARAM_SET_addControl(set, "{i}", isFormatOk_inputFile, isContentOk_inputFileWithPipe, convertRepair_path, extract_inputSignature);
-	PARAM_SET_addControl(set, "{f}", isFormatOk_inputHash, isContentOk_inputHash, convertRepair_path, extract_inputHash);
+	PARAM_SET_addControl(set, "{i}{s}", isFormatOk_inputFile, isContentOk_inputFile, convertRepair_path, NULL);
+//	PARAM_SET_addControl(set, "{s}", isFormatOk_inputFile, isContentOk_inputFile, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{d}{x}{ver-int}{ver-cal}{ver-key}{ver-pub}{dump}", isFormatOk_flag, NULL, NULL, NULL);
 	PARAM_SET_addControl(set, "{pub-str}", isFormatOk_pubString, NULL, NULL, extract_pubString);
 
@@ -314,66 +310,24 @@ cleanup:
 	return res;
 }
 
-static int signature_verify(int id, PARAM_SET *set, ERR_TRCKR *err, COMPOSITE *extra,
-							KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh,
-							KSI_PolicyVerificationResult **out) {
-	int res;
-
-	if (set == NULL || err == NULL || ksi == NULL || sig == NULL || out == NULL) {
-		ERR_TRCKR_ADD(err, res = KT_INVALID_ARGUMENT, NULL);
-		goto cleanup;
-	}
-
-	switch(id) {
-		case ANC_BASED_DEFAULT:
-		case ANC_BASED_PUB_FILE:
-		case ANC_BASED_PUB_FILE_X:
-		case ANC_BASED_PUB_SRT:
-		case ANC_BASED_PUB_SRT_X:
-			res = signature_verify_general(set, err, extra, ksi, sig, hsh, out);
-			goto cleanup;
-		case INT_BASED:
-			res = signature_verify_internally(set, err, ksi, sig, hsh, out);
-			goto cleanup;
-		case CAL_BASED:
-			res = signature_verify_calendar_based(set, err, ksi, sig, hsh, out);
-			goto cleanup;
-		case KEY_BASED:
-			res = signature_verify_key_based(set, err, ksi, sig, hsh, out);
-			goto cleanup;
-		case PUB_BASED_FILE:
-		case PUB_BASED_FILE_X:
-			res = signature_verify_publication_based_with_pubfile(set, err, ksi, sig, hsh, out);
-			goto cleanup;
-		case PUB_BASED_STR:
-		case PUB_BASED_STR_X:
-			res = signature_verify_publication_based_with_user_pub(set, err, extra, ksi, sig, hsh, out);
-			goto cleanup;
-		default:
-			ERR_CATCH_MSG(err, (res = KT_UNKNOWN_ERROR), "Error: Unknown signature verification task.");
-			goto cleanup;
-	}
-
-cleanup:
-	print_progressResult(res);
-
-	return res;
-}
-
-static int signature_verify_general(PARAM_SET *set, ERR_TRCKR *err, COMPOSITE *extra,
-									KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh,
-									KSI_PolicyVerificationResult **out) {
+static int signature_verify_general(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
+									KSI_Signature *sig, KSI_DataHash *hsh, KSI_PolicyVerificationResult **out) {
 	int res;
 	int d = PARAM_SET_isSetByName(set, "d");
 	int x = PARAM_SET_isSetByName(set, "x");
 	KSI_PublicationData *pub_data = NULL;
 	static const char *task = "Signature verification according to trust anchor";
+	COMPOSITE extra;
+
+	extra.ctx = ksi;
+	extra.err = err;
+	extra.fname_out = NULL;
 
 	/**
 	 * Get Publication data if available.
 	 */
 	if (PARAM_SET_isSetByName(set, "pub-str")) {
-		res = PARAM_SET_getObjExtended(set, "pub-str", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, extra, (void**)&pub_data);
+		res = PARAM_SET_getObjExtended(set, "pub-str", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &extra, (void**)&pub_data);
 		ERR_CATCH_MSG(err, res, "Error: Failed to get publication data.");
 	}
 
@@ -456,19 +410,23 @@ cleanup:
 	return res;
 }
 
-static int signature_verify_publication_based_with_user_pub(PARAM_SET *set, ERR_TRCKR *err, COMPOSITE *extra,
-															KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh,
-															KSI_PolicyVerificationResult **out) {
+static int signature_verify_publication_based_with_user_pub(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
+															KSI_Signature *sig, KSI_DataHash *hsh, KSI_PolicyVerificationResult **out) {
 	int res;
 	int d = PARAM_SET_isSetByName(set, "d");
 	int x = PARAM_SET_isSetByName(set, "x");
 	KSI_PublicationData *pub_data = NULL;
 	static const char *task = "Signature publication-based verification with user publication string";
+	COMPOSITE extra;
+
+	extra.ctx = ksi;
+	extra.err = err;
+	extra.fname_out = NULL;
 
 	/**
 	 * Get Publication data.
 	 */
-	res = PARAM_SET_getObjExtended(set, "pub-str", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, extra, (void**)&pub_data);
+	res = PARAM_SET_getObjExtended(set, "pub-str", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &extra, (void**)&pub_data);
 	ERR_CATCH_MSG(err, res, "Error: Failed to get publication data.");
 
 	/**
@@ -554,12 +512,93 @@ cleanup:
 	return res;
 }
 
-static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err) {
+static int get_derived_name(char *org, const char *extension, char **derived) {
 	int res;
+	char *buf = NULL;
 
-	res = get_pipe_in_error(set, err, NULL, "i,f", NULL);
-	if (res != KT_OK) goto cleanup;
+	if (org == NULL || extension == NULL || derived == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+	buf = (char*)KSI_malloc(strlen(org) + strlen(extension) + 1);
+	if (buf == NULL) {
+		res = KT_OUT_OF_MEMORY;
+		goto cleanup;
+	}
+	sprintf(buf, "%s%s", org, extension);
+	*derived = buf;
+	res = KT_OK;
 
 cleanup:
+
 	return res;
+}
+
+static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files) {
+	int res = KT_IO_ERROR;
+	IO_FILES tmp;
+	int i = 0;
+
+	memset(&tmp, 0, sizeof(tmp));
+
+	if (files->inSigName == NULL) {
+		/* Default log signature file name is derived from the log file name. */
+		const char *extensions[] = {".ls11", ".ksisig", NULL};
+		while (extensions[i]) {
+			res = get_derived_name(files->inLogName, extensions[i], &tmp.derivedSigName);
+			ERR_CATCH_MSG(err, res, "Error: out of memory.");
+			if (SMART_FILE_doFileExist(tmp.derivedSigName)) break;
+			KSI_free(tmp.derivedSigName);
+			tmp.derivedSigName = NULL;
+			i++;
+		}
+		if (tmp.derivedSigName == NULL) {
+			res = KT_KSI_SIG_VER_IMPOSSIBLE;
+			ERR_CATCH_MSG(err, res, "Error: no matching log signature file found for log file %s.", files->inLogName);
+		}
+		tmp.inSigName = tmp.derivedSigName;
+	} else {
+		tmp.inSigName = files->inSigName;
+	}
+	tmp.inLogName = files->inLogName;
+
+	if (tmp.inSigName) {
+		tmp.inSigFile = fopen(tmp.inSigName, "rb");
+		res = (tmp.inSigFile == NULL) ? KT_IO_ERROR : KT_OK;
+		ERR_CATCH_MSG(err, res, "Error: could not open file %s.", tmp.inSigName);
+	}
+
+	if (tmp.inLogName) {
+		tmp.inLogFile = fopen(tmp.inLogName, "rb");
+		res = (tmp.inLogFile == NULL) ? KT_IO_ERROR : KT_OK;
+		ERR_CATCH_MSG(err, res, "Error: could not open file %s.", tmp.inLogName);
+	}
+
+	tmp.inSigName = files->inSigName;
+	tmp.inLogName = files->inLogName;
+	*files = tmp;
+	memset(&tmp, 0, sizeof(tmp));
+	res = KT_OK;
+
+cleanup:
+
+	if (tmp.derivedSigName) {
+		if (tmp.inSigFile) fclose(tmp.inSigFile);
+		tmp.inSigFile = NULL;
+		KSI_free(tmp.derivedSigName);
+	}
+
+	if (tmp.inSigFile) fclose(tmp.inSigFile);
+	if (tmp.inLogFile) fclose(tmp.inLogFile);
+
+	return res;
+}
+
+static void close_log_and_signature_files(IO_FILES *files) {
+	if (files->derivedSigName) {
+		KSI_free(files->derivedSigName);
+	}
+
+	if (files->inSigFile) fclose(files->inSigFile);
+	if (files->inLogFile) fclose(files->inLogFile);
 }

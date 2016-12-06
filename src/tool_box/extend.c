@@ -39,8 +39,6 @@
 #include "tool.h"
 #include "rsyslog.h"
 
-
-
 static int extend_to_nearest_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_Signature **ext);
 static int extend_to_specified_time(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_Signature **ext);
 static int extend_to_specified_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_Signature **ext);
@@ -94,10 +92,10 @@ int extend_run(int argc, char** argv, char **envp) {
 	res = check_pipe_errors(set, err);
 	if (res != KT_OK) goto cleanup;
 
-	res = PARAM_SET_getStr(set, "i", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.inName);
+	res = PARAM_SET_getStr(set, "i", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.inSigName);
 	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
 
-	res = PARAM_SET_getStr(set, "o", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.outName);
+	res = PARAM_SET_getStr(set, "o", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.outSigName);
 	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
 
 	switch(TASK_getID(task)) {
@@ -444,80 +442,80 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 	memset(&tmp, 0, sizeof(tmp));
 
 	/* Default input file is stdin. */
-	if (files->inName == NULL || !strcmp(files->inName, "-")) {
+	if (files->inSigName == NULL || !strcmp(files->inSigName, "-")) {
 		/* Default output file is a temporary file that is copied to stdout on success. */
-		if (files->outName == NULL || !strcmp(files->outName, "-")) {
-			res = get_temp_name(&tmp.tempName);
+		if (files->outSigName == NULL || !strcmp(files->outSigName, "-")) {
+			res = get_temp_name(&tmp.tempSigName);
 			ERR_CATCH_MSG(err, res, "Error: out of memory.");
-			tmp.outName = tmp.tempName;
+			tmp.outSigName = tmp.tempSigName;
 		} else {
-			tmp.outName = files->outName;
+			tmp.outSigName = files->outSigName;
 		}
 	} else {
 		/* Default output file is the same as input, but a backup of the input file is retained. */
-		if (files->outName == NULL || !strcmp(files->inName, files->outName)) {
-			res = get_backup_name(files->inName, &buf);
+		if (files->outSigName == NULL || !strcmp(files->inSigName, files->outSigName)) {
+			res = get_backup_name(files->inSigName, &buf);
 			ERR_CATCH_MSG(err, res, "Error: out of memory.");
 			remove(buf);
-			res = (rename(files->inName, buf) == 0) ? KT_OK : KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: could not rename file %s to %s.", files->inName, buf);
-			tmp.backupName = buf;
+			res = (rename(files->inSigName, buf) == 0) ? KT_OK : KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: could not rename file %s to %s.", files->inSigName, buf);
+			tmp.backupSigName = buf;
 			buf = NULL;
-			tmp.inName = tmp.backupName;
-			tmp.outName = files->inName;
-		} else if (!strcmp(files->outName, "-")) {
-			res = get_temp_name(&tmp.tempName);
+			tmp.inSigName = tmp.backupSigName;
+			tmp.outSigName = files->inSigName;
+		} else if (!strcmp(files->outSigName, "-")) {
+			res = get_temp_name(&tmp.tempSigName);
 			ERR_CATCH_MSG(err, res, "Error: out of memory.");
-			tmp.inName = files->inName;
-			tmp.outName = tmp.tempName;
+			tmp.inSigName = files->inSigName;
+			tmp.outSigName = tmp.tempSigName;
 		} else {
-			tmp.inName = files->inName;
-			tmp.outName = files->outName;
+			tmp.inSigName = files->inSigName;
+			tmp.outSigName = files->outSigName;
 		}
 	}
 
-	if (tmp.inName) {
-		tmp.inFile = fopen(tmp.inName, "rb");
-		res = (tmp.inFile == NULL) ? KT_IO_ERROR : KT_OK;
-		ERR_CATCH_MSG(err, res, "Error: could not open file %s.", tmp.inName);
+	if (tmp.inSigName) {
+		tmp.inSigFile = fopen(tmp.inSigName, "rb");
+		res = (tmp.inSigFile == NULL) ? KT_IO_ERROR : KT_OK;
+		ERR_CATCH_MSG(err, res, "Error: could not open file %s.", tmp.inSigName);
 	} else {
-		tmp.inFile = stdin;
+		tmp.inSigFile = stdin;
 	}
 
-	if (tmp.outName) {
-		tmp.outFile = fopen(tmp.outName, "wb");
-		res = (tmp.outFile == NULL) ? KT_IO_ERROR : KT_OK;
-		ERR_CATCH_MSG(err, res, "Error: could not create file %s.", tmp.outName);
+	if (tmp.outSigName) {
+		tmp.outSigFile = fopen(tmp.outSigName, "wb");
+		res = (tmp.outSigFile == NULL) ? KT_IO_ERROR : KT_OK;
+		ERR_CATCH_MSG(err, res, "Error: could not create file %s.", tmp.outSigName);
 	} else {
-		tmp.outFile = stdout;
+		tmp.outSigFile = stdout;
 	}
 
-	tmp.inName = files->inName;
-	tmp.outName = files->outName;
+	tmp.inSigName = files->inSigName;
+	tmp.outSigName = files->outSigName;
 	*files = tmp;
 	memset(&tmp, 0, sizeof(tmp));
 	res = KT_OK;
 
 cleanup:
 
-	if (tmp.inFile == stdin) tmp.inFile = NULL;
-	if (tmp.outFile == stdout) tmp.outFile = NULL;
+	if (tmp.inSigFile == stdin) tmp.inSigFile = NULL;
+	if (tmp.outSigFile == stdout) tmp.outSigFile = NULL;
 
-	if (tmp.backupName) {
-		if (tmp.inFile) fclose(tmp.inFile);
-		tmp.inFile = NULL;
-		rename(tmp.backupName, files->inName);
-		KSI_free(tmp.backupName);
+	if (tmp.backupSigName) {
+		if (tmp.inSigFile) fclose(tmp.inSigFile);
+		tmp.inSigFile = NULL;
+		rename(tmp.backupSigName, files->inSigName);
+		KSI_free(tmp.backupSigName);
 	}
-	if (tmp.tempName) {
-		if (tmp.outFile) fclose(tmp.outFile);
-		tmp.outFile = NULL;
-		KSI_free(tmp.tempName);
+	if (tmp.tempSigName) {
+		if (tmp.outSigFile) fclose(tmp.outSigFile);
+		tmp.outSigFile = NULL;
+		KSI_free(tmp.tempSigName);
 	}
 	KSI_free(buf);
 
-	if (tmp.inFile) fclose(tmp.inFile);
-	if (tmp.outFile) fclose(tmp.outFile);
+	if (tmp.inSigFile) fclose(tmp.inSigFile);
+	if (tmp.outSigFile) fclose(tmp.outSigFile);
 
 	return res;
 }
@@ -526,36 +524,36 @@ static void close_input_and_output_files(int result, IO_FILES *files) {
 	char buf[1024];
 	size_t count = 0;
 
-	if (files->inFile == stdin) files->inFile = NULL;
-	if (files->outFile == stdout) files->outFile = NULL;
+	if (files->inSigFile == stdin) files->inSigFile = NULL;
+	if (files->outSigFile == stdout) files->outSigFile = NULL;
 
-	if (files->tempName) {
+	if (files->tempSigName) {
 		if (result == KT_OK) {
-			freopen(NULL, "rb", files->outFile);
-			while (!feof(files->outFile)) {
-				count = fread(buf, 1, sizeof(buf), files->outFile);
+			freopen(NULL, "rb", files->outSigFile);
+			while (!feof(files->outSigFile)) {
+				count = fread(buf, 1, sizeof(buf), files->outSigFile);
 				fwrite(buf, 1, count, stdout);
 			}
 		}
-		fclose(files->outFile);
-		files->outFile = NULL;
-		remove(files->tempName);
-		KSI_free(files->tempName);
+		fclose(files->outSigFile);
+		files->outSigFile = NULL;
+		remove(files->tempSigName);
+		KSI_free(files->tempSigName);
 	}
 
-	if (files->backupName) {
+	if (files->backupSigName) {
 		if (result != KT_OK) {
-			fclose(files->outFile);
-			files->outFile = NULL;
-			remove(files->inName);
-			fclose(files->inFile);
-			files->inFile = NULL;
-			rename(files->backupName, files->inName);
+			fclose(files->outSigFile);
+			files->outSigFile = NULL;
+			remove(files->inSigName);
+			fclose(files->inSigFile);
+			files->inSigFile = NULL;
+			rename(files->backupSigName, files->inSigName);
 		}
-		KSI_free(files->backupName);
+		KSI_free(files->backupSigName);
 	}
 
-	if (files->inFile) fclose(files->inFile);
-	if (files->outFile) fclose(files->outFile);
+	if (files->inSigFile) fclose(files->inSigFile);
+	if (files->outSigFile) fclose(files->outSigFile);
 }
 

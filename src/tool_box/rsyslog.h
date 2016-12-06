@@ -17,18 +17,26 @@
  * reserves and retains all trademark rights.
  */
 
-//#include <ksi/tlv_element.h>
-#include "../../libksi/out/include/ksi/tlv_element.h"
+#include <ksi/tlv_element.h>
 
 typedef int (*EXTENDING_FUNCTION)(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_Signature **ext);
+typedef int (*VERIFYING_FUNCTION)(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hash, KSI_PolicyVerificationResult **verificationResult);
 
 typedef struct {
-	char *inName;
-	char *outName;
-	char *backupName;
-	char *tempName;
-	FILE *inFile;
-	FILE *outFile;
+	VERIFYING_FUNCTION verify_signature;
+	EXTENDING_FUNCTION extend_signature;
+} SIGNATURE_PROCESSORS;
+
+typedef struct {
+	char *inSigName;
+	char *outSigName;
+	char *backupSigName;
+	char *tempSigName;
+	char *inLogName;
+	char *derivedSigName;
+	FILE *inSigFile;
+	FILE *outSigFile;
+	FILE *inLogFile;
 } IO_FILES;
 
 #define MAX_TREE_HEIGHT 10
@@ -51,3 +59,4 @@ typedef struct {
 } BLOCK_INFO;
 
 int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_FUNCTION extend_signature, IO_FILES *files);
+int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, VERIFYING_FUNCTION verify_signature, IO_FILES *files);

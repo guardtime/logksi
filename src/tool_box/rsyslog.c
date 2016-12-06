@@ -24,8 +24,7 @@
 #include "ksitool_err.h"
 #include "api_wrapper.h"
 #include "debug_print.h"
-//#include <ksi/tlv_element.h>
-#include "../../libksi/out/include/ksi/tlv_element.h"
+#include <ksi/tlv_element.h>
 #include "rsyslog.h"
 
 static size_t buf_to_int(unsigned char *buf, size_t len) {
@@ -208,6 +207,44 @@ cleanup:
 	return res;
 }
 
+int get_hash_of_logline(KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_DataHash **hash) {
+	int res;
+	KSI_DataHash *tmp = NULL;
+	char buf[1024];
+
+	if (files == NULL || hash == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	if (files->inLogFile) {
+		if (fgets(buf, sizeof(buf), files->inLogFile) == NULL) {
+			res = KT_IO_ERROR;
+			goto cleanup;
+		}
+		/* Last character (newline) is not used in hash calculation. */
+		res = KSI_DataHash_create(ksi, buf, strlen(buf) - 1, blocks->hashAlgo, &tmp);
+		if (res != KSI_OK) goto cleanup;
+	}
+	*hash = tmp;
+	tmp = NULL;
+	res = KT_OK;
+
+cleanup:
+
+	KSI_DataHash_free(tmp);
+	return res;
+}
+
+static size_t max_intermediate_records(size_t nof_records) {
+	size_t max = 0;
+	while (nof_records) {
+		max = max + nof_records;
+		nof_records = nof_records / 2;
+	}
+	return max;
+}
+
 static int process_magic_number(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files) {
 	int res;
 	char buf[10];
@@ -215,7 +252,7 @@ static int process_magic_number(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files)
 	size_t magicLength = strlen("LOGSIG11");
 	int d = 0;
 
-	if (set == NULL || err == NULL || files == NULL || files->inFile == NULL) {
+	if (set == NULL || err == NULL || files == NULL || files->inSigFile == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
@@ -223,14 +260,14 @@ static int process_magic_number(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files)
 	d = PARAM_SET_isSetByName(set, "d");
 
 	print_progressDesc(d, "Processing magic number... ");
-	count = fread(buf, 1, magicLength, files->inFile);
+	count = fread(buf, 1, magicLength, files->inSigFile);
 	if (count != magicLength || strncmp(buf, "LOGSIG11", magicLength)) {
 		res = KT_INVALID_INPUT_FORMAT;
 		ERR_CATCH_MSG(err, res, "Error: Magic number not found at the beginning of log signature file.");
 	}
 
-	if (files->outFile) {
-		count = fwrite(buf, 1, magicLength, files->outFile);
+	if (files->outSigFile) {
+		count = fwrite(buf, 1, magicLength, files->outSigFile);
 		if (count != magicLength) {
 			res = KT_IO_ERROR;
 			ERR_CATCH_MSG(err, res, "Error: Could not copy magic number to extended log signature file.");
@@ -295,8 +332,8 @@ static int process_block_header(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BL
 	res = KSI_DataHash_fromImprint(ksi, sub_ftlv_raw + sub_ftlv[2].off + sub_ftlv[2].hdr_len, sub_ftlv[2].dat_len, &tmpHash);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to create hash of previous block.", blocks->blockNo);
 
-	if (files->outFile) {
-		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->outFile) != blocks->ftlv_len) {
+	if (files->outSigFile) {
+		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->outSigFile) != blocks->ftlv_len) {
 			res = KT_IO_ERROR;
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to copy block header.", blocks->blockNo);
 		}
@@ -334,6 +371,7 @@ static int process_record_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLO
 	int res;
 	int d = 0;
 	KSI_DataHash *recordHash = NULL;
+	KSI_DataHash *hash = NULL;
 
 	if (set == NULL || err == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -352,11 +390,21 @@ static int process_record_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLO
 	res = KSI_DataHash_fromImprint(ksi, blocks->ftlv_raw + blocks->ftlv.hdr_len, blocks->ftlv.dat_len, &recordHash);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to create hash of record no. %3d.", blocks->blockNo, blocks->nofRecordHashes);
 
+	if (files->inLogFile) {
+		res = get_hash_of_logline(ksi, blocks, files, &hash);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to calculate hash of logline no. %3d.", blocks->blockNo, blocks->nofRecordHashes);
+
+		if (!KSI_DataHash_equals(recordHash, hash)) {
+			res = KT_VERIFICATION_FAILURE;
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: record hashes not equal.", blocks->blockNo);
+		}
+	}
+
 	res = add_hash_to_merkle_tree(ksi, blocks, recordHash);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to add hash to Merkle tree.", blocks->blockNo);
 
-	if (files->outFile) {
-		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->outFile) != blocks->ftlv_len) {
+	if (files->outSigFile) {
+		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->outSigFile) != blocks->ftlv_len) {
 			res = KT_IO_ERROR;
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to copy record hash.", blocks->blockNo);
 		}
@@ -367,6 +415,7 @@ cleanup:
 
 	print_progressResult(res);
 	KSI_DataHash_free(recordHash);
+	KSI_DataHash_free(hash);
 	return res;
 }
 
@@ -374,6 +423,7 @@ static int process_intermediate_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 	int res;
 	int d = 0;
 	KSI_DataHash *tmpHash = NULL;
+	KSI_DataHash *hash = NULL;
 	unsigned char i;
 
 	if (set == NULL || err == NULL || files == NULL || blocks == NULL) {
@@ -393,13 +443,26 @@ static int process_intermediate_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 	res = KSI_DataHash_fromImprint(ksi, blocks->ftlv_raw + blocks->ftlv.hdr_len, blocks->ftlv.dat_len, &tmpHash);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to create intermediate hash.", blocks->blockNo);
 
-	if (files->outFile) {
-		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->outFile) != blocks->ftlv_len) {
+	if (files->outSigFile) {
+		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->outSigFile) != blocks->ftlv_len) {
 			res = KT_IO_ERROR;
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to copy record hash.", blocks->blockNo);
 		}
 	}
 
+	/* If the block contains intermediate hashes, but not record hashes:
+	 * Calculate missing record hashes from the records in the logfile and
+	 * build the Merkle tree according to the number of intermediate hashes encountered. */
+	if (blocks->nofIntermediateHashes > max_intermediate_records(blocks->nofRecordHashes)) {
+		if (files->inLogFile) {
+			blocks->nofRecordHashes++;
+			res = get_hash_of_logline(ksi, blocks, files, &hash);
+			res = add_hash_to_merkle_tree(ksi, blocks, hash);
+			KSI_DataHash_free(hash);
+			hash = NULL;
+		}
+	}
+	/* Find the corresponding intermediate hash from the Merkle tree. */
 	for (i = 0; i < blocks->treeHeight; i++) {
 		if (blocks->notVerified[i] != NULL) break;
 	}
@@ -420,10 +483,11 @@ cleanup:
 
 	print_progressResult(res);
 	KSI_DataHash_free(tmpHash);
+	KSI_DataHash_free(hash);
 	return res;
 }
 
-static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_FUNCTION extend_signature, BLOCK_INFO *blocks, IO_FILES *files) {
+static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PROCESSORS *processors, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	int d = 0;
 	KSI_FTLV sub_ftlv[2];
@@ -432,13 +496,15 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 	KSI_Signature *sig = NULL;
 	KSI_Signature *ext = NULL;
 	KSI_VerificationContext context;
+	KSI_PolicyVerificationResult *verificationResult = NULL;
+	KSI_DataHash *hash = NULL;
 
-	if (set == NULL || err == NULL || ksi == NULL || extend_signature == NULL || files == NULL || blocks == NULL) {
+	memset(&context, 0, sizeof(context));
+
+	if (set == NULL || err == NULL || ksi == NULL || processors == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
-
-	KSI_VerificationContext_init(&context, ksi);
 
 	d = PARAM_SET_isSetByName(set, "d");
 
@@ -470,51 +536,81 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 		size_t record_count = 0;
 
 		record_count = buf_to_int(sub_ftlv_raw + sub_ftlv[0].off + sub_ftlv[0].hdr_len, sub_ftlv[0].dat_len);
+		/* If the block contains neither record hashes nor intermediate hashes:
+		 * Calculate missing record hashes from the records in the logfile and
+		 * build the Merkle tree according to the record count in the signature data. */
+		if (blocks->nofRecordHashes == 0) {
+			if (files->inLogFile) {
+				while (blocks->nofRecordHashes < record_count) {
+					blocks->nofRecordHashes++;
+					res = get_hash_of_logline(ksi, blocks, files, &hash);
+					ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to calculate hash of logline no. %3d.", blocks->blockNo, blocks->nofRecordHashes);
+					res = add_hash_to_merkle_tree(ksi, blocks, hash);
+					ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to add hash to Merkle tree.", blocks->blockNo);
+					KSI_DataHash_free(hash);
+					hash = NULL;
+				}
+			}
+		}
 		if (record_count != blocks->nofRecordHashes) {
 			res = KT_INVALID_INPUT_FORMAT;
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: expected %d record hashes, but found %d.", blocks->blockNo, record_count, blocks->nofRecordHashes);
 		}
 		print_progressResult(res); /* Done with parsing block signature data. */
 
-		print_progressDesc(d, "Block no. %3d: parsing and verifying KSI signature... ", blocks->blockNo);
 		sig_raw = sub_ftlv_raw + sub_ftlv[1].off + sub_ftlv[1].hdr_len;
 		sig_raw_len = sub_ftlv[1].dat_len;
 		res = calculate_root_hash(ksi, blocks, &context.documentHash);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to get root hash for verification.", blocks->blockNo);
-		res = KSI_Signature_parseWithPolicy(ksi, sig_raw, sig_raw_len, KSI_VERIFICATION_POLICY_INTERNAL, &context, &sig);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse KSI signature.", blocks->blockNo);
+
+		print_progressDesc(d, "Block no. %3d: parsing and verifying KSI signature... ", blocks->blockNo);
+		if (processors->verify_signature) {
+			res = KSI_Signature_parseWithPolicy(ksi, sig_raw, sig_raw_len, KSI_VERIFICATION_POLICY_EMPTY, NULL, &sig);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse KSI signature.", blocks->blockNo);
+
+			res = processors->verify_signature(set, err, ksi, sig, context.documentHash, &verificationResult);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: KSI signature verification failed.", blocks->blockNo);
+			/* TODO: add dumping of verification results. */
+			KSI_PolicyVerificationResult_free(verificationResult);
+			verificationResult = NULL;
+
+		} else if (processors->extend_signature) {
+			res = KSI_Signature_parseWithPolicy(ksi, sig_raw, sig_raw_len, KSI_VERIFICATION_POLICY_INTERNAL, &context, &sig);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse KSI signature.", blocks->blockNo);
+			print_progressResult(res);
+
+			res = processors->extend_signature(set, err, ksi, sig, &ext);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to extend KSI signature.", blocks->blockNo);
+
+			print_progressDesc(d, "Block no. %3d: serializing extended KSI signature... ", blocks->blockNo);
+			res = KSI_Signature_serialize(ext, &ext_raw, &ext_raw_len);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to serialize extended KSI signature.", blocks->blockNo);
+			KSI_Signature_free(ext);
+			ext = NULL;
+			print_progressResult(res);
+
+			print_progressDesc(d, "Block no. %3d: writing extended KSI signature to file... ", blocks->blockNo);
+			/* Reuse the raw buffer and adjust FTLV headers accordingly. */
+			memcpy(sig_raw, ext_raw, ext_raw_len);
+			KSI_free(ext_raw);
+			ext_raw = NULL;
+
+			blocks->ftlv.dat_len = blocks->ftlv.dat_len - sig_raw_len + ext_raw_len;
+			sub_ftlv[1].dat_len = ext_raw_len;
+			adjust_tlv_length_in_buffer(sub_ftlv_raw + sub_ftlv[1].off, &sub_ftlv[1]);
+			adjust_tlv_length_in_buffer(blocks->ftlv_raw, &blocks->ftlv);
+			blocks->ftlv_len = blocks->ftlv.hdr_len + blocks->ftlv.dat_len;
+			if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->outSigFile) != blocks->ftlv_len) {
+				res = KT_IO_ERROR;
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to write extended signature to extended log signature file.", blocks->blockNo);
+			}
+		}
+
+		KSI_Signature_free(sig);
+		sig = NULL;
 		KSI_DataHash_free(context.documentHash);
 		context.documentHash = NULL;
 		KSI_VerificationContext_clean(&context);
-		print_progressResult(res);
-
-		res = extend_signature(set, err, ksi, sig, &ext);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to extend KSI signature.", blocks->blockNo);
-		KSI_Signature_free(sig);
-		sig = NULL;
-
-		print_progressDesc(d, "Block no. %3d: serializing extended KSI signature... ", blocks->blockNo);
-		res = KSI_Signature_serialize(ext, &ext_raw, &ext_raw_len);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to serialize extended KSI signature.", blocks->blockNo);
-		KSI_Signature_free(ext);
-		ext = NULL;
-		print_progressResult(res);
-
-		print_progressDesc(d, "Block no. %3d: writing extended KSI signature to file... ", blocks->blockNo);
-		/* Reuse the raw buffer and adjust FTLV headers accordingly. */
-		memcpy(sig_raw, ext_raw, ext_raw_len);
-		KSI_free(ext_raw);
-		ext_raw = NULL;
-
-		blocks->ftlv.dat_len = blocks->ftlv.dat_len - sig_raw_len + ext_raw_len;
-		sub_ftlv[1].dat_len = ext_raw_len;
-		adjust_tlv_length_in_buffer(sub_ftlv_raw + sub_ftlv[1].off, &sub_ftlv[1]);
-		adjust_tlv_length_in_buffer(blocks->ftlv_raw, &blocks->ftlv);
-		blocks->ftlv_len = blocks->ftlv.hdr_len + blocks->ftlv.dat_len;
-		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->outFile) != blocks->ftlv_len) {
-			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to write extended signature to extended log signature file.", blocks->blockNo);
-		}
 		print_progressResult(res);
 	}
 	res = KT_OK;
@@ -525,7 +621,9 @@ cleanup:
 	KSI_Signature_free(sig);
 	KSI_Signature_free(ext);
 	KSI_DataHash_free(context.documentHash);
+	KSI_DataHash_free(hash);
 	KSI_VerificationContext_clean(&context);
+	KSI_PolicyVerificationResult_free(verificationResult);
 	return res;
 }
 
@@ -576,6 +674,7 @@ int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_
 	int res;
 	BLOCK_INFO blocks;
 	unsigned char ftlv_raw[0xffff + 4];
+	SIGNATURE_PROCESSORS processors;
 
 	if (set == NULL || err == NULL || ksi == NULL || extend_signature == NULL || files == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -584,12 +683,14 @@ int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_
 
 	memset(&blocks, 0, sizeof(blocks));
 	blocks.ftlv_raw = ftlv_raw;
+	processors.verify_signature = NULL;
+	processors.extend_signature = extend_signature;
 
 	res = process_magic_number(set, err, files);
 	if (res != KT_OK) goto cleanup;
 
-	while (!feof(files->inFile)) {
-		res = KSI_FTLV_fileRead(files->inFile, blocks.ftlv_raw, sizeof(ftlv_raw), &blocks.ftlv_len, &blocks.ftlv);
+	while (!feof(files->inSigFile)) {
+		res = KSI_FTLV_fileRead(files->inSigFile, blocks.ftlv_raw, sizeof(ftlv_raw), &blocks.ftlv_len, &blocks.ftlv);
 		if (res == KSI_OK) {
 			switch (blocks.ftlv.tag) {
 				case 0x901:
@@ -609,7 +710,7 @@ int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_
 
 				case 0x904:
 				{
-					res = process_block_signature(set, err, ksi, extend_signature, &blocks, files);
+					res = process_block_signature(set, err, ksi, &processors, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				}
 				break;
@@ -623,7 +724,84 @@ int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_
 				break;
 			}
 		} else {
-			if (feof(files->inFile)) {
+			if (feof(files->inSigFile)) {
+				res = KT_OK;
+				break;
+			} else {
+				/* File reading failed. */
+				res = KT_IO_ERROR;
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to read next TLV.");
+			}
+		}
+	}
+
+	res = finalize_log_signature(set, err, &blocks);
+	if (res != KT_OK) goto cleanup;
+
+	res = KT_OK;
+
+cleanup:
+
+	free_blocks(&blocks);
+
+	return res;
+}
+
+int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, VERIFYING_FUNCTION verify_signature, IO_FILES *files) {
+	int res;
+	BLOCK_INFO blocks;
+	unsigned char ftlv_raw[0xffff + 4];
+	SIGNATURE_PROCESSORS processors;
+
+	if (set == NULL || err == NULL || ksi == NULL || verify_signature == NULL || files == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	memset(&blocks, 0, sizeof(blocks));
+	blocks.ftlv_raw = ftlv_raw;
+	processors.verify_signature = verify_signature;
+	processors.extend_signature = NULL;
+
+	res = process_magic_number(set, err, files);
+	if (res != KT_OK) goto cleanup;
+
+	while (!feof(files->inSigFile)) {
+		res = KSI_FTLV_fileRead(files->inSigFile, blocks.ftlv_raw, sizeof(ftlv_raw), &blocks.ftlv_len, &blocks.ftlv);
+		if (res == KSI_OK) {
+			switch (blocks.ftlv.tag) {
+				case 0x901:
+					res = process_block_header(set, err, ksi, &blocks, files);
+					if (res != KT_OK) goto cleanup;
+				break;
+
+				case 0x902:
+					res = process_record_hash(set, err, ksi, &blocks, files);
+					if (res != KT_OK) goto cleanup;
+				break;
+
+				case 0x903:
+					res = process_intermediate_hash(set, err, ksi, &blocks, files);
+					if (res != KT_OK) goto cleanup;
+				break;
+
+				case 0x904:
+				{
+					res = process_block_signature(set, err, ksi, &processors, &blocks, files);
+					if (res != KT_OK) goto cleanup;
+				}
+				break;
+
+				default:
+					/* TODO: unknown TLV found. Either
+					 * 1) Warn user and skip TLV
+					 * 2) Copy TLV (maybe warn user)
+					 * 3) Abort extending with an error
+					 */
+				break;
+			}
+		} else {
+			if (feof(files->inSigFile)) {
 				res = KT_OK;
 				break;
 			} else {
