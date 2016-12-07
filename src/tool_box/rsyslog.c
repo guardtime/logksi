@@ -462,21 +462,24 @@ static int process_intermediate_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 			hash = NULL;
 		}
 	}
-	/* Find the corresponding intermediate hash from the Merkle tree. */
-	for (i = 0; i < blocks->treeHeight; i++) {
-		if (blocks->notVerified[i] != NULL) break;
-	}
-	if (i == blocks->treeHeight) {
-		res = KT_VERIFICATION_FAILURE;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unexpected intermediate hash.", blocks->blockNo);
-	}
 
-	if (!KSI_DataHash_equals(blocks->notVerified[i], tmpHash)) {
-		res = KT_VERIFICATION_FAILURE;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: intermediate hashes not equal.", blocks->blockNo);
+	if (blocks->nofRecordHashes) {
+		/* Find the corresponding intermediate hash from the Merkle tree. */
+		for (i = 0; i < blocks->treeHeight; i++) {
+			if (blocks->notVerified[i] != NULL) break;
+		}
+		if (i == blocks->treeHeight) {
+			res = KT_VERIFICATION_FAILURE;
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unexpected intermediate hash.", blocks->blockNo);
+		}
+
+		if (!KSI_DataHash_equals(blocks->notVerified[i], tmpHash)) {
+			res = KT_VERIFICATION_FAILURE;
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: intermediate hashes not equal.", blocks->blockNo);
+		}
+		KSI_DataHash_free(blocks->notVerified[i]);
+		blocks->notVerified[i] = NULL;
 	}
-	KSI_DataHash_free(blocks->notVerified[i]);
-	blocks->notVerified[i] = NULL;
 	res = KT_OK;
 
 cleanup:
@@ -499,7 +502,7 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 	KSI_PolicyVerificationResult *verificationResult = NULL;
 	KSI_DataHash *hash = NULL;
 
-	memset(&context, 0, sizeof(context));
+	KSI_VerificationContext_init(&context, ksi);
 
 	if (set == NULL || err == NULL || ksi == NULL || processors == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -552,7 +555,7 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 				}
 			}
 		}
-		if (record_count != blocks->nofRecordHashes) {
+		if (blocks->nofRecordHashes && blocks->nofRecordHashes != record_count) {
 			res = KT_INVALID_INPUT_FORMAT;
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: expected %d record hashes, but found %d.", blocks->blockNo, record_count, blocks->nofRecordHashes);
 		}
