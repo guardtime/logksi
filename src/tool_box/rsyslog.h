@@ -34,9 +34,14 @@ typedef struct {
 	char *tempSigName;
 	char *inLogName;
 	char *derivedSigName;
+	char *partsPathName;
+	char *partsBlockName;
+	char *partsSigName;
+	char *integratedSigName;
 	FILE *inSigFile;
 	FILE *outSigFile;
 	FILE *inLogFile;
+	FILE *inBlockFile;
 } IO_FILES;
 
 #define MAX_TREE_HEIGHT 10
@@ -54,9 +59,11 @@ typedef struct {
 	KSI_DataHash *lastRecordHash;
 	KSI_DataHash *MerkleTree[MAX_TREE_HEIGHT];
 	KSI_DataHash *notVerified[MAX_TREE_HEIGHT];
+	KSI_DataHash *rootHash;
 	unsigned char treeHeight;
 	unsigned char balanced;
 } BLOCK_INFO;
 
 int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_FUNCTION extend_signature, IO_FILES *files);
 int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, VERIFYING_FUNCTION verify_signature, IO_FILES *files);
+int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files);

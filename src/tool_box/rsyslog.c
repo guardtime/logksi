@@ -251,8 +251,15 @@ static int process_magic_number(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files)
 	size_t count = 0;
 	size_t magicLength = strlen("LOGSIG11");
 	int d = 0;
+	FILE *in = NULL;
 
-	if (set == NULL || err == NULL || files == NULL || files->inSigFile == NULL) {
+	if (set == NULL || err == NULL || files == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	in = files->inBlockFile ? files->inBlockFile : files->inSigFile;
+	if (in == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
@@ -260,7 +267,8 @@ static int process_magic_number(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files)
 	d = PARAM_SET_isSetByName(set, "d");
 
 	print_progressDesc(d, "Processing magic number... ");
-	count = fread(buf, 1, magicLength, files->inSigFile);
+
+	count = fread(buf, 1, magicLength, in);
 	if (count != magicLength || strncmp(buf, "LOGSIG11", magicLength)) {
 		res = KT_INVALID_INPUT_FORMAT;
 		ERR_CATCH_MSG(err, res, "Error: Magic number not found at the beginning of log signature file.");
@@ -356,6 +364,8 @@ static int process_block_header(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BL
 	}
 	blocks->treeHeight = 0;
 	blocks->balanced = 0;
+	KSI_DataHash_free(blocks->rootHash);
+	blocks->rootHash = NULL;
 
 	res = KT_OK;
 
@@ -630,6 +640,164 @@ cleanup:
 	return res;
 }
 
+static int process_partial_block(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
+	int res;
+	int d = 0;
+	KSI_FTLV sub_ftlv[2];
+	size_t nof_sub_ftlvs = 0;
+	unsigned char *sub_ftlv_raw = NULL;
+	KSI_DataHash *hash = NULL;
+	KSI_DataHash *rootHash = NULL;
+
+	if (set == NULL || err == NULL || ksi == NULL || files == NULL || blocks == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	d = PARAM_SET_isSetByName(set, "d");
+
+	print_progressDesc(d, "Block no. %3d: processing partial block data... ", blocks->blockNo);
+
+	blocks->sigNo++;
+	if (blocks->sigNo > blocks->blockNo) {
+		res = KT_INVALID_INPUT_FORMAT;
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: block signature data without preceding block header found.", blocks->sigNo);
+	}
+
+	sub_ftlv_raw = blocks->ftlv_raw + blocks->ftlv.hdr_len;
+	res = KSI_FTLV_memReadN(sub_ftlv_raw, blocks->ftlv_len - blocks->ftlv.hdr_len, sub_ftlv, 2, &nof_sub_ftlvs);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse block signature data.", blocks->blockNo);
+	if (nof_sub_ftlvs != 2) {
+		res = KT_INVALID_INPUT_FORMAT;
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse block signature data.", blocks->blockNo);
+	} else if (sub_ftlv[0].tag != 0x01) {
+		res = KT_INVALID_INPUT_FORMAT;
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse record count.", blocks->blockNo);
+	} else if (sub_ftlv[1].tag != 0x02) {
+		res = KT_INVALID_INPUT_FORMAT;
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse root hash.", blocks->blockNo);
+	} else {
+		unsigned char *imprint_raw = NULL;
+		size_t imprint_raw_len = 0;
+		size_t record_count = 0;
+
+		record_count = buf_to_int(sub_ftlv_raw + sub_ftlv[0].off + sub_ftlv[0].hdr_len, sub_ftlv[0].dat_len);
+		if (blocks->nofRecordHashes && blocks->nofRecordHashes != record_count) {
+			res = KT_INVALID_INPUT_FORMAT;
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: expected %d record hashes, but found %d.", blocks->blockNo, record_count, blocks->nofRecordHashes);
+		}
+
+		imprint_raw = sub_ftlv_raw + sub_ftlv[1].off + sub_ftlv[1].hdr_len;
+		imprint_raw_len = sub_ftlv[1].dat_len;
+		res = KSI_DataHash_fromImprint(ksi, imprint_raw, imprint_raw_len, &hash);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse root hash.", blocks->blockNo);
+
+		res = calculate_root_hash(ksi, blocks, &rootHash);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to calculate root hash.", blocks->blockNo);
+		if (!KSI_DataHash_equals(hash, rootHash)) {
+			res = KT_VERIFICATION_FAILURE;
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: root hashes not equal.", blocks->blockNo);
+		}
+		blocks->rootHash = hash;
+		hash = NULL;
+		print_progressResult(res); /* Done with parsing block signature data. */
+
+		/* Do your work here. */
+	}
+	res = KT_OK;
+
+cleanup:
+
+	print_progressResult(res);
+	KSI_DataHash_free(rootHash);
+	return res;
+}
+
+static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
+	int res;
+	int d = 0;
+	KSI_FTLV sub_ftlv[3];
+	size_t nof_sub_ftlvs = 0;
+	unsigned char *sub_ftlv_raw = NULL;
+	KSI_Signature *sig = NULL;
+	KSI_DataHash *hash = NULL;
+	KSI_DataHash *tmp = NULL;
+
+	if (set == NULL || err == NULL || ksi == NULL || files == NULL || blocks == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	d = PARAM_SET_isSetByName(set, "d");
+
+	print_progressDesc(d, "Block no. %3d: processing block signature data... ", blocks->blockNo);
+
+	sub_ftlv_raw = blocks->ftlv_raw + blocks->ftlv.hdr_len;
+	res = KSI_FTLV_memReadN(sub_ftlv_raw, blocks->ftlv_len - blocks->ftlv.hdr_len, sub_ftlv, 3, &nof_sub_ftlvs);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse block signature data.", blocks->blockNo);
+	if (nof_sub_ftlvs < 2) {
+		res = KT_INVALID_INPUT_FORMAT;
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse block signature data.", blocks->blockNo);
+	} else if (sub_ftlv[0].tag != 0x01) {
+		res = KT_INVALID_INPUT_FORMAT;
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse record count.", blocks->blockNo);
+	} else {
+		size_t record_count = 0;
+
+		record_count = buf_to_int(sub_ftlv_raw + sub_ftlv[0].off + sub_ftlv[0].hdr_len, sub_ftlv[0].dat_len);
+		if (blocks->nofRecordHashes && blocks->nofRecordHashes != record_count) {
+			res = KT_INVALID_INPUT_FORMAT;
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: expected %d record hashes, but found %d.", blocks->blockNo, record_count, blocks->nofRecordHashes);
+		}
+
+		if (sub_ftlv[1].tag == 0x0905) {
+			unsigned char *sig_raw = NULL;
+			size_t sig_raw_len = 0;
+
+			sig_raw = sub_ftlv_raw + sub_ftlv[1].off + sub_ftlv[1].hdr_len;
+			sig_raw_len = sub_ftlv[1].dat_len;
+
+			res = KSI_Signature_parseWithPolicy(ksi, sig_raw, sig_raw_len, KSI_VERIFICATION_POLICY_EMPTY, NULL, &sig);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse KSI signature.", blocks->blockNo);
+
+			res = KSI_Signature_getDocumentHash(sig, &tmp);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to get root hash from KSI signature.", blocks->blockNo);
+			if (!KSI_DataHash_equals(tmp, blocks->rootHash)) {
+				res = KT_VERIFICATION_FAILURE;
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: root hashes not equal.", blocks->blockNo);
+			}
+		} else if (sub_ftlv[1].tag == 0x02) {
+			unsigned char *imprint_raw = NULL;
+			size_t imprint_raw_len = 0;
+
+			imprint_raw = sub_ftlv_raw + sub_ftlv[1].off + sub_ftlv[1].hdr_len;
+			imprint_raw_len = sub_ftlv[1].dat_len;
+			res = KSI_DataHash_fromImprint(ksi, imprint_raw, imprint_raw_len, &hash);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse root hash.", blocks->blockNo);
+
+			if (!KSI_DataHash_equals(hash, blocks->rootHash)) {
+				res = KT_VERIFICATION_FAILURE;
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: root hashes not equal.", blocks->blockNo);
+			}
+		}
+		if (files->outSigFile) {
+			if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->outSigFile) != blocks->ftlv_len) {
+				res = KT_IO_ERROR;
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to write signature data log signature file.", blocks->blockNo);
+			}
+		}
+	}
+
+	res = KT_OK;
+
+cleanup:
+
+	print_progressResult(res);
+	KSI_Signature_free(sig);
+	KSI_DataHash_free(hash);
+	return res;
+}
+
 static int finalize_log_signature(PARAM_SET *set, ERR_TRCKR *err, BLOCK_INFO *blocks) {
 	int res;
 	int d = 0;
@@ -670,6 +838,7 @@ static void free_blocks(BLOCK_INFO *blocks) {
 			KSI_DataHash_free(blocks->notVerified[i]);
 			i++;
 		}
+		KSI_DataHash_free(blocks->rootHash);
 	}
 }
 
@@ -805,6 +974,91 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, VERIFYING_
 			}
 		} else {
 			if (feof(files->inSigFile)) {
+				res = KT_OK;
+				break;
+			} else {
+				/* File reading failed. */
+				res = KT_IO_ERROR;
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to read next TLV.");
+			}
+		}
+	}
+
+	res = finalize_log_signature(set, err, &blocks);
+	if (res != KT_OK) goto cleanup;
+
+	res = KT_OK;
+
+cleanup:
+
+	free_blocks(&blocks);
+
+	return res;
+}
+
+int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files) {
+	int res;
+	BLOCK_INFO blocks;
+	unsigned char ftlv_raw[0xffff + 4];
+
+	if (set == NULL || err == NULL || ksi == NULL || files == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	memset(&blocks, 0, sizeof(blocks));
+	blocks.ftlv_raw = ftlv_raw;
+
+	res = process_magic_number(set, err, files);
+	if (res != KT_OK) goto cleanup;
+
+	while (!feof(files->inBlockFile)) {
+		res = KSI_FTLV_fileRead(files->inBlockFile, blocks.ftlv_raw, sizeof(ftlv_raw), &blocks.ftlv_len, &blocks.ftlv);
+		if (res == KSI_OK) {
+			switch (blocks.ftlv.tag) {
+				case 0x901:
+					res = process_block_header(set, err, ksi, &blocks, files);
+					if (res != KT_OK) goto cleanup;
+				break;
+
+				case 0x902:
+					res = process_record_hash(set, err, ksi, &blocks, files);
+					if (res != KT_OK) goto cleanup;
+				break;
+
+				case 0x903:
+					res = process_intermediate_hash(set, err, ksi, &blocks, files);
+					if (res != KT_OK) goto cleanup;
+				break;
+
+				case 0x904:
+				{
+					res = process_partial_block(set, err, ksi, &blocks, files);
+					if (res != KT_OK) goto cleanup;
+
+					res = KSI_FTLV_fileRead(files->inSigFile, blocks.ftlv_raw, sizeof(ftlv_raw), &blocks.ftlv_len, &blocks.ftlv);
+					if (res != KT_OK) goto cleanup;
+
+					if (blocks.ftlv.tag != 0x904) {
+						res = KT_INVALID_INPUT_FORMAT;
+						ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unexpected TLV %04X read from block-signatures file.", blocks.blockNo, blocks.ftlv.tag);
+					}
+
+					res = process_partial_signature(set, err, ksi, &blocks, files);
+					if (res != KT_OK) goto cleanup;
+				}
+				break;
+
+				default:
+					/* TODO: unknown TLV found. Either
+					 * 1) Warn user and skip TLV
+					 * 2) Copy TLV (maybe warn user)
+					 * 3) Abort extending with an error
+					 */
+				break;
+			}
+		} else {
+			if (feof(files->inBlockFile)) {
 				res = KT_OK;
 				break;
 			} else {

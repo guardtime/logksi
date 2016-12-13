@@ -189,7 +189,7 @@ char *verify_help_toString(char *buf, size_t len) {
 	size_t count = 0;
 
 	count += KSI_snprintf(buf + count, len - count,
-		"Usage:"
+		"Usage:\n"
 		" %s verify -i <log> [-s <logsignature.ls11>] [more_options]\n"
 		" %s verify --ver-int -i <log> [-s <logsignature.ls11>] [more_options]\n"
 		" %s verify --ver-cal -i <log> [-s <logsignature.ls11>] -X <URL>\n"

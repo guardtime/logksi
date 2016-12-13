@@ -441,6 +441,11 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 
 	memset(&tmp, 0, sizeof(tmp));
 
+	if (err == NULL || files == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
 	/* Default input file is stdin. */
 	if (files->inSigName == NULL || !strcmp(files->inSigName, "-")) {
 		/* Default output file is a temporary file that is copied to stdout on success. */
@@ -523,6 +528,8 @@ cleanup:
 static void close_input_and_output_files(int result, IO_FILES *files) {
 	char buf[1024];
 	size_t count = 0;
+
+	if (files == NULL) return;
 
 	if (files->inSigFile == stdin) files->inSigFile = NULL;
 	if (files->outSigFile == stdout) files->outSigFile = NULL;

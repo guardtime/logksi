@@ -37,7 +37,8 @@ LIB_OBJ = \
 	$(OBJ_DIR)\task_initializer.obj \
 	$(OBJ_DIR)\param_control.obj \
 	$(OBJ_DIR)\conf.obj \
-	$(OBJ_DIR)\rsyslog.obj
+	$(OBJ_DIR)\rsyslog.obj \
+	$(OBJ_DIR)\integrate.obj
 
 CCFLAGS = /I$(SRC_DIR) /I$(PARAM_SET_DIR) /I$(MAIN_DIR)
 CCFLAGS = $(CCFLAGS) $(CCEXTRA)
