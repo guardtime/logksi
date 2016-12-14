@@ -83,7 +83,9 @@ int integrate_run(int argc, char **argv, char **envp) {
 	res = PARAM_SET_getStr(set, "o", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.outSigName);
 	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
 
-	open_input_and_output_files(err, &files);
+	res = open_input_and_output_files(err, &files);
+	if (res != KT_OK) goto cleanup;
+
 	res = logsignature_integrate(set, err, ksi, &files);
 	if (res != KT_OK) goto cleanup;
 

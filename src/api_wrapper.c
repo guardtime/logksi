@@ -407,17 +407,10 @@ int KSITOOL_SignatureVerify_userProvidedPublicationBased(ERR_TRCKR *err, KSI_Sig
 	return res;
 }
 
-int KSITOOL_BlockSigner_closeAndSign(ERR_TRCKR *err, KSI_CTX *ctx, KSI_BlockSigner *signer) {
+int KSITOOL_createSignature(ERR_TRCKR *err, KSI_CTX *ctx, KSI_DataHash *dataHash, KSI_Signature **sig) {
 	int res;
-
-	if (err == NULL || ctx == NULL || signer == NULL) {
-		ERR_TRCKR_ADD(err, res = KT_INVALID_ARGUMENT, NULL);
-		return res;
-	}
-
-	res = KSI_BlockSigner_closeAndSign(signer);
+	res = KSI_createSignature(ctx, dataHash, sig);
 	if (res != KSI_OK) KSITOOL_KSI_ERRTrace_save(ctx);
-
 	if (appendBaseErrorIfPresent(err, res, ctx, __LINE__) == 0) {
 		appendNetworkErrors(err, res);
 		appendAggreErrors(err, res);

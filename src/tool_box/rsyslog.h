@@ -21,10 +21,12 @@
 
 typedef int (*EXTENDING_FUNCTION)(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_Signature **ext);
 typedef int (*VERIFYING_FUNCTION)(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hash, KSI_PolicyVerificationResult **verificationResult);
+typedef int (*SIGNING_FUNCTION)(ERR_TRCKR *err, KSI_CTX *ksi, KSI_DataHash *hash, KSI_Signature **sig);
 
 typedef struct {
 	VERIFYING_FUNCTION verify_signature;
 	EXTENDING_FUNCTION extend_signature;
+	SIGNING_FUNCTION create_signature;
 } SIGNATURE_PROCESSORS;
 
 typedef struct {
@@ -51,6 +53,7 @@ typedef struct {
 	unsigned char *ftlv_raw;
 	size_t ftlv_len;
 	size_t blockNo;
+	size_t partNo;
 	size_t sigNo;
 	size_t nofRecordHashes;
 	size_t nofIntermediateHashes;
@@ -67,3 +70,4 @@ typedef struct {
 int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_FUNCTION extend_signature, IO_FILES *files);
 int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, VERIFYING_FUNCTION verify_signature, IO_FILES *files);
 int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files);
+int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files);

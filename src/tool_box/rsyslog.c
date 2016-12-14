@@ -27,6 +27,48 @@
 #include <ksi/tlv_element.h>
 #include "rsyslog.h"
 
+#define KSI_TLV_MASK_TLV16 0x80u
+#define KSI_TLV_MASK_LENIENT 0x40u
+#define KSI_TLV_MASK_FORWARD 0x20u
+#define KSI_TLV_MASK_TLV8_TYPE 0x1fu
+
+static int serialize_tlv(int tag, int nc, int fw, unsigned char *src, size_t src_len, unsigned char *dst, size_t *dst_len) {
+	size_t hdr_len;
+	int res;
+
+	if (tag > 0x1FFF || src_len > 65535 || src == NULL || dst_len == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	if (tag > KSI_TLV_MASK_TLV8_TYPE || src_len > 255) {
+		hdr_len = 4;
+	} else {
+		hdr_len = 2;
+	}
+
+	if (hdr_len == 4) {
+		dst[0] = ((tag >> 8) & KSI_TLV_MASK_TLV8_TYPE);
+		dst[1] = tag & 0xFF;
+		dst[2] = (src_len >> 8) & 0xFF;
+		dst[3] = src_len & 0xFF;
+	} else {
+		dst[0] = tag & KSI_TLV_MASK_TLV8_TYPE;
+		dst[1] = src_len & 0xFF;
+	}
+	if (hdr_len == 4) dst[0] |= KSI_TLV_MASK_TLV16;
+	if (nc) dst[0] |= KSI_TLV_MASK_LENIENT;
+	if (fw) dst[0] |= KSI_TLV_MASK_FORWARD;
+
+	memcpy(dst + hdr_len, src, src_len);
+	*dst_len = src_len + hdr_len;
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
+
 static size_t buf_to_int(unsigned char *buf, size_t len) {
 	size_t val = 0;
 
@@ -604,13 +646,12 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 
 			print_progressDesc(d, "Block no. %3d: writing extended KSI signature to file... ", blocks->blockNo);
 			/* Reuse the raw buffer and adjust FTLV headers accordingly. */
-			memcpy(sig_raw, ext_raw, ext_raw_len);
+			res = serialize_tlv(0x905, 0, 0, ext_raw, ext_raw_len, sub_ftlv_raw + sub_ftlv[1].off, &sig_raw_len);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to serialize KSI signature.", blocks->blockNo);
 			KSI_free(ext_raw);
 			ext_raw = NULL;
 
-			blocks->ftlv.dat_len = blocks->ftlv.dat_len - sig_raw_len + ext_raw_len;
-			sub_ftlv[1].dat_len = ext_raw_len;
-			adjust_tlv_length_in_buffer(sub_ftlv_raw + sub_ftlv[1].off, &sub_ftlv[1]);
+			blocks->ftlv.dat_len = sub_ftlv[0].hdr_len + sub_ftlv[0].dat_len + sig_raw_len;
 			adjust_tlv_length_in_buffer(blocks->ftlv_raw, &blocks->ftlv);
 			blocks->ftlv_len = blocks->ftlv.hdr_len + blocks->ftlv.dat_len;
 			if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->outSigFile) != blocks->ftlv_len) {
@@ -658,10 +699,10 @@ static int process_partial_block(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, B
 
 	print_progressDesc(d, "Block no. %3d: processing partial block data... ", blocks->blockNo);
 
-	blocks->sigNo++;
-	if (blocks->sigNo > blocks->blockNo) {
+	blocks->partNo++;
+	if (blocks->partNo > blocks->blockNo) {
 		res = KT_INVALID_INPUT_FORMAT;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: block signature data without preceding block header found.", blocks->sigNo);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: partial block data without preceding block header found.", blocks->sigNo);
 	}
 
 	sub_ftlv_raw = blocks->ftlv_raw + blocks->ftlv.hdr_len;
@@ -713,7 +754,7 @@ cleanup:
 	return res;
 }
 
-static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
+static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PROCESSORS *processors, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	int d = 0;
 	KSI_FTLV sub_ftlv[3];
@@ -723,7 +764,7 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 	KSI_DataHash *hash = NULL;
 	KSI_DataHash *tmp = NULL;
 
-	if (set == NULL || err == NULL || ksi == NULL || files == NULL || blocks == NULL) {
+	if (set == NULL || err == NULL || ksi == NULL || processors == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
@@ -731,6 +772,12 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 	d = PARAM_SET_isSetByName(set, "d");
 
 	print_progressDesc(d, "Block no. %3d: processing block signature data... ", blocks->blockNo);
+
+	blocks->sigNo++;
+	if (blocks->sigNo > blocks->blockNo) {
+		res = KT_INVALID_INPUT_FORMAT;
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: block signature data without preceding block header found.", blocks->sigNo);
+	}
 
 	sub_ftlv_raw = blocks->ftlv_raw + blocks->ftlv.hdr_len;
 	res = KSI_FTLV_memReadN(sub_ftlv_raw, blocks->ftlv_len - blocks->ftlv.hdr_len, sub_ftlv, 3, &nof_sub_ftlvs);
@@ -762,6 +809,12 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 
 			res = KSI_Signature_getDocumentHash(sig, &tmp);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to get root hash from KSI signature.", blocks->blockNo);
+
+			if (blocks->rootHash == NULL) {
+				res = calculate_root_hash(ksi, blocks, &blocks->rootHash);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to calculate root hash.", blocks->blockNo);
+			}
+
 			if (!KSI_DataHash_equals(tmp, blocks->rootHash)) {
 				res = KT_VERIFICATION_FAILURE;
 				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: root hashes not equal.", blocks->blockNo);
@@ -769,15 +822,48 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 		} else if (sub_ftlv[1].tag == 0x02) {
 			unsigned char *imprint_raw = NULL;
 			size_t imprint_raw_len = 0;
+			unsigned char *sig_raw = NULL;
+			size_t sig_raw_len = 0;
 
 			imprint_raw = sub_ftlv_raw + sub_ftlv[1].off + sub_ftlv[1].hdr_len;
 			imprint_raw_len = sub_ftlv[1].dat_len;
 			res = KSI_DataHash_fromImprint(ksi, imprint_raw, imprint_raw_len, &hash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse root hash.", blocks->blockNo);
 
+			if (blocks->rootHash == NULL) {
+				res = calculate_root_hash(ksi, blocks, &blocks->rootHash);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to calculate root hash.", blocks->blockNo);
+			}
 			if (!KSI_DataHash_equals(hash, blocks->rootHash)) {
 				res = KT_VERIFICATION_FAILURE;
 				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: root hashes not equal.", blocks->blockNo);
+			}
+			print_progressResult(res);
+
+			if (processors->create_signature) {
+				print_progressDesc(d, "Block no. %3d: creating missing KSI signature... ", blocks->blockNo);
+				res = processors->create_signature(err, ksi, hash, &sig);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to sign root hash.", blocks->blockNo);
+				print_progressResult(res);
+
+				print_progressDesc(d, "Block no. %3d: serializing KSI signature... ", blocks->blockNo);
+				res = KSI_Signature_serialize(sig, &sig_raw, &sig_raw_len);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to serialize KSI signature.", blocks->blockNo);
+				KSI_Signature_free(sig);
+				sig = NULL;
+				print_progressResult(res);
+
+				print_progressDesc(d, "Block no. %3d: writing KSI signature to file... ", blocks->blockNo);
+				/* Reuse the raw buffer and adjust FTLV headers accordingly. */
+
+				res = serialize_tlv(0x905, 0, 0, sig_raw, sig_raw_len, sub_ftlv_raw + sub_ftlv[1].off, &imprint_raw_len);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to serialize KSI signature.", blocks->blockNo);
+				KSI_free(sig_raw);
+				sig_raw = NULL;
+
+				blocks->ftlv.dat_len = sub_ftlv[0].hdr_len + sub_ftlv[0].dat_len + imprint_raw_len;
+				adjust_tlv_length_in_buffer(blocks->ftlv_raw, &blocks->ftlv);
+				blocks->ftlv_len = blocks->ftlv.hdr_len + blocks->ftlv.dat_len;
 			}
 		}
 		if (files->outSigFile) {
@@ -1000,6 +1086,7 @@ int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILE
 	int res;
 	BLOCK_INFO blocks;
 	unsigned char ftlv_raw[0xffff + 4];
+	SIGNATURE_PROCESSORS processors;
 
 	if (set == NULL || err == NULL || ksi == NULL || files == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -1008,6 +1095,7 @@ int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILE
 
 	memset(&blocks, 0, sizeof(blocks));
 	blocks.ftlv_raw = ftlv_raw;
+	processors.create_signature = NULL;
 
 	res = process_magic_number(set, err, files);
 	if (res != KT_OK) goto cleanup;
@@ -1044,7 +1132,7 @@ int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILE
 						ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unexpected TLV %04X read from block-signatures file.", blocks.blockNo, blocks.ftlv.tag);
 					}
 
-					res = process_partial_signature(set, err, ksi, &blocks, files);
+					res = process_partial_signature(set, err, ksi, &processors, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				}
 				break;
@@ -1080,3 +1168,80 @@ cleanup:
 
 	return res;
 }
+
+int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files) {
+	int res;
+	BLOCK_INFO blocks;
+	unsigned char ftlv_raw[0xffff + 4];
+	SIGNATURE_PROCESSORS processors;
+
+	if (set == NULL || err == NULL || ksi == NULL || files == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	memset(&blocks, 0, sizeof(blocks));
+	blocks.ftlv_raw = ftlv_raw;
+	processors.create_signature = KSITOOL_createSignature;
+
+	res = process_magic_number(set, err, files);
+	if (res != KT_OK) goto cleanup;
+
+	while (!feof(files->inSigFile)) {
+		res = KSI_FTLV_fileRead(files->inSigFile, blocks.ftlv_raw, sizeof(ftlv_raw), &blocks.ftlv_len, &blocks.ftlv);
+		if (res == KSI_OK) {
+			switch (blocks.ftlv.tag) {
+				case 0x901:
+					res = process_block_header(set, err, ksi, &blocks, files);
+					if (res != KT_OK) goto cleanup;
+				break;
+
+				case 0x902:
+					res = process_record_hash(set, err, ksi, &blocks, files);
+					if (res != KT_OK) goto cleanup;
+				break;
+
+				case 0x903:
+					res = process_intermediate_hash(set, err, ksi, &blocks, files);
+					if (res != KT_OK) goto cleanup;
+				break;
+
+				case 0x904:
+				{
+					res = process_partial_signature(set, err, ksi, &processors, &blocks, files);
+					if (res != KT_OK) goto cleanup;
+				}
+				break;
+
+				default:
+					/* TODO: unknown TLV found. Either
+					 * 1) Warn user and skip TLV
+					 * 2) Copy TLV (maybe warn user)
+					 * 3) Abort extending with an error
+					 */
+				break;
+			}
+		} else {
+			if (feof(files->inSigFile)) {
+				res = KT_OK;
+				break;
+			} else {
+				/* File reading failed. */
+				res = KT_IO_ERROR;
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to read next TLV.");
+			}
+		}
+	}
+
+	res = finalize_log_signature(set, err, &blocks);
+	if (res != KT_OK) goto cleanup;
+
+	res = KT_OK;
+
+cleanup:
+
+	free_blocks(&blocks);
+
+	return res;
+}
+
