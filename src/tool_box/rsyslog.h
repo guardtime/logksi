@@ -46,7 +46,7 @@ typedef struct {
 	FILE *inBlockFile;
 } IO_FILES;
 
-#define MAX_TREE_HEIGHT 10
+#define MAX_TREE_HEIGHT 31
 
 typedef struct {
 	KSI_FTLV ftlv;
@@ -59,7 +59,7 @@ typedef struct {
 	size_t nofIntermediateHashes;
 	KSI_HashAlgorithm hashAlgo;
 	KSI_OctetString *randomSeed;
-	KSI_DataHash *lastRecordHash;
+	KSI_DataHash *prevLeaf;
 	KSI_DataHash *MerkleTree[MAX_TREE_HEIGHT];
 	KSI_DataHash *notVerified[MAX_TREE_HEIGHT];
 	KSI_DataHash *rootHash;

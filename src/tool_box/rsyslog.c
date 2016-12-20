@@ -60,7 +60,9 @@ static int serialize_tlv(int tag, int nc, int fw, unsigned char *src, size_t src
 	if (nc) dst[0] |= KSI_TLV_MASK_LENIENT;
 	if (fw) dst[0] |= KSI_TLV_MASK_FORWARD;
 
-	memcpy(dst + hdr_len, src, src_len);
+	if (dst + hdr_len != src) {
+		memmove(dst + hdr_len, src, src_len);
+	}
 	*dst_len = src_len + hdr_len;
 	res = KT_OK;
 
@@ -76,16 +78,6 @@ static size_t buf_to_int(unsigned char *buf, size_t len) {
 		val = val * 256  + *buf++;
 	}
 	return val;
-}
-
-static void adjust_tlv_length_in_buffer(unsigned char *raw, KSI_FTLV *ftlv) {
-	size_t val = ftlv->dat_len;
-	size_t i = ftlv->hdr_len;
-
-	while (i-- > ftlv->hdr_len / 2) {
-		raw[i] = val & 0xFF;
-		val = (val >> 8);
-	}
 }
 
 static int calculate_new_intermediate_hash(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *leftHash, KSI_DataHash *rightHash, unsigned char level, KSI_DataHash **nodeHash) {
@@ -133,7 +125,7 @@ static int calculate_new_leaf_hash(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHas
 
 	res = KSI_DataHasher_open(ksi, blocks->hashAlgo, &hasher);
 	if (res != KSI_OK) goto cleanup;
-	res = KSI_DataHasher_addImprint(hasher, blocks->lastRecordHash);
+	res = KSI_DataHasher_addImprint(hasher, blocks->prevLeaf);
 	if (res != KSI_OK) goto cleanup;
 	res = KSI_DataHasher_addOctetString(hasher, blocks->randomSeed);
 	if (res != KSI_OK) goto cleanup;
@@ -234,8 +226,8 @@ int add_hash_to_merkle_tree(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *hash
 		blocks->balanced = 1;
 	}
 
-	KSI_DataHash_free(blocks->lastRecordHash);
-	blocks->lastRecordHash = lastHash;
+	KSI_DataHash_free(blocks->prevLeaf);
+	blocks->prevLeaf = lastHash;
 	lastHash = NULL;
 	right = NULL;
 	tmp = NULL;
@@ -393,8 +385,14 @@ static int process_block_header(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BL
 	KSI_OctetString_free(blocks->randomSeed);
 	blocks->randomSeed = tmpSeed;
 	tmpSeed = NULL;
-	KSI_DataHash_free(blocks->lastRecordHash);
-	blocks->lastRecordHash = tmpHash;
+	if (blocks->prevLeaf != NULL) {
+		if (!KSI_DataHash_equals(blocks->prevLeaf, tmpHash)) {
+			res = KT_VERIFICATION_FAILURE;
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: previous leaf hashes not equal.", blocks->blockNo);
+		}
+	}
+	KSI_DataHash_free(blocks->prevLeaf);
+	blocks->prevLeaf = tmpHash;
 	tmpHash = NULL;
 
 	while (i < blocks->treeHeight) {
@@ -651,9 +649,13 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 			KSI_free(ext_raw);
 			ext_raw = NULL;
 
-			blocks->ftlv.dat_len = sub_ftlv[0].hdr_len + sub_ftlv[0].dat_len + sig_raw_len;
-			adjust_tlv_length_in_buffer(blocks->ftlv_raw, &blocks->ftlv);
-			blocks->ftlv_len = blocks->ftlv.hdr_len + blocks->ftlv.dat_len;
+			res = serialize_tlv(0x904, 0, 0,
+								blocks->ftlv_raw + blocks->ftlv.hdr_len,
+								sub_ftlv[0].hdr_len + sub_ftlv[0].dat_len + sig_raw_len,
+								blocks->ftlv_raw,
+								&blocks->ftlv_len);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to serialize KSI signature.", blocks->blockNo);
+
 			if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->outSigFile) != blocks->ftlv_len) {
 				res = KT_IO_ERROR;
 				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to write extended signature to extended log signature file.", blocks->blockNo);
@@ -861,9 +863,12 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 				KSI_free(sig_raw);
 				sig_raw = NULL;
 
-				blocks->ftlv.dat_len = sub_ftlv[0].hdr_len + sub_ftlv[0].dat_len + imprint_raw_len;
-				adjust_tlv_length_in_buffer(blocks->ftlv_raw, &blocks->ftlv);
-				blocks->ftlv_len = blocks->ftlv.hdr_len + blocks->ftlv.dat_len;
+				res = serialize_tlv(0x904, 0, 0,
+									blocks->ftlv_raw + blocks->ftlv.hdr_len,
+									sub_ftlv[0].hdr_len + sub_ftlv[0].dat_len + imprint_raw_len,
+									blocks->ftlv_raw,
+									&blocks->ftlv_len);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to serialize KSI signature.", blocks->blockNo);
 			}
 		}
 		if (files->outSigFile) {
@@ -917,7 +922,7 @@ static void free_blocks(BLOCK_INFO *blocks) {
 	unsigned char i = 0;
 
 	if (blocks) {
-		KSI_DataHash_free(blocks->lastRecordHash);
+		KSI_DataHash_free(blocks->prevLeaf);
 		KSI_OctetString_free(blocks->randomSeed);
 		while (i < blocks->treeHeight) {
 			KSI_DataHash_free(blocks->MerkleTree[i]);
