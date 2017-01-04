@@ -24,7 +24,8 @@
 #include "ksitool_err.h"
 #include "api_wrapper.h"
 #include "debug_print.h"
-#include <ksi/tlv_element.h>
+//#include <ksi/tlv_element.h>
+#include <../../libksi/src/ksi/tlv_element.h>
 #include "rsyslog.h"
 
 #define KSI_TLV_MASK_TLV16 0x80u
@@ -279,6 +280,116 @@ static size_t max_intermediate_records(size_t nof_records) {
 	return max;
 }
 
+int tlv_element_get_uint(KSI_TlvElement *tlv, KSI_CTX *ksi, unsigned tag, KSI_uint64_t *out) {
+	int res;
+	KSI_Integer *tmp = NULL;
+
+	res = KSI_TlvElement_getInteger(tlv, ksi, tag, &tmp);
+	if (res != KSI_OK) goto cleanup;
+	if (tmp == NULL) {
+		res = KT_INVALID_INPUT_FORMAT;
+		goto cleanup;
+	}
+
+	*out = KSI_Integer_getUInt64(tmp);
+	res = KT_OK;
+
+cleanup:
+
+	KSI_Integer_free(tmp);
+	return res;
+}
+
+int tlv_get_octet_string(KSI_TlvElement *tlv, KSI_CTX *ksi, unsigned tag, KSI_OctetString **out) {
+	int res;
+	KSI_OctetString *tmp = NULL;
+
+	res = KSI_TlvElement_getOctetString(tlv, ksi, tag, &tmp);
+	if (res != KSI_OK) goto cleanup;
+	if (tmp == NULL) {
+		res = KT_INVALID_INPUT_FORMAT;
+		goto cleanup;
+	}
+
+	*out = tmp;
+	tmp = NULL;
+	res = KT_OK;
+
+cleanup:
+
+	KSI_OctetString_free(tmp);
+	return res;
+}
+
+int tlv_element_get_hash(KSI_TlvElement *tlv, KSI_CTX *ksi, unsigned tag, KSI_DataHash **out) {
+	int res;
+	KSI_OctetString *tmp = NULL;
+	KSI_DataHash *hash = NULL;
+	unsigned char *imprint = NULL;
+	size_t imprint_len = 0;
+
+	res = KSI_TlvElement_getOctetString(tlv, ksi, tag, &tmp);
+	if (res != KSI_OK) goto cleanup;
+	if (tmp == NULL) {
+		res = KT_INVALID_INPUT_FORMAT;
+		goto cleanup;
+	}
+
+	res = KSI_OctetString_extract(tmp, &imprint, &imprint_len);
+	if (res != KSI_OK) goto cleanup;
+
+	res = KSI_DataHash_fromImprint(ksi, imprint, imprint_len, &hash);
+	if (res != KSI_OK) goto cleanup;
+
+	*out = hash;
+	hash = NULL;
+	res = KT_OK;
+
+cleanup:
+
+	KSI_OctetString_free(tmp);
+	KSI_DataHash_free(hash);
+	return res;
+}
+
+int tlv_element_set_uint(KSI_TlvElement *tlv, KSI_CTX *ksi, unsigned tag, KSI_uint64_t val) {
+	int res;
+	KSI_Integer *tmp = NULL;
+
+	res = KSI_Integer_new(ksi, val, &tmp);
+	if (res != KSI_OK) goto cleanup;
+
+	res = KSI_TlvElement_setInteger(tlv, tag, tmp);
+	if (res != KSI_OK) goto cleanup;
+
+cleanup:
+
+	KSI_Integer_free(tmp);
+	return res;
+}
+
+int tlv_element_set_signature(KSI_TlvElement *tlv, KSI_CTX *ksi, unsigned tag, KSI_Signature *sig) {
+	int res;
+	KSI_OctetString *tmp = NULL;
+	unsigned char *buf = NULL;
+	size_t len = 0;
+
+	res = KSI_Signature_serialize(sig, &buf, &len);
+	if (res != KSI_OK) goto cleanup;
+
+	res = KSI_OctetString_new(ksi, buf, len, &tmp);
+	if (res != KSI_OK) goto cleanup;
+
+	res = KSI_TlvElement_setOctetString(tlv, tag, tmp);
+	if (res != KSI_OK) goto cleanup;
+
+cleanup:
+
+	KSI_OctetString_free(tmp);
+	KSI_free(buf);
+	return res;
+}
+
 static int process_magic_number(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files) {
 	int res;
 	char buf[10];
@@ -299,7 +410,6 @@ static int process_magic_number(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files)
 	}
 
 	d = PARAM_SET_isSetByName(set, "d");
-
 	print_progressDesc(d, "Processing magic number... ");
 
 	count = fread(buf, 1, magicLength, in);
@@ -327,12 +437,11 @@ cleanup:
 static int process_block_header(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	int d = 0;
-	KSI_FTLV sub_ftlv[3];
-	size_t nof_sub_ftlvs = 0;
-	unsigned char *sub_ftlv_raw = NULL;
-	KSI_OctetString *tmpSeed = NULL;
-	KSI_DataHash *tmpHash = NULL;
+	KSI_OctetString *seed = NULL;
+	KSI_DataHash *hash = NULL;
 	unsigned char i = 0;
+	KSI_TlvElement *tlv = NULL;
+	KSI_uint64_t algo;
 
 	if (set == NULL || err == NULL || ksi == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -340,8 +449,8 @@ static int process_block_header(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BL
 	}
 
 	d = PARAM_SET_isSetByName(set, "d");
-
 	print_progressDesc(d, "Block no. %3d: processing block header... ", blocks->blockNo + 1);
+
 	if (blocks->blockNo > blocks->sigNo) {
 		res = KT_INVALID_INPUT_FORMAT;
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: block signature data missing.", blocks->blockNo);
@@ -350,29 +459,24 @@ static int process_block_header(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BL
 	blocks->nofRecordHashes = 0;
 	blocks->nofIntermediateHashes = 0;
 
-	sub_ftlv_raw = blocks->ftlv_raw + blocks->ftlv.hdr_len;
-	res = KSI_FTLV_memReadN(sub_ftlv_raw, blocks->ftlv_len - blocks->ftlv.hdr_len, sub_ftlv, 3, &nof_sub_ftlvs);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse block header data.", blocks->blockNo);
+	res = KSI_TlvElement_parse(blocks->ftlv_raw, blocks->ftlv_len, &tlv);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse block header as TLV element.", blocks->blockNo);
 
-	if (nof_sub_ftlvs != 3) {
-		res = KT_INVALID_INPUT_FORMAT;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse block header data.", blocks->blockNo);
-	} else if (sub_ftlv[0].tag != 0x01) {
-		res = KT_INVALID_INPUT_FORMAT;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse hash algorithm.", blocks->blockNo);
-	} else if (sub_ftlv[1].tag != 0x02) {
-		res = KT_INVALID_INPUT_FORMAT;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse random seed.", blocks->blockNo);
-	} else if (sub_ftlv[2].tag != 0x03) {
-		res = KT_INVALID_INPUT_FORMAT;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse last hash of previous block.", blocks->blockNo);
+	res = tlv_element_get_uint(tlv, ksi, 0x01, &algo);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse hash algorithm.", blocks->blockNo);
+
+	res = tlv_get_octet_string(tlv, ksi, 0x02, &seed);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse random seed.", blocks->blockNo);
+
+	res = tlv_element_get_hash(tlv, ksi, 0x03, &hash);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse last hash of previous block.", blocks->blockNo);
+
+	if (blocks->prevLeaf != NULL) {
+		if (!KSI_DataHash_equals(blocks->prevLeaf, hash)) {
+			res = KT_VERIFICATION_FAILURE;
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: previous leaf hashes not equal.", blocks->blockNo);
+		}
 	}
-
-	res = KSI_OctetString_new(ksi, sub_ftlv_raw + sub_ftlv[1].off + sub_ftlv[1].hdr_len, sub_ftlv[1].dat_len, &tmpSeed);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to create random seed.", blocks->blockNo);
-
-	res = KSI_DataHash_fromImprint(ksi, sub_ftlv_raw + sub_ftlv[2].off + sub_ftlv[2].hdr_len, sub_ftlv[2].dat_len, &tmpHash);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to create hash of previous block.", blocks->blockNo);
 
 	if (files->outSigFile) {
 		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->outSigFile) != blocks->ftlv_len) {
@@ -381,19 +485,13 @@ static int process_block_header(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BL
 		}
 	}
 
-	blocks->hashAlgo = buf_to_int(sub_ftlv_raw + sub_ftlv[0].off + sub_ftlv[0].hdr_len, sub_ftlv[0].dat_len);
+	blocks->hashAlgo = algo;
 	KSI_OctetString_free(blocks->randomSeed);
-	blocks->randomSeed = tmpSeed;
-	tmpSeed = NULL;
-	if (blocks->prevLeaf != NULL) {
-		if (!KSI_DataHash_equals(blocks->prevLeaf, tmpHash)) {
-			res = KT_VERIFICATION_FAILURE;
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: previous leaf hashes not equal.", blocks->blockNo);
-		}
-	}
+	blocks->randomSeed = seed;
+	seed = NULL;
 	KSI_DataHash_free(blocks->prevLeaf);
-	blocks->prevLeaf = tmpHash;
-	tmpHash = NULL;
+	blocks->prevLeaf = hash;
+	hash = NULL;
 
 	while (i < blocks->treeHeight) {
 		KSI_DataHash_free(blocks->MerkleTree[i]);
@@ -412,8 +510,9 @@ static int process_block_header(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BL
 cleanup:
 
 	print_progressResult(res);
-	KSI_OctetString_free(tmpSeed);
-	KSI_DataHash_free(tmpHash);
+	KSI_OctetString_free(seed);
+	KSI_DataHash_free(hash);
+	KSI_TlvElement_free(tlv);
 	return res;
 }
 
@@ -429,8 +528,8 @@ static int process_record_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLO
 	}
 
 	d = PARAM_SET_isSetByName(set, "d");
-
 	print_progressDesc(d, "Block no. %3d: processing record hash... ", blocks->blockNo);
+
 	if (blocks->blockNo == blocks->sigNo) {
 		res = KT_INVALID_INPUT_FORMAT;
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: record hash without preceding block header found.", blocks->blockNo + 1);
@@ -482,8 +581,8 @@ static int process_intermediate_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 	}
 
 	d = PARAM_SET_isSetByName(set, "d");
-
 	print_progressDesc(d, "Block no. %3d: processing intermediate hash... ", blocks->blockNo);
+
 	if (blocks->blockNo == blocks->sigNo) {
 		res = KT_INVALID_INPUT_FORMAT;
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: intermediate hash without preceding block header found.", blocks->blockNo + 1);
@@ -543,14 +642,14 @@ cleanup:
 static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PROCESSORS *processors, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	int d = 0;
-	KSI_FTLV sub_ftlv[2];
-	size_t nof_sub_ftlvs = 0;
-	unsigned char *sub_ftlv_raw = NULL;
 	KSI_Signature *sig = NULL;
 	KSI_Signature *ext = NULL;
 	KSI_VerificationContext context;
 	KSI_PolicyVerificationResult *verificationResult = NULL;
 	KSI_DataHash *hash = NULL;
+	KSI_TlvElement *tlv = NULL;
+	KSI_TlvElement *tlvSig = NULL;
+	size_t record_count = 0;
 
 	KSI_VerificationContext_init(&context, ksi);
 
@@ -560,7 +659,6 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 	}
 
 	d = PARAM_SET_isSetByName(set, "d");
-
 	print_progressDesc(d, "Block no. %3d: processing block signature data... ", blocks->blockNo);
 
 	blocks->sigNo++;
@@ -569,105 +667,75 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: block signature data without preceding block header found.", blocks->sigNo);
 	}
 
-	sub_ftlv_raw = blocks->ftlv_raw + blocks->ftlv.hdr_len;
-	res = KSI_FTLV_memReadN(sub_ftlv_raw, blocks->ftlv_len - blocks->ftlv.hdr_len, sub_ftlv, 2, &nof_sub_ftlvs);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse block signature data.", blocks->blockNo);
-	if (nof_sub_ftlvs != 2) {
-		res = KT_INVALID_INPUT_FORMAT;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse block signature data.", blocks->blockNo);
-	} else if (sub_ftlv[0].tag != 0x01) {
-		res = KT_INVALID_INPUT_FORMAT;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse record count.", blocks->blockNo);
-	} else if (sub_ftlv[1].tag != 0x0905) {
-		res = KT_INVALID_INPUT_FORMAT;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unsupported block signature type %04X found.", blocks->blockNo, sub_ftlv[1].tag);
-	} else {
-		unsigned char *sig_raw = NULL;
-		size_t sig_raw_len = 0;
-		unsigned char *ext_raw = NULL;
-		size_t ext_raw_len = 0;
-		size_t record_count = 0;
+	res = KSI_TlvElement_parse(blocks->ftlv_raw, blocks->ftlv_len, &tlv);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse block signature as TLV element.", blocks->blockNo);
 
-		record_count = buf_to_int(sub_ftlv_raw + sub_ftlv[0].off + sub_ftlv[0].hdr_len, sub_ftlv[0].dat_len);
-		/* If the block contains neither record hashes nor intermediate hashes:
-		 * Calculate missing record hashes from the records in the logfile and
-		 * build the Merkle tree according to the record count in the signature data. */
-		if (blocks->nofRecordHashes == 0) {
-			if (files->inLogFile) {
-				while (blocks->nofRecordHashes < record_count) {
-					blocks->nofRecordHashes++;
-					res = get_hash_of_logline(ksi, blocks, files, &hash);
-					ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to calculate hash of logline no. %3d.", blocks->blockNo, blocks->nofRecordHashes);
-					res = add_hash_to_merkle_tree(ksi, blocks, hash);
-					ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to add hash to Merkle tree.", blocks->blockNo);
-					KSI_DataHash_free(hash);
-					hash = NULL;
-				}
+	res = tlv_element_get_uint(tlv, ksi, 0x01, &record_count);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse record count.", blocks->blockNo);
+
+	res = KSI_TlvElement_getElement(tlv, 0x905, &tlvSig);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse KSI signature.", blocks->blockNo);
+
+	/* If the block contains neither record hashes nor intermediate hashes:
+	 * Calculate missing record hashes from the records in the logfile and
+	 * build the Merkle tree according to the record count in the signature data. */
+	if (blocks->nofRecordHashes == 0) {
+		if (files->inLogFile) {
+			while (blocks->nofRecordHashes < record_count) {
+				blocks->nofRecordHashes++;
+				res = get_hash_of_logline(ksi, blocks, files, &hash);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to calculate hash of logline no. %3d.", blocks->blockNo, blocks->nofRecordHashes);
+				res = add_hash_to_merkle_tree(ksi, blocks, hash);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to add hash to Merkle tree.", blocks->blockNo);
+				KSI_DataHash_free(hash);
+				hash = NULL;
 			}
 		}
-		if (blocks->nofRecordHashes && blocks->nofRecordHashes != record_count) {
-			res = KT_INVALID_INPUT_FORMAT;
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: expected %d record hashes, but found %d.", blocks->blockNo, record_count, blocks->nofRecordHashes);
-		}
-		print_progressResult(res); /* Done with parsing block signature data. */
+	}
+	if (blocks->nofRecordHashes && blocks->nofRecordHashes != record_count) {
+		res = KT_INVALID_INPUT_FORMAT;
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: expected %d record hashes, but found %d.", blocks->blockNo, record_count, blocks->nofRecordHashes);
+	}
+	print_progressResult(res);
+	print_progressDesc(d, "Block no. %3d: verifying KSI signature... ", blocks->blockNo);
 
-		sig_raw = sub_ftlv_raw + sub_ftlv[1].off + sub_ftlv[1].hdr_len;
-		sig_raw_len = sub_ftlv[1].dat_len;
-		res = calculate_root_hash(ksi, blocks, &context.documentHash);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to get root hash for verification.", blocks->blockNo);
+	res = calculate_root_hash(ksi, blocks, &context.documentHash);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to get root hash for verification.", blocks->blockNo);
 
-		print_progressDesc(d, "Block no. %3d: parsing and verifying KSI signature... ", blocks->blockNo);
-		if (processors->verify_signature) {
-			res = KSI_Signature_parseWithPolicy(ksi, sig_raw, sig_raw_len, KSI_VERIFICATION_POLICY_EMPTY, NULL, &sig);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse KSI signature.", blocks->blockNo);
+	if (processors->verify_signature) {
+		res = KSI_Signature_parseWithPolicy(ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_EMPTY, NULL, &sig);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse KSI signature.", blocks->blockNo);
 
-			res = processors->verify_signature(set, err, ksi, sig, context.documentHash, &verificationResult);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: KSI signature verification failed.", blocks->blockNo);
-			/* TODO: add dumping of verification results. */
-			KSI_PolicyVerificationResult_free(verificationResult);
-			verificationResult = NULL;
+		res = processors->verify_signature(set, err, ksi, sig, context.documentHash, &verificationResult);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: KSI signature verification failed.", blocks->blockNo);
+		/* TODO: add dumping of verification results. */
+		KSI_PolicyVerificationResult_free(verificationResult);
+		verificationResult = NULL;
 
-		} else if (processors->extend_signature) {
-			res = KSI_Signature_parseWithPolicy(ksi, sig_raw, sig_raw_len, KSI_VERIFICATION_POLICY_INTERNAL, &context, &sig);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse KSI signature.", blocks->blockNo);
-			print_progressResult(res);
+	} else if (processors->extend_signature) {
+		res = KSI_Signature_parseWithPolicy(ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_INTERNAL, &context, &sig);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse KSI signature.", blocks->blockNo);
 
-			res = processors->extend_signature(set, err, ksi, sig, &ext);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to extend KSI signature.", blocks->blockNo);
+		print_progressResult(res);
+		print_progressDesc(d, "Block no. %3d: extending KSI signature... ", blocks->blockNo);
 
-			print_progressDesc(d, "Block no. %3d: serializing extended KSI signature... ", blocks->blockNo);
-			res = KSI_Signature_serialize(ext, &ext_raw, &ext_raw_len);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to serialize extended KSI signature.", blocks->blockNo);
-			KSI_Signature_free(ext);
-			ext = NULL;
-			print_progressResult(res);
+		res = processors->extend_signature(set, err, ksi, sig, &ext);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to extend KSI signature.", blocks->blockNo);
 
-			print_progressDesc(d, "Block no. %3d: writing extended KSI signature to file... ", blocks->blockNo);
-			/* Reuse the raw buffer and adjust FTLV headers accordingly. */
-			res = serialize_tlv(0x905, 0, 0, ext_raw, ext_raw_len, sub_ftlv_raw + sub_ftlv[1].off, &sig_raw_len);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to serialize KSI signature.", blocks->blockNo);
-			KSI_free(ext_raw);
-			ext_raw = NULL;
+		res = tlv_element_set_signature(tlv, ksi, 0x905, ext);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to serialize extended KSI signature.", blocks->blockNo);
 
-			res = serialize_tlv(0x904, 0, 0,
-								blocks->ftlv_raw + blocks->ftlv.hdr_len,
-								sub_ftlv[0].hdr_len + sub_ftlv[0].dat_len + sig_raw_len,
-								blocks->ftlv_raw,
-								&blocks->ftlv_len);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to serialize KSI signature.", blocks->blockNo);
+		res = KSI_TlvElement_serialize(tlv, blocks->ftlv_raw, 0xffff + 4, &blocks->ftlv_len, 0);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to serialize extended block signature.", blocks->blockNo);
 
-			if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->outSigFile) != blocks->ftlv_len) {
-				res = KT_IO_ERROR;
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to write extended signature to extended log signature file.", blocks->blockNo);
-			}
+		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->outSigFile) != blocks->ftlv_len) {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to write extended signature to extended log signature file.", blocks->blockNo);
 		}
 
-		KSI_Signature_free(sig);
-		sig = NULL;
 		KSI_DataHash_free(context.documentHash);
 		context.documentHash = NULL;
 		KSI_VerificationContext_clean(&context);
-		print_progressResult(res);
 	}
 	res = KT_OK;
 
@@ -680,17 +748,18 @@ cleanup:
 	KSI_DataHash_free(hash);
 	KSI_VerificationContext_clean(&context);
 	KSI_PolicyVerificationResult_free(verificationResult);
+	KSI_TlvElement_free(tlvSig);
+	KSI_TlvElement_free(tlv);
 	return res;
 }
 
 static int process_partial_block(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	int d = 0;
-	KSI_FTLV sub_ftlv[2];
-	size_t nof_sub_ftlvs = 0;
-	unsigned char *sub_ftlv_raw = NULL;
 	KSI_DataHash *hash = NULL;
 	KSI_DataHash *rootHash = NULL;
+	KSI_TlvElement *tlv = NULL;
+	size_t record_count = 0;
 
 	if (set == NULL || err == NULL || ksi == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -698,7 +767,6 @@ static int process_partial_block(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, B
 	}
 
 	d = PARAM_SET_isSetByName(set, "d");
-
 	print_progressDesc(d, "Block no. %3d: processing partial block data... ", blocks->blockNo);
 
 	blocks->partNo++;
@@ -707,64 +775,49 @@ static int process_partial_block(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, B
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: partial block data without preceding block header found.", blocks->sigNo);
 	}
 
-	sub_ftlv_raw = blocks->ftlv_raw + blocks->ftlv.hdr_len;
-	res = KSI_FTLV_memReadN(sub_ftlv_raw, blocks->ftlv_len - blocks->ftlv.hdr_len, sub_ftlv, 2, &nof_sub_ftlvs);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse block signature data.", blocks->blockNo);
-	if (nof_sub_ftlvs != 2) {
+	res = KSI_TlvElement_parse(blocks->ftlv_raw, blocks->ftlv_len, &tlv);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse block signature as TLV element.", blocks->blockNo);
+
+	res = tlv_element_get_uint(tlv, ksi, 0x01, &record_count);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse record count.", blocks->blockNo);
+
+	res = tlv_element_get_hash(tlv, ksi, 0x02, &hash);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse root hash of unsigned block.", blocks->blockNo);
+
+	if (blocks->nofRecordHashes && blocks->nofRecordHashes != record_count) {
 		res = KT_INVALID_INPUT_FORMAT;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse block signature data.", blocks->blockNo);
-	} else if (sub_ftlv[0].tag != 0x01) {
-		res = KT_INVALID_INPUT_FORMAT;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse record count.", blocks->blockNo);
-	} else if (sub_ftlv[1].tag != 0x02) {
-		res = KT_INVALID_INPUT_FORMAT;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse root hash.", blocks->blockNo);
-	} else {
-		unsigned char *imprint_raw = NULL;
-		size_t imprint_raw_len = 0;
-		size_t record_count = 0;
-
-		record_count = buf_to_int(sub_ftlv_raw + sub_ftlv[0].off + sub_ftlv[0].hdr_len, sub_ftlv[0].dat_len);
-		if (blocks->nofRecordHashes && blocks->nofRecordHashes != record_count) {
-			res = KT_INVALID_INPUT_FORMAT;
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: expected %d record hashes, but found %d.", blocks->blockNo, record_count, blocks->nofRecordHashes);
-		}
-
-		imprint_raw = sub_ftlv_raw + sub_ftlv[1].off + sub_ftlv[1].hdr_len;
-		imprint_raw_len = sub_ftlv[1].dat_len;
-		res = KSI_DataHash_fromImprint(ksi, imprint_raw, imprint_raw_len, &hash);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse root hash.", blocks->blockNo);
-
-		res = calculate_root_hash(ksi, blocks, &rootHash);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to calculate root hash.", blocks->blockNo);
-		if (!KSI_DataHash_equals(hash, rootHash)) {
-			res = KT_VERIFICATION_FAILURE;
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: root hashes not equal.", blocks->blockNo);
-		}
-		blocks->rootHash = hash;
-		hash = NULL;
-		print_progressResult(res); /* Done with parsing block signature data. */
-
-		/* Do your work here. */
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: expected %d record hashes, but found %d.", blocks->blockNo, record_count, blocks->nofRecordHashes);
 	}
+
+	res = calculate_root_hash(ksi, blocks, &rootHash);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to calculate root hash.", blocks->blockNo);
+	if (!KSI_DataHash_equals(hash, rootHash)) {
+		res = KT_VERIFICATION_FAILURE;
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: root hashes not equal.", blocks->blockNo);
+	}
+	blocks->rootHash = hash;
+	hash = NULL;
+
 	res = KT_OK;
 
 cleanup:
 
 	print_progressResult(res);
 	KSI_DataHash_free(rootHash);
+	KSI_TlvElement_free(tlv);
 	return res;
 }
 
 static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PROCESSORS *processors, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	int d = 0;
-	KSI_FTLV sub_ftlv[3];
-	size_t nof_sub_ftlvs = 0;
-	unsigned char *sub_ftlv_raw = NULL;
 	KSI_Signature *sig = NULL;
 	KSI_DataHash *hash = NULL;
-	KSI_DataHash *tmp = NULL;
+	KSI_DataHash *docHash = NULL;
+	KSI_TlvElement *tlv = NULL;
+	KSI_TlvElement *tlvSig = NULL;
+	KSI_TlvElement *tlvNoSig = NULL;
+	size_t record_count = 0;
 
 	if (set == NULL || err == NULL || ksi == NULL || processors == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -772,110 +825,91 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 	}
 
 	d = PARAM_SET_isSetByName(set, "d");
-
-	print_progressDesc(d, "Block no. %3d: processing block signature data... ", blocks->blockNo);
+	print_progressDesc(d, "Block no. %3d: processing partial signature data... ", blocks->blockNo);
 
 	blocks->sigNo++;
 	if (blocks->sigNo > blocks->blockNo) {
 		res = KT_INVALID_INPUT_FORMAT;
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: block signature data without preceding block header found.", blocks->sigNo);
 	}
+	res = KSI_TlvElement_parse(blocks->ftlv_raw, blocks->ftlv_len, &tlv);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse block signature as TLV element.", blocks->blockNo);
 
-	sub_ftlv_raw = blocks->ftlv_raw + blocks->ftlv.hdr_len;
-	res = KSI_FTLV_memReadN(sub_ftlv_raw, blocks->ftlv_len - blocks->ftlv.hdr_len, sub_ftlv, 3, &nof_sub_ftlvs);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse block signature data.", blocks->blockNo);
-	if (nof_sub_ftlvs < 2) {
+	res = tlv_element_get_uint(tlv, ksi, 0x01, &record_count);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse record count.", blocks->blockNo);
+
+	if (blocks->nofRecordHashes && blocks->nofRecordHashes != record_count) {
+		res = KT_INVALID_INPUT_FORMAT;
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: expected %d record hashes, but found %d.", blocks->blockNo, record_count, blocks->nofRecordHashes);
+	}
+
+	res = KSI_TlvElement_getElement(tlv, 0x905, &tlvSig);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse KSI signature.", blocks->blockNo);
+
+	res = KSI_TlvElement_getElement(tlv, 0x02, &tlvNoSig);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse missing KSI signature.", blocks->blockNo);
+
+	if (tlvSig != NULL) {
+		res = KSI_Signature_parseWithPolicy(ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_EMPTY, NULL, &sig);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse KSI signature.", blocks->blockNo);
+
+		res = KSI_Signature_getDocumentHash(sig, &docHash);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to get root hash from KSI signature.", blocks->blockNo);
+
+		if (blocks->rootHash == NULL) {
+			res = calculate_root_hash(ksi, blocks, &blocks->rootHash);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to calculate root hash.", blocks->blockNo);
+		}
+
+		if (!KSI_DataHash_equals(docHash, blocks->rootHash)) {
+			res = KT_VERIFICATION_FAILURE;
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: root hashes not equal.", blocks->blockNo);
+		}
+	} else if (tlvNoSig != NULL) {
+		res = tlv_element_get_hash(tlv, ksi, 0x02, &hash);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse root hash.", blocks->blockNo);
+
+		if (blocks->rootHash == NULL) {
+			res = calculate_root_hash(ksi, blocks, &blocks->rootHash);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to calculate root hash.", blocks->blockNo);
+		}
+		if (!KSI_DataHash_equals(hash, blocks->rootHash)) {
+			res = KT_VERIFICATION_FAILURE;
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: root hashes not equal.", blocks->blockNo);
+		}
+
+		if (processors->create_signature) {
+			print_progressResult(res);
+			print_progressDesc(d, "Block no. %3d: creating missing KSI signature... ", blocks->blockNo);
+
+			res = processors->create_signature(err, ksi, hash, &sig);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to sign root hash.", blocks->blockNo);
+
+			res = KSI_TlvElement_new(&tlvSig);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to serialize KSI signature.", blocks->blockNo);
+			tlvSig->ftlv.tag = 0x904;
+
+			res = tlv_element_set_uint(tlvSig, ksi, 0x01, record_count);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to serialize KSI signature.", blocks->blockNo);
+
+			res = tlv_element_set_signature(tlvSig, ksi, 0x905, sig);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to serialize KSI signature.", blocks->blockNo);
+
+			res = KSI_TlvElement_serialize(tlvSig, blocks->ftlv_raw, 0xffff + 4, &blocks->ftlv_len, 0);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to serialize KSI signature.", blocks->blockNo);
+		}
+	} else {
 		res = KT_INVALID_INPUT_FORMAT;
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse block signature data.", blocks->blockNo);
-	} else if (sub_ftlv[0].tag != 0x01) {
-		res = KT_INVALID_INPUT_FORMAT;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse record count.", blocks->blockNo);
-	} else {
-		size_t record_count = 0;
+	}
 
-		record_count = buf_to_int(sub_ftlv_raw + sub_ftlv[0].off + sub_ftlv[0].hdr_len, sub_ftlv[0].dat_len);
-		if (blocks->nofRecordHashes && blocks->nofRecordHashes != record_count) {
-			res = KT_INVALID_INPUT_FORMAT;
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: expected %d record hashes, but found %d.", blocks->blockNo, record_count, blocks->nofRecordHashes);
-		}
+	if (files->outSigFile) {
+		print_progressResult(res);
+		print_progressDesc(d, "Block no. %3d: writing KSI signature to file... ", blocks->blockNo);
 
-		if (sub_ftlv[1].tag == 0x0905) {
-			unsigned char *sig_raw = NULL;
-			size_t sig_raw_len = 0;
-
-			sig_raw = sub_ftlv_raw + sub_ftlv[1].off + sub_ftlv[1].hdr_len;
-			sig_raw_len = sub_ftlv[1].dat_len;
-
-			res = KSI_Signature_parseWithPolicy(ksi, sig_raw, sig_raw_len, KSI_VERIFICATION_POLICY_EMPTY, NULL, &sig);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse KSI signature.", blocks->blockNo);
-
-			res = KSI_Signature_getDocumentHash(sig, &tmp);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to get root hash from KSI signature.", blocks->blockNo);
-
-			if (blocks->rootHash == NULL) {
-				res = calculate_root_hash(ksi, blocks, &blocks->rootHash);
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to calculate root hash.", blocks->blockNo);
-			}
-
-			if (!KSI_DataHash_equals(tmp, blocks->rootHash)) {
-				res = KT_VERIFICATION_FAILURE;
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: root hashes not equal.", blocks->blockNo);
-			}
-		} else if (sub_ftlv[1].tag == 0x02) {
-			unsigned char *imprint_raw = NULL;
-			size_t imprint_raw_len = 0;
-			unsigned char *sig_raw = NULL;
-			size_t sig_raw_len = 0;
-
-			imprint_raw = sub_ftlv_raw + sub_ftlv[1].off + sub_ftlv[1].hdr_len;
-			imprint_raw_len = sub_ftlv[1].dat_len;
-			res = KSI_DataHash_fromImprint(ksi, imprint_raw, imprint_raw_len, &hash);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse root hash.", blocks->blockNo);
-
-			if (blocks->rootHash == NULL) {
-				res = calculate_root_hash(ksi, blocks, &blocks->rootHash);
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to calculate root hash.", blocks->blockNo);
-			}
-			if (!KSI_DataHash_equals(hash, blocks->rootHash)) {
-				res = KT_VERIFICATION_FAILURE;
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: root hashes not equal.", blocks->blockNo);
-			}
-			print_progressResult(res);
-
-			if (processors->create_signature) {
-				print_progressDesc(d, "Block no. %3d: creating missing KSI signature... ", blocks->blockNo);
-				res = processors->create_signature(err, ksi, hash, &sig);
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to sign root hash.", blocks->blockNo);
-				print_progressResult(res);
-
-				print_progressDesc(d, "Block no. %3d: serializing KSI signature... ", blocks->blockNo);
-				res = KSI_Signature_serialize(sig, &sig_raw, &sig_raw_len);
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to serialize KSI signature.", blocks->blockNo);
-				KSI_Signature_free(sig);
-				sig = NULL;
-				print_progressResult(res);
-
-				print_progressDesc(d, "Block no. %3d: writing KSI signature to file... ", blocks->blockNo);
-				/* Reuse the raw buffer and adjust FTLV headers accordingly. */
-
-				res = serialize_tlv(0x905, 0, 0, sig_raw, sig_raw_len, sub_ftlv_raw + sub_ftlv[1].off, &imprint_raw_len);
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to serialize KSI signature.", blocks->blockNo);
-				KSI_free(sig_raw);
-				sig_raw = NULL;
-
-				res = serialize_tlv(0x904, 0, 0,
-									blocks->ftlv_raw + blocks->ftlv.hdr_len,
-									sub_ftlv[0].hdr_len + sub_ftlv[0].dat_len + imprint_raw_len,
-									blocks->ftlv_raw,
-									&blocks->ftlv_len);
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to serialize KSI signature.", blocks->blockNo);
-			}
-		}
-		if (files->outSigFile) {
-			if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->outSigFile) != blocks->ftlv_len) {
-				res = KT_IO_ERROR;
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to write signature data log signature file.", blocks->blockNo);
-			}
+		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->outSigFile) != blocks->ftlv_len) {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to write signature data log signature file.", blocks->blockNo);
 		}
 	}
 
@@ -886,6 +920,9 @@ cleanup:
 	print_progressResult(res);
 	KSI_Signature_free(sig);
 	KSI_DataHash_free(hash);
+	KSI_TlvElement_free(tlvSig);
+	KSI_TlvElement_free(tlvNoSig);
+	KSI_TlvElement_free(tlv);
 	return res;
 }
 
@@ -899,7 +936,6 @@ static int finalize_log_signature(PARAM_SET *set, ERR_TRCKR *err, BLOCK_INFO *bl
 	}
 
 	d = PARAM_SET_isSetByName(set, "d");
-
 	print_progressDesc(d, "Finalizing log signature... ");
 
 	if (blocks->blockNo == 0) {
@@ -910,6 +946,10 @@ static int finalize_log_signature(PARAM_SET *set, ERR_TRCKR *err, BLOCK_INFO *bl
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: block signature data missing.", blocks->blockNo);
 	}
 
+	if (blocks->partNo > blocks->sigNo) {
+		res = KT_INVALID_INPUT_FORMAT;
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: block signature data missing.", blocks->blockNo);
+	}
 	res = KT_OK;
 
 cleanup:
