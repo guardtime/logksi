@@ -759,6 +759,7 @@ static int process_partial_block(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, B
 	KSI_DataHash *hash = NULL;
 	KSI_DataHash *rootHash = NULL;
 	KSI_TlvElement *tlv = NULL;
+	KSI_TlvElement *tlvNoSig = NULL;
 	size_t record_count = 0;
 
 	if (set == NULL || err == NULL || ksi == NULL || files == NULL || blocks == NULL) {
@@ -781,7 +782,10 @@ static int process_partial_block(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, B
 	res = tlv_element_get_uint(tlv, ksi, 0x01, &record_count);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse record count.", blocks->blockNo);
 
-	res = tlv_element_get_hash(tlv, ksi, 0x02, &hash);
+	res = KSI_TlvElement_getElement(tlv, 0x02, &tlvNoSig);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse missing KSI signature.", blocks->blockNo);
+
+	res = tlv_element_get_hash(tlvNoSig, ksi, 0x01, &hash);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse root hash of unsigned block.", blocks->blockNo);
 
 	if (blocks->nofRecordHashes && blocks->nofRecordHashes != record_count) {
@@ -866,7 +870,7 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: root hashes not equal.", blocks->blockNo);
 		}
 	} else if (tlvNoSig != NULL) {
-		res = tlv_element_get_hash(tlv, ksi, 0x02, &hash);
+		res = tlv_element_get_hash(tlvNoSig, ksi, 0x01, &hash);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse root hash.", blocks->blockNo);
 
 		if (blocks->rootHash == NULL) {
