@@ -63,6 +63,7 @@ typedef struct {
 	KSI_DataHash *MerkleTree[MAX_TREE_HEIGHT];
 	KSI_DataHash *notVerified[MAX_TREE_HEIGHT];
 	KSI_DataHash *rootHash;
+	KSI_DataHash *metarecordHash;
 	unsigned char treeHeight;
 	unsigned char balanced;
 } BLOCK_INFO;

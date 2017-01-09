@@ -24,62 +24,8 @@
 #include "ksitool_err.h"
 #include "api_wrapper.h"
 #include "debug_print.h"
-//#include <ksi/tlv_element.h>
-#include <../../libksi/src/ksi/tlv_element.h>
+#include <ksi/tlv_element.h>
 #include "rsyslog.h"
-
-#define KSI_TLV_MASK_TLV16 0x80u
-#define KSI_TLV_MASK_LENIENT 0x40u
-#define KSI_TLV_MASK_FORWARD 0x20u
-#define KSI_TLV_MASK_TLV8_TYPE 0x1fu
-
-static int serialize_tlv(int tag, int nc, int fw, unsigned char *src, size_t src_len, unsigned char *dst, size_t *dst_len) {
-	size_t hdr_len;
-	int res;
-
-	if (tag > 0x1FFF || src_len > 65535 || src == NULL || dst_len == NULL) {
-		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
-
-	if (tag > KSI_TLV_MASK_TLV8_TYPE || src_len > 255) {
-		hdr_len = 4;
-	} else {
-		hdr_len = 2;
-	}
-
-	if (hdr_len == 4) {
-		dst[0] = ((tag >> 8) & KSI_TLV_MASK_TLV8_TYPE);
-		dst[1] = tag & 0xFF;
-		dst[2] = (src_len >> 8) & 0xFF;
-		dst[3] = src_len & 0xFF;
-	} else {
-		dst[0] = tag & KSI_TLV_MASK_TLV8_TYPE;
-		dst[1] = src_len & 0xFF;
-	}
-	if (hdr_len == 4) dst[0] |= KSI_TLV_MASK_TLV16;
-	if (nc) dst[0] |= KSI_TLV_MASK_LENIENT;
-	if (fw) dst[0] |= KSI_TLV_MASK_FORWARD;
-
-	if (dst + hdr_len != src) {
-		memmove(dst + hdr_len, src, src_len);
-	}
-	*dst_len = src_len + hdr_len;
-	res = KT_OK;
-
-cleanup:
-
-	return res;
-}
-
-static size_t buf_to_int(unsigned char *buf, size_t len) {
-	size_t val = 0;
-
-	while (len--) {
-		val = val * 256  + *buf++;
-	}
-	return val;
-}
 
 static int calculate_new_intermediate_hash(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *leftHash, KSI_DataHash *rightHash, unsigned char level, KSI_DataHash **nodeHash) {
 	int res;
@@ -113,7 +59,7 @@ cleanup:
 	return res;
 }
 
-static int calculate_new_leaf_hash(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *recordHash, KSI_DataHash **leafHash) {
+static int calculate_new_leaf_hash(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *recordHash, int isMetaRecordHash, KSI_DataHash **leafHash) {
 	int res;
 	KSI_DataHasher *hasher = NULL;
 	KSI_DataHash *mask = NULL;
@@ -133,8 +79,13 @@ static int calculate_new_leaf_hash(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHas
 	res = KSI_DataHasher_close(hasher, &mask);
 	if (res != KSI_OK) goto cleanup;
 
-	res = calculate_new_intermediate_hash(ksi, blocks, mask, recordHash, 1, &tmp);
-	if (res != KT_OK) goto cleanup;
+	if (isMetaRecordHash) {
+		res = calculate_new_intermediate_hash(ksi, blocks, recordHash, mask, 1, &tmp);
+		if (res != KT_OK) goto cleanup;
+	} else {
+		res = calculate_new_intermediate_hash(ksi, blocks, mask, recordHash, 1, &tmp);
+		if (res != KT_OK) goto cleanup;
+	}
 
 	*leafHash = tmp;
 	tmp = NULL;
@@ -189,7 +140,7 @@ cleanup:
 	return res;
 }
 
-int add_hash_to_merkle_tree(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *hash) {
+int add_hash_to_merkle_tree(KSI_CTX *ksi, BLOCK_INFO *blocks, int isMetaRecordHash, KSI_DataHash *hash) {
 	int res;
 	unsigned char i = 0;
 	KSI_DataHash *lastHash = NULL;
@@ -201,7 +152,7 @@ int add_hash_to_merkle_tree(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *hash
 		goto cleanup;
 	}
 
-	res = calculate_new_leaf_hash(ksi, blocks, hash, &lastHash);
+	res = calculate_new_leaf_hash(ksi, blocks, hash, isMetaRecordHash, &lastHash);
 	if (res != KT_OK) goto cleanup;
 
 	right = KSI_DataHash_ref(lastHash);
@@ -271,6 +222,29 @@ cleanup:
 	return res;
 }
 
+int get_hash_of_metarecord(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_TlvElement *tlv, KSI_DataHash **hash) {
+	int res;
+	KSI_DataHash *tmp = NULL;
+
+	if (tlv == NULL || hash == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	/* The complete metarecord TLV us used in hash calculation. */
+	res = KSI_DataHash_create(ksi, tlv->ptr, tlv->ftlv.hdr_len + tlv->ftlv.dat_len, blocks->hashAlgo, &tmp);
+	if (res != KSI_OK) goto cleanup;
+
+	*hash = tmp;
+	tmp = NULL;
+	res = KT_OK;
+
+cleanup:
+
+	KSI_DataHash_free(tmp);
+	return res;
+}
+
 static size_t max_intermediate_records(size_t nof_records) {
 	size_t max = 0;
 	while (nof_records) {
@@ -323,22 +297,17 @@ cleanup:
 
 int tlv_element_get_hash(KSI_TlvElement *tlv, KSI_CTX *ksi, unsigned tag, KSI_DataHash **out) {
 	int res;
-	KSI_OctetString *tmp = NULL;
+	KSI_TlvElement *el = NULL;
 	KSI_DataHash *hash = NULL;
-	unsigned char *imprint = NULL;
-	size_t imprint_len = 0;
 
-	res = KSI_TlvElement_getOctetString(tlv, ksi, tag, &tmp);
+	res = KSI_TlvElement_getElement(tlv, tag, &el);
 	if (res != KSI_OK) goto cleanup;
-	if (tmp == NULL) {
+	if (el == NULL) {
 		res = KT_INVALID_INPUT_FORMAT;
 		goto cleanup;
 	}
 
-	res = KSI_OctetString_extract(tmp, &imprint, &imprint_len);
-	if (res != KSI_OK) goto cleanup;
-
-	res = KSI_DataHash_fromImprint(ksi, imprint, imprint_len, &hash);
+	res = KSI_DataHash_fromImprint(ksi, el->ptr + el->ftlv.hdr_len, el->ftlv.dat_len, &hash);
 	if (res != KSI_OK) goto cleanup;
 
 	*out = hash;
@@ -347,7 +316,7 @@ int tlv_element_get_hash(KSI_TlvElement *tlv, KSI_CTX *ksi, unsigned tag, KSI_Da
 
 cleanup:
 
-	KSI_OctetString_free(tmp);
+	KSI_TlvElement_free(el);
 	KSI_DataHash_free(hash);
 	return res;
 }
@@ -504,6 +473,8 @@ static int process_block_header(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BL
 	blocks->balanced = 0;
 	KSI_DataHash_free(blocks->rootHash);
 	blocks->rootHash = NULL;
+	KSI_DataHash_free(blocks->metarecordHash);
+	blocks->metarecordHash = NULL;
 
 	res = KT_OK;
 
@@ -539,18 +510,33 @@ static int process_record_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLO
 	res = KSI_DataHash_fromImprint(ksi, blocks->ftlv_raw + blocks->ftlv.hdr_len, blocks->ftlv.dat_len, &recordHash);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to create hash of record no. %3d.", blocks->blockNo, blocks->nofRecordHashes);
 
-	if (files->inLogFile) {
-		res = get_hash_of_logline(ksi, blocks, files, &hash);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to calculate hash of logline no. %3d.", blocks->blockNo, blocks->nofRecordHashes);
-
-		if (!KSI_DataHash_equals(recordHash, hash)) {
+	if (blocks->metarecordHash != NULL) {
+		/* This is a metarecord hash. */
+		if (!KSI_DataHash_equals(recordHash, blocks->metarecordHash)) {
 			res = KT_VERIFICATION_FAILURE;
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: record hashes not equal.", blocks->blockNo);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: metarecord hashes not equal.", blocks->blockNo);
 		}
-	}
 
-	res = add_hash_to_merkle_tree(ksi, blocks, recordHash);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to add hash to Merkle tree.", blocks->blockNo);
+		res = add_hash_to_merkle_tree(ksi, blocks, 1, blocks->metarecordHash);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
+
+		KSI_DataHash_free(blocks->metarecordHash);
+		blocks->metarecordHash = NULL;
+	} else {
+		/* This is a logline record hash. */
+		if (files->inLogFile) {
+			res = get_hash_of_logline(ksi, blocks, files, &hash);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to calculate hash of logline no. %3d.", blocks->blockNo, blocks->nofRecordHashes);
+
+			if (!KSI_DataHash_equals(recordHash, hash)) {
+				res = KT_VERIFICATION_FAILURE;
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: record hashes not equal.", blocks->blockNo);
+			}
+		}
+
+		res = add_hash_to_merkle_tree(ksi, blocks, 0, recordHash);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to add hash to Merkle tree.", blocks->blockNo);
+	}
 
 	if (files->outSigFile) {
 		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->outSigFile) != blocks->ftlv_len) {
@@ -606,7 +592,7 @@ static int process_intermediate_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 		if (files->inLogFile) {
 			blocks->nofRecordHashes++;
 			res = get_hash_of_logline(ksi, blocks, files, &hash);
-			res = add_hash_to_merkle_tree(ksi, blocks, hash);
+			res = add_hash_to_merkle_tree(ksi, blocks, 0, hash);
 			KSI_DataHash_free(hash);
 			hash = NULL;
 		}
@@ -639,7 +625,66 @@ cleanup:
 	return res;
 }
 
-static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PROCESSORS *processors, BLOCK_INFO *blocks, IO_FILES *files) {
+int process_metarecord(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
+	int res;
+	int d = 0;
+	KSI_DataHash *hash = NULL;
+	KSI_TlvElement *tlv = NULL;
+	size_t metarecord_index = 0;
+
+	if (set == NULL || err == NULL || files == NULL || blocks == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	d = PARAM_SET_isSetByName(set, "d");
+	print_progressDesc(d, "Block no. %3d: processing metarecord... ", blocks->blockNo);
+
+	res = KSI_TlvElement_parse(blocks->ftlv_raw, blocks->ftlv_len, &tlv);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse metarecord as TLV element.", blocks->blockNo);
+
+	res = tlv_element_get_uint(tlv, ksi, 0x01, &metarecord_index);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse metarecord index.", blocks->blockNo);
+
+	if (files->inLogFile) {
+		/* If the block contains metarecords but not the corresponding record hashes:
+		 * Calculate missing metarecord hash from the last metarecord and
+		 * build the Merkle tree according to the record count in the signature data. */
+		if (blocks->metarecordHash != NULL) {
+			/* Add the previous metarecord to Merkle tree. */
+			blocks->nofRecordHashes++;
+			res = add_hash_to_merkle_tree(ksi, blocks, 1, blocks->metarecordHash);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
+		}
+
+		while (blocks->nofRecordHashes < metarecord_index) {
+			blocks->nofRecordHashes++;
+			res = get_hash_of_logline(ksi, blocks, files, &hash);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to calculate hash of logline no. %3d.", blocks->blockNo, blocks->nofRecordHashes);
+			res = add_hash_to_merkle_tree(ksi, blocks, 0, hash);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to add hash to Merkle tree.", blocks->blockNo);
+			KSI_DataHash_free(hash);
+			hash = NULL;
+		}
+	}
+
+	res = get_hash_of_metarecord(ksi, blocks, tlv, &hash);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to calculate hash of metarecord with index %3d.", blocks->blockNo, metarecord_index);
+
+	KSI_DataHash_free(blocks->metarecordHash);
+	blocks->metarecordHash = hash;
+
+	res = KT_OK;
+
+cleanup:
+
+	print_progressResult(res);
+	KSI_DataHash_free(hash);
+	KSI_TlvElement_free(tlv);
+	return res;
+}
+
+int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PROCESSORS *processors, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	int d = 0;
 	KSI_Signature *sig = NULL;
@@ -676,22 +721,35 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 	res = KSI_TlvElement_getElement(tlv, 0x905, &tlvSig);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse KSI signature.", blocks->blockNo);
 
-	/* If the block contains neither record hashes nor intermediate hashes:
-	 * Calculate missing record hashes from the records in the logfile and
-	 * build the Merkle tree according to the record count in the signature data. */
-	if (blocks->nofRecordHashes == 0) {
-		if (files->inLogFile) {
-			while (blocks->nofRecordHashes < record_count) {
-				blocks->nofRecordHashes++;
-				res = get_hash_of_logline(ksi, blocks, files, &hash);
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to calculate hash of logline no. %3d.", blocks->blockNo, blocks->nofRecordHashes);
-				res = add_hash_to_merkle_tree(ksi, blocks, hash);
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to add hash to Merkle tree.", blocks->blockNo);
-				KSI_DataHash_free(hash);
-				hash = NULL;
-			}
+	if (tlvSig == NULL) {
+		res = KT_INVALID_INPUT_FORMAT;
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse KSI signature.", blocks->blockNo);
+	}
+
+	if (files->inLogFile) {
+		/* If the block contains metarecords but not the corresponding record hashes:
+		 * Calculate missing metarecord hash from the last metarecord and
+		 * build the Merkle tree according to the record count in the signature data. */
+		if (blocks->metarecordHash != NULL) {
+			/* Add the previous metarecord to Merkle tree. */
+			blocks->nofRecordHashes++;
+			res = add_hash_to_merkle_tree(ksi, blocks, 1, blocks->metarecordHash);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
+		}
+		/* If the block contains neither record hashes nor intermediate hashes:
+		 * Calculate missing record hashes from the records in the logfile and
+		 * build the Merkle tree according to the record count in the signature data. */
+		while (blocks->nofRecordHashes < record_count) {
+			blocks->nofRecordHashes++;
+			res = get_hash_of_logline(ksi, blocks, files, &hash);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to calculate hash of logline no. %3d.", blocks->blockNo, blocks->nofRecordHashes);
+			res = add_hash_to_merkle_tree(ksi, blocks, 0, hash);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to add hash to Merkle tree.", blocks->blockNo);
+			KSI_DataHash_free(hash);
+			hash = NULL;
 		}
 	}
+
 	if (blocks->nofRecordHashes && blocks->nofRecordHashes != record_count) {
 		res = KT_INVALID_INPUT_FORMAT;
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: expected %d record hashes, but found %d.", blocks->blockNo, record_count, blocks->nofRecordHashes);
@@ -809,6 +867,7 @@ cleanup:
 	print_progressResult(res);
 	KSI_DataHash_free(rootHash);
 	KSI_TlvElement_free(tlv);
+	KSI_TlvElement_free(tlvNoSig);
 	return res;
 }
 
@@ -974,6 +1033,7 @@ static void free_blocks(BLOCK_INFO *blocks) {
 			i++;
 		}
 		KSI_DataHash_free(blocks->rootHash);
+		KSI_DataHash_free(blocks->metarecordHash);
 	}
 }
 
@@ -1014,6 +1074,10 @@ int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_
 					res = process_intermediate_hash(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
+
+				case 0x911:
+					res = process_metarecord(set, err, ksi, &blocks, files);
+					if (res != KT_OK) goto cleanup;
 
 				case 0x904:
 				{
@@ -1092,6 +1156,10 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, VERIFYING_
 					if (res != KT_OK) goto cleanup;
 				break;
 
+				case 0x911:
+					res = process_metarecord(set, err, ksi, &blocks, files);
+					if (res != KT_OK) goto cleanup;
+
 				case 0x904:
 				{
 					res = process_block_signature(set, err, ksi, &processors, &blocks, files);
@@ -1167,6 +1235,10 @@ int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILE
 					res = process_intermediate_hash(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
+
+				case 0x911:
+					res = process_metarecord(set, err, ksi, &blocks, files);
+					if (res != KT_OK) goto cleanup;
 
 				case 0x904:
 				{
@@ -1254,6 +1326,10 @@ int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *fi
 					res = process_intermediate_hash(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
+
+				case 0x911:
+					res = process_metarecord(set, err, ksi, &blocks, files);
+					if (res != KT_OK) goto cleanup;
 
 				case 0x904:
 				{
