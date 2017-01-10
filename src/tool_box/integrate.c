@@ -222,7 +222,7 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 		goto cleanup;
 	}
 
-	res = get_derived_name(files->partsPathName, "/blocks.dat", &tmp.partsBlockName);
+	res = get_derived_name(files->partsPathName, ".logsig.parts/blocks.dat", &tmp.partsBlockName);
 	ERR_CATCH_MSG(err, res, "Error: out of memory.");
 
 	if (!SMART_FILE_doFileExist(tmp.partsBlockName)) {
@@ -230,11 +230,11 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 		ERR_CATCH_MSG(err, res, "Error: unable to find block file %s.", tmp.partsBlockName);
 	}
 
-	res = get_derived_name(files->partsPathName, "/block-signatures.dat", &tmp.partsSigName);
+	res = get_derived_name(files->partsPathName, ".logsig.parts/block-signatures.dat", &tmp.partsSigName);
 	ERR_CATCH_MSG(err, res, "Error: out of memory.");
 
 	if (files->outSigName == NULL) {
-		res = get_truncated_name(files->partsPathName, ".parts", &tmp.integratedSigName);
+		res = get_derived_name(files->partsPathName, ".logsig", &tmp.integratedSigName);
 		ERR_CATCH_MSG(err, res, "Error: out of memory");
 		tmp.outSigName = tmp.integratedSigName;
 	} else {
