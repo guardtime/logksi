@@ -121,7 +121,7 @@ char *integrate_help_toString(char *buf, size_t len) {
 
 	count += KSI_snprintf(buf + count, len - count,
 		"Usage:\n"
-		" %s integrate -i <directory> [-o <logsignature.ls11>]\n",
+		" %s integrate -i <directory> [-o <logsignature.logsig>]\n",
 		TOOL_getName()
 	);
 

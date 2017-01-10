@@ -190,15 +190,15 @@ char *verify_help_toString(char *buf, size_t len) {
 
 	count += KSI_snprintf(buf + count, len - count,
 		"Usage:\n"
-		" %s verify -i <log> [-s <logsignature.ls11>] [more_options]\n"
-		" %s verify --ver-int -i <log> [-s <logsignature.ls11>] [more_options]\n"
-		" %s verify --ver-cal -i <log> [-s <logsignature.ls11>] -X <URL>\n"
+		" %s verify -i <log> [-s <logsignature.logsig>] [more_options]\n"
+		" %s verify --ver-int -i <log> [-s <logsignature.logsig>] [more_options]\n"
+		" %s verify --ver-cal -i <log> [-s <logsignature.logsig>] -X <URL>\n"
 		"     [--ext-user <user> --ext-key <key>] [more_options]\n"
-		" %s verify --ver-key -i <log> [-s <logsignature.ls11>] -P <URL>\n"
+		" %s verify --ver-key -i <log> [-s <logsignature.logsig>] -P <URL>\n"
 		"     [--cnstr <oid=value>]... [more_options]\n"
-		" %s verify --ver-pub -i <log> [-s <logsignature.ls11>] --pub-str <pubstring>\n"
+		" %s verify --ver-pub -i <log> [-s <logsignature.logsig>] --pub-str <pubstring>\n"
 		"     [-x -X <URL>  [--ext-user <user> --ext-key <key>]] [more_options]\n"
-		" %s verify --ver-pub -i <log> [-s <logsignature.ls11>] -P <URL> [--cnstr <oid=value>]...\n"
+		" %s verify --ver-pub -i <log> [-s <logsignature.logsig>] -P <URL> [--cnstr <oid=value>]...\n"
 		"        [-x -X <URL>  [--ext-user <user> --ext-key <key>]] [more_options]\n"
 		"\n"
 		" --ver-int - Perform internal verification.\n"
@@ -207,9 +207,9 @@ char *verify_help_toString(char *buf, size_t len) {
 		" --ver-pub - Perform publication-based verification (use with -x to permit extending).\n"
 		" -i <log>\n"
 		"           - Log file to be verified.\n"
-		" -s <logsignature.ls11>\n"
+		" -s <logsignature.logsig>\n"
 		"             Log signature file to be verified. If omitted, the log signature file name is\n"
-		"             derived by adding .ls11 or .ksisig to <log>. It is expected to be found in the\n"
+		"             derived by adding .logsig or .ksisig to <log>. It is expected to be found in the\n"
 		"             same folder as the <log> file.\n"
 		" -x        - Permit to use extender for publication-based verification.\n"
 		" -X <URL>  - Extending service (KSI Extender) URL.\n"
@@ -543,7 +543,7 @@ static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files) {
 
 	if (files->inSigName == NULL) {
 		/* Default log signature file name is derived from the log file name. */
-		const char *extensions[] = {".ls11", ".ksisig", NULL};
+		const char *extensions[] = {".logsig", ".ksisig", NULL};
 		while (extensions[i]) {
 			res = get_derived_name(files->inLogName, extensions[i], &tmp.derivedSigName);
 			ERR_CATCH_MSG(err, res, "Error: out of memory.");
