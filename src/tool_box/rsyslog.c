@@ -671,8 +671,16 @@ int process_metarecord(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO 
 	res = get_hash_of_metarecord(ksi, blocks, tlv, &hash);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to calculate hash of metarecord with index %3d.", blocks->blockNo, metarecord_index);
 
+	if (files->outSigFile) {
+		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->outSigFile) != blocks->ftlv_len) {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to copy record hash.", blocks->blockNo);
+		}
+	}
+
 	KSI_DataHash_free(blocks->metarecordHash);
 	blocks->metarecordHash = hash;
+	hash = NULL;
 
 	res = KT_OK;
 
@@ -1078,6 +1086,7 @@ int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_
 				case 0x911:
 					res = process_metarecord(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
+				break;
 
 				case 0x904:
 				{
@@ -1159,6 +1168,7 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, VERIFYING_
 				case 0x911:
 					res = process_metarecord(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
+				break;
 
 				case 0x904:
 				{
@@ -1239,6 +1249,7 @@ int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILE
 				case 0x911:
 					res = process_metarecord(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
+				break;
 
 				case 0x904:
 				{
@@ -1330,6 +1341,7 @@ int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *fi
 				case 0x911:
 					res = process_metarecord(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
+				break;
 
 				case 0x904:
 				{
