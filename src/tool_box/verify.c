@@ -83,6 +83,7 @@ int verify_run(int argc, char **argv, char **envp) {
 	KSI_Signature *sig = NULL;
 	IO_FILES files;
 	VERIFYING_FUNCTION verify_signature = NULL;
+	int count = 0;
 
 	memset(&files, 0, sizeof(files));
 
@@ -90,7 +91,7 @@ int verify_run(int argc, char **argv, char **envp) {
 	 * Extract command line parameters and also add configuration specific parameters.
 	 */
 	res = PARAM_SET_new(
-			CONF_generate_param_set_desc("{input}{x}{s}{d}{pub-str}{ver-int}{ver-cal}{ver-key}{ver-pub}{dump}{conf}{log}{h|help}", "XP", buf, sizeof(buf)),
+			CONF_generate_param_set_desc("{input}{x}{d}{pub-str}{ver-int}{ver-cal}{ver-key}{ver-pub}{dump}{conf}{log}{h|help}", "XP", buf, sizeof(buf)),
 			&set);
 	if (res != KT_OK) goto cleanup;
 
@@ -111,11 +112,16 @@ int verify_run(int argc, char **argv, char **envp) {
 
 	d = PARAM_SET_isSetByName(set, "d");
 
-	res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.inLogName);
+	res = PARAM_SET_getValueCount(set, "input", NULL, PST_PRIORITY_NONE, &count);
+	if (res != KT_OK) goto cleanup;
+
+	res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, 0, &files.inLogName);
 	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
 
-	res = PARAM_SET_getStr(set, "s", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.inSigName);
-	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
+	if (count > 1) {
+		res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, 1, &files.inSigName);
+		if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
+	}
 
 	switch(TASK_getID(task)) {
 		case ANC_BASED_DEFAULT:
@@ -191,15 +197,15 @@ char *verify_help_toString(char *buf, size_t len) {
 
 	count += KSI_snprintf(buf + count, len - count,
 		"Usage:\n"
-		" %s verify <log> [-s <logsignature.logsig>] [more_options]\n"
-		" %s verify --ver-int <log> [-s <logsignature.logsig>] [more_options]\n"
-		" %s verify --ver-cal <log> [-s <logsignature.logsig>] -X <URL>\n"
+		" %s verify <log> [<logsignature.logsig>] [more_options]\n"
+		" %s verify --ver-int <log> [<logsignature.logsig>] [more_options]\n"
+		" %s verify --ver-cal <log> [<logsignature.logsig>] -X <URL>\n"
 		"     [--ext-user <user> --ext-key <key>] [more_options]\n"
-		" %s verify --ver-key <log> [-s <logsignature.logsig>] -P <URL>\n"
+		" %s verify --ver-key <log> [<logsignature.logsig>] -P <URL>\n"
 		"     [--cnstr <oid=value>]... [more_options]\n"
-		" %s verify --ver-pub <log> [-s <logsignature.logsig>] --pub-str <pubstring>\n"
+		" %s verify --ver-pub <log> [<logsignature.logsig>] --pub-str <pubstring>\n"
 		"     [-x -X <URL>  [--ext-user <user> --ext-key <key>]] [more_options]\n"
-		" %s verify --ver-pub <log> [-s <logsignature.logsig>] -P <URL> [--cnstr <oid=value>]...\n"
+		" %s verify --ver-pub <log> [<logsignature.logsig>] -P <URL> [--cnstr <oid=value>]...\n"
 		"        [-x -X <URL>  [--ext-user <user> --ext-key <key>]] [more_options]\n"
 		"\n"
 		" --ver-int - Perform internal verification.\n"
@@ -208,7 +214,7 @@ char *verify_help_toString(char *buf, size_t len) {
 		" --ver-pub - Perform publication-based verification (use with -x to permit extending).\n"
 		" <log>\n"
 		"           - Log file to be verified.\n"
-		" -s <logsignature.logsig>\n"
+		" <logsignature.logsig>\n"
 		"             Log signature file to be verified. If omitted, the log signature file name is\n"
 		"             derived by adding .logsig or .ksisig to <log>. It is expected to be found in the\n"
 		"             same folder as the <log> file.\n"
@@ -267,7 +273,7 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 
 	PARAM_SET_addControl(set, "{conf}", isFormatOk_inputFile, isContentOk_inputFileRestrictPipe, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{log}", isFormatOk_path, NULL, convertRepair_path, NULL);
-	PARAM_SET_addControl(set, "{input}{s}", isFormatOk_inputFile, isContentOk_inputFile, convertRepair_path, NULL);
+	PARAM_SET_addControl(set, "{input}", isFormatOk_inputFile, isContentOk_inputFile, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{d}{x}{ver-int}{ver-cal}{ver-key}{ver-pub}{dump}", isFormatOk_flag, NULL, NULL, NULL);
 	PARAM_SET_addControl(set, "{pub-str}", isFormatOk_pubString, NULL, NULL, extract_pubString);
 
