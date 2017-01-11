@@ -161,7 +161,7 @@ char *extend_help_toString(char*buf, size_t len) {
 		"    [--ext-user <user> --ext-key <key>] -T time [more_options]\n"
 		"\n"
 		" <in.logsig>\n"
-		"           - File path to the log signature file to be extended. If not specified or '-',\n"
+		"           - File path to the log signature file to be extended. If not specified,\n"
 		"             the log signature is read from stdin.\n"
 		" -o <out.logsig>\n"
 		"           - Output file path for the extended log signature file. Use '-' to redirect the extended\n"
@@ -449,7 +449,7 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 	}
 
 	/* Default input file is stdin. */
-	if (files->inSigName == NULL || !strcmp(files->inSigName, "-")) {
+	if (files->inSigName == NULL) {
 		/* Default output file is a temporary file that is copied to stdout on success. */
 		if (files->outSigName == NULL || !strcmp(files->outSigName, "-")) {
 			res = get_temp_name(&tmp.tempSigName);
