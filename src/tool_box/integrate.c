@@ -22,6 +22,7 @@
 #include <ksi/compatibility.h>
 #include "param_set/param_set.h"
 #include "param_set/task_def.h"
+#include "param_set/parameter.h"
 #include "tool_box/ksi_init.h"
 #include "tool_box/param_control.h"
 #include "tool_box/task_initializer.h"
@@ -56,7 +57,7 @@ int integrate_run(int argc, char **argv, char **envp) {
 	 * Extract command line parameters.
 	 */
 	res = PARAM_SET_new(
-			CONF_generate_param_set_desc("{i}{o}{d}{log}{h|help}", "", buf, sizeof(buf)),
+			CONF_generate_param_set_desc("{input}{o}{d}{log}{h|help}", "", buf, sizeof(buf)),
 			&set);
 	if (res != KT_OK) goto cleanup;
 
@@ -77,7 +78,7 @@ int integrate_run(int argc, char **argv, char **envp) {
 
 	d = PARAM_SET_isSetByName(set, "d");
 
-	res = PARAM_SET_getStr(set, "i", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.partsPathName);
+	res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.partsPathName);
 	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
 
 	res = PARAM_SET_getStr(set, "o", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.outSigName);
@@ -121,7 +122,7 @@ char *integrate_help_toString(char *buf, size_t len) {
 
 	count += KSI_snprintf(buf + count, len - count,
 		"Usage:\n"
-		" %s integrate -i <directory> [-o <logsignature.logsig>]\n",
+		" %s integrate <logfile> [-o <logfile.logsig>]\n",
 		TOOL_getName()
 	);
 
@@ -143,15 +144,17 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	/**
 	 * Configure parameter set, control, repair and object extractor function.
 	 */
-	PARAM_SET_addControl(set, "{i}", isFormatOk_path, NULL, convertRepair_path, NULL);
+	PARAM_SET_addControl(set, "{input}", isFormatOk_path, NULL, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{log}{o}", isFormatOk_inputFile, NULL, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{d}", isFormatOk_flag, NULL, NULL, NULL);
+
+	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
 
 	/**
 	 * Define possible tasks.
 	 */
 	/*					  ID	DESC													MAN			ATL		FORBIDDEN		IGN	*/
-	TASK_SET_add(task_set, 0,	"Integrate log signature block with KSI signature.",	"i",		NULL,	NULL,			NULL);
+	TASK_SET_add(task_set, 0,	"Integrate log signature block with KSI signature.",	"input",	NULL,	NULL,			NULL);
 
 	res = KT_OK;
 
@@ -174,35 +177,6 @@ static int get_derived_name(char *org, const char *extension, char **derived) {
 		goto cleanup;
 	}
 	sprintf(buf, "%s%s", org, extension);
-	*derived = buf;
-	res = KT_OK;
-
-cleanup:
-
-	return res;
-}
-
-static int get_truncated_name(char *org, const char *extension, char **derived) {
-	int res;
-	char *buf = NULL;
-	char *tail = NULL;
-	size_t len = 0;
-
-	if (org == NULL || extension == NULL || derived == NULL) {
-		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
-	tail = strstr(org, extension);
-	if (tail) {
-		len = tail - org;
-		buf = KSI_malloc(len + 1);
-		if (buf == NULL) {
-			res = KT_OUT_OF_MEMORY;
-			goto cleanup;
-		}
-	}
-	memcpy(buf, org, len);
-	buf[len] = 0;
 	*derived = buf;
 	res = KT_OK;
 
