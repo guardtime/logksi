@@ -671,8 +671,16 @@ int process_metarecord(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO 
 	res = get_hash_of_metarecord(ksi, blocks, tlv, &hash);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to calculate hash of metarecord with index %3d.", blocks->blockNo, metarecord_index);
 
+	if (files->outSigFile) {
+		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->outSigFile) != blocks->ftlv_len) {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to copy record hash.", blocks->blockNo);
+		}
+	}
+
 	KSI_DataHash_free(blocks->metarecordHash);
 	blocks->metarecordHash = hash;
+	hash = NULL;
 
 	res = KT_OK;
 
@@ -759,12 +767,13 @@ int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNAT
 
 	res = calculate_root_hash(ksi, blocks, &context.documentHash);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to get root hash for verification.", blocks->blockNo);
+	context.docAggrLevel = blocks->treeHeight + 1;
 
 	if (processors->verify_signature) {
 		res = KSI_Signature_parseWithPolicy(ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_EMPTY, NULL, &sig);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse KSI signature.", blocks->blockNo);
 
-		res = processors->verify_signature(set, err, ksi, sig, context.documentHash, &verificationResult);
+		res = processors->verify_signature(set, err, ksi, sig, context.documentHash, context.docAggrLevel , &verificationResult);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: KSI signature verification failed.", blocks->blockNo);
 		/* TODO: add dumping of verification results. */
 		KSI_PolicyVerificationResult_free(verificationResult);
@@ -1078,6 +1087,7 @@ int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_
 				case 0x911:
 					res = process_metarecord(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
+				break;
 
 				case 0x904:
 				{
@@ -1159,6 +1169,7 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, VERIFYING_
 				case 0x911:
 					res = process_metarecord(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
+				break;
 
 				case 0x904:
 				{
@@ -1239,6 +1250,7 @@ int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILE
 				case 0x911:
 					res = process_metarecord(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
+				break;
 
 				case 0x904:
 				{
@@ -1330,6 +1342,7 @@ int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *fi
 				case 0x911:
 					res = process_metarecord(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
+				break;
 
 				case 0x904:
 				{

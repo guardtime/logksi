@@ -26,6 +26,7 @@
 #include <ksi/compatibility.h>
 #include "param_set/param_set.h"
 #include "param_set/task_def.h"
+#include "param_set/parameter.h"
 #include "api_wrapper.h"
 #include "tool_box/param_control.h"
 #include "tool_box/ksi_init.h"
@@ -66,7 +67,7 @@ int sign_run(int argc, char** argv, char **envp) {
 	 * Extract command line parameters.
 	 */
 	res = PARAM_SET_new(
-			CONF_generate_param_set_desc("{sign}{i}{o}{d}{log}{conf}{h|help}", "S", buf, sizeof(buf)),
+			CONF_generate_param_set_desc("{sign}{input}{o}{d}{log}{conf}{h|help}", "S", buf, sizeof(buf)),
 			&set);
 	if (res != KT_OK) goto cleanup;
 
@@ -90,7 +91,7 @@ int sign_run(int argc, char** argv, char **envp) {
 	res = check_pipe_errors(set, err);
 	if (res != KT_OK) goto cleanup;
 
-	res = PARAM_SET_getStr(set, "i", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.inSigName);
+	res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.inLogName);
 	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
 
 	res = PARAM_SET_getStr(set, "o", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.outSigName);
@@ -133,16 +134,16 @@ char *sign_help_toString(char*buf, size_t len) {
 	count += KSI_snprintf(buf + count, len - count,
 		"Usage:\n"
 		" %s sign -S <URL> [--aggr-user <user> --aggr-key <key>]\n"
-		"          [more_options] [-i <in.ls11>] [-o <out.ls11>]\n"
+		"          [more_options] [<logfile>] [-o <out.logsig>]\n"
 		"\n"
 		"\n"
-		" -i <in.ls11>\n"
-		"           - File path to the log signature file to be signed. If not specified or '-',\n"
+		" <logfile>\n"
+		"           - File path to the log file to be signed. If not specified,\n"
 		"             the log signature is read from stdin.\n"
-		" -o <out.ls11>\n"
+		" -o <out.logsig>\n"
 		"           - Output file path for the signed log signature file. Use '-' to redirect the signed\n"
 		"             log signature binary stream to stdout. If not specified, the log signature is saved\n"
-		"             to <in.ls11> while a backup of <in.ls11> is saved in <in.ls11>.bak.\n"
+		"             to <in.logsig> while a backup of <in.logsig> is saved in <in.logsig>.bak.\n"
 		"             If specified, existing file is always overwritten.\n"
 		"             If both input and outpur or not specified, stdin and stdout are used resepectively.\n"
 		" -S <URL>  - Signing service (KSI Aggregator) URL.\n"
@@ -185,12 +186,14 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 
 	PARAM_SET_addControl(set, "{conf}", isFormatOk_inputFile, isContentOk_inputFileRestrictPipe, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{o}{log}", isFormatOk_path, NULL, convertRepair_path, NULL);
-	PARAM_SET_addControl(set, "{i}", isFormatOk_inputHash, isContentOk_inputHash, convertRepair_path, extract_inputHash);
+	PARAM_SET_addControl(set, "{input}", isFormatOk_inputHash, isContentOk_inputHash, convertRepair_path, extract_inputHash);
 	PARAM_SET_addControl(set, "{d}", isFormatOk_flag, NULL, NULL, NULL);
 
 
+	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
+
 	/*					  ID	DESC										MAN					ATL		FORBIDDEN		IGN	*/
-	TASK_SET_add(task_set, 0,	"Sign data.",								"S,i",				NULL,	NULL,		NULL);
+	TASK_SET_add(task_set, 0,	"Sign data.",								"S,input",				NULL,	NULL,		NULL);
 
 cleanup:
 
@@ -203,12 +206,35 @@ static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err) {
 	res = get_pipe_out_error(set, err, "o", "log", NULL);
 	if (res != KT_OK) goto cleanup;
 
-	res = get_pipe_in_error(set, err, "i", NULL, NULL);
+	res = get_pipe_in_error(set, err, "input", NULL, NULL);
 	if (res != KT_OK) goto cleanup;
 
 cleanup:
 	return res;
 }
+
+static int get_derived_name(char *org, const char *extension, char **derived) {
+	int res;
+	char *buf = NULL;
+
+	if (org == NULL || extension == NULL || derived == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+	buf = (char*)KSI_malloc(strlen(org) + strlen(extension) + 1);
+	if (buf == NULL) {
+		res = KT_OUT_OF_MEMORY;
+		goto cleanup;
+	}
+	sprintf(buf, "%s%s", org, extension);
+	*derived = buf;
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
+
 
 static int get_backup_name(char *org, char **backup) {
 	int res = KT_OUT_OF_MEMORY;
@@ -253,7 +279,7 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 	}
 
 	/* Default input file is stdin. */
-	if (files->inSigName == NULL || !strcmp(files->inSigName, "-")) {
+	if (files->inLogName == NULL) {
 		/* Default output file is a temporary file that is copied to stdout on success. */
 		if (files->outSigName == NULL || !strcmp(files->outSigName, "-")) {
 			res = get_temp_name(&tmp.tempSigName);
@@ -263,24 +289,27 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 			tmp.outSigName = files->outSigName;
 		}
 	} else {
+		res = get_derived_name(files->inLogName, ".logsig", &tmp.derivedSigName);
+		ERR_CATCH_MSG(err, res, "Error: out of memory.");
+
 		/* Default output file is the same as input, but a backup of the input file is retained. */
-		if (files->outSigName == NULL || !strcmp(files->inSigName, files->outSigName)) {
-			res = get_backup_name(files->inSigName, &buf);
+		if (files->outSigName == NULL || !strcmp(tmp.derivedSigName, files->outSigName)) {
+			res = get_backup_name(tmp.derivedSigName, &buf);
 			ERR_CATCH_MSG(err, res, "Error: out of memory.");
 			remove(buf);
-			res = (rename(files->inSigName, buf) == 0) ? KT_OK : KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: could not rename file %s to %s.", files->inSigName, buf);
+			res = (rename(tmp.derivedSigName, buf) == 0) ? KT_OK : KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: could not rename file %s to %s.", tmp.derivedSigName, buf);
 			tmp.backupSigName = buf;
 			buf = NULL;
 			tmp.inSigName = tmp.backupSigName;
-			tmp.outSigName = files->inSigName;
+			tmp.outSigName = tmp.derivedSigName;
 		} else if (!strcmp(files->outSigName, "-")) {
 			res = get_temp_name(&tmp.tempSigName);
 			ERR_CATCH_MSG(err, res, "Error: out of memory.");
-			tmp.inSigName = files->inSigName;
+			tmp.inSigName = tmp.derivedSigName;
 			tmp.outSigName = tmp.tempSigName;
 		} else {
-			tmp.inSigName = files->inSigName;
+			tmp.inSigName = tmp.derivedSigName;
 			tmp.outSigName = files->outSigName;
 		}
 	}
@@ -301,7 +330,7 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 		tmp.outSigFile = stdout;
 	}
 
-	tmp.inSigName = files->inSigName;
+	tmp.inLogName = files->inLogName;
 	tmp.outSigName = files->outSigName;
 	*files = tmp;
 	memset(&tmp, 0, sizeof(tmp));
@@ -315,7 +344,7 @@ cleanup:
 	if (tmp.backupSigName) {
 		if (tmp.inSigFile) fclose(tmp.inSigFile);
 		tmp.inSigFile = NULL;
-		rename(tmp.backupSigName, files->inSigName);
+		rename(tmp.backupSigName, tmp.inSigName);
 		KSI_free(tmp.backupSigName);
 	}
 	if (tmp.tempSigName) {
@@ -324,6 +353,10 @@ cleanup:
 		KSI_free(tmp.tempSigName);
 	}
 	KSI_free(buf);
+
+	if (tmp.derivedSigName) {
+		KSI_free(tmp.derivedSigName);
+	}
 
 	if (tmp.inSigFile) fclose(tmp.inSigFile);
 	if (tmp.outSigFile) fclose(tmp.outSigFile);
@@ -364,6 +397,10 @@ static void close_input_and_output_files(int result, IO_FILES *files) {
 			rename(files->backupSigName, files->inSigName);
 		}
 		KSI_free(files->backupSigName);
+	}
+
+	if (files->derivedSigName) {
+		KSI_free(files->derivedSigName);
 	}
 
 	if (files->inSigFile) fclose(files->inSigFile);
