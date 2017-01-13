@@ -1,0 +1,54 @@
+.TH LOGKSI-INTEGRATE 1
+.\"
+.SH NAME
+\fBlogksi integrate \fR- Integrate the log blocks information and signatures to log signatures file.
+.\"
+.SH SYNOPSIS
+.HP 4
+\fBlogksi integrate -i \fIlogfile \fR[\fB-o \fIoutput.logsig\fR]
+.\"
+.SH DESCRIPTION
+Integrates the log blocks file and respective KSI signatures file into one log signature file.
+.LP
+If \fIlogfile\fR is given as input parameter, the respective temporary files (\fIblocks.dat\fR and \fIblock-signatures.dat\fR) to create the final log signature file are expected to locate in the folder \fIlogfile.parts\fR.
+.LP
+If no output file name is specified, a dedicated \fIlogfile.logsig\fR file is generated next to the original \fIlogfile\fR.
+.LP
+For integration to succeed, two criteria need to be met:
+.LP
+.IP \(bu 4
+The order of log blocks in \fIblocks.dat\fR and signatures in \fIblock-signatures.dat\fR needs to match.
+.IP \(bu 4
+The root hash of each block in the blocks file needs to be equal to the one in the signatures file.
+.LP
+.\"
+.SH OPTIONS
+.TP
+\fB-i \fIlogfile\fR
+Specify the \fIlogfile\fR to create the log signature file for. \fIlogfile\fR must be associated with two files: one containing the information about log record blocks, and the other with corresponding signatures. Use '-' as the path to read the input from \fIstdin\fR.
+.\"
+.TP
+\fB-o \fIlogfile.logsig\fR
+Specify the output file path for the log signature file. If not specified, the log signature file is saved as \fIlogfile.logsig\fR in the same folder where the input information is located. If the output file name is explicitly specified, existing file is always overwritten.
+.br
+.\"
+.SH EXIT STATUS
+See \fBlogksi\fR(1) for more information.
+.\"
+.SH EXAMPLES
+In the following examples it is assumed that KSI service configuration options (URLs, access credentials) are defined. See \fBlogksi-conf\fR(5) for more information.
+.\"
+.TP 2
+\fB1
+\fRTo integrate temporary files \fI\\logfile.parts\\blocks.dat\fR and \fI\\logfile.parts\\block-signatures.dat\fR into complete log signature file with default name \fIlogfile.logsig\fR:
+.LP
+.RS 4
+\fBlogksi integrate -i \fIlogfile
+.RE
+.\"
+.SH AUTHOR
+Guardtime AS, http://www.guardtime.com/
+.LP
+.\"
+.SH SEE ALSO
+\fBlogksi\fR(1), \fBlogksi-sign\fR(1), \fBlogksi-extend\fR,(1) \fBlogksi-verify\fR(1), \fBlogksi-pubfile\fR(1), \fBlogksi-conf\fR(5)
