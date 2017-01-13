@@ -36,7 +36,6 @@ typedef struct {
 	char *tempSigName;
 	char *inLogName;
 	char *derivedSigName;
-	char *partsPathName;
 	char *partsBlockName;
 	char *partsSigName;
 	char *integratedSigName;

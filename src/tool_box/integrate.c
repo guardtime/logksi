@@ -78,7 +78,7 @@ int integrate_run(int argc, char **argv, char **envp) {
 
 	d = PARAM_SET_isSetByName(set, "d");
 
-	res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.partsPathName);
+	res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.inLogName);
 	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
 
 	res = PARAM_SET_getStr(set, "o", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.outSigName);
@@ -196,7 +196,7 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 		goto cleanup;
 	}
 
-	res = get_derived_name(files->partsPathName, ".logsig.parts/blocks.dat", &tmp.partsBlockName);
+	res = get_derived_name(files->inLogName, ".logsig.parts/blocks.dat", &tmp.partsBlockName);
 	ERR_CATCH_MSG(err, res, "Error: out of memory.");
 
 	if (!SMART_FILE_doFileExist(tmp.partsBlockName)) {
@@ -204,11 +204,11 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 		ERR_CATCH_MSG(err, res, "Error: unable to find block file %s.", tmp.partsBlockName);
 	}
 
-	res = get_derived_name(files->partsPathName, ".logsig.parts/block-signatures.dat", &tmp.partsSigName);
+	res = get_derived_name(files->inLogName, ".logsig.parts/block-signatures.dat", &tmp.partsSigName);
 	ERR_CATCH_MSG(err, res, "Error: out of memory.");
 
 	if (files->outSigName == NULL) {
-		res = get_derived_name(files->partsPathName, ".logsig", &tmp.integratedSigName);
+		res = get_derived_name(files->inLogName, ".logsig", &tmp.integratedSigName);
 		ERR_CATCH_MSG(err, res, "Error: out of memory");
 		tmp.outSigName = tmp.integratedSigName;
 	} else {
@@ -227,7 +227,7 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 	res = (tmp.outSigFile == NULL) ? KT_IO_ERROR : KT_OK;
 	ERR_CATCH_MSG(err, res, "Error: could not open file %s.", tmp.outSigName);
 
-	tmp.partsPathName = files->partsPathName;
+	tmp.inLogName = files->inLogName;
 	tmp.outSigName = files->outSigName;
 	*files = tmp;
 	memset(&tmp, 0, sizeof(tmp));
