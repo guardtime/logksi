@@ -767,12 +767,13 @@ int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNAT
 
 	res = calculate_root_hash(ksi, blocks, &context.documentHash);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to get root hash for verification.", blocks->blockNo);
+	context.docAggrLevel = blocks->treeHeight + 1;
 
 	if (processors->verify_signature) {
 		res = KSI_Signature_parseWithPolicy(ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_EMPTY, NULL, &sig);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse KSI signature.", blocks->blockNo);
 
-		res = processors->verify_signature(set, err, ksi, sig, context.documentHash, &verificationResult);
+		res = processors->verify_signature(set, err, ksi, sig, context.documentHash, context.docAggrLevel , &verificationResult);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: KSI signature verification failed.", blocks->blockNo);
 		/* TODO: add dumping of verification results. */
 		KSI_PolicyVerificationResult_free(verificationResult);

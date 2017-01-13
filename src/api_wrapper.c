@@ -284,7 +284,7 @@ int KSITOOL_RequestHandle_getExtendResponse(ERR_TRCKR *err, KSI_CTX *ctx, KSI_Re
 	return res;
 }
 
-int KSITOOL_SignatureVerify_general(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh,
+int KSITOOL_SignatureVerify_general(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
 									KSI_PublicationData *pubdata, int extperm,
 									KSI_PolicyVerificationResult **result) {
 	int res;
@@ -296,22 +296,22 @@ int KSITOOL_SignatureVerify_general(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX 
 
 	/* First check if user has provided publications */
 	if (pubdata != NULL) {
-		res = KSITOOL_SignatureVerify_userProvidedPublicationBased(err, sig, ctx, hsh, pubdata, extperm, result);
+		res = KSITOOL_SignatureVerify_userProvidedPublicationBased(err, sig, ctx, hsh, rootLevel, pubdata, extperm, result);
 	} else {
 		/* Get available trust anchor from the signature */
 		if (KSITOOL_Signature_isCalendarAuthRecPresent(sig)) {
-			res = KSITOOL_SignatureVerify_keyBased(err, sig, ctx, hsh, result);
+			res = KSITOOL_SignatureVerify_keyBased(err, sig, ctx, hsh, rootLevel, result);
 		} else if (KSITOOL_Signature_isPublicationRecordPresent(sig)) {
-			res = KSITOOL_SignatureVerify_publicationsFileBased(err, sig, ctx, hsh, extperm, result);
+			res = KSITOOL_SignatureVerify_publicationsFileBased(err, sig, ctx, hsh, rootLevel, extperm, result);
 		} else {
-			res = KSITOOL_SignatureVerify_calendarBased(err, sig, ctx, hsh, result);
+			res = KSITOOL_SignatureVerify_calendarBased(err, sig, ctx, hsh, rootLevel, result);
 		}
 	}
 
 	return res;
 }
 
-int KSITOOL_SignatureVerify_internally(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh,
+int KSITOOL_SignatureVerify_internally(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
 									   KSI_PolicyVerificationResult **result) {
 	int res;
 
@@ -320,14 +320,14 @@ int KSITOOL_SignatureVerify_internally(ERR_TRCKR *err, KSI_Signature *sig, KSI_C
 		return res;
 	}
 
-	res = verify_signature(sig, ctx, hsh, 0, 0, NULL, NULL, KSI_VERIFICATION_POLICY_INTERNAL, result);
+	res = verify_signature(sig, ctx, hsh, rootLevel, 0, NULL, NULL, KSI_VERIFICATION_POLICY_INTERNAL, result);
 	if (res != KSI_OK) KSITOOL_KSI_ERRTrace_save(ctx);
 	appendBaseErrorIfPresent(err, res, ctx, __LINE__);
 
 	return res;
 }
 
-int KSITOOL_SignatureVerify_calendarBased(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh,
+int KSITOOL_SignatureVerify_calendarBased(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
 										  KSI_PolicyVerificationResult **result) {
 	int res;
 
@@ -336,7 +336,7 @@ int KSITOOL_SignatureVerify_calendarBased(ERR_TRCKR *err, KSI_Signature *sig, KS
 		return res;
 	}
 
-	res = verify_signature(sig, ctx, hsh, 0, 1, NULL, NULL, KSI_VERIFICATION_POLICY_CALENDAR_BASED, result);
+	res = verify_signature(sig, ctx, hsh, rootLevel, 1, NULL, NULL, KSI_VERIFICATION_POLICY_CALENDAR_BASED, result);
 	if (res != KSI_OK) KSITOOL_KSI_ERRTrace_save(ctx);
 
 	if (appendBaseErrorIfPresent(err, res, ctx, __LINE__) == 0) {
@@ -346,7 +346,7 @@ int KSITOOL_SignatureVerify_calendarBased(ERR_TRCKR *err, KSI_Signature *sig, KS
 	return res;
 }
 
-int KSITOOL_SignatureVerify_keyBased(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh,
+int KSITOOL_SignatureVerify_keyBased(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
 									 KSI_PolicyVerificationResult **result){
 	int res;
 
@@ -355,7 +355,7 @@ int KSITOOL_SignatureVerify_keyBased(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX
 		return res;
 	}
 
-	res = verify_signature(sig, ctx, hsh, 0, 0, NULL, NULL, KSI_VERIFICATION_POLICY_KEY_BASED, result);
+	res = verify_signature(sig, ctx, hsh, rootLevel, 0, NULL, NULL, KSI_VERIFICATION_POLICY_KEY_BASED, result);
 	if (res != KSI_OK) KSITOOL_KSI_ERRTrace_save(ctx);
 
 	if (appendBaseErrorIfPresent(err, res, ctx, __LINE__) == 0) {
@@ -364,7 +364,7 @@ int KSITOOL_SignatureVerify_keyBased(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX
 	return res;
 }
 
-int KSITOOL_SignatureVerify_publicationsFileBased(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh,
+int KSITOOL_SignatureVerify_publicationsFileBased(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
 												  int extperm,
 												  KSI_PolicyVerificationResult **result){
 	int res;
@@ -374,7 +374,7 @@ int KSITOOL_SignatureVerify_publicationsFileBased(ERR_TRCKR *err, KSI_Signature 
 		return res;
 	}
 
-	res = verify_signature(sig, ctx, hsh, 0, extperm, NULL, NULL, KSI_VERIFICATION_POLICY_PUBLICATIONS_FILE_BASED, result);
+	res = verify_signature(sig, ctx, hsh, rootLevel, extperm, NULL, NULL, KSI_VERIFICATION_POLICY_PUBLICATIONS_FILE_BASED, result);
 	if (res != KSI_OK) KSITOOL_KSI_ERRTrace_save(ctx);
 
 	if (appendBaseErrorIfPresent(err, res, ctx, __LINE__) == 0) {
@@ -385,7 +385,7 @@ int KSITOOL_SignatureVerify_publicationsFileBased(ERR_TRCKR *err, KSI_Signature 
 	return res;
 }
 
-int KSITOOL_SignatureVerify_userProvidedPublicationBased(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh,
+int KSITOOL_SignatureVerify_userProvidedPublicationBased(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
 														 KSI_PublicationData *pubdata, int extperm,
 														 KSI_PolicyVerificationResult **result){
 	int res;
@@ -397,7 +397,7 @@ int KSITOOL_SignatureVerify_userProvidedPublicationBased(ERR_TRCKR *err, KSI_Sig
 
 	if (pubdata == NULL) return KSI_INVALID_FORMAT;
 
-	res = verify_signature(sig, ctx, hsh, 0, extperm, NULL, pubdata, KSI_VERIFICATION_POLICY_USER_PUBLICATION_BASED, result);
+	res = verify_signature(sig, ctx, hsh, rootLevel, extperm, NULL, pubdata, KSI_VERIFICATION_POLICY_USER_PUBLICATION_BASED, result);
 	if (res != KSI_OK) KSITOOL_KSI_ERRTrace_save(ctx);
 
 	if (appendBaseErrorIfPresent(err, res, ctx, __LINE__) == 0) {
