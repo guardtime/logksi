@@ -39,9 +39,9 @@ Packager: Guardtime AS <info@guardtime.com>
 Distribution: Guardtime utilities
 BuildRoot: %{_tmppath}/%{name_package}-%{version}-build
 
-# Obsolate ksitool in the future.
-# Obsoletes: ksitool <= 1.10.0-2
-Obsoletes: ksi <= 2.0.744-2
+# Obsolete logksi in the future.
+# Obsoletes: logksi <= 1.10.0-2
+Obsoletes: logksi <= 1.0.0
 
 # Dependencies are set in config.ac
 @KSI_BUILD_DEPENDECY@
@@ -52,7 +52,7 @@ Guardtime signing and verification tool. Execute
 
 
 %post
-echo "Warning: Package ksitool is legacy version of the package ksi-tools and will be obsolated in the future."
+echo "Warning: Package logksi is legacy version of the package logksi-tools and will be obsolated in the future."
 
 %prep
 %setup -q -n %{name_package}-%{version}
@@ -73,7 +73,6 @@ make install DESTDIR=%{buildroot}
 %{_mandir}/man1/logksi.1*
 %{_mandir}/man1/logksi-sign.1*
 %{_mandir}/man1/logksi-extend.1*
-%{_mandir}/man1/logksi-pubfile.1*
 %{_mandir}/man1/logksi-verify.1*
 %{_mandir}/man5/logksi-conf.5*
 %{_docdir}/%{name_package}/LICENSE

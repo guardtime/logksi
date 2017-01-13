@@ -22,7 +22,6 @@ man_MANS = \
 	../doc/logksi-conf.5 \
 	../doc/logksi-sign.1 \
 	../doc/logksi-extend.1 \
-	../doc/logksi-pubfile.1 \
 	../doc/logksi-verify.1
 
 dist_doc_DATA = ../LICENSE ../doc/ChangeLog
@@ -41,7 +40,6 @@ logksi_SOURCES = \
 	err_trckr.h \
 	tool_box.c \
 	tool_box.h \
-	tool_box/pubfile.c \
 	tool_box/sign.c \
 	tool_box/verify.c \
 	tool_box/extend.c \
@@ -79,4 +77,3 @@ logksi_SOURCES = \
 	obj_printer.h \
 	debug_print.c \
 	debug_print.h
-

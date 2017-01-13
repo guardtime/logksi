@@ -307,8 +307,7 @@ static int ksitool_compo_get(TASK_SET *tasks, PARAM_SET **set, TOOL_COMPONENT_LI
 	TASK_SET_add(tasks, 0, "Sign", "sign", NULL, NULL, NULL);
 	TASK_SET_add(tasks, 1, "Verify", "verify", NULL, NULL, NULL);
 	TASK_SET_add(tasks, 2, "extend", "extend", NULL, NULL, NULL);
-	TASK_SET_add(tasks, 3, "pubfile", "pubfile", NULL, NULL, NULL);
-	TASK_SET_add(tasks, 4, "integrate", "integrate", NULL, NULL, NULL);
+	TASK_SET_add(tasks, 3, "integrate", "integrate", NULL, NULL, NULL);
 	TASK_SET_add(tasks, 0xffff, "conf", "conf", NULL, NULL, NULL);
 
 	/**
@@ -317,7 +316,6 @@ static int ksitool_compo_get(TASK_SET *tasks, PARAM_SET **set, TOOL_COMPONENT_LI
 	TOOL_COMPONENT_LIST_add(tmp_compo, "sign", sign_run, sign_help_toString,  sign_get_desc, 0);
 	TOOL_COMPONENT_LIST_add(tmp_compo, "verify", verify_run, verify_help_toString, verify_get_desc, 1);
 	TOOL_COMPONENT_LIST_add(tmp_compo, "extend", extend_run, extend_help_toString, extend_get_desc, 2);
-	TOOL_COMPONENT_LIST_add(tmp_compo, "pubfile", pubfile_run, pubfile_help_toString, pubfile_get_desc, 3);
 	TOOL_COMPONENT_LIST_add(tmp_compo, "integrate", integrate_run, integrate_help_toString, integrate_get_desc, 4);
 	TOOL_COMPONENT_LIST_add(tmp_compo, "conf", conf_run, conf_help_toString, conf_get_desc, 0xffff);
 

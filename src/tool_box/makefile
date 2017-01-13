@@ -30,7 +30,6 @@ MAIN_DIR = ..\
 
 LIB_OBJ = \
 	$(OBJ_DIR)\ksi_init.obj \
-	$(OBJ_DIR)\pubfile.obj \
 	$(OBJ_DIR)\extend.obj \
 	$(OBJ_DIR)\sign.obj \
 	$(OBJ_DIR)\verify.obj \
