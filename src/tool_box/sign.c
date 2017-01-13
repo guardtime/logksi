@@ -391,10 +391,10 @@ static void close_input_and_output_files(int result, IO_FILES *files) {
 		if (result != KT_OK) {
 			fclose(files->outSigFile);
 			files->outSigFile = NULL;
-			remove(files->inSigName);
+			remove(files->derivedSigName);
 			fclose(files->inSigFile);
 			files->inSigFile = NULL;
-			rename(files->backupSigName, files->inSigName);
+			rename(files->backupSigName, files->derivedSigName);
 		}
 		KSI_free(files->backupSigName);
 	}
