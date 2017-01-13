@@ -786,7 +786,7 @@ int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNAT
 		print_progressResult(res);
 		print_progressDesc(d, "Block no. %3d: extending KSI signature... ", blocks->blockNo);
 
-		res = processors->extend_signature(set, err, ksi, sig, &ext);
+		res = processors->extend_signature(set, err, ksi, sig, &context, &ext);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to extend KSI signature.", blocks->blockNo);
 
 		res = tlv_element_set_signature(tlv, ksi, 0x905, ext);
@@ -954,7 +954,7 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 			print_progressResult(res);
 			print_progressDesc(d, "Block no. %3d: creating missing KSI signature... ", blocks->blockNo);
 
-			res = processors->create_signature(err, ksi, hash, &sig);
+			res = processors->create_signature(err, ksi, hash, blocks->treeHeight + 1, &sig);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to sign root hash.", blocks->blockNo);
 
 			res = KSI_TlvElement_new(&tlvSig);

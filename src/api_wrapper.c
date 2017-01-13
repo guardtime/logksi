@@ -208,7 +208,7 @@ cleanup:
 	return res;
 }
 
-int KSITOOL_extendSignature(ERR_TRCKR *err, KSI_CTX *ctx, KSI_Signature *sig, KSI_Signature **ext) {
+int KSITOOL_extendSignature(ERR_TRCKR *err, KSI_CTX *ctx, KSI_Signature *sig, KSI_VerificationContext *context, KSI_Signature **ext) {
 	int res;
 
 	if (err == NULL || ctx == NULL || sig == NULL || ext == NULL) {
@@ -216,7 +216,7 @@ int KSITOOL_extendSignature(ERR_TRCKR *err, KSI_CTX *ctx, KSI_Signature *sig, KS
 		return res;
 	}
 
-	res = KSI_extendSignature(ctx, sig, ext);
+	res = KSI_extendSignatureWithPolicy(ctx, sig, KSI_VERIFICATION_POLICY_INTERNAL, context, ext);
 	if (res != KSI_OK) KSITOOL_KSI_ERRTrace_save(ctx);
 
 	if (appendBaseErrorIfPresent(err, res, ctx, __LINE__) == 0) {
@@ -228,7 +228,7 @@ int KSITOOL_extendSignature(ERR_TRCKR *err, KSI_CTX *ctx, KSI_Signature *sig, KS
 	return res;
 }
 
-int KSITOOL_Signature_extendTo(ERR_TRCKR *err, const KSI_Signature *signature, KSI_CTX *ctx, KSI_Integer *to, KSI_Signature **extended) {
+int KSITOOL_Signature_extendTo(ERR_TRCKR *err, const KSI_Signature *signature, KSI_CTX *ctx, KSI_Integer *to, KSI_VerificationContext *context, KSI_Signature **extended) {
 	int res;
 
 	if (err == NULL || ctx == NULL || signature == NULL || to == NULL || extended == NULL) {
@@ -236,7 +236,7 @@ int KSITOOL_Signature_extendTo(ERR_TRCKR *err, const KSI_Signature *signature, K
 		return res;
 	}
 
-	res = KSI_Signature_extendTo(signature, ctx, to, extended);
+	res = KSI_Signature_extendToWithPolicy(signature, ctx, to, KSI_VERIFICATION_POLICY_INTERNAL, context, extended);
 	if (res != KSI_OK) KSITOOL_KSI_ERRTrace_save(ctx);
 
 	if (appendBaseErrorIfPresent(err, res, ctx, __LINE__) == 0) {
@@ -246,7 +246,7 @@ int KSITOOL_Signature_extendTo(ERR_TRCKR *err, const KSI_Signature *signature, K
 	return res;
 }
 
-int KSITOOL_Signature_extend(ERR_TRCKR *err, const KSI_Signature *signature, KSI_CTX *ctx, const KSI_PublicationRecord *pubRec, KSI_Signature **extended) {
+int KSITOOL_Signature_extend(ERR_TRCKR *err, const KSI_Signature *signature, KSI_CTX *ctx, const KSI_PublicationRecord *pubRec, KSI_VerificationContext *context, KSI_Signature **extended) {
 	int res;
 
 	if (err == NULL || ctx == NULL || signature == NULL || pubRec == NULL || extended == NULL) {
@@ -254,7 +254,7 @@ int KSITOOL_Signature_extend(ERR_TRCKR *err, const KSI_Signature *signature, KSI
 		return res;
 	}
 
-	res = KSI_Signature_extend(signature, ctx, pubRec, extended);
+	res = KSI_Signature_extendWithPolicy(signature, ctx, pubRec, KSI_VERIFICATION_POLICY_INTERNAL, context, extended);
 	if (res != KSI_OK) KSITOOL_KSI_ERRTrace_save(ctx);
 
 	if (appendBaseErrorIfPresent(err, res, ctx, __LINE__) == 0) {
@@ -407,9 +407,9 @@ int KSITOOL_SignatureVerify_userProvidedPublicationBased(ERR_TRCKR *err, KSI_Sig
 	return res;
 }
 
-int KSITOOL_createSignature(ERR_TRCKR *err, KSI_CTX *ctx, KSI_DataHash *dataHash, KSI_Signature **sig) {
+int KSITOOL_createSignature(ERR_TRCKR *err, KSI_CTX *ctx, KSI_DataHash *dataHash, KSI_uint64_t rootLevel, KSI_Signature **sig) {
 	int res;
-	res = KSI_createSignature(ctx, dataHash, sig);
+	res = KSI_Signature_signAggregated(ctx, dataHash, rootLevel, sig);
 	if (res != KSI_OK) KSITOOL_KSI_ERRTrace_save(ctx);
 	if (appendBaseErrorIfPresent(err, res, ctx, __LINE__) == 0) {
 		appendNetworkErrors(err, res);

@@ -40,9 +40,9 @@
 #include "tool.h"
 #include "rsyslog.h"
 
-static int extend_to_nearest_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_Signature **ext);
-static int extend_to_specified_time(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_Signature **ext);
-static int extend_to_specified_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_Signature **ext);
+static int extend_to_nearest_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_VerificationContext *context, KSI_Signature **ext);
+static int extend_to_specified_time(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_VerificationContext *context, KSI_Signature **ext);
+static int extend_to_specified_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_VerificationContext *context, KSI_Signature **ext);
 static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
 static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err);
 static int get_backup_name(char *org, char **backup);
@@ -207,7 +207,7 @@ const char *extend_get_desc(void) {
 	return "Extends existing KSI signature to the given publication.";
 }
 
-static int extend_to_nearest_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_Signature **ext) {
+static int extend_to_nearest_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_VerificationContext *context, KSI_Signature **ext) {
 	int res;
 	int d = 0;
 	KSI_Signature *tmp = NULL;
@@ -234,7 +234,7 @@ static int extend_to_nearest_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX
 	}
 
 	print_progressDesc(d, "Extend the signature to the earliest available publication... ");
-	res = KSITOOL_extendSignature(err, ksi, sig, &tmp);
+	res = KSITOOL_extendSignature(err, ksi, sig, context, &tmp);
 	ERR_CATCH_MSG(err, res, "Error: Unable to extend signature.");
 	print_progressResult(res);
 
@@ -251,7 +251,7 @@ cleanup:
 	return res;
 }
 
-static int extend_to_specified_time(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_Signature **ext) {
+static int extend_to_specified_time(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_VerificationContext *context, KSI_Signature **ext) {
 	int res;
 	int d = 0;
 	KSI_Signature *tmp = NULL;
@@ -280,7 +280,7 @@ static int extend_to_specified_time(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi
 	print_progressDesc(d, "Extending the signature to %s (%i)... ",
 			KSI_Integer_toDateString(pubTime, buf, sizeof(buf)),
 			KSI_Integer_getUInt64(pubTime));
-	res = KSITOOL_Signature_extendTo(err, sig, ksi, pubTime, &tmp);
+	res = KSITOOL_Signature_extendTo(err, sig, ksi, pubTime, context, &tmp);
 	ERR_CATCH_MSG(err, res, "Error: Unable to extend signature.");
 	print_progressResult(res);
 
@@ -298,7 +298,7 @@ cleanup:
 	return res;
 }
 
-static int extend_to_specified_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_Signature **ext) {
+static int extend_to_specified_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_VerificationContext *context, KSI_Signature **ext) {
 	int res;
 	int d = 0;
 	KSI_Signature *tmp = NULL;
@@ -338,7 +338,7 @@ static int extend_to_specified_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_C
 	}
 
 	print_progressDesc(d, "Extend the signature to the specified publication... ");
-	res = KSITOOL_Signature_extend(err, sig, ksi, pub_rec, &tmp);
+	res = KSITOOL_Signature_extend(err, sig, ksi, pub_rec, context, &tmp);
 	ERR_CATCH_MSG(err, res, "Error: Unable to extend signature.");
 	print_progressResult(res);
 
