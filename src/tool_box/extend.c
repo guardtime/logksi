@@ -93,7 +93,7 @@ int extend_run(int argc, char** argv, char **envp) {
 	res = check_pipe_errors(set, err);
 	if (res != KT_OK) goto cleanup;
 
-	res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.inSigName);
+	res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.inLogName);
 	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
 
 	res = PARAM_SET_getStr(set, "o", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.outSigName);
@@ -153,15 +153,15 @@ char *extend_help_toString(char*buf, size_t len) {
 
 	count += KSI_snprintf(buf + count, len - count,
 		"Usage:\n"
-		" %s extend <in.logsig> [-o <out.logsig>] -X <URL>\n"
+		" %s extend <logfile> [-o <out.logsig>] -X <URL>\n"
 		"    [--ext-user <user> --ext-key <key>] -P <URL> [--cnstr <oid=value>]... [more_options]\n"
-		" %s extend <in.logsig> [-o <out.logsig>] -X <URL>\n"
+		" %s extend <logfile> [-o <out.logsig>] -X <URL>\n"
 		"    [--ext-user <user> --ext-key <key>] -P <URL> [--cnstr <oid=value>]... [--pub-str <str>] [more_options]\n"
-		" %s extend <in.logsig> [-o <out.logsig>] -X <URL>\n"
+		" %s extend <logfile> [-o <out.logsig>] -X <URL>\n"
 		"    [--ext-user <user> --ext-key <key>] -T time [more_options]\n"
 		"\n"
-		" <in.logsig>\n"
-		"           - File path to the log signature file to be extended. If not specified,\n"
+		" <logfile>\n"
+		"           - File path to the log file whose logsignature file is to be extended. If not specified,\n"
 		"             the log signature is read from stdin.\n"
 		" -o <out.logsig>\n"
 		"           - Output file path for the extended log signature file. Use '-' to redirect the extended\n"
@@ -406,6 +406,28 @@ cleanup:
 	return res;
 }
 
+static int get_derived_name(char *org, const char *extension, char **derived) {
+	int res;
+	char *buf = NULL;
+
+	if (org == NULL || extension == NULL || derived == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+	buf = (char*)KSI_malloc(strlen(org) + strlen(extension) + 1);
+	if (buf == NULL) {
+		res = KT_OUT_OF_MEMORY;
+		goto cleanup;
+	}
+	sprintf(buf, "%s%s", org, extension);
+	*derived = buf;
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
+
 static int get_backup_name(char *org, char **backup) {
 	int res = KT_OUT_OF_MEMORY;
 	char *buf = NULL;
@@ -449,7 +471,7 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 	}
 
 	/* Default input file is stdin. */
-	if (files->inSigName == NULL) {
+	if (files->inLogName == NULL) {
 		/* Default output file is a temporary file that is copied to stdout on success. */
 		if (files->outSigName == NULL || !strcmp(files->outSigName, "-")) {
 			res = get_temp_name(&tmp.tempSigName);
@@ -459,24 +481,27 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 			tmp.outSigName = files->outSigName;
 		}
 	} else {
+		res = get_derived_name(files->inLogName, ".logsig", &tmp.derivedSigName);
+		ERR_CATCH_MSG(err, res, "Error: out of memory.");
+
 		/* Default output file is the same as input, but a backup of the input file is retained. */
-		if (files->outSigName == NULL || !strcmp(files->inSigName, files->outSigName)) {
-			res = get_backup_name(files->inSigName, &buf);
+		if (files->outSigName == NULL || !strcmp(tmp.derivedSigName, files->outSigName)) {
+			res = get_backup_name(tmp.derivedSigName, &buf);
 			ERR_CATCH_MSG(err, res, "Error: out of memory.");
 			remove(buf);
-			res = (rename(files->inSigName, buf) == 0) ? KT_OK : KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: could not rename file %s to %s.", files->inSigName, buf);
+			res = (rename(tmp.derivedSigName, buf) == 0) ? KT_OK : KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: could not rename file %s to %s.", tmp.derivedSigName, buf);
 			tmp.backupSigName = buf;
 			buf = NULL;
 			tmp.inSigName = tmp.backupSigName;
-			tmp.outSigName = files->inSigName;
+			tmp.outSigName = tmp.derivedSigName;
 		} else if (!strcmp(files->outSigName, "-")) {
 			res = get_temp_name(&tmp.tempSigName);
 			ERR_CATCH_MSG(err, res, "Error: out of memory.");
-			tmp.inSigName = files->inSigName;
+			tmp.inSigName = tmp.derivedSigName;
 			tmp.outSigName = tmp.tempSigName;
 		} else {
-			tmp.inSigName = files->inSigName;
+			tmp.inSigName = tmp.derivedSigName;
 			tmp.outSigName = files->outSigName;
 		}
 	}
@@ -497,7 +522,7 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 		tmp.outSigFile = stdout;
 	}
 
-	tmp.inSigName = files->inSigName;
+	tmp.inLogName = files->inLogName;
 	tmp.outSigName = files->outSigName;
 	*files = tmp;
 	memset(&tmp, 0, sizeof(tmp));
@@ -520,6 +545,10 @@ cleanup:
 		KSI_free(tmp.tempSigName);
 	}
 	KSI_free(buf);
+
+	if (tmp.derivedSigName) {
+		KSI_free(tmp.derivedSigName);
+	}
 
 	if (tmp.inSigFile) fclose(tmp.inSigFile);
 	if (tmp.outSigFile) fclose(tmp.outSigFile);
@@ -560,6 +589,10 @@ static void close_input_and_output_files(int result, IO_FILES *files) {
 			rename(files->backupSigName, files->inSigName);
 		}
 		KSI_free(files->backupSigName);
+	}
+
+	if (files->derivedSigName) {
+		KSI_free(files->derivedSigName);
 	}
 
 	if (files->inSigFile) fclose(files->inSigFile);
