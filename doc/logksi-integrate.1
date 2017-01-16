@@ -1,16 +1,16 @@
 .TH LOGKSI-INTEGRATE 1
 .\"
 .SH NAME
-\fBlogksi integrate \fR- Integrate the log blocks information and signatures to log signatures file.
+\fBlogksi integrate \fR- Integrate the log blocks and their signatures into log signatures file.
 .\"
 .SH SYNOPSIS
 .HP 4
-\fBlogksi integrate -i \fIlogfile \fR[\fB-o \fIoutput.logsig\fR]
+\fBlogksi integrate \fIlogfile \fR[\fB-o \fIoutput.logsig\fR]
 .\"
 .SH DESCRIPTION
-Integrates the log blocks file and respective KSI signatures file into one log signature file.
+Integrates the temporary log blocks file and log signatures file containing the respective KSI signatures into one final log signature file.
 .LP
-If \fIlogfile\fR is given as input parameter, the respective temporary files (\fIblocks.dat\fR and \fIblock-signatures.dat\fR) to create the final log signature file are expected to locate in the folder \fIlogfile.logsig.parts\fR.
+If \fIlogfile\fR is given as input parameter, the respective temporary files (\fIblocks.dat\fR and \fIblock-signatures.dat\fR) to create the final log signature file are expected to locate in the folder \fIlogfile.logsig.parts\fR. These files are created during logging and the integration can be performed after the logging has rotated.
 .LP
 If no output file name is specified, a dedicated \fIlogfile.logsig\fR file is generated next to the original \fIlogfile\fR.
 .LP
@@ -24,12 +24,8 @@ The root hash of each block in the blocks file needs to be equal to the one in t
 .\"
 .SH OPTIONS
 .TP
-\fB-i \fIlogfile\fR
-Specify the \fIlogfile\fR to create the log signature file for. \fIlogfile\fR must be associated with two files: one containing the information about log record blocks, and the other with corresponding signatures. Use '-' as the path to read the input from \fIstdin\fR.
-.\"
-.TP
 \fB-o \fIlogfile.logsig\fR
-Specify the output file path for the log signature file. If not specified, the log signature file is saved as \fIlogfile.logsig\fR in the same folder where the input information is located. If the output file name is explicitly specified, existing file is always overwritten.
+Specify the output file path for the log signature file. If not specified, the log signature file is saved as \fIlogfile.logsig\fR in the same folder where the \fIlogfile\fR is located. If the output file name is explicitly specified, existing file is always overwritten.
 .br
 .\"
 .SH EXIT STATUS
