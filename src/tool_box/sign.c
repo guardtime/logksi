@@ -67,7 +67,7 @@ int sign_run(int argc, char** argv, char **envp) {
 	 * Extract command line parameters.
 	 */
 	res = PARAM_SET_new(
-			CONF_generate_param_set_desc("{sign}{input}{o}{d}{log}{conf}{h|help}", "S", buf, sizeof(buf)),
+			CONF_generate_param_set_desc("{input}{o}{d}{log}{conf}{h|help}", "S", buf, sizeof(buf)),
 			&set);
 	if (res != KT_OK) goto cleanup;
 
@@ -193,7 +193,7 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
 
 	/*					  ID	DESC										MAN					ATL		FORBIDDEN		IGN	*/
-	TASK_SET_add(task_set, 0,	"Sign data.",								"S,input",				NULL,	NULL,		NULL);
+	TASK_SET_add(task_set, 0,	"Sign data.",								"S",				NULL,	NULL,		NULL);
 
 cleanup:
 

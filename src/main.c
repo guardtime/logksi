@@ -135,7 +135,7 @@ static void print_general_help(PARAM_SET *set, const char *KSI_CONF){
 }
 
 static int ksitool_compo_get(TASK_SET *tasks, PARAM_SET **set, TOOL_COMPONENT_LIST **compo);
-
+static int min_arg_cnt(TASK_ID id);
 
 int main(int argc, char** argv, char **envp) {
 	int res;
@@ -206,7 +206,7 @@ int main(int argc, char** argv, char **envp) {
 	/**
 	 * Simple tool help handler.
 	 */
-	if (PARAM_SET_isSetByName(set, "h") || (argc < 2 && task == NULL) || (argc < 3 && task != NULL)) {
+	if (PARAM_SET_isSetByName(set, "h") || (argc < 2 && task == NULL) || (task != NULL && argc < min_arg_cnt(TASK_getID(task)) + 2)) {
 		print_result("%s %s (C) Guardtime\n", TOOL_getName(), TOOL_getVersion());
 		print_result("%s (C) Guardtime\n\n", KSI_getVersion());
 
@@ -295,7 +295,7 @@ static int ksitool_compo_get(TASK_SET *tasks, PARAM_SET **set, TOOL_COMPONENT_LI
 	/**
 	 * Create parameter list that contains all known tasks.
 	 */
-	res = PARAM_SET_new("{sign}{extend}{verify}{pubfile}{integrate}{conf}", &tmp_set);
+	res = PARAM_SET_new("{sign}{extend}{verify}{integrate}{conf}", &tmp_set);
 	if (res != PST_OK) goto cleanup;
 
 	res = TOOL_COMPONENT_LIST_new(32, &tmp_compo);
@@ -304,19 +304,19 @@ static int ksitool_compo_get(TASK_SET *tasks, PARAM_SET **set, TOOL_COMPONENT_LI
 	/**
 	 * Define all components as possible tasks.
 	 */
-	TASK_SET_add(tasks, 0, "Sign", "sign", NULL, NULL, NULL);
-	TASK_SET_add(tasks, 1, "Verify", "verify", NULL, NULL, NULL);
-	TASK_SET_add(tasks, 2, "extend", "extend", NULL, NULL, NULL);
-	TASK_SET_add(tasks, 3, "integrate", "integrate", NULL, NULL, NULL);
+	TASK_SET_add(tasks, TASK_ID_SIGN, "Sign", "sign", NULL, NULL, NULL);
+	TASK_SET_add(tasks, TASK_ID_VERIFY, "Verify", "verify", NULL, NULL, NULL);
+	TASK_SET_add(tasks, TASK_ID_EXTEND, "Extend", "extend", NULL, NULL, NULL);
+	TASK_SET_add(tasks, TASK_ID_INTEGRATE, "Integrate", "integrate", NULL, NULL, NULL);
 	TASK_SET_add(tasks, 0xffff, "conf", "conf", NULL, NULL, NULL);
 
 	/**
 	 * Define tool component as runnable.
 	 */
-	TOOL_COMPONENT_LIST_add(tmp_compo, "sign", sign_run, sign_help_toString,  sign_get_desc, 0);
-	TOOL_COMPONENT_LIST_add(tmp_compo, "verify", verify_run, verify_help_toString, verify_get_desc, 1);
-	TOOL_COMPONENT_LIST_add(tmp_compo, "extend", extend_run, extend_help_toString, extend_get_desc, 2);
-	TOOL_COMPONENT_LIST_add(tmp_compo, "integrate", integrate_run, integrate_help_toString, integrate_get_desc, 4);
+	TOOL_COMPONENT_LIST_add(tmp_compo, "sign", sign_run, sign_help_toString,  sign_get_desc, TASK_ID_SIGN);
+	TOOL_COMPONENT_LIST_add(tmp_compo, "verify", verify_run, verify_help_toString, verify_get_desc, TASK_ID_VERIFY);
+	TOOL_COMPONENT_LIST_add(tmp_compo, "extend", extend_run, extend_help_toString, extend_get_desc, TASK_ID_EXTEND);
+	TOOL_COMPONENT_LIST_add(tmp_compo, "integrate", integrate_run, integrate_help_toString, integrate_get_desc, TASK_ID_INTEGRATE);
 	TOOL_COMPONENT_LIST_add(tmp_compo, "conf", conf_run, conf_help_toString, conf_get_desc, 0xffff);
 
 	*set = tmp_set;
@@ -331,4 +331,18 @@ cleanup:
 	TOOL_COMPONENT_LIST_free(tmp_compo);
 
 	return res;
+}
+
+static int min_arg_cnt(TASK_ID id) {
+	switch(id) {
+		case TASK_ID_SIGN:
+		case TASK_ID_EXTEND:
+			return 0;
+		case TASK_ID_VERIFY:
+		case TASK_ID_INTEGRATE:
+		case 0xffff:
+			return 1;
+		default:
+			return 0xff;
+	}
 }

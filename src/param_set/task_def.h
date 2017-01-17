@@ -54,6 +54,12 @@ const char* TASK_getName(TASK *task);
 PARAM_SET *TASK_getSet(TASK *task);
 TASK_DEFINITION *TASK_getDef(TASK *task);
 
+typedef enum {
+	TASK_ID_SIGN = 0,
+	TASK_ID_VERIFY = 1,
+	TASK_ID_EXTEND = 2,
+	TASK_ID_INTEGRATE = 3
+} TASK_ID;
 
 #ifdef	__cplusplus
 }
