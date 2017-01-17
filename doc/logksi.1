@@ -17,6 +17,8 @@ The checkpoints of the blockchain, published in newspapers and electronic media,
 .LP
 Log signature tool is specifically designed to add KSI signature to any type of logs. It enables log signing, signature extending and verifying.
 .LP
+To use \fBlogksi\fR log entries and log blocks need to be hashed. Supported hahs algorithms are: SHA1, SHA2-256, RIPEMD-160, SHA2-384, SHA2-512.
+.LP
 .SH KSI COMMANDS
 .LP
 .TP
@@ -30,10 +32,6 @@ Verifies existing log signature. See \fBlogksi-verify\fR(1) for more information
 .TP
 \fBextend\fR
 Extends existing log signature to the given publication. See \fBlogksi-extend\fR(1) for more information.
-.\"
-.TP
-\fBpubfile\fR
-Downloads and verifies KSI publications file. See \fBlogksi-pubfile\fR(1) for more information.
 .\"
 .TP
 \fBintegrate\fR
@@ -75,7 +73,7 @@ TODO: \fICheck if the exit status' are sync with reality.\fR
 .\"
 .TP
 \fB5
-\fBNetwork error.\fR KSI tool is unable to connect to the service, connection is timed out or an HTTP error was returned from the KSI service.
+\fBNetwork error.\fR KSI log signature tool is unable to connect to the service, connection is timed out or an HTTP error was returned from the KSI service.
 .\"
 .TP
 \fB6
@@ -116,11 +114,11 @@ TODO: \fICheck if the exit status' are sync with reality.\fR
 .\"
 .TP
 \fB16
-\fBInvalid configuration.\fR KSI tool configuration or KSI C API library configuration is invalid.
+\fBInvalid configuration.\fR KSI log signature tool configuration or KSI C API library configuration is invalid.
 .br
 .\"
 .SH ENVIRONMENT
-The \fBLOGKSI_CONF\fR environment variable points to the KSI configuration file containing the KSI service related parameters such as the URLs to the KSI Aggregator and Extender service and the corresponding access credentials. See \fBlogksi-conf\fR(5) for more information.
+The \fBKSI_CONF\fR environment variable points to the KSI configuration file containing the KSI service related parameters such as the URLs to the KSI Aggregator and Extender service and the corresponding access credentials. See \fBlogksi-conf\fR(5) for more information.
 .LP
 .\"
 .SH AUTHOR
@@ -128,4 +126,4 @@ Guardtime AS, http://www.guardtime.com/
 .LP
 .\"
 .SH SEE ALSO
-\fBlogksi-sign\fR(1), \fBlogksi-integrate\fR(1), \fBlogksi-extend\fR(1), \fBlogksi-verify\fR(1), \fBlogksi-pubfile\fR(1), \fBlogksi-conf\fR(5)
+\fBlogksi-sign\fR(1), \fBlogksi-integrate\fR(1), \fBlogksi-extend\fR(1), \fBlogksi-verify\fR(1), \fBlogksi-conf\fR(5)

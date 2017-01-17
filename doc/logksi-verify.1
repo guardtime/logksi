@@ -5,17 +5,17 @@
 .\"
 .SH SYNOPSIS
 .HP 4
-\fBlogksi verify -i \fIlogfile \fR[\fB-s \fIlogfile.logsig\fR] [\fImore_options\fR]
+\fBlogksi verify \fIlogfile \fR[\fB-s \fIlogfile.logsig\fR] [\fImore_options\fR]
 .HP 4
-\fBlogksi verify --ver-int -i \fIlogfile \fR[\fB-s \fIlogfile.logsig\fR] [\fImore_options\fR]
+\fBlogksi verify --ver-int \fIlogfile \fR[\fB-s \fIlogfile.logsig\fR] [\fImore_options\fR]
 .HP 4
-\fBlogksi verify --ver-cal -i \fIlogfile \fR[\fB-s \fIlogfile.logsig\fR] \fB-X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR] [\fImore_options\fR]
+\fBlogksi verify --ver-cal \fIlogfile \fR[\fB-s \fIlogfile.logsig\fR] \fB-X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR] [\fImore_options\fR]
 .HP 4
-\fBlogksi verify --ver-key -i \fIlogfile \fR[\fB-s \fIlogfile.logsig\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... [\fImore_options\fR]
+\fBlogksi verify --ver-key \fIlogfile \fR[\fB-s \fIlogfile.logsig\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... [\fImore_options\fR]
 .HP 4
-\fBlogksi verify --ver-pub -i \fIlogfile \fR[\fB-s \fIlogfile.logsig\fR] \fB--pub-str \fIpubstr \fR[\fB-x -X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR]] [\fImore_options\fR]
+\fBlogksi verify --ver-pub \fIlogfile \fR[\fB-s \fIlogfile.logsig\fR] \fB--pub-str \fIpubstr \fR[\fB-x -X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR]] [\fImore_options\fR]
 .HP 4
-\fBlogksi verify --ver-pub -i \fIlogfile \fR[\fB-s \fIlogfile.logsig\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... \fR[\fB-x -X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR]] [\fImore_options\fR]
+\fBlogksi verify --ver-pub \fIlogfile \fR[\fB-s \fIlogfile.logsig\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... \fR[\fB-x -X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR]] [\fImore_options\fR]
 .\"
 .SH DESCRIPTION
 Verifies the KSI signatures present in the log signature file associated with the given logfile.
@@ -53,10 +53,6 @@ Perform key-based verification.
 Perform publication-based verification (use with \fB-x\fR to permit extending).
 .\"
 .TP
-\fB-i \fIlogfile\fR
-Specify the log file whose signatures are to be verified.
-.\"
-.TP
 \fB-s \fIlogfile.logsig\fR
 Specify the log signature file of the given \fIlogfile\fR. If omitted, it is expected that the log siganture file with the default name \fIlogfile.logsig\fR is located in the same folder as the \fIlogfile\fR.
 .\"
@@ -86,7 +82,7 @@ Specify the publications file URL (or file with URI scheme 'file://').
 .\"
 .TP
 \fB--cnstr \fIoid\fR=\fIvalue\fR
-Specify the OID of the PKI certificate field (e.g. e-mail address) and the expected value to qualify the certificate for verification of publications file's PKI signature. At least one constraint must be defined. All values from lower priority source are ignored (see \fBksi-conf\fR(5) for more information).
+Specify the OID of the PKI certificate field (e.g. e-mail address) and the expected value to qualify the certificate for verification of publications file's PKI signature. At least one constraint must be defined. All values from lower priority source are ignored (see \fBlogksi-conf\fR(5) for more information).
 .RS
 .HP 0
 For more common OIDs there are convenience names defined:
@@ -129,46 +125,46 @@ In the following examples it is assumed that KSI service configuration options (
 .\"
 .TP 2
 \fB1
-\fRTo perform internal verification of the KSI signatures of the \fIlogfile\fR:
+\fRTo perform internal verification of the KSI signatures of the \fI/var/log/secure\fR:
 .LP
 .RS 4
-\fBlogksi verify --ver-int -i \fIlogfile\fR
+\fBlogksi verify --ver-int \fI/var/log/secure\fR
 .RE
 .\"
 .TP 2
 \fB2
-\fRTo perform publication-based verification of the KSI signatures of \fIlogfile\fR, using publication string:
+\fRTo perform publication-based verification of the KSI signatures of \fI/var/log/secure\fR, using publication string:
 .LP
 .RS 4
-\fBlogksi verify --ver-pub -i \fIlogfile\fR \fB--pub-str \fIAAAAAA-CWYEKQ-AAIYPA-UJ4GRT-HXMFBE-OTB4AB-XH3PT3-KNIKGV-PYCJXU-HL2TN4-RG6SCC-3ZGSBM
+\fBlogksi verify --ver-pub \fI/var/log/secure\fR \fB--pub-str \fIAAAAAA-CWYEKQ-AAIYPA-UJ4GRT-HXMFBE-OTB4AB-XH3PT3-KNIKGV-PYCJXU-HL2TN4-RG6SCC-3ZGSBM
 .RE
 .\"
 .TP 2
 \fB3
-\fRTo perform publication-based verification of the KSI signatures of \fIlogfile\fR, using a publications file which is auto-downloaded and verified based on the default configuration options:
+\fRTo perform publication-based verification of the KSI signatures of \fI/var/log/secure\fR, using a publications file which is auto-downloaded and verified based on the default configuration options:
 .LP
 .RS 4
-\fBlogksi verify --ver-pub -i \fIlogfile\fR
+\fBlogksi verify --ver-pub \fI/var/log/secure\fR
 .RE
 .\"
 .TP 2
 \fB4
-\fRTo perform publication-based verification of the KSI signatures of \fIlogfile\fR, possibly extending them on the fly:
+\fRTo perform publication-based verification of the KSI signatures of \fI/var/log/secure\fR, possibly extending them on the fly:
 .LP
 .RS 4
-\fBlogksi verify --ver-pub -i \fIlogfile\fR \fB-x
+\fBlogksi verify --ver-pub \fI/varlog/secure\fR \fB-x
 .RE
 .\"
 .TP 2
 \fB5
-To perform verification of the KSI signatures of \fIlogfile\fR using any policy possible, depending on the current state of the signatures and dump the log signature file content:
+To perform verification of the KSI signatures of \fI/var/log/secure\fR using any policy possible, depending on the current state of the signatures and dump the log signature file content:
 .LP
 .RS 4
-\fBlogksi verify -i \fIlogfile\fR \fB--dump\fR
+\fBlogksi verify \fI/var/log/secure\fR \fB--dump\fR
 .RE
 .\"
 .SH ENVIRONMENT
-Use the environment variable \fBLOGKSI_CONF\fR to define the default configuration file. See \fBlogksi-conf\fR(5) for more information.
+Use the environment variable \fBKSI_CONF\fR to define the default configuration file. See \fBlogksi-conf\fR(5) for more information.
 .LP
 .\"
 .SH AUTHOR
@@ -176,4 +172,4 @@ Guardtime AS, http://www.guardtime.com/
 .LP
 .\"
 .SH SEE ALSO
-\fBlogksi\fR(1), \fBlogksi-sign\fR(1), \fBlogksi-integrate\fR(1), \fBlogksi-extend\fR(1), \fBlogksi-pubfile\fR(1), \fBlogksi-conf\fR(5)
+\fBlogksi\fR(1), \fBlogksi-sign\fR(1), \fBlogksi-integrate\fR(1), \fBlogksi-extend\fR(1), \fBlogksi-conf\fR(5)

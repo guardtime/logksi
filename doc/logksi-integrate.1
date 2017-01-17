@@ -32,14 +32,12 @@ Specify the output file path for the log signature file. If not specified, the l
 See \fBlogksi\fR(1) for more information.
 .\"
 .SH EXAMPLES
-In the following examples it is assumed that KSI service configuration options (URLs, access credentials) are defined. See \fBlogksi-conf\fR(5) for more information.
-.\"
 .TP 2
 \fB1
-\fRTo integrate temporary files \fI\\logfile.parts\\blocks.dat\fR and \fI\\logfile.parts\\block-signatures.dat\fR into complete log signature file with default name \fIlogfile.logsig\fR:
+\fRTo integrate temporary files \fI/var/log/secure.logsig.parts/blocks.dat\fR and \fI/var/log/secure.logsig.parts/block-signatures.dat\fR into complete log signature file with default name \fI/var/log/secure.logsig\fR:
 .LP
 .RS 4
-\fBlogksi integrate -i \fIlogfile
+\fBlogksi integrate -i \fI/var/log/secure
 .RE
 .\"
 .SH AUTHOR
@@ -47,4 +45,4 @@ Guardtime AS, http://www.guardtime.com/
 .LP
 .\"
 .SH SEE ALSO
-\fBlogksi\fR(1), \fBlogksi-sign\fR(1), \fBlogksi-extend\fR,(1) \fBlogksi-verify\fR(1), \fBlogksi-pubfile\fR(1), \fBlogksi-conf\fR(5)
+\fBlogksi\fR(1), \fBlogksi-sign\fR(1), \fBlogksi-extend\fR,(1) \fBlogksi-verify\fR(1), \fBlogksi-conf\fR(5)

@@ -57,30 +57,6 @@ Specify the username for extending service.
 Specify the HMAC key for extending service.
 .\"
 .TP
-\fB--max-lvl \fIint\fR
-Set the maximum depth (0 - 255) of the local aggregation tree (default: 0). It must be noted that when using masking (\fB--mask\fR) or embedding of the metadata (\fB--mdata\fR), the maximum count of document hash values that could be signed during a single local aggregation round will be reduced. To enable signing in multiple local aggregation rounds see \fB--max-aggr-rounds\fR.
-.\"
-.TP
-\fB--max-aggr-rounds \fIint\fR
-Set the upper limit of local aggregation rounds that may be performed (default: 1).
-.\"
-.TP
-\fB--mdata-cli-id \fIstr\fR
-Specify the client ID as a string which will be embedded into the signature as metadata. It is mandatory part of the metadata.
-.\"
-.TP
-\fB--mdata-mac-id \fIstr\fR
-Specify the machine ID as a string which will be embedded into the signature as metadata. It is optional part of the metadata.
-.\"
-.TP
-\fB--mdata-sqn-nr \fR[\fIint\fR]
-Specify the incremental (sequence number is incremented in every aggregation round) sequence number of the request as integer which will be embedded into the signature as metadata. If the parameter is given without the argument, 0 is used. It is optional part of metadata.
-.\"
-.TP
-\fB--mdata-req-tm\fR
-Embed the request time extracted from the machine clock into the signature as metadata. It is optional part of metadata.
-.\"
-.TP
 \fB-P \fIURL\fR
 Specify the publications file URL (or file with URI scheme 'file://').
 .\"
@@ -118,10 +94,10 @@ Specify allowed network transfer timeout, after successful connect, in seconds.
 .\"
 .TP
 \fB--publications-file-no-verify\fR
-Force the KSI tool to trust the publications file without verifying it. This option can only be defined on command line to avoid the usage of insecure configuration files. It must be noted that the \fBoption is insecure\fR and may only be used for testing.
+Force the KSI log signature tool to trust the publications file without verifying it. This option can only be defined on command line to avoid the usage of insecure configuration files. It must be noted that the \fBoption is insecure\fR and may only be used for testing.
 .\"
 .SH ENVIRONMENT
-Program \fBlogksi\fR(1) uses environment variable \fBLOGKSI_CONF \fRto point to the default configuration file.
+Program \fBlogksi\fR(1) uses environment variable \fBKSI_CONF \fRto point to the default configuration file.
 .\"
 .SH EXAMPLES
 An example of configuration file:

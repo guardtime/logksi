@@ -5,10 +5,12 @@
 .\"
 .SH SYNOPSIS
 .HP 4
-\fBlogksi sign -i \fIin.logsig\fR [\fB-o \fIout.logsig\fR] \fB-S \fIURL \fR[\fB--aggr-user \fIuser \fB--aggr-key \fIkey\fR] [\fImore options\fR]
+\fBlogksi sign \fIlogfile\fR [\fB-o \fIout.logsig\fR] \fB-S \fIURL \fR[\fB--aggr-user \fIuser \fB--aggr-key \fIkey\fR] [\fImore options\fR]
 .\"
 .SH DESCRIPTION
 Signs the unsigned log blocks in a given log signaure file. User must have access to KSI signing service (KSI Aggregator) for signing.
+.LP
+By default all the log blocks will be signed almost exactly at the time of the logging, with possible maximum delay of 1.5 seconds. In rare cases when some block(s) have been left unsigned (e.g. because of the KSI service being temporarily out of reach), the \fBlogksi sign\fR function can be used to sign the remaining unsigned log blocks later, i.e. after the log has rotated.
 .LP
 Acceptable log signature file format is achieved by using \fBlogksi integrate\fR.
 .LP
@@ -16,12 +18,8 @@ Note that until not extended, the signatures can be verified using the copy of c
 .\"
 .SH OPTIONS
 .TP
-\fB-i \fIin.logsig\fR
-Specify the log signature file containing the log blocks to be signed. If left blank or '-' is used, data is read from \fIstdin\fR.
-.\"
-.TP
 \fB-o \fIout.logsig\fR
-Define the output file's path for the signature log file. Use '-' as file name to redirect signed binary stream to \fIstdout\fR. If not specified, the output is saved as \fIin.logsig\fR to the same directory where the input file is located. The backup of the original log signature file will be saved to \fIin.logsig.bak\fR. If output file name is explicitly specified, the existing file will always be overwritten.
+Define the output file's path for the signature log file. Use '-' as file name to redirect signed binary stream to \fIstdout\fR. If not specified, the output is saved as \fIlogfile.logsig\fR to the same directory where the input file is located. The backup of the original log signature file will be saved to \fIlogfile.logsig.bak\fR. If output file name is explicitly specified, the existing file will always be overwritten.
 .\"
 .TP
 \fB-S \fIURL\fR
@@ -56,25 +54,25 @@ In the following examples it is assumed that KSI service configuration options (
 .\"
 .TP 2
 \fB1
-To sign a log signatue file \fIin.logsig\fR and save as new signature file \fIout.logsig\fR:
+To sign a log signatue file \fI/var/log/secure.logsig\fR and save as new signature file \fI/var/log/secure-signed.logsig\fR:
 .LP
 .RS 4
-\fBlogksi sign -i \fIin.logsig\fR \fB-o \fIout.logsig\fR
+\fBlogksi sign \fI/var/log/secure\fR \fB-o \fI/var/log/secure-signed.logsig\fR
 .RE
 .\"
 .TP 2
 \fB2
-To sign a log signature file \fIin.logsig\fR and save the result in the same file after creating the respective backup file \fIin.logsig.bak\fR:
+To sign a log signature file \fI/var/log/secure.logsig\fR and save the result in the same file after creating the respective backup file \fI/var/log/secure.logsig.bak\fR:
 .LP
 .RS 4
-\fBlogksi sign -i \fIin.logsig\fR
+\fBlogksi sign \fI/var/log/secure\fR
 .RE
 .\"
 .SH ENVIRONMENT
-Use the environment variable \fBLOGKSI_CONF\fR to define the default configuration file. See \fBlogksi-conf\fR(5) for more information.
+Use the environment variable \fBKSI_CONF\fR to define the default configuration file. See \fBlogksi-conf\fR(5) for more information.
 .LP
 .SH AUTHOR
 Guardtime AS, http://www.guardtime.com/
 .LP
 .SH SEE ALSO
-\fBlogksi\fR(1), \fBlogksi-integrate\fR(1), \fBlogksi-extend\fR(1), \fBlogksi-verify\fR(1), \fBlogksi-pubfile\fR(1), \fBlogksi-conf\fR(5)
+\fBlogksi\fR(1), \fBlogksi-integrate\fR(1), \fBlogksi-extend\fR(1), \fBlogksi-verify\fR(1), \fBlogksi-conf\fR(5)
