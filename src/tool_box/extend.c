@@ -69,7 +69,7 @@ int extend_run(int argc, char** argv, char **envp) {
 	 * Extract command line parameters.
 	 */
 	res = PARAM_SET_new(
-			CONF_generate_param_set_desc("{input}{o}{d}{x}{T}{pub-str}{dump}{conf}{log}{h|help}", "XP", buf, sizeof(buf)),
+			CONF_generate_param_set_desc("{input}{o}{d}{x}{T}{pub-str}{conf}{log}{h|help}", "XP", buf, sizeof(buf)),
 			&set);
 	if (res != KT_OK) goto cleanup;
 
@@ -188,7 +188,6 @@ char *extend_help_toString(char*buf, size_t len) {
 		" -V        - Certificate file in PEM format for publications file verification.\n"
 		"             All values from lower priority source are ignored.\n"
 		" -d        - Print detailed information about processes and errors.\n"
-		" --dump    - Dump extended signature and verification info in human-readable format to stdout.\n"
 		" --conf <file>\n"
 		"             Read configuration options from given file. It must be noted\n"
 		"             that configuration options given explicitly on command line will\n"
@@ -376,7 +375,7 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	PARAM_SET_addControl(set, "{log}{o}", isFormatOk_path, NULL, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{input}", isFormatOk_inputFile, isContentOk_inputFileWithPipe, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{T}", isFormatOk_utcTime, isContentOk_utcTime, NULL, extract_utcTime);
-	PARAM_SET_addControl(set, "{d}{dump}", isFormatOk_flag, NULL, NULL, NULL);
+	PARAM_SET_addControl(set, "{d}", isFormatOk_flag, NULL, NULL, NULL);
 	PARAM_SET_addControl(set, "{pub-str}", isFormatOk_pubString, NULL, NULL, extract_pubString);
 
 	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);

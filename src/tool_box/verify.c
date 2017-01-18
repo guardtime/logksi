@@ -91,7 +91,7 @@ int verify_run(int argc, char **argv, char **envp) {
 	 * Extract command line parameters and also add configuration specific parameters.
 	 */
 	res = PARAM_SET_new(
-			CONF_generate_param_set_desc("{input}{x}{d}{pub-str}{ver-int}{ver-cal}{ver-key}{ver-pub}{dump}{conf}{log}{h|help}", "XP", buf, sizeof(buf)),
+			CONF_generate_param_set_desc("{input}{x}{d}{pub-str}{ver-int}{ver-cal}{ver-key}{ver-pub}{conf}{log}{h|help}", "XP", buf, sizeof(buf)),
 			&set);
 	if (res != KT_OK) goto cleanup;
 
@@ -235,7 +235,6 @@ char *verify_help_toString(char *buf, size_t len) {
 		"             All values from lower priority source are ignored.\n"
 		"\n"
 		" -d        - Print detailed information about processes and errors to stderr.\n"
-		" --dump    - Dump signature and document hash being verified in human-readable format to stdout.\n"
 		" --conf <file>\n"
 		"             Read configuration options from given file. It must be noted\n"
 		"             that configuration options given explicitly on command line will\n"
@@ -274,7 +273,7 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	PARAM_SET_addControl(set, "{conf}", isFormatOk_inputFile, isContentOk_inputFileRestrictPipe, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{log}", isFormatOk_path, NULL, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{input}", isFormatOk_inputFile, isContentOk_inputFile, convertRepair_path, NULL);
-	PARAM_SET_addControl(set, "{d}{x}{ver-int}{ver-cal}{ver-key}{ver-pub}{dump}", isFormatOk_flag, NULL, NULL, NULL);
+	PARAM_SET_addControl(set, "{d}{x}{ver-int}{ver-cal}{ver-key}{ver-pub}", isFormatOk_flag, NULL, NULL, NULL);
 	PARAM_SET_addControl(set, "{pub-str}", isFormatOk_pubString, NULL, NULL, extract_pubString);
 
 	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);

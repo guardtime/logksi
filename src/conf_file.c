@@ -54,8 +54,7 @@ char* CONF_generate_param_set_desc(char *description, const char *flags, char *b
 
 	if (is_S) {
 		count += KSI_snprintf(buf + count, buf_len - count,
-				"{S}{aggr-user}{aggr-key}"
-				"{max-lvl}{max-aggr-rounds}{mdata-cli-id}{mdata-mac-id}{mdata-sqn-nr}{mdata-req-tm}");
+				"{S}{aggr-user}{aggr-key}");
 	}
 
 	if (is_X) {
@@ -138,30 +137,6 @@ int CONF_initialize_set_functions(PARAM_SET *conf, const char *flags) {
 		if (res != PST_OK) goto cleanup;
 
 		res = PARAM_SET_addControl(conf, "{aggr-user}{aggr-key}", isFormatOk_userPass, NULL, NULL, NULL);
-		if (res != PST_OK) goto cleanup;
-
-		/**
-		 * Configure parameters related to the local aggregation (block signer).
-		 */
-		res = PARAM_SET_addControl(conf, "{max-aggr-rounds}", isFormatOk_int, isContentOk_uint_not_zero, NULL, extract_int);
-		if (res != PST_OK) goto cleanup;
-
-		res = PARAM_SET_addControl(conf, "{mdata-sqn-nr}", isFormatOk_int_can_be_null, isContentOk_uint_can_be_null, NULL, extract_int);
-		if (res != PST_OK) goto cleanup;
-
-		res = PARAM_SET_addControl(conf, "{max-lvl}", isFormatOk_int, isContentOk_tree_level, NULL, extract_int);
-		if (res != PST_OK) goto cleanup;
-
-		res = PARAM_SET_setParseOptions(conf, "{max-lvl}{max-aggr-rounds}", PST_PRSCMD_HAS_VALUE);
-		if (res != PST_OK) goto cleanup;
-
-		res = PARAM_SET_addControl(conf, "{mdata-req-tm}", isFormatOk_flag, NULL, NULL, NULL);
-		if (res != PST_OK) goto cleanup;
-
-		res = PARAM_SET_addControl(conf, "{mdata-cli-id}{mdata-mac-id}", isFormatOk_string, NULL, NULL, NULL);
-		if (res != PST_OK) goto cleanup;
-
-		res = PARAM_SET_setParseOptions(conf, "{mdata-req-tm}", PST_PRSCMD_HAS_NO_VALUE);
 		if (res != PST_OK) goto cleanup;
 	}
 
