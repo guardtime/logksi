@@ -27,7 +27,7 @@ If both, input and output values are left unspecified, the \fIstdin\fR and \fIst
 .SH OPTIONS
 .TP
 \fB-o \fIout.logsig\fR
-Specify the output file path for the extended log signature file. Default output file is \fIlogfile.logsig\fR, and in this case the backup of the original \fIlogfile.logsig\fR will be saved in \fIlogfile.logsig.bak\fR. If extending fails, the newly created \fIlogfile.logsig\fR will be deleted and the original \fIlogfile.logsig\fR will be restored from the backup file. Use '-' to redirect the output as binary stream to \fIstdout\fR. If a file with the name specified already exists, it will be overwritten and backup file will not be created.
+Specify the output file path for the extended log signature file. Default output file is \fIlogfile.logsig\fR, and in this case the backup of the original \fIlogfile.logsig\fR will be saved in \fIlogfile.logsig.bak\fR. If extending fails, the newly created \fIlogfile.logsig\fR will be deleted and the original \fIlogfile.logsig\fR will be restored from the backup file. If a file with the name specified already exists, it will be overwritten and backup file will not be created. Use '-' as file name to redirect the output as binary stream to \fIstdout\fR.
 .\"
 .TP
 \fB-X \fIURL\fR
