@@ -5,22 +5,22 @@
 .\"
 .SH SYNOPSIS
 .HP 4
-\fBlogksi verify \fIlogfile \fR[\fB-s \fIlogfile.logsig\fR] [\fImore_options\fR]
+\fBlogksi verify \fIlogfile \fR[\fIlogfile.logsig\fR] [\fImore_options\fR]
 .HP 4
-\fBlogksi verify --ver-int \fIlogfile \fR[\fB-s \fIlogfile.logsig\fR] [\fImore_options\fR]
+\fBlogksi verify --ver-int \fIlogfile \fR[\fIlogfile.logsig\fR] [\fImore_options\fR]
 .HP 4
-\fBlogksi verify --ver-cal \fIlogfile \fR[\fB-s \fIlogfile.logsig\fR] \fB-X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR] [\fImore_options\fR]
+\fBlogksi verify --ver-cal \fIlogfile \fR[\fIlogfile.logsig\fR] \fB-X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR] [\fImore_options\fR]
 .HP 4
-\fBlogksi verify --ver-key \fIlogfile \fR[\fB-s \fIlogfile.logsig\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... [\fImore_options\fR]
+\fBlogksi verify --ver-key \fIlogfile \fR[\fIlogfile.logsig\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... [\fImore_options\fR]
 .HP 4
-\fBlogksi verify --ver-pub \fIlogfile \fR[\fB-s \fIlogfile.logsig\fR] \fB--pub-str \fIpubstr \fR[\fB-x -X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR]] [\fImore_options\fR]
+\fBlogksi verify --ver-pub \fIlogfile \fR[\fIlogfile.logsig\fR] \fB--pub-str \fIpubstr \fR[\fB-x -X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR]] [\fImore_options\fR]
 .HP 4
-\fBlogksi verify --ver-pub \fIlogfile \fR[\fB-s \fIlogfile.logsig\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... \fR[\fB-x -X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR]] [\fImore_options\fR]
+\fBlogksi verify --ver-pub \fIlogfile \fR[\fIlogfile.logsig\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... \fR[\fB-x -X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR]] [\fImore_options\fR]
 .\"
 .SH DESCRIPTION
-Verifies the KSI signatures present in the log signature file associated with the given logfile.
+Verifies the KSI signatures present in the log signature file associated with the given \fIlogfile\fR. The log signatures are by default expected to be found in \fIlogfile.logsig\fR. If this is not the case, the correct log signature file name must be given after the \fIlogfile\fR.
 .LP
-To verify the log signature, first the root hash of the log block using log records from the \fIlogfile\fR will be recomputed, after whch the respective KSI signature can be found from corresponding \fIlogfile.logsig\fR.
+To verify the log signature, first the root hash of the log block using log records from the \fIlogfile\fR will be recomputed and compaired against the hash in the corresponding KSI signature present in \fIlogfile.logsig\fR.
 .LP
 There are four main verification policies:
 .LP
@@ -53,12 +53,8 @@ Perform key-based verification.
 Perform publication-based verification (use with \fB-x\fR to permit extending).
 .\"
 .TP
-\fB-s \fIlogfile.logsig\fR
-Specify the log signature file of the given \fIlogfile\fR. If omitted, it is expected that the log siganture file with the default name \fIlogfile.logsig\fR is located in the same folder as the \fIlogfile\fR.
-.\"
-.TP
 \fB-x\fR
-Permit to use extender for publication-based verification.
+Permit to use extender for publication-based verification. See \fBlogksi-exted\fR(1) fo details.
 .\"
 .TP
 \fB-X \fIURL\fR
@@ -103,10 +99,6 @@ Specify the certificate file in PEM format for publications file verification. A
 .TP
 \fB-d\fR
 Print detailed information about processes and errors to \fIstderr\fR.
-.\"
-.TP
-\fB--dump\fR
-Dump signatures and hash being verified in human-readable format to \fIstdout\fR.
 .\"
 .TP
 \fB--conf \fIfile\fR

@@ -13,29 +13,38 @@
 .\"
 .SH DESCRIPTION
 Keyless Signature Infrastructure (KSI) is an industrial scale blockchain platform that cryptographically ensures data integrity and proves time of existence. Its keyless signatures, based on hash chains, link data to global calendar blockchain.
-The checkpoints of the blockchain, published in newspapers and electronic media, enable long term integrity of any digital asset without the need to trust any system.
+The checkpoints of the blockchain, published in newspapers and electronic media, enable long term integrity of any digital asset where only trusted publications file or a publication string in printed media is needed to perform the verification.
 .LP
-Log signature tool is specifically designed to add KSI signature to any type of logs. It enables log signing, signature extending and verifying.
+Log signature tool is specifically designed to add and manage KSI signatures for any type of logs, it enables:
 .LP
-To use \fBlogksi\fR log entries and log blocks need to be hashed. Supported hahs algorithms are: SHA1, SHA2-256, RIPEMD-160, SHA2-384, SHA2-512.
+.IP \(bu 4
+Integrating temporary files containing log signature blocks and KSI signatures into one final log signature file (\fBlogksi-integrate\fR(1)).
+.IP \(bu 4
+Sign recovery of possible unsigned blocks in a final log signature file (\fBlogksi-sign\fR(1)).
+.IP \(bu 4
+Extending of KSI signatures in a log signature file (\fBlogksi-extend\fR(1)).
+.IP \(bu 4
+Verifying the KSI signatures in a log signature file (\fBlogksi-verify\fR(1)).
+.LP
+To use \fBlogksi\fR the log entries and log blocks need to be hashed. List of accepted hashing algorithms is available in help text (\fB-h\fR).
 .LP
 .SH KSI COMMANDS
 .LP
 .TP
 \fBsign\fR
-Signs the given input with KSI. See \fBlogksi-sign\fR(1) for more information.
+Signs the previously unsigned log blocks in a given log signature file. Only to be used for sign recovery, as routine signing should be done during logging itself. See \fBlogksi-sign\fR(1) for more information.
 .\"
 .TP
 \fBverify\fR
-Verifies existing log signature. See \fBlogksi-verify\fR(1) for more information.
+Verifies existing log signatures. See \fBlogksi-verify\fR(1) for more information.
 .\"
 .TP
 \fBextend\fR
-Extends existing log signature to the given publication. See \fBlogksi-extend\fR(1) for more information.
+Extends existing log signatures to the given publication. See \fBlogksi-extend\fR(1) for more information.
 .\"
 .TP
 \fBintegrate\fR
-Integrates temporary log block files and log signatures files into final log signature file.
+Integrates temporary log signature file with signature blocks and log signature file containing the KSI signatures into final log signature file. See \fBlogksi-integrate\fR(1) for more information.
 .\"
 .TP
 \fBconf\fR
@@ -53,8 +62,6 @@ Print version info.
 .\"
 .\"
 .SH EXIT STATUS
-.LP
-TODO: \fICheck if the exit status' are sync with reality.\fR
 .TP
 \fB0\fR
 \fBExit success.\fR Returned if everything is OK.
@@ -93,7 +100,7 @@ TODO: \fICheck if the exit status' are sync with reality.\fR
 .\"
 .TP
 \fB10
-\fBCryptographic error.\fR Error may be generated due to mistrusted or unavailable hash algorithm or by an invalid PKI signature / mistrusted certificate.
+\fBCryptographic error.\fR Error may be generated due to mistrusted or unavailable hash algorithm or by an invalid PKI signature/mistrusted certificate.
 .\"
 .TP
 \fB11
