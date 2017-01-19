@@ -1,45 +1,60 @@
-.TH KSI 1
+.TH LOGKSI 1
 .\"
 .SH NAME
-\fBksi \fR- Keyless Signature Infrastructure (KSI) command-line tool, also called KSI tool.
+\fBlogksi \fR- Log signature tool of Keyless Signature Infrastructure (KSI).
 .\"
 .SH SYNOPSIS
-\fBksi \fR[\fB-h\fR][\fB--version\fR]
-.br
-\fBksi \fBcommand\fR \fB-h\fR
-.br
-\fBksi \fBcommand\fR [\fIservice_parameters\fR][\fIoptions\fR]
+.HP 4
+\fBlogksi \fR[\fB-h\fR][\fB--version\fR]
+.HP 4
+\fBlogksi \fBcommand\fR \fB-h\fR
+.HP 4
+\fBlogksi \fBcommand\fR [\fIservice_parameters\fR] [\fIoptions\fR]
 .\"
 .SH DESCRIPTION
 Keyless Signature Infrastructure (KSI) is an industrial scale blockchain platform that cryptographically ensures data integrity and proves time of existence. Its keyless signatures, based on hash chains, link data to global calendar blockchain.
+The checkpoints of the blockchain, published in newspapers and electronic media, enable long term integrity of any digital asset where only trusted publications file or a publication string in printed media is needed to perform the verification.
 .LP
-KSI command-line tool enables the access to the KSI blockchain and its functions from the shell. It can be used for signing data in files or other sources, extending existing KSI signatures and verifying them using different trust anchors. The first argument of the tool is the KSI command followed by the KSI service configuration parameters and options.
+Log signature tool is specifically designed to add and manage KSI signatures for any type of logs, it enables:
 .LP
-See \fBksi-conf\fR(5) or man page of specific KSI command for more information about KSI service configuration.
+.IP \(bu 4
+Integrating temporary files containing log signature blocks and KSI signatures into one final log signature file (\fBlogksi-integrate\fR(1)).
+.IP \(bu 4
+Sign recovery of possible unsigned blocks in a final log signature file (\fBlogksi-sign\fR(1)).
+.IP \(bu 4
+Extending of KSI signatures in a log signature file (\fBlogksi-extend\fR(1)).
+.IP \(bu 4
+Verifying the KSI signatures in a log signature file (\fBlogksi-verify\fR(1)).
+.LP
+To use \fBlogksi\fR the log entries and log blocks need to be hashed. List of accepted hashing algorithms is available in help text (\fB-h\fR).
 .LP
 .SH KSI COMMANDS
 .LP
 .TP
 \fBsign\fR
-Signs the given input with KSI. See \fBksi-sign\fR(1) for more information.
+Signs the previously unsigned log blocks in a given log signature file. Only to be used for sign recovery, as routine signing should be done during logging itself. See \fBlogksi-sign\fR(1) for more information.
 .\"
 .TP
 \fBverify\fR
-Verifies existing KSI signature. See \fBksi-verify\fR(1) for more information.
+Verifies existing log signatures. See \fBlogksi-verify\fR(1) for more information.
 .\"
 .TP
 \fBextend\fR
-Extends existing KSI signature to the given publication. See \fBksi-extend\fR(1) for more information.
+Extends existing log signatures to the given publication. See \fBlogksi-extend\fR(1) for more information.
 .\"
 .TP
-\fBpubfile\fR
-Downloads and verifies KSI publications file. See \fBksi-pubfile\fR(1) for more information.
+\fBintegrate\fR
+Integrates temporary log signature file with signature blocks and log signature file containing the KSI signatures into final log signature file. See \fBlogksi-integrate\fR(1) for more information.
+.\"
+.TP
+\fBconf\fR
+Defines the KSI service configuration. See \fBlogksi-conf\fR(5) for more information.
 .\"
 .SH OPTIONS
 .\"
 .TP
 \fB-h\fR
-Print help text. Use \fBksi command -h\fR to print help for the specific command.
+Print help text. Use \fBlogksi command -h\fR to print help for the specific command.
 .\"
 .TP
 \fB--version\fR
@@ -65,7 +80,7 @@ Print version info.
 .\"
 .TP
 \fB5
-\fBNetwork error.\fR KSI tool is unable to connect to the service, connection is timed out or an HTTP error was returned from the KSI service.
+\fBNetwork error.\fR KSI log signature tool is unable to connect to the service, connection is timed out or an HTTP error was returned from the KSI service.
 .\"
 .TP
 \fB6
@@ -85,7 +100,7 @@ Print version info.
 .\"
 .TP
 \fB10
-\fBCryptographic error.\fR Error may be generated due to mistrusted or unavailable hash algorithm or by an invalid PKI signature / mistrusted certificate.
+\fBCryptographic error.\fR Error may be generated due to mistrusted or unavailable hash algorithm or by an invalid PKI signature/mistrusted certificate.
 .\"
 .TP
 \fB11
@@ -106,11 +121,11 @@ Print version info.
 .\"
 .TP
 \fB16
-\fBInvalid configuration.\fR KSI tool configuration or KSI C API library configuration is invalid.
+\fBInvalid configuration.\fR KSI log signature tool configuration or KSI C API library configuration is invalid.
 .br
 .\"
 .SH ENVIRONMENT
-The \fBKSI_CONF\fR environment variable points to the KSI configuration file containing the KSI service related parameters such as the URLs to the KSI Aggregator and Extender service and the corresponding access credentials. See \fBksi-conf\fR(5) for more information.
+The \fBKSI_CONF\fR environment variable points to the KSI configuration file containing the KSI service related parameters such as the URLs to the KSI Aggregator and Extender service and the corresponding access credentials. See \fBlogksi-conf\fR(5) for more information.
 .LP
 .\"
 .SH AUTHOR
@@ -118,4 +133,4 @@ Guardtime AS, http://www.guardtime.com/
 .LP
 .\"
 .SH SEE ALSO
-\fBksi-sign\fR(1), \fBksi-verify\fR(1), \fBksi-extend\fR(1), \fBksi-pubfile\fR(1), \fBksi-conf\fR(5) 
+\fBlogksi-sign\fR(1), \fBlogksi-integrate\fR(1), \fBlogksi-extend\fR(1), \fBlogksi-verify\fR(1), \fBlogksi-conf\fR(5)

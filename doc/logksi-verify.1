@@ -1,24 +1,28 @@
-.TH KSI-VERIFY 1
+.TH LOGKSI-VERIFY 1
 .\"
 .SH NAME
-\fBksi verify \fR- Verify KSI signature with KSI command-line tool.
+\fBlogksi verify \fR- Verify KSI signatures present in a log signature file.
 .\"
 .SH SYNOPSIS
 .HP 4
-\fBksi verify -i \fIin.ksig \fR[\fB-f \fIdata\fR] [\fImore_options\fR]
+\fBlogksi verify \fIlogfile \fR[\fIlogfile.logsig\fR] [\fImore_options\fR]
 .HP 4
-\fBksi verify --ver-int -i \fIin.ksig \fR[\fB-f \fIdata\fR] [\fImore_options\fR]
+\fBlogksi verify --ver-int \fIlogfile \fR[\fIlogfile.logsig\fR] [\fImore_options\fR]
 .HP 4
-\fBksi verify --ver-cal -i \fIin.ksig \fR[\fB-f \fIdata\fR] \fB-X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR] [\fImore_options\fR]
+\fBlogksi verify --ver-cal \fIlogfile \fR[\fIlogfile.logsig\fR] \fB-X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR] [\fImore_options\fR]
 .HP 4
-\fBksi verify --ver-key -i \fIin.ksig \fR[\fB-f \fIdata\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... \fR[\fB-V \fIcert.pem\fR]... \fR[\fB-W \fIdir\fR]... [\fImore_options\fR]
+\fBlogksi verify --ver-key \fIlogfile \fR[\fIlogfile.logsig\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... [\fImore_options\fR]
 .HP 4
-\fBksi verify --ver-pub -i \fIin.ksig \fR[\fB-f \fIdata\fR] \fB--pub-str \fIpubstr \fR[\fB-x -X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR]] [\fImore_options\fR]
+\fBlogksi verify --ver-pub \fIlogfile \fR[\fIlogfile.logsig\fR] \fB--pub-str \fIpubstr \fR[\fB-x -X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR]] [\fImore_options\fR]
 .HP 4
-\fBksi verify --ver-pub -i \fIin.ksig \fR[\fB-f \fIdata\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... \fR[\fB-V \fIcert.pem\fR]... \fR[\fB-W \fIdir\fR]... \fR[\fB-x -X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR]] [\fImore_options\fR]
+\fBlogksi verify --ver-pub \fIlogfile \fR[\fIlogfile.logsig\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... \fR[\fB-x -X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR]] [\fImore_options\fR]
 .\"
 .SH DESCRIPTION
-Verifies the given KSI signature and, if given, the file or its precomputed hash value. There are four main verification policies:
+Verifies the KSI signatures present in the log signature file associated with the given \fIlogfile\fR. The log signatures are by default expected to be found in \fIlogfile.logsig\fR. If this is not the case, the correct log signature file name must be given after the \fIlogfile\fR.
+.LP
+To verify the log signature, first the root hash of the log block using log records from the \fIlogfile\fR will be recomputed and compaired against the hash in the corresponding KSI signature present in \fIlogfile.logsig\fR.
+.LP
+There are four main verification policies:
 .LP
 .IP \(bu 4
 Internal verification (\fB--ver-int\fR). Only internal consistency of the signature is checked and no trust anchor is used and no external resources are needed. This check is also performed as the first step in all other policies.
@@ -49,12 +53,8 @@ Perform key-based verification.
 Perform publication-based verification (use with \fB-x\fR to permit extending).
 .\"
 .TP
-\fB-i \fIin.ksig\fR
-Specify the signature file to be verified. Use '-' as file name to read signature file from \fIstdin\fR.
-.\"
-.TP
-\fB-f \fIdata\fR
-Specify file to be hashed or precomputed data hash imprint to extract the hash value that is going to be verified. Hash format: <alg>:<hash in hex>. Use '-' as file name to read data to be hashed from \fIstdin\fR. Call \fBksi -h \fRto get the list of supported hash algorithms.
+\fB-x\fR
+Permit to use extender for publication-based verification. See \fBlogksi-exted\fR(1) fo details.
 .\"
 .TP
 \fB-X \fIURL\fR
@@ -69,10 +69,6 @@ Specify the username for extending service.
 Specify the HMAC key for extending service.
 .\"
 .TP
-\fB-x\fR
-Permit to use extender for publication-based verification.
-.\"
-.TP
 \fB--pub-str \fIstr\fR
 Specify the publication string to verify with.
 .\"
@@ -82,7 +78,7 @@ Specify the publications file URL (or file with URI scheme 'file://').
 .\"
 .TP
 \fB--cnstr \fIoid\fR=\fIvalue\fR
-Specify the OID of the PKI certificate field (e.g. e-mail address) and the expected value to qualify the certificate for verification of publications file's PKI signature. At least one constraint must be defined. All values from lower priority source are ignored (see \fBksi-conf\fR(5) for more information).
+Specify the OID of the PKI certificate field (e.g. e-mail address) and the expected value to qualify the certificate for verification of publications file's PKI signature. At least one constraint must be defined. All values from lower priority source are ignored (see \fBlogksi-conf\fR(5) for more information).
 .RS
 .HP 0
 For more common OIDs there are convenience names defined:
@@ -98,23 +94,15 @@ For more common OIDs there are convenience names defined:
 .\"
 .TP
 \fB-V \fIfile\fR
-Specify the certificate file in PEM format for publications file verification. All values from lower priority source are ignored (see \fBksi-conf\fR(5)).
-.\"
-.TP
-\fB-W \fIdir\fR
-Specify an OpenSSL-style trust store directory for publications file verification. All values from lower priority source are ignored (see \fBksi-conf\fR(5)).
+Specify the certificate file in PEM format for publications file verification. All values from lower priority source are ignored (see \fBlogksi-conf\fR(5)).
 .\"
 .TP
 \fB-d\fR
 Print detailed information about processes and errors to \fIstderr\fR.
 .\"
 .TP
-\fB--dump\fR
-Dump signature and document hash being verified in human-readable format to \fIstdout\fR.
-.\"
-.TP
 \fB--conf \fIfile\fR
-Read configuration options from given file. It must be noted that configuration options given explicitly on command line will override the ones in the configuration file (see \fBksi-conf\fR(5) for more information).
+Read configuration options from given file. It must be noted that configuration options given explicitly on command line will override the ones in the configuration file (see \fBlogksi-conf\fR(5) for more information).
 .\"
 .TP
 \fB--log \fIfile\fR
@@ -122,69 +110,53 @@ Write libksi log to given file. Use '-' as file name to redirect log to \fIstdou
 .br
 .\"
 .SH EXIT STATUS
-See \fBksi\fR(1) for more information.
+See \fBlogksi\fR(1) for more information.
 .\"
 .SH EXAMPLES
-In the following examples it is assumed that KSI service configuration options (URLs, access credentials) are defined. See \fBksi-conf\fR(5) for more information. Signature files with extension \fB.ext.ksig\fR are extended and files with extension \fB.ksig\fR are not.
+In the following examples it is assumed that KSI service configuration options (URLs, access credentials) are defined. See \fBlogksi-conf\fR(5) for more information. ot.
 .\"
 .TP 2
 \fB1
-\fRTo perform internal verification of the KSI signature \fItest.ksig \fRand the data in the file \fItest\fR:
+\fRTo perform internal verification of the KSI signatures of the \fI/var/log/secure\fR:
 .LP
 .RS 4
-\fBksi verify --ver-int -i \fItest.ksig\fR \fB-f \fItest\fR
+\fBlogksi verify --ver-int \fI/var/log/secure\fR
 .RE
 .\"
 .TP 2
 \fB2
-\fRTo perform key-based verification of the KSI signature \fItest.ksig \fRand given document hash:
+\fRTo perform publication-based verification of the KSI signatures of \fI/var/log/secure\fR, using publication string:
 .LP
 .RS 4
-\fBksi verify --ver-key -i \fItest.ksig\fR \fB-f \fISHA-256:c8ef6d57ac28d1b4e95a513959f5fcdd0688380a43d601a5ace1d2e96884690a\fR
+\fBlogksi verify --ver-pub \fI/var/log/secure\fR \fB--pub-str \fIAAAAAA-CWYEKQ-AAIYPA-UJ4GRT-HXMFBE-OTB4AB-XH3PT3-KNIKGV-PYCJXU-HL2TN4-RG6SCC-3ZGSBM
 .RE
 .\"
 .TP 2
 \fB3
-\fRTo perform calendar-based verification of the KSI signature \fItest.ksig\fR:
+\fRTo perform publication-based verification of the KSI signatures of \fI/var/log/secure\fR, using a publications file which is auto-downloaded and verified based on the default configuration options:
 .LP
 .RS 4
-\fBksi verify --ver-cal -i \fItest.ksig\fR
+\fBlogksi verify --ver-pub \fI/var/log/secure\fR
 .RE
 .\"
 .TP 2
 \fB4
-\fRTo perform publication-based verification of the KSI signature \fItest.ext.ksig\fR, using publication string:
+\fRTo perform publication-based verification of the KSI signatures of \fI/var/log/secure\fR, possibly extending them on the fly:
 .LP
 .RS 4
-\fBksi verify --ver-pub -i \fItest.ext.ksig\fR \fB--pub-str \fIAAAAAA-CWYEKQ-AAIYPA-UJ4GRT-HXMFBE-OTB4AB-XH3PT3-KNIKGV-PYCJXU-HL2TN4-RG6SCC-3ZGSBM
+\fBlogksi verify --ver-pub \fI/varlog/secure\fR \fB-x
 .RE
 .\"
 .TP 2
 \fB5
-\fRTo perform publication-based verification of the KSI signature \fItest.ext.ksig\fR, using a publications file which is auto-downloaded and verified based on the default configuration options:
+To perform verification of the KSI signatures of \fI/var/log/secure\fR using any policy possible, depending on the current state of the signatures:
 .LP
 .RS 4
-\fBksi verify --ver-pub -i \fItest.ext.ksig\fR
-.RE
-.\"
-.TP 2
-\fB6
-\fRTo perform publication-based verification of the KSI signature \fItest.ksig\fR, possibly extending it on the fly:
-.LP
-.RS 4
-\fBksi verify --ver-pub -i \fItest.ksig\fR \fB-x
-.RE
-.\"
-.TP 2
-\fB7
-To perform verification of the KSI signature \fItest.ksig\fR using any policy possible, depending on the current state of the signature and dump its content:
-.LP
-.RS 4
-\fBksi verify -i \fItest.ksig\fR \fB--dump\fR
+\fBlogksi verify \fI/var/log/secure\fR
 .RE
 .\"
 .SH ENVIRONMENT
-Use the environment variable \fBKSI_CONF\fR to define the default configuration file. See \fBksi-conf\fR(5) for more information.
+Use the environment variable \fBKSI_CONF\fR to define the default configuration file. See \fBlogksi-conf\fR(5) for more information.
 .LP
 .\"
 .SH AUTHOR
@@ -192,4 +164,4 @@ Guardtime AS, http://www.guardtime.com/
 .LP
 .\"
 .SH SEE ALSO
-\fBksi\fR(1), \fBksi-sign\fR(1), \fBksi-extend\fR(1), \fBksi-pubfile\fR(1), \fBksi-conf\fR(5)
+\fBlogksi\fR(1), \fBlogksi-sign\fR(1), \fBlogksi-integrate\fR(1), \fBlogksi-extend\fR(1), \fBlogksi-conf\fR(5)
