@@ -5,13 +5,13 @@
 .\"
 .SH SYNOPSIS
 .HP 4
-\fBlogksi extend \fIlogfile \fR[\fB-o \fIout.logsig\fR] \fB-X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... [\fImore_options\fR]
+\fBlogksi extend \fR[\fIlogfile\fR] [\fB-o \fIout.logsig\fR] \fB-X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... [\fImore_options\fR]
 .HP 4
-\fBlogksi extend \fIlogfile \fR[\fB-o \fIout.logsig\fR] \fB-X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... \fB--pub-str \fIstr \fR[\fImore_options\fR]
+\fBlogksi extend \fR[\fIlogfile\fR] [\fB-o \fIout.logsig\fR] \fB-X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... \fB--pub-str \fIstr \fR[\fImore_options\fR]
 .HP 4
-\fBlogksi extend \fIlogfile \fR[\fB-o \fIout.logsig\fR] \fB-X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR] \fB-T \fItime \fR[\fImore_options\fR]
+\fBlogksi extend \fR[\fIlogfile\fR] [\fB-o \fIout.logsig\fR] \fB-X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR] \fB-T \fItime \fR[\fImore_options\fR]
 .HP 4
-\fBlogksi extend \fIlogfile \fR[\fB-o \fIout.logsig\fR] \fB--conf \fIlogksi.conf\fR [\fImore_options\fR]
+\fBlogksi extend \fR[\fIlogfile\fR] [\fB-o \fIout.logsig\fR] \fB--conf \fIlogksi.conf\fR [\fImore_options\fR]
 .\"
 .SH DESCRIPTION
 Extends the KSI signatures in a log signature file of the given \fIlogfile\fR to the time of given publication. KSI signatures are expected to be found from \fIlogfile.logsig\fR. If no \fIlogfile\fR is specified, the input is expected from \fIstdin\fR.
