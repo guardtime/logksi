@@ -29,6 +29,11 @@ typedef struct {
 	SIGNING_FUNCTION create_signature;
 } SIGNATURE_PROCESSORS;
 
+typedef enum {
+	LOGSIG11 = 0,
+	LOGSIG12 = 1
+} LOGSIG_VERSION;
+
 typedef struct {
 	char *inSigName;
 	char *outSigName;
@@ -65,6 +70,7 @@ typedef struct {
 	KSI_DataHash *metarecordHash;
 	unsigned char treeHeight;
 	unsigned char balanced;
+	LOGSIG_VERSION version;
 } BLOCK_INFO;
 
 int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_FUNCTION extend_signature, IO_FILES *files);

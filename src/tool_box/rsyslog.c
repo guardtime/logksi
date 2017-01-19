@@ -140,6 +140,18 @@ cleanup:
 	return res;
 }
 
+static int get_aggregation_level(BLOCK_INFO *blocks) {
+	int level = 0;
+	if (blocks != NULL) {
+		if (blocks->version == LOGSIG11) {
+			level = 0;
+		} else {
+			level = blocks->treeHeight + 1;
+		}
+	}
+	return level;
+}
+
 int add_hash_to_merkle_tree(KSI_CTX *ksi, BLOCK_INFO *blocks, int isMetaRecordHash, KSI_DataHash *hash) {
 	int res;
 	unsigned char i = 0;
@@ -359,12 +371,14 @@ cleanup:
 	return res;
 }
 
-static int process_magic_number(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files) {
+static int process_magic_number(PARAM_SET *set, ERR_TRCKR *err, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	char buf[10];
 	size_t count = 0;
-	size_t magicLength = strlen("LOGSIG11");
+	size_t magicLength;
+	char *magicNumbers[] = {"LOGSIG11", "LOGSIG12"};
 	int d = 0;
+	int i;
 	FILE *in = NULL;
 
 	if (set == NULL || err == NULL || files == NULL) {
@@ -381,9 +395,19 @@ static int process_magic_number(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files)
 	d = PARAM_SET_isSetByName(set, "d");
 	print_progressDesc(d, "Processing magic number... ");
 
-	count = fread(buf, 1, magicLength, in);
-	if (count != magicLength || strncmp(buf, "LOGSIG11", magicLength)) {
-		res = KT_INVALID_INPUT_FORMAT;
+	res = KT_INVALID_INPUT_FORMAT;
+	for (i = 0; i < sizeof(magicNumbers) / sizeof(magicNumbers[0]); i++) {
+		magicLength = strlen(magicNumbers[i]);
+		count = fread(buf, 1, magicLength, in);
+		if (count == magicLength && strncmp(buf, magicNumbers[i], magicLength) == 0) {
+			blocks->version = i;
+			res = KT_OK;
+			break;
+		}
+		rewind(in);
+	}
+
+	if (res != KT_OK) {
 		ERR_CATCH_MSG(err, res, "Error: Magic number not found at the beginning of log signature file.");
 	}
 
@@ -391,7 +415,7 @@ static int process_magic_number(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files)
 		count = fwrite(buf, 1, magicLength, files->outSigFile);
 		if (count != magicLength) {
 			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: Could not copy magic number to extended log signature file.");
+			ERR_CATCH_MSG(err, res, "Error: Could not copy magic number to log signature file.");
 		}
 	}
 
@@ -767,7 +791,7 @@ int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNAT
 
 	res = calculate_root_hash(ksi, blocks, &context.documentHash);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to get root hash for verification.", blocks->blockNo);
-	context.docAggrLevel = blocks->treeHeight + 1;
+	context.docAggrLevel = get_aggregation_level(blocks);
 
 	if (processors->verify_signature) {
 		res = KSI_Signature_parseWithPolicy(ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_EMPTY, NULL, &sig);
@@ -954,7 +978,7 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 			print_progressResult(res);
 			print_progressDesc(d, "Block no. %3d: creating missing KSI signature... ", blocks->blockNo);
 
-			res = processors->create_signature(err, ksi, hash, blocks->treeHeight + 1, &sig);
+			res = processors->create_signature(err, ksi, hash, get_aggregation_level(blocks), &sig);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to sign root hash.", blocks->blockNo);
 
 			res = KSI_TlvElement_new(&tlvSig);
@@ -1062,7 +1086,7 @@ int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_
 	processors.verify_signature = NULL;
 	processors.extend_signature = extend_signature;
 
-	res = process_magic_number(set, err, files);
+	res = process_magic_number(set, err, &blocks, files);
 	if (res != KT_OK) goto cleanup;
 
 	while (!feof(files->inSigFile)) {
@@ -1144,7 +1168,7 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, VERIFYING_
 	processors.verify_signature = verify_signature;
 	processors.extend_signature = NULL;
 
-	res = process_magic_number(set, err, files);
+	res = process_magic_number(set, err, &blocks, files);
 	if (res != KT_OK) goto cleanup;
 
 	while (!feof(files->inSigFile)) {
@@ -1225,7 +1249,7 @@ int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILE
 	blocks.ftlv_raw = ftlv_raw;
 	processors.create_signature = NULL;
 
-	res = process_magic_number(set, err, files);
+	res = process_magic_number(set, err, &blocks, files);
 	if (res != KT_OK) goto cleanup;
 
 	while (!feof(files->inBlockFile)) {
@@ -1317,7 +1341,7 @@ int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *fi
 	blocks.ftlv_raw = ftlv_raw;
 	processors.create_signature = KSITOOL_createSignature;
 
-	res = process_magic_number(set, err, files);
+	res = process_magic_number(set, err, &blocks, files);
 	if (res != KT_OK) goto cleanup;
 
 	while (!feof(files->inSigFile)) {
