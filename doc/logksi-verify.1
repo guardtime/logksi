@@ -1,7 +1,7 @@
 .TH LOGKSI-VERIFY 1
 .\"
 .SH NAME
-\fBlogksi verify \fR- Verify KSI signatures present in a log signature file.
+\fBlogksi verify \fR- Verify log file using its log signature.
 .\"
 .SH SYNOPSIS
 .HP 4
@@ -18,11 +18,11 @@
 \fBlogksi verify --ver-pub \fIlogfile \fR[\fIlogfile.logsig\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... \fR[\fB-x -X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR]] [\fImore_options\fR]
 .\"
 .SH DESCRIPTION
-Verifies the KSI signatures present in the log signature file associated with the given \fIlogfile\fR. The log signatures are by default expected to be found in \fIlogfile.logsig\fR. If this is not the case, the correct log signature file name must be given after the \fIlogfile\fR.
+Verifies log file \fIlogfile\fR. The log signature is by default expected to be found in \fIlogfile.logsig\fR. If this is not the case, the correct log signature file name must be given after the \fIlogfile\fR.
 .LP
-To verify the log signature, first the root hash of the log block using log records from the \fIlogfile\fR will be recomputed and compaired against the hash in the corresponding KSI signature present in \fIlogfile.logsig\fR.
+For each signed log block the root hash of the block is computed and then verified using the KSI signature of that block.
 .LP
-There are four main verification policies:
+KSI signature can be verified using any of its standard verification policies:
 .LP
 .IP \(bu 4
 Internal verification (\fB--ver-int\fR). Only internal consistency of the signature is checked and no trust anchor is used and no external resources are needed. This check is also performed as the first step in all other policies.
@@ -117,7 +117,7 @@ In the following examples it is assumed that KSI service configuration options (
 .\"
 .TP 2
 \fB1
-\fRTo perform internal verification of the KSI signatures of the \fI/var/log/secure\fR:
+\fRTo verify \fI/var/log/secure\fR using only internal verification of KSI signatures:
 .LP
 .RS 4
 \fBlogksi verify --ver-int \fI/var/log/secure\fR
@@ -125,7 +125,7 @@ In the following examples it is assumed that KSI service configuration options (
 .\"
 .TP 2
 \fB2
-\fRTo perform publication-based verification of the KSI signatures of \fI/var/log/secure\fR, using publication string:
+\fRTo verify \fI/var/log/secure\fR, using publication-based verification of the KSI signatures with specified publication string:
 .LP
 .RS 4
 \fBlogksi verify --ver-pub \fI/var/log/secure\fR \fB--pub-str \fIAAAAAA-CWYEKQ-AAIYPA-UJ4GRT-HXMFBE-OTB4AB-XH3PT3-KNIKGV-PYCJXU-HL2TN4-RG6SCC-3ZGSBM
@@ -133,7 +133,7 @@ In the following examples it is assumed that KSI service configuration options (
 .\"
 .TP 2
 \fB3
-\fRTo perform publication-based verification of the KSI signatures of \fI/var/log/secure\fR, using a publications file which is auto-downloaded and verified based on the default configuration options:
+\fRTo verify \fI/var/log/secure\fR, using publication-based verification of the KSI signatures and publications file which is auto-downloaded and verified based on the default configuration options:
 .LP
 .RS 4
 \fBlogksi verify --ver-pub \fI/var/log/secure\fR
@@ -141,7 +141,7 @@ In the following examples it is assumed that KSI service configuration options (
 .\"
 .TP 2
 \fB4
-\fRTo perform publication-based verification of the KSI signatures of \fI/var/log/secure\fR, possibly extending them on the fly:
+\fRTo verify \fI/var/log/secure\fR, using publication-based verification of the KSI signatures and possibly extending them on the fly:
 .LP
 .RS 4
 \fBlogksi verify --ver-pub \fI/varlog/secure\fR \fB-x
@@ -149,7 +149,7 @@ In the following examples it is assumed that KSI service configuration options (
 .\"
 .TP 2
 \fB5
-To perform verification of the KSI signatures of \fI/var/log/secure\fR using any policy possible, depending on the current state of the signatures:
+To verify \fI/var/log/secure\fR, using any policy possible, depending on the current state of the signatures:
 .LP
 .RS 4
 \fBlogksi verify \fI/var/log/secure\fR

@@ -1,27 +1,22 @@
 .TH LOGKSI-SIGN 1
 .\"
 .SH NAME
-\fBlogksi sign \fR- Sign recovery for logs using KSI log signature tool.
+\fBlogksi sign \fR- Sign unsigned blocks for the given log file.
 .\"
 .SH SYNOPSIS
 .HP 4
 \fBlogksi sign \fR[\fIlogfile\fR] [\fB-o \fIout.logsig\fR] \fB-S \fIURL \fR[\fB--aggr-user \fIuser \fB--aggr-key \fIkey\fR] [\fImore options\fR]
 .\"
 .SH DESCRIPTION
-Signs the unsigned log blocks in a log signature file of a given \fIlogfile\fR. Log signature file is expected to be \fIlogfile.logsig\fR. If no \fIlogfile\fR is given, input is read from \fIstdin\fR.
+Signs the unsigned log blocks in a log signature file of a given \fIlogfile\fR. Log signature file is expected to be \fIlogfile.logsig\fR. If no \fIlogfile\fR is given, input is read from \fIstdin\fR and should correspond to log signature file.
 .LP
-Acceptable log signature file format is achieved by using \fBlogksi integrate\fR.
+During log signing, some blocks of a log file may remained unsigned. For instance, when the KSI service is not reachable.
 .LP
 User must have access to KSI signing service (KSI Aggregator) for signing.
-.LP
-By default all the log blocks will be signed almost exactly at the time of the logging, with possible maximum delay of 1.5 seconds. In rare cases when some block(s) have been left unsigned (e.g. because of the KSI service being temporarily out of reach), the \fBlogksi sign\fR function can be used to sign the remaining unsigned log blocks later, i.e. after the log has rotated.
-.LP
-Note that until not extended, the signatures can be verified using the copy of calendar blockchain at KSI Extender (calendar-based verification) or using the PKI signature in the calendar authentication record (key-based verification, temporary only). See \fBlogksi-extend\fR(1) and \fBlogksi-verify\fR(1) for details.
-.\"
 .SH OPTIONS
 .TP
 \fB-o \fIout.logsig\fR
-Define the output file's path for the log signature file. If not specified, the output is saved as \fIlogfile.logsig\fR to the same directory where the input file is located. The backup of the original log signature file will be saved to \fIlogfile.logsig.bak\fR. If output file name is explicitly specified, the existing file will always be overwritten and no backup file will be created. Use '-' as file name to redirect the log signatures' binary stream to \fIstdout\fR.
+Define the output file's path for the log signature file. If not specified, the input file \fIlogfile.logsig\fR is modified. The backup of the original log signature file will be saved to \fIlogfile.logsig.bak\fR. If output file name is explicitly specified, the existing file will always be overwritten and no backup file will be created. Use '-' as file name to redirect the log signatures' binary stream to \fIstdout\fR.
 .\"
 .TP
 \fB-S \fIURL\fR
@@ -56,7 +51,7 @@ In the following examples it is assumed that KSI service configuration options (
 .\"
 .TP 2
 \fB1
-To sign a log signature file \fI/var/log/secure.logsig\fR and save as new signatures file \fI/var/log/secure-signed.logsig\fR:
+To sign unsigned blocks in log signature file \fI/var/log/secure.logsig\fR and save the amended log signature file in \fI/var/log/secure-signed.logsig\fR:
 .LP
 .RS 4
 \fBlogksi sign \fI/var/log/secure\fR \fB-o \fI/var/log/secure-signed.logsig\fR
@@ -64,7 +59,7 @@ To sign a log signature file \fI/var/log/secure.logsig\fR and save as new signat
 .\"
 .TP 2
 \fB2
-To sign a log signature file \fI/var/log/secure.logsig\fR and save the result in the same file after creating the respective backup file \fI/var/log/secure.logsig.bak\fR:
+To sign unsigned blocks in log signature file \fI/var/log/secure.logsig\fR and save the result in the same file after creating the respective backup file \fI/var/log/secure.logsig.bak\fR:
 .LP
 .RS 4
 \fBlogksi sign \fI/var/log/secure\fR

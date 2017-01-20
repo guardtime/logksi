@@ -1,7 +1,7 @@
 .TH LOGKSI 1
 .\"
 .SH NAME
-\fBlogksi \fR- Log signature tool of Keyless Signature Infrastructure (KSI).
+\fBlogksi \fR- Log signature command-line tool of Keyless Signature Infrastructure (KSI).
 .\"
 .SH SYNOPSIS
 .HP 4
@@ -15,40 +15,37 @@
 Keyless Signature Infrastructure (KSI) is an industrial scale blockchain platform that cryptographically ensures data integrity and proves time of existence. Its keyless signatures, based on hash chains, link data to global calendar blockchain.
 The checkpoints of the blockchain, published in newspapers and electronic media, enable long term integrity of any digital asset where only trusted publications file or a publication string in printed media is needed to perform the verification.
 .LP
-Log signature tool is specifically designed to add and manage KSI signatures for any type of logs, it enables:
+Log signature tool is used to perform operations related to log signature files created according to the log signature specification, for instance by KSI Rsyslog module. It provides the following functions:
 .LP
-.IP \(bu 4
-Integrating temporary files containing log signature blocks and KSI signatures into one final log signature file (\fBlogksi-integrate\fR(1)).
-.IP \(bu 4
-Sign recovery of possible unsigned blocks in a final log signature file (\fBlogksi-sign\fR(1)).
 .IP \(bu 4
 Extending of KSI signatures in a log signature file (\fBlogksi-extend\fR(1)).
 .IP \(bu 4
-Verifying the KSI signatures in a log signature file (\fBlogksi-verify\fR(1)).
-.LP
-To use \fBlogksi\fR the log entries and log blocks need to be hashed. List of accepted hashing algorithms is available in help text (\fB-h\fR).
-.LP
-.SH KSI COMMANDS
+Verifying of log signatures (\fBlogksi-verify\fR(1)).
+.IP \(bu 4
+Recovery signing of unsigned blocks in a log signature file (\fBlogksi-sign\fR(1)).
+.IP \(bu 4
+Integrating of temporary files containing log signature blocks and KSI signatures into one final log signature file (\fBlogksi-integrate\fR(1)).
+.SH LOGKSI COMMANDS
 .LP
 .TP
-\fBsign\fR
-Signs the previously unsigned log blocks in a given log signature file. Only to be used for sign recovery, as routine signing should be done during logging itself. See \fBlogksi-sign\fR(1) for more information.
+\fBextend\fR
+Extends KSI signatures in existing log signature file to the given publication. See \fBlogksi-extend\fR(1) for more information.
 .\"
 .TP
 \fBverify\fR
-Verifies existing log signatures. See \fBlogksi-verify\fR(1) for more information.
+Verifies log using corresponding log signatures. See \fBlogksi-verify\fR(1) for more information.
 .\"
 .TP
-\fBextend\fR
-Extends existing log signatures to the given publication. See \fBlogksi-extend\fR(1) for more information.
+\fBsign\fR
+Signs any unsigned block in a given log signature file. Used for recovery signing if due to service unavailability some blocks remained unsigned. See \fBlogksi-sign\fR(1) for more information.
 .\"
 .TP
 \fBintegrate\fR
-Integrates temporary log signature file with signature blocks and log signature file containing the KSI signatures into final log signature file. See \fBlogksi-integrate\fR(1) for more information.
+Integrates temporary blocks file and signatures file (created as a result of asynchronous signing) into standard log signature file. See \fBlogksi-integrate\fR(1) for more information.
 .\"
 .TP
 \fBconf\fR
-Defines the KSI service configuration. See \fBlogksi-conf\fR(5) for more information.
+Prints the KSI service parameters. See \fBlogksi-conf\fR(5) for more information.
 .\"
 .SH OPTIONS
 .\"
