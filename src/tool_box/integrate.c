@@ -223,6 +223,11 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 	res = (tmp.inSigFile == NULL) ? KT_IO_ERROR : KT_OK;
 	ERR_CATCH_MSG(err, res, "Error: could not open file %s.", tmp.partsSigName);
 
+	res = get_file_read_lock(tmp.inBlockFile);
+	ERR_CATCH_MSG(err, res, "Error: could not acquire read lock for file %s.", tmp.partsBlockName);
+	res = get_file_read_lock(tmp.inSigFile);
+	ERR_CATCH_MSG(err, res, "Error: could not acquire read lock for file %s.", tmp.partsSigName);
+
 	tmp.outSigFile = fopen(tmp.outSigName, "wb");
 	res = (tmp.outSigFile == NULL) ? KT_IO_ERROR : KT_OK;
 	ERR_CATCH_MSG(err, res, "Error: could not open file %s.", tmp.outSigName);

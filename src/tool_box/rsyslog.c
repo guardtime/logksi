@@ -27,6 +27,11 @@
 #include <ksi/tlv_element.h>
 #include "rsyslog.h"
 
+#ifndef _WIN32
+#include <fcntl.h>
+#endif
+
+
 static int calculate_new_intermediate_hash(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *leftHash, KSI_DataHash *rightHash, unsigned char level, KSI_DataHash **nodeHash) {
 	int res;
 	KSI_DataHasher *hasher = NULL;
@@ -1407,3 +1412,27 @@ cleanup:
 	return res;
 }
 
+#ifndef _WIN32
+int get_file_read_lock(FILE *in) {
+	struct flock lock;
+	int fres;
+
+	if (in == NULL) return KT_INVALID_ARGUMENT;
+
+	lock.l_type = F_RDLCK;
+	lock.l_whence = SEEK_SET;
+	lock.l_start = 0;
+	lock.l_len = 0;
+	fres = fcntl(fileno(in), F_SETLKW, &lock);
+	if (fres != 0) return KT_IO_ERROR;
+
+	return KT_OK;
+}
+#else
+int get_file_read_lock(FILE *in) {
+	if (in == NULL)
+		return KT_INVALID_ARGUMENT;
+	else
+		return KT_OK;
+}
+#endif
