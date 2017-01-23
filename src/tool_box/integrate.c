@@ -87,6 +87,12 @@ int integrate_run(int argc, char **argv, char **envp) {
 	res = open_input_and_output_files(err, &files);
 	if (res != KT_OK) goto cleanup;
 
+	if (files.inBlockFile == NULL && files.inSigFile == NULL) {
+		/* Special task of waiting until *.logsig file is ready. No integration required. */
+		res = KT_OK;
+		goto cleanup;
+	}
+
 	res = logsignature_integrate(set, err, ksi, &files);
 	if (res != KT_OK) goto cleanup;
 
@@ -199,11 +205,6 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 	res = get_derived_name(files->inLogName, ".logsig.parts/blocks.dat", &tmp.partsBlockName);
 	ERR_CATCH_MSG(err, res, "Error: out of memory.");
 
-	if (!SMART_FILE_doFileExist(tmp.partsBlockName)) {
-		res = KT_KSI_SIG_VER_IMPOSSIBLE;
-		ERR_CATCH_MSG(err, res, "Error: unable to find block file %s.", tmp.partsBlockName);
-	}
-
 	res = get_derived_name(files->inLogName, ".logsig.parts/block-signatures.dat", &tmp.partsSigName);
 	ERR_CATCH_MSG(err, res, "Error: out of memory.");
 
@@ -215,22 +216,44 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 		tmp.outSigName = files->outSigName;
 	}
 
-	tmp.inBlockFile = fopen(tmp.partsBlockName, "rb");
-	res = (tmp.inBlockFile == NULL) ? KT_IO_ERROR : KT_OK;
-	ERR_CATCH_MSG(err, res, "Error: could not open file %s.", tmp.partsBlockName);
+	if (SMART_FILE_doFileExist(tmp.partsBlockName) && SMART_FILE_doFileExist(tmp.partsSigName)) {
+		tmp.inBlockFile = fopen(tmp.partsBlockName, "rb");
+		res = (tmp.inBlockFile == NULL) ? KT_IO_ERROR : KT_OK;
+		ERR_CATCH_MSG(err, res, "Error: could not open file %s.", tmp.partsBlockName);
 
-	tmp.inSigFile = fopen(tmp.partsSigName, "rb");
-	res = (tmp.inSigFile == NULL) ? KT_IO_ERROR : KT_OK;
-	ERR_CATCH_MSG(err, res, "Error: could not open file %s.", tmp.partsSigName);
+		tmp.inSigFile = fopen(tmp.partsSigName, "rb");
+		res = (tmp.inSigFile == NULL) ? KT_IO_ERROR : KT_OK;
+		ERR_CATCH_MSG(err, res, "Error: could not open file %s.", tmp.partsSigName);
 
-	res = get_file_read_lock(tmp.inBlockFile);
-	ERR_CATCH_MSG(err, res, "Error: could not acquire read lock for file %s.", tmp.partsBlockName);
-	res = get_file_read_lock(tmp.inSigFile);
-	ERR_CATCH_MSG(err, res, "Error: could not acquire read lock for file %s.", tmp.partsSigName);
+		res = get_file_read_lock(tmp.inBlockFile);
+		ERR_CATCH_MSG(err, res, "Error: could not acquire read lock for file %s.", tmp.partsBlockName);
+		res = get_file_read_lock(tmp.inSigFile);
+		ERR_CATCH_MSG(err, res, "Error: could not acquire read lock for file %s.", tmp.partsSigName);
 
-	tmp.outSigFile = fopen(tmp.outSigName, "wb");
-	res = (tmp.outSigFile == NULL) ? KT_IO_ERROR : KT_OK;
-	ERR_CATCH_MSG(err, res, "Error: could not open file %s.", tmp.outSigName);
+		tmp.outSigFile = fopen(tmp.outSigName, "wb");
+		res = (tmp.outSigFile == NULL) ? KT_IO_ERROR : KT_OK;
+		ERR_CATCH_MSG(err, res, "Error: could not open file %s.", tmp.outSigName);
+	} else if (!SMART_FILE_doFileExist(tmp.partsBlockName) && !SMART_FILE_doFileExist(tmp.partsSigName)) {
+		if (SMART_FILE_doFileExist(tmp.outSigName)) {
+			/* Special task of waiting until *.logsig file is ready. No integration required. */
+			tmp.outSigFile = fopen(tmp.outSigName, "rb");
+			res = (tmp.outSigFile == NULL) ? KT_IO_ERROR : KT_OK;
+			ERR_CATCH_MSG(err, res, "Error: could not open file %s.", tmp.outSigName);
+
+			res = get_file_read_lock(tmp.outSigFile);
+			ERR_CATCH_MSG(err, res, "Error: could not acquire read lock for file %s.", tmp.outSigName);
+		} else {
+			res = KT_KSI_SIG_VER_IMPOSSIBLE;
+			ERR_CATCH_MSG(err, res, "Error: unable to find block file %s.", tmp.partsBlockName);
+		}
+	} else {
+		res = KT_KSI_SIG_VER_IMPOSSIBLE;
+		if (!SMART_FILE_doFileExist(tmp.partsBlockName)) {
+			ERR_CATCH_MSG(err, res, "Error: unable to find block file %s.", tmp.partsBlockName);
+		} else {
+			ERR_CATCH_MSG(err, res, "Error: unable to find block file %s.", tmp.partsSigName);
+		}
+	}
 
 	tmp.inLogName = files->inLogName;
 	tmp.outSigName = files->outSigName;
