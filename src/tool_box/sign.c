@@ -133,34 +133,32 @@ char *sign_help_toString(char*buf, size_t len) {
 
 	count += KSI_snprintf(buf + count, len - count,
 		"Usage:\n"
-		" %s sign -S <URL> [--aggr-user <user> --aggr-key <key>]\n"
-		"          [more_options] [<logfile>] [-o <out.logsig>]\n"
-		"\n"
+		" %s sign [<logfile>] [-o <out.logsig>] -S <URL> [--aggr-user <user> --aggr-key <key>]\n"
+		"          [more_options]\n"
 		"\n"
 		" <logfile>\n"
-		"           - File path to the log file to be signed. If not specified,\n"
-		"             the log signature is read from stdin.\n"
+		"           - File path to the log file whose log signature file's unsigned blocks are to be signed.\n"
+		"             If not specified, the log signature file is read from <stdin>.\n"
 		" -o <out.logsig>\n"
 		"           - Output file path for the signed log signature file. Use '-' to redirect the signed\n"
-		"             log signature binary stream to stdout. If not specified, the log signature is saved\n"
-		"             to <in.logsig> while a backup of <in.logsig> is saved in <in.logsig>.bak.\n"
+		"             log signature file to <stdout>. If not specified, the log signature is saved\n"
+		"             to <logfile.logsig> while a backup of <logfile.logsig> is saved in <logfile.logsig.bak>.\n"
 		"             If specified, existing file is always overwritten.\n"
-		"             If both input and outpur or not specified, stdin and stdout are used resepectively.\n"
+		"             If both input and outpur or not specified, <stdin> and <stdout> are used resepectively.\n"
 		" -S <URL>  - Signing service (KSI Aggregator) URL.\n"
-		" --aggr-user <str>\n"
+		" --aggr-user <user>\n"
 		"           - Username for signing service.\n"
-		" --aggr-key <str>\n"
+		" --aggr-key <key>\n"
 		"           - HMAC key for signing service.\n"
-
-		" -d        - Print detailed information about processes and errors to stderr.\n"
+		" -d        - Print detailed information about processes and errors to <stderr>.\n"
 		" --conf <file>\n"
 		"           - Read configuration options from given file. It must be noted\n"
 		"             that configuration options given explicitly on command line will\n"
 		"             override the ones in the configuration file.\n"
 		" --log <file>\n"
 		"           - Write libksi log to given file. Use '-' as file name to redirect\n"
-		"             log to stdout.\n\n"
-		, TOOL_getName()
+		"             log to <stdout>.\n",
+		TOOL_getName()
 	);
 
 	return buf;

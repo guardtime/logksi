@@ -25,6 +25,7 @@ Verifying of log signatures (\fBlogksi-verify\fR(1)).
 Recovery signing of unsigned blocks in a log signature file (\fBlogksi-sign\fR(1)).
 .IP \(bu 4
 Integrating of temporary files containing log signature blocks and KSI signatures into one final log signature file (\fBlogksi-integrate\fR(1)).
+.\"
 .SH LOGKSI COMMANDS
 .LP
 .TP
@@ -33,7 +34,7 @@ Extends KSI signatures in existing log signature file to the given publication. 
 .\"
 .TP
 \fBverify\fR
-Verifies log using corresponding log signatures. See \fBlogksi-verify\fR(1) for more information.
+Verifies the log using corresponding log signatures. See \fBlogksi-verify\fR(1) for more information.
 .\"
 .TP
 \fBsign\fR
@@ -48,7 +49,6 @@ Integrates temporary blocks file and signatures file (created as a result of asy
 Prints the KSI service parameters. See \fBlogksi-conf\fR(5) for more information.
 .\"
 .SH OPTIONS
-.\"
 .TP
 \fB-h\fR
 Print help text. Use \fBlogksi command -h\fR to print help for the specific command.
@@ -81,7 +81,7 @@ Print version info.
 .\"
 .TP
 \fB6
-\fBVerification error.\fR Verification of signature or document hash failed.
+\fBVerification error.\fR Verification of signature or document/block hash failed.
 .\"
 .TP
 \fB7

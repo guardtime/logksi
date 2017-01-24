@@ -20,7 +20,7 @@
 .SH DESCRIPTION
 Verifies log file \fIlogfile\fR. The log signature is by default expected to be found in \fIlogfile.logsig\fR. If this is not the case, the correct log signature file name must be given after the \fIlogfile\fR.
 .LP
-For each signed log block the root hash of the block is computed and then verified using the KSI signature of that block.
+For each signed log block the root hash of the block is recomputed and then verified using the KSI signature of that block.
 .LP
 KSI signature can be verified using any of its standard verification policies:
 .LP
@@ -61,11 +61,11 @@ Permit to use extender for publication-based verification. See \fBlogksi-exted\f
 Specify the extending service (KSI Extender) URL.
 .\"
 .TP
-\fB--ext-user \fIstr\fR
+\fB--ext-user \fIuser\fR
 Specify the username for extending service.
 .\"
 .TP
-\fB--ext-key \fIstr\fR
+\fB--ext-key \fIkey\fR
 Specify the HMAC key for extending service.
 .\"
 .TP
@@ -125,7 +125,7 @@ In the following examples it is assumed that KSI service configuration options (
 .\"
 .TP 2
 \fB2
-\fRTo verify \fI/var/log/secure\fR, using publication-based verification of the KSI signatures with specified publication string:
+\fRTo verify \fI/var/log/secure\fR using publication-based verification of the KSI signatures with specified publication string:
 .LP
 .RS 4
 \fBlogksi verify --ver-pub \fI/var/log/secure\fR \fB--pub-str \fIAAAAAA-CWYEKQ-AAIYPA-UJ4GRT-HXMFBE-OTB4AB-XH3PT3-KNIKGV-PYCJXU-HL2TN4-RG6SCC-3ZGSBM
@@ -133,7 +133,7 @@ In the following examples it is assumed that KSI service configuration options (
 .\"
 .TP 2
 \fB3
-\fRTo verify \fI/var/log/secure\fR, using publication-based verification of the KSI signatures and publications file which is auto-downloaded and verified based on the default configuration options:
+\fRTo verify \fI/var/log/secure\fR using publication-based verification of the KSI signatures and publications file which is auto-downloaded and verified based on the default configuration options:
 .LP
 .RS 4
 \fBlogksi verify --ver-pub \fI/var/log/secure\fR
@@ -141,7 +141,7 @@ In the following examples it is assumed that KSI service configuration options (
 .\"
 .TP 2
 \fB4
-\fRTo verify \fI/var/log/secure\fR, using publication-based verification of the KSI signatures and possibly extending them on the fly:
+\fRTo verify \fI/var/log/secure\fR using publication-based verification of the KSI signatures and possibly extending them on the fly:
 .LP
 .RS 4
 \fBlogksi verify --ver-pub \fI/varlog/secure\fR \fB-x
@@ -149,7 +149,7 @@ In the following examples it is assumed that KSI service configuration options (
 .\"
 .TP 2
 \fB5
-To verify \fI/var/log/secure\fR, using any policy possible, depending on the current state of the signatures:
+To verify \fI/var/log/secure\fR using any policy possible, depending on the current state of the signatures:
 .LP
 .RS 4
 \fBlogksi verify \fI/var/log/secure\fR

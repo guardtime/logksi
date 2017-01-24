@@ -153,22 +153,21 @@ char *extend_help_toString(char*buf, size_t len) {
 
 	count += KSI_snprintf(buf + count, len - count,
 		"Usage:\n"
-		" %s extend <logfile> [-o <out.logsig>] -X <URL>\n"
+		" %s extend [<logfile>] [-o <out.logsig>] -X <URL>\n"
 		"    [--ext-user <user> --ext-key <key>] -P <URL> [--cnstr <oid=value>]... [more_options]\n"
-		" %s extend <logfile> [-o <out.logsig>] -X <URL>\n"
+		" %s extend [<logfile>] [-o <out.logsig>] -X <URL>\n"
 		"    [--ext-user <user> --ext-key <key>] -P <URL> [--cnstr <oid=value>]... [--pub-str <str>] [more_options]\n"
-		" %s extend <logfile> [-o <out.logsig>] -X <URL>\n"
-		"    [--ext-user <user> --ext-key <key>] -T time [more_options]\n"
+		" %s extend [<logfile>] [-o <out.logsig>] --conf <logksi.conf> [more_options]\n"
 		"\n"
 		" <logfile>\n"
-		"           - File path to the log file whose logsignature file is to be extended. If not specified,\n"
-		"             the log signature is read from stdin.\n"
+		"           - File path to the log file whose log signature file is to be extended. If not specified,\n"
+		"             the log signature is read from <stdin>.\n"
 		" -o <out.logsig>\n"
 		"           - Output file path for the extended log signature file. Use '-' to redirect the extended\n"
-		"             log signature binary stream to stdout. If not specified, the log signature is saved\n"
-		"             to <in.logsig> while a backup of <in.logsig> is saved in <in.logsig>.bak.\n"
+		"             log signature binary stream to <stdout>. If not specified, the log signature is saved\n"
+		"             to <in.logsig> while a backup of <in.logsig> is saved in <in.logsig.bak>.\n"
 		"             If specified, existing file is always overwritten.\n"
-		"             If both input and outpur or not specified, stdin and stdout are used resepectively.\n"
+		"             If both input and output are not specified, <stdin> and <stdout> are used resepectively.\n"
 		" -X <URL>  - Extending service (KSI Extender) URL.\n"
 		" --ext-user <user>\n"
 		"           - Username for extending service.\n"
@@ -181,20 +180,16 @@ char *extend_help_toString(char*buf, size_t len) {
 		"             PKI signature. At least one constraint must be defined.\n"
 		" --pub-str <str>\n"
 		"           - Publication record as publication string to extend the signature to.\n"
-		" -T <time> - Publication time to extend to as the number of seconds since\n"
-		"             1970-01-01 00:00:00 UTC or time string formatted as \"YYYY-MM-DD hh:mm:ss\".\n"
-		"\n"
-		"\n"
 		" -V        - Certificate file in PEM format for publications file verification.\n"
 		"             All values from lower priority source are ignored.\n"
-		" -d        - Print detailed information about processes and errors.\n"
+		" -d        - Print detailed information about processes and errors to <stderr>.\n"
 		" --conf <file>\n"
-		"             Read configuration options from given file. It must be noted\n"
-		"             that configuration options given explicitly on command line will\n"
+		"             Read configuration options from given file.\n"
+		"             Configuration options given explicitly on command line will\n"
 		"             override the ones in the configuration file.\n"
 		" --log <file>\n"
 		"           - Write libksi log to given file. Use '-' as file name to redirect\n"
-		"             log to stdout.\n",
+		"             log to <stdout>.\n",
 		TOOL_getName(),
 		TOOL_getName(),
 		TOOL_getName()
@@ -597,4 +592,3 @@ static void close_input_and_output_files(int result, IO_FILES *files) {
 	if (files->inSigFile) fclose(files->inSigFile);
 	if (files->outSigFile) fclose(files->outSigFile);
 }
-

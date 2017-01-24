@@ -10,13 +10,13 @@
 .SH DESCRIPTION
 Signs the unsigned log blocks in a log signature file of a given \fIlogfile\fR. Log signature file is expected to be \fIlogfile.logsig\fR. If no \fIlogfile\fR is given, input is read from \fIstdin\fR and should correspond to log signature file.
 .LP
-During log signing, some blocks of a log file may remained unsigned. For instance, when the KSI service is not reachable.
+During log signing, some blocks of a log file may remain unsigned. For instance, when the KSI service is not reachable.
 .LP
 User must have access to KSI signing service (KSI Aggregator) for signing.
 .SH OPTIONS
 .TP
 \fB-o \fIout.logsig\fR
-Define the output file's path for the log signature file. If not specified, the input file \fIlogfile.logsig\fR is modified. The backup of the original log signature file will be saved to \fIlogfile.logsig.bak\fR. If output file name is explicitly specified, the existing file will always be overwritten and no backup file will be created. Use '-' as file name to redirect the log signatures' binary stream to \fIstdout\fR.
+Specify the output file path for the log signature file. If not specified, the input file \fIlogfile.logsig\fR is modified. The backup of the original log signature file will be saved to \fIlogfile.logsig.bak\fR. If output file name is explicitly specified, the existing file will always be overwritten and no backup file will be created. Use '-' as file name to redirect the output as binary stream to \fIstdout\fR.
 .\"
 .TP
 \fB-S \fIURL\fR

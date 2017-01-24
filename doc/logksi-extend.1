@@ -9,8 +9,6 @@
 .HP 4
 \fBlogksi extend \fR[\fIlogfile\fR] [\fB-o \fIout.logsig\fR] \fB-X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... \fB--pub-str \fIstr \fR[\fImore_options\fR]
 .HP 4
-\fBlogksi extend \fR[\fIlogfile\fR] [\fB-o \fIout.logsig\fR] \fB-X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR] \fB-T \fItime \fR[\fImore_options\fR]
-.HP 4
 \fBlogksi extend \fR[\fIlogfile\fR] [\fB-o \fIout.logsig\fR] \fB--conf \fIlogksi.conf\fR [\fImore_options\fR]
 .\"
 .SH DESCRIPTION
@@ -27,7 +25,7 @@ If both, input and output files are left unspecified, the \fIstdin\fR and \fIstd
 .SH OPTIONS
 .TP
 \fB-o \fIout.logsig\fR
-Specify the output file path for the extended log signature file. Default output file is \fIlogfile.logsig\fR, and in this case the backup of the original \fIlogfile.logsig\fR will be saved in \fIlogfile.logsig.bak\fR. If extending fails, the newly created \fIlogfile.logsig\fR will be deleted and the original \fIlogfile.logsig\fR will be restored from the backup file. If a file with the name specified already exists, it will be overwritten and backup file will not be created. Use '-' as file name to redirect the output as binary stream to \fIstdout\fR.
+Specify the output file path for the extended log signature file. If not specified, the input file \fIlogfile.logsig\fR is modified. The backup of the original log signature file will be saved to \fIlogfile.logsig.bak\fR. If extending fails, the newly created \fIlogfile.logsig\fR will be deleted and the original \fIlogfile.logsig\fR will be restored from the backup file. If output file name is explicitly specified, the existing file will always be overwritten and no backup file will be created. Use '-' as file name to redirect the output as binary stream to \fIstdout\fR.
 .\"
 .TP
 \fB-X \fIURL\fR

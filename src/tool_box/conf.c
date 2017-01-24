@@ -89,18 +89,18 @@ char *conf_help_toString(char *buf, size_t len) {
 	count += KSI_snprintf(buf + count, len - count,
 		"Usage:\n"
 		" %s conf -h | -d | --dump \n"
-		" -d        - print KSI_CONF value to stderr if is configured.\n"
-		" --dump    - dump configuration file pointed by KSI_CONF to stdout.\n"
-		" -h        - print the current help message.\n\n"
-			, TOOL_getName()
-			);
+		" -d        - Print KSI_CONF value to <stderr> if is configured.\n"
+		" --dump    - Dump configuration file pointed by KSI_CONF to <stdout>.\n"
+		" -h        - Print the current help message.\n",
+		TOOL_getName()
+	);
 
 	count += KSI_snprintf(buf + count, len - count,
 		"KSI configuration file help:\n\n"
-		"  The KSI command-line tool has several configuration options, most of them are\n"
-		"  related to the KSI service configuration (e.g. KSI signing service URL and access\n"
-		"  credentials). The configuration options are described below. There are following\n"
-		"  ways to specify these configuration options:\n\n"
+		"  The log signature command-line tool has several configuration options related to\n"
+		"  the KSI service configuration (e.g. KSI signing service URL and access credentials).\n"
+		"  The configuration options are described below. There are following ways to specify\n"
+		"  these configuration options:\n\n"
 
 		"   * directly on command line (highest priority);\n"
 		"   * in a file specified by the --conf command-line argument;\n"
@@ -123,28 +123,27 @@ char *conf_help_toString(char *buf, size_t len) {
 		);
 
 	count += KSI_snprintf(buf + count, len - count,
-		" -S <URL>  - signing service (KSI Aggregator) URL.\n"
-		" --aggr-user <str>\n"
-		"           - username for signing service.\n"
-		" --aggr-key <str>\n"
+		" -S <URL>  - Signing service (KSI Aggregator) URL.\n"
+		" --aggr-user <user>\n"
+		"           - Username for signing service.\n"
+		" --aggr-key <key>\n"
 		"           - HMAC key for signing service.\n"
 		" -X <URL>  - Extending service (KSI Extender) URL.\n"
-		" --ext-user <str>\n"
-		"           - username for extending service.\n"
-		" --ext-key <str>\n"
+		" --ext-user <user>\n"
+		"           - Username for extending service.\n"
+		" --ext-key <key>\n"
 		"           - HMAC key for extending service.\n"
-		" -P <URL>  - publications file URL (or file with URI scheme 'file://').\n"
+		" -P <URL>  - Publications file URL (or file with URI scheme 'file://').\n"
 		" --cnstr <oid=value>\n"
 		"           - OID of the PKI certificate field (e.g. e-mail address) and the expected\n"
 		"             value to qualify the certificate for verification of publications file\n"
 		"             PKI signature. At least one constraint must be defined.\n"
 		" -V        - Certificate file in PEM format for publications file verification.\n"
-		" -W <dir>  - specify an OpenSSL-style trust store directory for publications file verification.\n"
-
-		" -c <int>  - set network transfer timeout, after successful connect, in seconds.\n"
-		" -C <int>  - set network connect timeout in seconds (is not supported with TCP client).\n"
+		" -W <dir>  - OpenSSL-style trust store directory for publications file verification.\n"
+		" -C <int>  - Set network connect timeout in seconds (is not supported with TCP client).\n"
+		" -c <int>  - Set network transfer timeout, after successful connect, in seconds.\n"
 		" --publications-file-no-verify\n"
-		"           - a flag to force the tool to trust the publications file without\n"
+		"           - A flag to force the tool to trust the publications file without\n"
 		"             verifying it. The flag can only be defined on command-line to avoid\n"
 		"             the usage of insecure configuration files. It must be noted that the\n"
 		"             option is insecure and may only be used for testing.\n"

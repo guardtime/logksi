@@ -122,12 +122,24 @@ char *integrate_help_toString(char *buf, size_t len) {
 
 	count += KSI_snprintf(buf + count, len - count,
 		"Usage:\n"
-		" %s integrate <logfile> [-o <logfile.logsig>]\n",
+		" %s integrate <logfile> [-o <out.logsig>]\n"
+		"\n"
+		" <logfile>\n"
+		"           - File path to the log file to whom the temporary files to be integrated belong.\n"
+		"             The two temporary files created while asynchronously signing are:\n"
+		"               * the log signature blocks file: <logfile.logsig.parts/blocks.dat>; and\n"
+		"               * the log signature file containing the respective KSI signatures: \n"
+		"                 <logfile.logsig.parts/block-signatures.dat>.\n"
+		" -o <out.logsig>\n"
+		"           - Specify the output file path for the log signature file. If not specified,\n"
+		"             the log signature file is saved as <logfile.logsig> in the same folder where\n"
+		"             the <logfile> is located. Any existing  files  with  output  file name will be overwritten.\n",
 		TOOL_getName()
 	);
 
 	return buf;
 }
+
 
 const char *integrate_get_desc(void) {
 	return "Integrates individual log signature blocks and KSI signatures into a single file.";
