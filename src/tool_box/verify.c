@@ -233,13 +233,13 @@ char *verify_help_toString(char *buf, size_t len) {
 		"             PKI signature. At least one constraint must be defined.\n"
 		" -V        - Certificate file in PEM format for publications file verification.\n"
 		"             All values from lower priority source are ignored.\n"
-		" -d        - Print detailed information about processes and errors to <stderr>.\n"
+		" -d        - Print detailed information about processes and errors to stderr.\n"
 		" --conf <file>\n"
 		"             Read configuration options from given file.\n"
 		"             Configuration options given explicitly on command line will\n"
 		"             override the ones in the configuration file.\n"
 		" --log <file>\n"
-		"           - Write libksi log to given file. Use '-' as file name to redirect log to <stdout>.\n",
+		"           - Write libksi log to given file. Use '-' as file name to redirect log to stdout.\n",
 		TOOL_getName(),
 		TOOL_getName(),
 		TOOL_getName(),

@@ -89,8 +89,8 @@ char *conf_help_toString(char *buf, size_t len) {
 	count += KSI_snprintf(buf + count, len - count,
 		"Usage:\n"
 		" %s conf -h | -d | --dump \n"
-		" -d        - Print KSI_CONF value to <stderr> if is configured.\n"
-		" --dump    - Dump configuration file pointed by KSI_CONF to <stdout>.\n"
+		" -d        - Print KSI_CONF value to stderr if is configured.\n"
+		" --dump    - Dump configuration file pointed by KSI_CONF to stdout.\n"
 		" -h        - Print the current help message.\n",
 		TOOL_getName()
 	);

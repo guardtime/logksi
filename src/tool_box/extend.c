@@ -161,13 +161,13 @@ char *extend_help_toString(char*buf, size_t len) {
 		"\n"
 		" <logfile>\n"
 		"           - File path to the log file whose log signature file is to be extended. If not specified,\n"
-		"             the log signature is read from <stdin>.\n"
+		"             the log signature is read from stdin.\n"
 		" -o <out.logsig>\n"
 		"           - Output file path for the extended log signature file. Use '-' to redirect the extended\n"
-		"             log signature binary stream to <stdout>. If not specified, the log signature is saved\n"
-		"             to <in.logsig> while a backup of <in.logsig> is saved in <in.logsig.bak>.\n"
+		"             log signature binary stream to stdout. If not specified, the log signature is saved\n"
+		"             to <logfile.logsig> while a backup of <logfile.logsig> is saved in <logfile.logsig.bak>.\n"
 		"             If specified, existing file is always overwritten.\n"
-		"             If both input and output are not specified, <stdin> and <stdout> are used resepectively.\n"
+		"             If both input and output are not specified, stdin and stdout are used resepectively.\n"
 		" -X <URL>  - Extending service (KSI Extender) URL.\n"
 		" --ext-user <user>\n"
 		"           - Username for extending service.\n"
@@ -182,14 +182,14 @@ char *extend_help_toString(char*buf, size_t len) {
 		"           - Publication record as publication string to extend the signature to.\n"
 		" -V        - Certificate file in PEM format for publications file verification.\n"
 		"             All values from lower priority source are ignored.\n"
-		" -d        - Print detailed information about processes and errors to <stderr>.\n"
+		" -d        - Print detailed information about processes and errors to stderr.\n"
 		" --conf <file>\n"
 		"             Read configuration options from given file.\n"
 		"             Configuration options given explicitly on command line will\n"
 		"             override the ones in the configuration file.\n"
 		" --log <file>\n"
 		"           - Write libksi log to given file. Use '-' as file name to redirect\n"
-		"             log to <stdout>.\n",
+		"             log to stdout.\n",
 		TOOL_getName(),
 		TOOL_getName(),
 		TOOL_getName()

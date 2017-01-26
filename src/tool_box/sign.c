@@ -138,26 +138,26 @@ char *sign_help_toString(char*buf, size_t len) {
 		"\n"
 		" <logfile>\n"
 		"           - File path to the log file whose log signature file's unsigned blocks are to be signed.\n"
-		"             If not specified, the log signature file is read from <stdin>.\n"
+		"             If not specified, the log signature file is read from stdin.\n"
 		" -o <out.logsig>\n"
 		"           - Output file path for the signed log signature file. Use '-' to redirect the signed\n"
-		"             log signature file to <stdout>. If not specified, the log signature is saved\n"
+		"             log signature file to stdout. If not specified, the log signature is saved\n"
 		"             to <logfile.logsig> while a backup of <logfile.logsig> is saved in <logfile.logsig.bak>.\n"
 		"             If specified, existing file is always overwritten.\n"
-		"             If both input and outpur or not specified, <stdin> and <stdout> are used resepectively.\n"
+		"             If both input and outpur or not specified, stdin and stdout are used resepectively.\n"
 		" -S <URL>  - Signing service (KSI Aggregator) URL.\n"
 		" --aggr-user <user>\n"
 		"           - Username for signing service.\n"
 		" --aggr-key <key>\n"
 		"           - HMAC key for signing service.\n"
-		" -d        - Print detailed information about processes and errors to <stderr>.\n"
+		" -d        - Print detailed information about processes and errors to stderr.\n"
 		" --conf <file>\n"
 		"           - Read configuration options from given file. It must be noted\n"
 		"             that configuration options given explicitly on command line will\n"
 		"             override the ones in the configuration file.\n"
 		" --log <file>\n"
 		"           - Write libksi log to given file. Use '-' as file name to redirect\n"
-		"             log to <stdout>.\n",
+		"             log to stdout.\n",
 		TOOL_getName()
 	);
 
