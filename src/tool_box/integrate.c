@@ -217,6 +217,11 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 	}
 
 	if (SMART_FILE_doFileExist(tmp.partsBlockName) && SMART_FILE_doFileExist(tmp.partsSigName)) {
+		/* Do not overwrite an exisiting log signature file as it may contain KSI signatures obtained by sign recovery. */
+		if (SMART_FILE_doFileExist(tmp.outSigName)) {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: overwriting of existing log signature file %s not supported.", tmp.outSigName);
+		}
 		tmp.inBlockFile = fopen(tmp.partsBlockName, "rb");
 		res = (tmp.inBlockFile == NULL) ? KT_IO_ERROR : KT_OK;
 		ERR_CATCH_MSG(err, res, "Error: could not open file %s.", tmp.partsBlockName);
@@ -225,6 +230,7 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 		res = (tmp.inSigFile == NULL) ? KT_IO_ERROR : KT_OK;
 		ERR_CATCH_MSG(err, res, "Error: could not open file %s.", tmp.partsSigName);
 
+		/* Check that the asynchronous signing process has completed writing to blocks and signatures files. */
 		res = get_file_read_lock(tmp.inBlockFile);
 		ERR_CATCH_MSG(err, res, "Error: could not acquire read lock for file %s.", tmp.partsBlockName);
 		res = get_file_read_lock(tmp.inSigFile);
@@ -234,8 +240,9 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 		res = (tmp.outSigFile == NULL) ? KT_IO_ERROR : KT_OK;
 		ERR_CATCH_MSG(err, res, "Error: could not open file %s.", tmp.outSigName);
 	} else if (!SMART_FILE_doFileExist(tmp.partsBlockName) && !SMART_FILE_doFileExist(tmp.partsSigName)) {
+		/* If blocks and signatures files don't exist, an existing log signature file is probably the result of the synchronous signing process. */
+		/* Check that the synchronous signing process has completed writing to log signature file. */
 		if (SMART_FILE_doFileExist(tmp.outSigName)) {
-			/* Special task of waiting until *.logsig file is ready. No integration required. */
 			tmp.outSigFile = fopen(tmp.outSigName, "rb");
 			res = (tmp.outSigFile == NULL) ? KT_IO_ERROR : KT_OK;
 			ERR_CATCH_MSG(err, res, "Error: could not open file %s.", tmp.outSigName);
@@ -249,9 +256,9 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 	} else {
 		res = KT_KSI_SIG_VER_IMPOSSIBLE;
 		if (!SMART_FILE_doFileExist(tmp.partsBlockName)) {
-			ERR_CATCH_MSG(err, res, "Error: unable to find block file %s.", tmp.partsBlockName);
+			ERR_CATCH_MSG(err, res, "Error: unable to find blocks file %s.", tmp.partsBlockName);
 		} else {
-			ERR_CATCH_MSG(err, res, "Error: unable to find block file %s.", tmp.partsSigName);
+			ERR_CATCH_MSG(err, res, "Error: unable to find signatures file %s.", tmp.partsSigName);
 		}
 	}
 
