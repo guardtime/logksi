@@ -15,7 +15,7 @@ the log signature blocks file: \fIlogfile.logsig.parts/blocks.dat\fR; and
 .IP \(bu 4
 the log signature file containing the respective KSI signatures: \fIlogfile.logsig.parts/block-signatures.dat\fR.
 .LP
-If output file name is not specified, it is derived from the name of the log file \fIlogfile\fR by adding standard suffix \fI.logsig\fR.
+If output file name is not specified, it is derived from the name of the log file \fIlogfile\fR by adding standard suffix \fI.logsig\fR. Attempt to overwrite an existing log signature file will result in error.
 .LP
 The integration of the files can be performed once both files are complete. Under Linux \fBlogksi integrate \fR checks for advisory lock on the files, waits until it is released and then integrates the files.
 .LP
@@ -51,4 +51,4 @@ Guardtime AS, http://www.guardtime.com/
 .LP
 .\"
 .SH SEE ALSO
-\fBlogksi\fR(1), \fBlogksi-sign\fR(1), \fBlogksi-extend\fR(1), \fBlogksi-verify\fR(1), \fBlogksi-conf\fR(5)
+\fBlogksi\fR(1), \fBlogksi-extend\fR(1), \fBlogksi-sign\fR(1), \fBlogksi-verify\fR(1), \fBlogksi-conf\fR(5)

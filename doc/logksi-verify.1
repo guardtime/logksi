@@ -1,7 +1,7 @@
 .TH LOGKSI-VERIFY 1
 .\"
 .SH NAME
-\fBlogksi verify \fR- Verify log file using its log signature.
+\fBlogksi verify \fR- Verify a log file using its log signature.
 .\"
 .SH SYNOPSIS
 .HP 4
@@ -18,7 +18,7 @@
 \fBlogksi verify --ver-pub \fIlogfile \fR[\fIlogfile.logsig\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... \fR[\fB-x -X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR]] [\fImore_options\fR]
 .\"
 .SH DESCRIPTION
-Verifies log file \fIlogfile\fR. The log signature is by default expected to be found in \fIlogfile.logsig\fR. If this is not the case, the correct log signature file name must be given after the \fIlogfile\fR.
+Verifies the log file \fIlogfile\fR. The log signature is by default expected to be found in \fIlogfile.logsig\fR. If this is not the case, the correct log signature file name must be given after the \fIlogfile\fR.
 .LP
 For each signed log block the root hash of the block is recomputed and then verified using the KSI signature of that block.
 .LP
@@ -69,10 +69,6 @@ Specify the username for extending service.
 Specify the HMAC key for extending service.
 .\"
 .TP
-\fB--pub-str \fIstr\fR
-Specify the publication string to verify with.
-.\"
-.TP
 \fB-P \fIURL\fR
 Specify the publications file URL (or file with URI scheme 'file://').
 .\"
@@ -91,6 +87,10 @@ For more common OIDs there are convenience names defined:
 .IP \(bu 4
 \fBO\fR or \fBorg\fR for OID 2.5.4.10
 .RE
+.\"
+.TP
+\fB--pub-str \fIstr\fR
+Specify the publication string to verify with.
 .\"
 .TP
 \fB-V \fIfile\fR
@@ -164,4 +164,4 @@ Guardtime AS, http://www.guardtime.com/
 .LP
 .\"
 .SH SEE ALSO
-\fBlogksi\fR(1), \fBlogksi-sign\fR(1), \fBlogksi-integrate\fR(1), \fBlogksi-extend\fR(1), \fBlogksi-conf\fR(5)
+\fBlogksi\fR(1), \fBlogksi-extend\fR(1), \fBlogksi-integrate\fR(1), \fBlogksi-sign\fR(1), \fBlogksi-conf\fR(5)
