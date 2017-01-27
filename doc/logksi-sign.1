@@ -10,9 +10,10 @@
 .SH DESCRIPTION
 Signs the unsigned log blocks in a log signature file of a given \fIlogfile\fR. Log signature file is expected to be \fIlogfile.logsig\fR. If no \fIlogfile\fR is given, input is read from \fIstdin\fR and should correspond to log signature file.
 .LP
-During log signing, some blocks of a log file may remain unsigned. For instance, when the KSI service is not reachable.
+\fBlogksi sign\fR provides the recovery signing functionality for cases when some log blocks have been left unsigned during routine signing/logging. For instance, when the KSI service was not reachable.
 .LP
 User must have access to KSI signing service (KSI Aggregator) for signing.
+.\"
 .SH OPTIONS
 .TP
 \fB-o \fIout.logsig\fR
