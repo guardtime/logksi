@@ -31,6 +31,7 @@
 #include <fcntl.h>
 #endif
 
+#define SOF_ARRAY(x) (sizeof(x) / sizeof((x)[0]))
 
 static int calculate_new_intermediate_hash(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *leftHash, KSI_DataHash *rightHash, unsigned char level, KSI_DataHash **nodeHash) {
 	int res;
@@ -376,14 +377,34 @@ cleanup:
 	return res;
 }
 
+static size_t find_header_in_file(FILE *in, char **headers, size_t len) {
+	size_t res = len;
+	size_t i;
+	size_t count;
+	char buf[32];
+
+	if (in == NULL || headers == NULL)
+		return len;
+
+	for (i = 0; i < len; i++) {
+		count = fread(buf, 1, strlen(headers[i]), in);
+		if (count == strlen(headers[i]) && strncmp(buf, headers[i], strlen(headers[i])) == 0) {
+			res = i;
+			break;
+		}
+		rewind(in);
+	}
+
+	return res;
+}
+
 static int process_magic_number(PARAM_SET *set, ERR_TRCKR *err, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
-	char buf[10];
 	size_t count = 0;
-	size_t magicLength;
-	char *magicNumbers[] = {"LOGSIG11", "LOGSIG12"};
+	char *logSignatureHeaders[] = {"LOGSIG11", "LOGSIG12"};
+	char *blocksFileHeaders[] = {"LOG12BLK"};
+	char *signaturesFileHeaders[] = {"LOG12SIG"};
 	int d = 0;
-	int i;
 	FILE *in = NULL;
 
 	if (set == NULL || err == NULL || files == NULL) {
@@ -401,24 +422,25 @@ static int process_magic_number(PARAM_SET *set, ERR_TRCKR *err, BLOCK_INFO *bloc
 	print_progressDesc(d, "Processing magic number... ");
 
 	res = KT_INVALID_INPUT_FORMAT;
-	for (i = 0; i < sizeof(magicNumbers) / sizeof(magicNumbers[0]); i++) {
-		magicLength = strlen(magicNumbers[i]);
-		count = fread(buf, 1, magicLength, in);
-		if (count == magicLength && strncmp(buf, magicNumbers[i], magicLength) == 0) {
-			blocks->version = i;
-			res = KT_OK;
-			break;
-		}
-		rewind(in);
-	}
 
-	if (res != KT_OK) {
-		ERR_CATCH_MSG(err, res, "Error: Magic number not found at the beginning of log signature file.");
+	if (files->inBlockFile) {
+		if (find_header_in_file(files->inBlockFile, blocksFileHeaders, SOF_ARRAY(blocksFileHeaders)) == SOF_ARRAY(blocksFileHeaders)) {
+			ERR_CATCH_MSG(err, res, "Error: Magic number not found at the beginning of blocks file.");
+		}
+		if (find_header_in_file(files->inSigFile, signaturesFileHeaders, SOF_ARRAY(signaturesFileHeaders)) == SOF_ARRAY(signaturesFileHeaders)) {
+			ERR_CATCH_MSG(err, res, "Error: Magic number not found at the beginning of signatures file.");
+		}
+		blocks->version = LOGSIG12;
+	} else {
+		blocks->version = find_header_in_file(files->inSigFile, logSignatureHeaders, SOF_ARRAY(logSignatureHeaders));
+		if (blocks->version == SOF_ARRAY(logSignatureHeaders)) {
+			ERR_CATCH_MSG(err, res, "Error: Magic number not found at the beginning of signatures file.");
+		}
 	}
 
 	if (files->outSigFile) {
-		count = fwrite(buf, 1, magicLength, files->outSigFile);
-		if (count != magicLength) {
+		count = fwrite(logSignatureHeaders[blocks->version], 1, strlen(logSignatureHeaders[blocks->version]), files->outSigFile);
+		if (count != strlen(logSignatureHeaders[blocks->version])) {
 			res = KT_IO_ERROR;
 			ERR_CATCH_MSG(err, res, "Error: Could not copy magic number to log signature file.");
 		}
