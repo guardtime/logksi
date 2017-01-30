@@ -160,13 +160,13 @@ char *extend_help_toString(char*buf, size_t len) {
 		" %s extend [<logfile>] [-o <out.logsig>] --conf <logksi.conf> [more_options]\n"
 		"\n"
 		" <logfile>\n"
-		"           - File path to the log file whose log signature file is to be extended. If not specified,\n"
+		"           - Name of the log file whose log signature file is to be extended. If not specified,\n"
 		"             the log signature is read from stdin.\n"
 		" -o <out.logsig>\n"
-		"           - Output file path for the extended log signature file. Use '-' to redirect the extended\n"
-		"             log signature binary stream to stdout. If not specified, the log signature is saved\n"
-		"             to <logfile.logsig> while a backup of <logfile.logsig> is saved in <logfile.logsig.bak>.\n"
-		"             If specified, existing file is always overwritten.\n"
+		"           - Name of the extended output log signature file. An existing log signature file is always overwritten.\n"
+		"             If not specified, the log signature is saved to <logfile.logsig> while a backup of <logfile.logsig>\n"
+		"             is saved in <logfile.logsig.bak>.\n"
+		"             Use '-' to redirect the extended log signature binary stream to stdout.\n"
 		"             If both input and output are not specified, stdin and stdout are used resepectively.\n"
 		" -X <URL>  - Extending service (KSI Extender) URL.\n"
 		" --ext-user <user>\n"
@@ -181,15 +181,14 @@ char *extend_help_toString(char*buf, size_t len) {
 		" --pub-str <str>\n"
 		"           - Publication record as publication string to extend the signature to.\n"
 		" -V        - Certificate file in PEM format for publications file verification.\n"
-		"             All values from lower priority source are ignored.\n"
+		"             All values from lower priority sources are ignored.\n"
 		" -d        - Print detailed information about processes and errors to stderr.\n"
 		" --conf <file>\n"
-		"             Read configuration options from given file.\n"
+		"             Read configuration options from the given file.\n"
 		"             Configuration options given explicitly on command line will\n"
 		"             override the ones in the configuration file.\n"
 		" --log <file>\n"
-		"           - Write libksi log to given file. Use '-' as file name to redirect\n"
-		"             log to stdout.\n",
+		"           - Write libksi log to the given file. Use '-' as file name to redirect the log to stdout.\n",
 		TOOL_getName(),
 		TOOL_getName(),
 		TOOL_getName()
@@ -198,7 +197,7 @@ char *extend_help_toString(char*buf, size_t len) {
 	return buf;
 }
 const char *extend_get_desc(void) {
-	return "Extends existing KSI signature to the given publication.";
+	return "Extends KSI signatures in a log signature file to the desired publication.";
 }
 
 static int extend_to_nearest_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_VerificationContext *context, KSI_Signature **ext) {

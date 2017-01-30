@@ -137,14 +137,14 @@ char *sign_help_toString(char*buf, size_t len) {
 		"          [more_options]\n"
 		"\n"
 		" <logfile>\n"
-		"           - File path to the log file whose log signature file's unsigned blocks are to be signed.\n"
+		"           - Name of the log file whose log signature file's unsigned blocks are to be signed.\n"
 		"             If not specified, the log signature file is read from stdin.\n"
 		" -o <out.logsig>\n"
-		"           - Output file path for the signed log signature file. Use '-' to redirect the signed\n"
-		"             log signature file to stdout. If not specified, the log signature is saved\n"
-		"             to <logfile.logsig> while a backup of <logfile.logsig> is saved in <logfile.logsig.bak>.\n"
-		"             If specified, existing file is always overwritten.\n"
-		"             If both input and outpur or not specified, stdin and stdout are used resepectively.\n"
+		"           - Name of the signed output log signature file. An existing log signature file is overwritten.\n"
+		"             If not specified, the log signature is saved to <logfile.logsig> while a backup of <logfile.logsig>\n"
+		"             is saved in <logfile.logsig.bak>.\n"
+		"             Use '-' to redirect the signed log signature binary stream to stdout.\n"
+		"             If both input and output are not specified, stdin and stdout are used resepectively.\n"
 		" -S <URL>  - Signing service (KSI Aggregator) URL.\n"
 		" --aggr-user <user>\n"
 		"           - Username for signing service.\n"
@@ -152,12 +152,11 @@ char *sign_help_toString(char*buf, size_t len) {
 		"           - HMAC key for signing service.\n"
 		" -d        - Print detailed information about processes and errors to stderr.\n"
 		" --conf <file>\n"
-		"           - Read configuration options from given file. It must be noted\n"
+		"           - Read configuration options from the given file. It must be noted\n"
 		"             that configuration options given explicitly on command line will\n"
 		"             override the ones in the configuration file.\n"
 		" --log <file>\n"
-		"           - Write libksi log to given file. Use '-' as file name to redirect\n"
-		"             log to stdout.\n",
+		"           - Write libksi log to the given file. Use '-' as file name to redirect the log to stdout.\n",
 		TOOL_getName()
 	);
 
@@ -165,7 +164,7 @@ char *sign_help_toString(char*buf, size_t len) {
 }
 
 const char *sign_get_desc(void) {
-	return "Signs the given input with KSI.";
+	return "Signs unsigned blocks in a log signature file.";
 }
 
 static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {

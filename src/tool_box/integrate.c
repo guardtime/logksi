@@ -131,15 +131,15 @@ char *integrate_help_toString(char *buf, size_t len) {
 		" %s integrate <logfile> [-o <out.logsig>]\n"
 		"\n"
 		" <logfile>\n"
-		"           - File path to the log file to whom the temporary files to be integrated belong.\n"
+		"           - Name of the log file whose temporary files are to be integrated.\n"
 		"             The two temporary files created while asynchronously signing are:\n"
 		"               * the log signature blocks file: <logfile.logsig.parts/blocks.dat>; and\n"
 		"               * the log signature file containing the respective KSI signatures: \n"
 		"                 <logfile.logsig.parts/block-signatures.dat>.\n"
 		" -o <out.logsig>\n"
-		"           - Specify the output file path for the log signature file. If not specified,\n"
+		"           - Name of the integrated output log signature file. If not specified,\n"
 		"             the log signature file is saved as <logfile.logsig> in the same folder where\n"
-		"             the <logfile> is located. Any existing  files  with  output  file name will be overwritten.\n",
+		"             the <logfile> is located. An attempt to overwrite an existing log signature file will result in an error.\n",
 		TOOL_getName()
 	);
 
@@ -148,7 +148,7 @@ char *integrate_help_toString(char *buf, size_t len) {
 
 
 const char *integrate_get_desc(void) {
-	return "Integrates individual log signature blocks and KSI signatures into a single file.";
+	return "Integrates individual log signature blocks file and KSI signatures file into a single log signature file.";
 }
 
 static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {

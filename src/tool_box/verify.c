@@ -232,14 +232,14 @@ char *verify_help_toString(char *buf, size_t len) {
 		" --pub-str <str>\n"
 		"           - Publication string to verify with.\n"
 		" -V        - Certificate file in PEM format for publications file verification.\n"
-		"             All values from lower priority source are ignored.\n"
+		"             All values from lower priority sources are ignored.\n"
 		" -d        - Print detailed information about processes and errors to stderr.\n"
 		" --conf <file>\n"
-		"             Read configuration options from given file.\n"
+		"             Read configuration options from the given file.\n"
 		"             Configuration options given explicitly on command line will\n"
 		"             override the ones in the configuration file.\n"
 		" --log <file>\n"
-		"           - Write libksi log to given file. Use '-' as file name to redirect log to stdout.\n",
+		"           - Write libksi log to the given file. Use '-' as file name to redirect the log to stdout.\n",
 		TOOL_getName(),
 		TOOL_getName(),
 		TOOL_getName(),
