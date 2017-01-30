@@ -12,11 +12,11 @@
 \fBlogksi extend \fR[\fIlogfile\fR] [\fB-o \fIout.logsig\fR] \fB--conf \fIlogksi.conf\fR [\fImore_options\fR]
 .\"
 .SH DESCRIPTION
-Finds the log signature file (\fIlogfile.logsig\fR) based on the specified log file \fIlogfile\fR and extends KSI signatures in it to the desired publication. If no \fIlogfile\fR is specified, the input is expected from \fIstdin\fR and correspond to a log signature file.
+Finds the log signature file (\fIlogfile.logsig\fR) based on the specified log file \fIlogfile\fR and extends KSI signatures in it to the desired publication. If no \fIlogfile\fR is specified, input is read from \fIstdin\fR and should correspond to a log signature file.
 .LP
 After the signatures are extended and the corresponding publication records are attached, the log signatures can be verified using publication-based verification where only trusted publications file or a publication string in printed media is needed to perform the verification. See \fBlogksi-verify\fR(1) for details.
 .LP
-User must have access to KSI extending service and trusted KSI publications file. By default the KSI signatures are extended to the earliest available publication. Use the option \fB--pub-str\fR to extend signatures to the publication denoted by the given publication string.
+User must have access to KSI extending service and a trusted KSI publications file. By default the KSI signatures are extended to the earliest available publication. Use the option \fB--pub-str\fR to extend signatures to the publication denoted by the given publication string.
 .LP
 Note that all KSI signatures present in the log signature file will be attempted to extend to the same publication. If for some reason the extending of at least one signature fails, none of the signatures are extended.
 .LP
@@ -25,7 +25,7 @@ If both, input and output files are left unspecified, the \fIstdin\fR and \fIstd
 .SH OPTIONS
 .TP
 \fB-o \fIout.logsig\fR
-Specify the output file path for the extended log signature file. If not specified, the input file \fIlogfile.logsig\fR is modified. The backup of the original log signature file will be saved to \fIlogfile.logsig.bak\fR. If extending fails, the newly created \fIlogfile.logsig\fR will be deleted and the original \fIlogfile.logsig\fR will be restored from the backup file. If output file name is explicitly specified, the existing file will always be overwritten and no backup file will be created. Use '-' as file name to redirect the output as binary stream to \fIstdout\fR.
+Specify the name of the extended output log signature file. If not specified, the input file \fIlogfile.logsig\fR is modified. The backup of the original log signature file will be saved to \fIlogfile.logsig.bak\fR. If extending fails, the newly created \fIlogfile.logsig\fR will be deleted and the original \fIlogfile.logsig\fR will be restored from the backup file. If the output file name is explicitly specified, the existing file will always be overwritten and no backup file will be created. Use '-' as file name to redirect the output as a binary stream to \fIstdout\fR.
 .\"
 .TP
 \fB-X \fIURL\fR
@@ -45,7 +45,7 @@ Specify the publications file URL (or file with URI scheme 'file://').
 .\"
 .TP
 \fB--cnstr \fIoid\fR=\fIvalue\fR
-Specify the OID of the PKI certificate field (e.g. e-mail address) and the expected value to qualify the certificate for verification of publications file's PKI signature. At least one constraint must be defined. All values from lower priority source are ignored (see \fBlogksi-conf\fR(5)).
+Specify the OID of the PKI certificate field (e.g. e-mail address) and the expected value to qualify the certificate for verification of publications file's PKI signature. At least one constraint must be defined. All values from lower priority sources are ignored (see \fBlogksi-conf\fR(5)).
 .RS
 .HP 0
 For more common OIDs there are convenience names defined:
@@ -65,7 +65,7 @@ Specify the publication record as publication string to extend the signatures to
 .\"
 .TP
 \fB-V \fIfile\fR
-Specify the certificate file in PEM format for publications file verification. All values from lower priority source are ignored (see \fBlogksi-conf\fR(5)).
+Specify the certificate file in PEM format for publications file verification. All values from lower priority sources are ignored (see \fBlogksi-conf\fR(5)).
 .\"
 .TP
 \fB-d\fR
@@ -73,11 +73,11 @@ Print detailed information about processes and errors to \fIstderr\fR.
 .\"
 .TP
 \fB--conf \fIfile\fR
-Read configuration options from given file. It must be noted that configuration options given explicitly on command line will override the ones in the configuration file. See \fBlogksi-conf\fR(5) for more information.
+Read configuration options from the given file. It must be noted that configuration options given explicitly on command line will override the ones in the configuration file. See \fBlogksi-conf\fR(5) for more information.
 .\"
 .TP
 \fB--log \fIfile\fR
-Write \fIlibksi\fR log to given file. Use '-' as file name to redirect log to \fIstdout\fR.
+Write \fIlibksi\fR log to the given file. Use '-' as file name to redirect the log to \fIstdout\fR.
 .br
 .\"
 .SH EXIT STATUS
@@ -96,7 +96,7 @@ In the following examples it is assumed that KSI service configuration options (
 .\"
 .TP 2
 \fB2
-\fRTo extend the signatures in \fI/var/log/secure.logsig\fR to the specified publication (the publication string available from Financial Times, ISSN: 0307-1766, 2016-03-17 given as example) and save the result with default name \fI/var/log/secure.logsig\fR:
+\fRTo extend the signatures in \fI/var/log/secure.logsig\fR to the specified publication (the publication string available from Financial Times, ISSN: 0307-1766, 2016-03-17 given as example) and save the result with the default name \fI/var/log/secure.logsig\fR:
 .LP
 .RS 4
 \fBlogksi extend \fI/var/log/secure \fB--pub-str \fIAAAAAA-CW45II-AAKWRK-F7FBNM-KB6FNV-DYYFW7-PJQN6F-JKZWBQ-3OQYZO-HCB7RA-YNYAGA-ODRL2V

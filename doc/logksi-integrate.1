@@ -1,7 +1,7 @@
 .TH LOGKSI-INTEGRATE 1
 .\"
 .SH NAME
-\fBlogksi integrate \fR- Integrate the log signature blocks file and respective KSI signatures file into final log signature file.
+\fBlogksi integrate \fR- Integrate the log signature blocks file and respective KSI signatures file into a final log signature file.
 .\"
 .SH SYNOPSIS
 .HP 4
@@ -15,9 +15,9 @@ the log signature blocks file: \fIlogfile.logsig.parts/blocks.dat\fR; and
 .IP \(bu 4
 the log signature file containing the respective KSI signatures: \fIlogfile.logsig.parts/block-signatures.dat\fR.
 .LP
-If output file name is not specified, it is derived from the name of the log file \fIlogfile\fR by adding standard suffix \fI.logsig\fR. Attempt to overwrite an existing log signature file will result in error.
+If the output file name is not specified, it is derived from the name of the log file \fIlogfile\fR by adding the standard suffix \fI.logsig\fR. Attempt to overwrite an existing log signature file will result in an error.
 .LP
-The integration of the files can be performed once both files are complete. Under Linux \fBlogksi integrate \fR checks for advisory lock on the files, waits until it is released and then integrates the files.
+The integration of the files can be performed once both files are complete. Under Linux \fBlogksi integrate \fR waits to acquire a read lock on the files before integrating them. The read lock is advisory and relies on the same implementation in the signing process.
 .LP
 During integration the following is checked:
 .LP
@@ -26,7 +26,7 @@ The order of log blocks in \fIblocks.dat\fR and KSI signatures in \fIblock-signa
 .IP \(bu 4
 The root hash of each block in the log signature blocks file needs to be equal to the one in the KSI signatures file.
 .LP
-If some KSI signatures are missing from the log signature file \fIblock-signatures.dat\fR, respective \fIno-sig\fR field is recognised and integration is performed anyway. The missing signatures can then be acquired using \fBlogksi sign\fR function.
+If some KSI signatures are missing from the log signature file \fIblock-signatures.dat\fR, a respective \fIno-sig\fR field is recognised and integration is performed anyway. The missing signatures can then be acquired using \fBlogksi sign\fR function.
 .\"
 .SH OPTIONS
 .TP
@@ -40,7 +40,7 @@ See \fBlogksi\fR(1) for more information.
 .SH EXAMPLES
 .TP 2
 \fB1
-\fRTo integrate temporary files \fI/var/log/secure.logsig.parts/blocks.dat\fR and \fI/var/log/secure.logsig.parts/block-signatures.dat\fR into complete log signature file with default name \fI/var/log/secure.logsig\fR:
+\fRTo integrate temporary files \fI/var/log/secure.logsig.parts/blocks.dat\fR and \fI/var/log/secure.logsig.parts/block-signatures.dat\fR into a complete log signature file with the default name \fI/var/log/secure.logsig\fR:
 .LP
 .RS 4
 \fBlogksi integrate \fI/var/log/secure

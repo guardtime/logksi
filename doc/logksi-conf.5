@@ -4,7 +4,7 @@
 \fBlogksi.conf\fR - Log signature command-line tool configuration file.
 .\"
 .SH DESCRIPTION
-The log signature tool has has several configuration options, most of them are related to the KSI service configuration (e.g. KSI signing service URL and access credentials). The configuration options are described in the \fBOPTIONS\fR section below. Ways to define the options are:
+The log signature tool has has several configuration options, most of them related to the KSI service configuration (e.g. KSI signing service URL and access credentials). The configuration options are described in the \fBOPTIONS\fR section below. Ways to define the options are:
 .LP
 .IP \(bu 4
 directly on command line (highest priority);
@@ -13,13 +13,13 @@ in a file specified by the \fB--conf\fR command-line argument; or
 .IP \(bu 4
 in a file specified by the \fBKSI_CONF\fR (lowest priority).
 .LP
-If a configuration option is specified in more than one source, the source with the highest priority will be used: i.e. command-line argument will override file specified by \fB--conf\fR or \fBKSI_CONF\fR.
+If a configuration option is specified in more than one source, the source with the highest priority will be used: i.e. command-line argument will override a file specified by \fB--conf\fR or \fBKSI_CONF\fR.
 .LP
-While defining options, a short parameter or multiple flags must have prefix '\fB-\fR' and long parameters have prefix '\fB--\fR'. If some parameter values contain whitespace characters, double quote marks (\fB"\fR) must be used to wrap the entire value. If double quote mark or backslash have to be used inside the value part, an escape character (\fB\\\fR) must be typed before the charcater. If configuration option with unknown or invalid key-value pairs is used, an error is generated.
+While defining options, a short parameter or multiple flags must have prefix '\fB-\fR' and long parameters have prefix '\fB--\fR'. If some parameter values contain whitespace characters, double quote marks (\fB"\fR) must be used to wrap the entire value. If a double quote mark or backslash has to be used inside the value part, an escape character (\fB\\\fR) must be typed before the charcater. If a configuration option with unknown or invalid key-value pairs is used, an error is generated.
 .LP
-In configuration file each key-value pair must be placed on a single line. For commenting, start the line with \fB#\fR.
+In the configuration file each key-value pair must be placed on a single line. For commenting, start the line with \fB#\fR.
 .br
-In case of \fB-V\fR, \fB-W\fR and \fB-P\fR options file location is interpreted as relative to the configuration file, if full path is not defined.
+In case of \fB-V\fR, \fB-W\fR and \fB-P\fR options, file location is interpreted as relative to the configuration file, if full path is not defined.
 .br
 See \fBEXAMPLES\fR for more information.
 .\"
@@ -92,7 +92,7 @@ Force the KSI log signature tool to trust the publications file without verifyin
 Program \fBlogksi\fR(1) uses environment variable \fBKSI_CONF \fRto point to the default configuration file.
 .\"
 .SH EXAMPLES
-An example of configuration file:
+An example of a configuration file:
 .LP
 .RS
 \fR# --- BEGINNING ---

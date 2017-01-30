@@ -18,7 +18,7 @@
 \fBlogksi verify --ver-pub \fIlogfile \fR[\fIlogfile.logsig\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... \fR[\fB-x -X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR]] [\fImore_options\fR]
 .\"
 .SH DESCRIPTION
-Verifies the log file \fIlogfile\fR. The log signature is by default expected to be found in \fIlogfile.logsig\fR. If this is not the case, the correct log signature file name must be given after the \fIlogfile\fR.
+Verifies the log file \fIlogfile\fR. The name of the log signature file is expected to be \fIlogfile.logsig\fR by default. If this is not the case, the name of the log signature file must be given explicitly after the \fIlogfile\fR.
 .LP
 For each signed log block the root hash of the block is recomputed and then verified using the KSI signature of that block.
 .LP
@@ -27,13 +27,13 @@ KSI signature can be verified using any of its standard verification policies:
 .IP \(bu 4
 Internal verification (\fB--ver-int\fR). Only internal consistency of the signature is checked and no trust anchor is used and no external resources are needed. This check is also performed as the first step in all other policies.
 .IP \(bu 4
-Calendar-based verification (\fB--ver-cal\fR). Signature is verified against calendar blockchain database at the KSI Extender. Verification is done by checking that the output hash value computed from the aggregation hash chain matches the corresponding entry in the calendar blockchain. Access to KSI Extender is needed.
+Calendar-based verification (\fB--ver-cal\fR). The signature is verified against calendar blockchain database at the KSI Extender. Verification is done by checking that the output hash value computed from the aggregation hash chain matches the corresponding entry in the calendar blockchain. Access to KSI Extender is needed.
 .IP \(bu 4
-Key-based verification (\fB--ver-key\fR). Signature must contain a calendar hash chain and a calendar authentication record that can be verified against the signing certificates. To be able to perform key-based verification user must have an access to a trusted KSI publications file with signing certificates in it.
+Key-based verification (\fB--ver-key\fR). The signature must contain a calendar hash chain and a calendar authentication record that can be verified against the signing certificates. To be able to perform key-based verification user must have access to a trusted KSI publications file with signing certificates in it.
 .IP \(bu 4
-Publication-based verification (\fB--ver-pub\fR). Signature must be extended to a time of publication and contain a publication record unless automatic extension of the signature is enabled with \fB-x\fR. Verification is done by checking that the publication record in the signature matches a publication in the publications file or the publication string given on the command line. Publications file or publication string retrieved from printed media is needed.
+Publication-based verification (\fB--ver-pub\fR). The signature must be extended to a time of publication and contain a publication record unless automatic extension of the signature is enabled with \fB-x\fR. Verification is done by checking that the publication record in the signature matches a publication in the publications file or the publication string given on the command line. Publications file or publication string retrieved from printed media is needed.
 .LP
-It must be noted that only publication-based verification should be preferred in long term as it does not rely on any keys and trusted services. The other policies can be used temporarily when the signature is created and there is not yet a publication to extend the signature to.
+It must be noted that only publication-based verification should be preferred in the long term as it does not rely on any keys and trusted services. The other policies can be used temporarily when the signature is created and there is not yet a publication to extend the signature to.
 .\"
 .SH OPTIONS
 .TP
@@ -74,7 +74,7 @@ Specify the publications file URL (or file with URI scheme 'file://').
 .\"
 .TP
 \fB--cnstr \fIoid\fR=\fIvalue\fR
-Specify the OID of the PKI certificate field (e.g. e-mail address) and the expected value to qualify the certificate for verification of publications file's PKI signature. At least one constraint must be defined. All values from lower priority source are ignored (see \fBlogksi-conf\fR(5) for more information).
+Specify the OID of the PKI certificate field (e.g. e-mail address) and the expected value to qualify the certificate for verification of publications file's PKI signature. At least one constraint must be defined. All values from lower priority sources are ignored (see \fBlogksi-conf\fR(5) for more information).
 .RS
 .HP 0
 For more common OIDs there are convenience names defined:
@@ -94,7 +94,7 @@ Specify the publication string to verify with.
 .\"
 .TP
 \fB-V \fIfile\fR
-Specify the certificate file in PEM format for publications file verification. All values from lower priority source are ignored (see \fBlogksi-conf\fR(5)).
+Specify the certificate file in PEM format for publications file verification. All values from lower priority sources are ignored (see \fBlogksi-conf\fR(5)).
 .\"
 .TP
 \fB-d\fR
@@ -102,11 +102,11 @@ Print detailed information about processes and errors to \fIstderr\fR.
 .\"
 .TP
 \fB--conf \fIfile\fR
-Read configuration options from given file. It must be noted that configuration options given explicitly on command line will override the ones in the configuration file (see \fBlogksi-conf\fR(5) for more information).
+Read configuration options from the given file. It must be noted that configuration options given explicitly on command line will override the ones in the configuration file (see \fBlogksi-conf\fR(5) for more information).
 .\"
 .TP
 \fB--log \fIfile\fR
-Write libksi log to given file. Use '-' as file name to redirect log to \fIstdout\fR.
+Write libksi log to the given file. Use '-' as file name to redirect log to \fIstdout\fR.
 .br
 .\"
 .SH EXIT STATUS

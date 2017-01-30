@@ -8,7 +8,7 @@
 \fBlogksi sign \fR[\fIlogfile\fR] [\fB-o \fIout.logsig\fR] \fB-S \fIURL \fR[\fB--aggr-user \fIuser \fB--aggr-key \fIkey\fR] [\fImore options\fR]
 .\"
 .SH DESCRIPTION
-Signs the unsigned log blocks in a log signature file of a given \fIlogfile\fR. Log signature file is expected to be \fIlogfile.logsig\fR. If no \fIlogfile\fR is given, input is read from \fIstdin\fR and should correspond to log signature file.
+Signs the unsigned log blocks in a log signature file of a given \fIlogfile\fR. The name of the log signature file is expected to be \fIlogfile.logsig\fR. If no \fIlogfile\fR is given, input is read from \fIstdin\fR and should correspond to a log signature file.
 .LP
 \fBlogksi sign\fR provides the recovery signing functionality for cases when some log blocks have been left unsigned during routine signing/logging. For instance, when the KSI service was not reachable.
 .LP
@@ -17,7 +17,7 @@ User must have access to KSI signing service (KSI Aggregator) for signing.
 .SH OPTIONS
 .TP
 \fB-o \fIout.logsig\fR
-Specify the output file path for the log signature file. If not specified, the input file \fIlogfile.logsig\fR is modified. The backup of the original log signature file will be saved to \fIlogfile.logsig.bak\fR. If output file name is explicitly specified, the existing file will always be overwritten and no backup file will be created. Use '-' as file name to redirect the output as binary stream to \fIstdout\fR.
+Specify the name of the output log signature file. If not specified, the input file \fIlogfile.logsig\fR is modified. The backup of the original log signature file will be saved to \fIlogfile.logsig.bak\fR. If the output file name is explicitly specified, an existing file will always be overwritten and no backup file will be created. Use '-' as file name to redirect the output as a binary stream to \fIstdout\fR.
 .\"
 .TP
 \fB-S \fIURL\fR
@@ -37,11 +37,11 @@ Print detailed information about processes and errors to \fIstderr\fR.
 .\"
 .TP
 \fB--conf \fIfile\fR
-Read configuration options from given file. It must be noted that configuration options given explicitly on command line will override the ones in the configuration file. See \fBlogksi-conf\fR(5) for more information.
+Read configuration options from the given file. It must be noted that configuration options given explicitly on command line will override the ones in the configuration file. See \fBlogksi-conf\fR(5) for more information.
 .\"
 .TP
 \fB--log \fIfile\fR
-Write libksi log to given file. Use '-' as file name to redirect log to \fIstdout\fR.
+Write libksi log to the given file. Use '-' as file name to redirect the log to \fIstdout\fR.
 .br
 .\"
 .SH EXIT STATUS
