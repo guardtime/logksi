@@ -139,7 +139,10 @@ char *integrate_help_toString(char *buf, size_t len) {
 		" -o <out.logsig>\n"
 		"           - Name of the integrated output log signature file. If not specified,\n"
 		"             the log signature file is saved as <logfile.logsig> in the same folder where\n"
-		"             the <logfile> is located. An attempt to overwrite an existing log signature file will result in an error.\n",
+		"             the <logfile> is located. An attempt to overwrite an existing log signature file will result in an error.\n"
+		" -d        - Print detailed information about processes and errors to stderr.\n"
+		" --log <file>\n"
+		"           - Write libksi log to the given file. Use '-' as file name to redirect the log to stdout.\n",
 		TOOL_getName()
 	);
 

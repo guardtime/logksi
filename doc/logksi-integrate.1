@@ -32,6 +32,14 @@ If some KSI signatures are missing from the log signature file \fIblock-signatur
 .TP
 \fB-o \fIout.logsig\fR
 Specify the name of the integrated output log signature file. If not specified, the log signature file is saved as \fIlogfile.logsig\fR in the same folder where the \fIlogfile\fR is located. An attempt to overwrite an existing log signature file will result in an error.
+.\"
+.TP
+\fB-d\fR
+Print detailed information about processes and errors to \fIstderr\fR.
+.\"
+.TP
+\fB--log \fIfile\fR
+Write \fIlibksi\fR log to the given file. Use '-' as file name to redirect the log to \fIstdout\fR.
 .br
 .\"
 .SH EXIT STATUS
