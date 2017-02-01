@@ -29,6 +29,7 @@
 
 #ifndef _WIN32
 #include <fcntl.h>
+#include <errno.h>
 #endif
 
 #define SOF_ARRAY(x) (sizeof(x) / sizeof((x)[0]))
@@ -1435,24 +1436,37 @@ cleanup:
 }
 
 #ifndef _WIN32
-int get_file_read_lock(FILE *in) {
+int get_file_read_lock(PARAM_SET *set, FILE *in) {
 	struct flock lock;
 	int fres;
+	int d = PARAM_SET_isSetByName(set, "d");
 
-	if (in == NULL) return KT_INVALID_ARGUMENT;
+	if (set == NULL || in == NULL) return KT_INVALID_ARGUMENT;
+
+	d = PARAM_SET_isSetByName(set, "d");
 
 	lock.l_type = F_RDLCK;
 	lock.l_whence = SEEK_SET;
 	lock.l_start = 0;
 	lock.l_len = 0;
-	fres = fcntl(fileno(in), F_SETLKW, &lock);
-	if (fres != 0) return KT_IO_ERROR;
+	fres = fcntl(fileno(in), F_SETLK, &lock);
+	if (fres != 0) {
+		if (errno == EAGAIN || errno == EACCES) {
+			print_progressDesc(d, "Waiting to acquire read lock... ");
+			fres = fcntl(fileno(in), F_SETLKW, &lock);
+			print_progressResult(fres);
+		}
+	}
 
-	return KT_OK;
+	if (fres != 0) {
+		return KT_IO_ERROR;
+	} else {
+		return KT_OK;
+	}
 }
 #else
-int get_file_read_lock(FILE *in) {
-	if (in == NULL)
+int get_file_read_lock(PARAM_SET *set, FILE *in) {
+	if (set == NULL || in == NULL)
 		return KT_INVALID_ARGUMENT;
 	else
 		return KT_OK;

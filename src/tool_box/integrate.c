@@ -36,7 +36,7 @@
 #include "rsyslog.h"
 
 static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
-static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files);
+static int open_input_and_output_files(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files);
 static void close_input_and_output_files(int result, IO_FILES *files);
 
 int integrate_run(int argc, char **argv, char **envp) {
@@ -84,7 +84,7 @@ int integrate_run(int argc, char **argv, char **envp) {
 	res = PARAM_SET_getStr(set, "o", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.outSigName);
 	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
 
-	res = open_input_and_output_files(err, &files);
+	res = open_input_and_output_files(set, err, &files);
 	if (res != KT_OK) goto cleanup;
 
 	if (files.inBlockFile == NULL && files.inSigFile == NULL) {
@@ -206,13 +206,13 @@ cleanup:
 	return res;
 }
 
-static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
+static int open_input_and_output_files(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files) {
 	int res = KT_IO_ERROR;
 	IO_FILES tmp;
 
 	memset(&tmp, 0, sizeof(tmp));
 
-	if (err == NULL || files == NULL) {
+	if (set == NULL || err == NULL || files == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
@@ -246,9 +246,9 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 		ERR_CATCH_MSG(err, res, "Error: could not open file %s.", tmp.partsSigName);
 
 		/* Check that the asynchronous signing process has completed writing to blocks and signatures files. */
-		res = get_file_read_lock(tmp.inBlockFile);
+		res = get_file_read_lock(set, tmp.inBlockFile);
 		ERR_CATCH_MSG(err, res, "Error: could not acquire read lock for file %s.", tmp.partsBlockName);
-		res = get_file_read_lock(tmp.inSigFile);
+		res = get_file_read_lock(set, tmp.inSigFile);
 		ERR_CATCH_MSG(err, res, "Error: could not acquire read lock for file %s.", tmp.partsSigName);
 
 		tmp.outSigFile = fopen(tmp.outSigName, "wb");
@@ -262,7 +262,7 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 			res = (tmp.outSigFile == NULL) ? KT_IO_ERROR : KT_OK;
 			ERR_CATCH_MSG(err, res, "Error: could not open file %s.", tmp.outSigName);
 
-			res = get_file_read_lock(tmp.outSigFile);
+			res = get_file_read_lock(set, tmp.outSigFile);
 			ERR_CATCH_MSG(err, res, "Error: could not acquire read lock for file %s.", tmp.outSigName);
 		} else {
 			res = KT_KSI_SIG_VER_IMPOSSIBLE;
