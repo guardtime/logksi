@@ -14,7 +14,7 @@ system logs, financial transactions, call records, etc. For more, see
 Log signature tool can be used for KSI-signing, extending and verifying log
 signatures.
 
-// TODO: rewrite the remainin sections.
+// TODO: rewrite the remaining sections.
 ## INSTALLION
 
 ### Latest release from Guardtime repository
@@ -31,7 +31,7 @@ sudo curl -O http://download.guardtime.com/ksi/configuration/guardtime.el6.repo
 # In case of RHEL / CentOS 7
 sudo curl -O http://download.guardtime.com/ksi/configuration/guardtime.el7.repo
 
-yum install ksi
+yum install logksi
 ```
 
 ### From source code
@@ -41,9 +41,9 @@ platform check out source code from Github and build it using gcc or VS.
 To build KSI tool libksi and libksi-devel (KSI C SDK) packages are needed.
 Libksi is available in Guardtime repository or as source code in GitHub:
 [https://github.com/GuardTime/libksi](https://github.com/GuardTime/libksi).
-Use rebuild.sh script to build KSI tool on CentOS /RHEL. See `WinBuild.txt`
-to read how to build KSI tool on Windows. See `test/TEST-README.md` to
-learn how to run KSI command-line tool tests on Windows and linux.
+Use rebuild.sh script to build logksi tool on CentOS /RHEL. See `WinBuild.txt`
+to read how to build logksi tool on Windows. See `test/TEST-README.md` to
+learn how to run logksi command-line tool tests on Windows and linux.
 
 
 ### Upgrade
