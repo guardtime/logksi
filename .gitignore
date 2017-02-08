@@ -16,7 +16,7 @@ src/ksi
 
 # Test files, temp files
 test/out
-*.ksig
+#*.ksig
 *~
 *.lnk
 *.ps
