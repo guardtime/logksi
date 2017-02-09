@@ -28,15 +28,8 @@ rm -rf $mem_test_dir 2> /dev/null
 mkdir -p $mem_test_dir
 
 # Create some test files to output directory.
-cp test/resource/file/testFile	$mem_test_dir/_
-cp test/resource/file/testFile	$mem_test_dir/10__
-cp test/resource/file/testFile	$mem_test_dir/test_file
-cp test/resource/file/testFile	$mem_test_dir/a_23_500
-cp test/resource/file/testFile	$mem_test_dir/a_23_1000
-cp test/resource/file/testFile	$mem_test_dir/a_23_1000.ksig
-cp test/resource/file/testFile	$mem_test_dir/a_23_1000_5.ksig
-cp test/resource/signature/ok-sig-2014-08-01.1.ksig $mem_test_dir/ok-sig.ksig
-cp test/resource/signature/ok-sig-2014-08-01.1.ksig $mem_test_dir/ok-sig
+cp -r test/resource/signature/syslog.logsig.parts $mem_test_dir/syslog.logsig.parts
+cp test/resource/file/syslog $mem_test_dir/syslog
 
 # Configure temporary KSI_CONF.
 export KSI_CONF=test/resource/conf/default-not-working-conf.cfg
@@ -47,26 +40,8 @@ test/convert-to-memory-test.sh $test_suite_dir/$1  $mem_test_dir/$1
 }
 
 # Convert test files to valgrind memory test files.
+generate_test integrate.test
 generate_test sign.test
-generate_test static-sign.test
-generate_test sign-verify.test
-generate_test extend.test
-generate_test extend-verify.test
-generate_test static-verify.test
-generate_test static-sign-verify.test
-generate_test static-extend.test
-generate_test sign-cmd.test
-generate_test extend-cmd.test
-generate_test static-verify-invalid-signatures.test
-generate_test pubfile.test
-generate_test static-pubfile.test
-generate_test verify-invalid-pubfile.test
-generate_test verify-cmd.test
-generate_test default-conf.test
-generate_test invalid-conf.test
-generate_test file-name-gen.test
-generate_test sign-block-signer.test
-generate_test sign-block-signer-cmd.test
 
 
 # Run generated test scripts.
@@ -80,26 +55,8 @@ else
 fi
 
 shelltest \
+$mem_test_dir/integrate.test \
 $mem_test_dir/sign.test \
-$mem_test_dir/static-sign.test \
-$mem_test_dir/sign-verify.test \
-$mem_test_dir/extend.test \
-$mem_test_dir/extend-verify.test \
-$mem_test_dir/static-verify.test \
-$mem_test_dir/static-sign-verify.test \
-$mem_test_dir/static-extend.test \
-$mem_test_dir/sign-cmd.test \
-$mem_test_dir/extend-cmd.test \
-$mem_test_dir/static-verify-invalid-signatures.test \
-$mem_test_dir/pubfile.test \
-$mem_test_dir/static-pubfile.test \
-$mem_test_dir/verify-invalid-pubfile.test \
-$mem_test_dir/verify-cmd.test \
-$mem_test_dir/default-conf.test \
-$mem_test_dir/invalid-conf.test \
-$mem_test_dir/file-name-gen.test \
-$mem_test_dir/sign-block-signer.test \
-$mem_test_dir/sign-block-signer-cmd.test \
 --with="valgrind --leak-check=full $tool" -- -j1
 exit_code=$?
 
