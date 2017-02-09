@@ -1,0 +1,121 @@
+Jan 13 12:53:21 localhost liblogging-stdlog:  [origin software="rsyslogd" swVersion="8.24.0.master" x-pid="13453" x-info="http://www.rsyslog.com"] start
+Jan 13 12:53:21 localhost liblogging-stdlog: action '*' treated as ':omusrmsg:*' - please use ':omusrmsg:*' syntax instead, '*' will not be supported in the future [v8.24.0.master try http://www.rsyslog.com/e/2184 ]
+Jan 13 12:53:21 localhost liblogging-stdlog: error during parsing file /etc/rsyslog.conf, on or before line 58: warnings occured in file '/etc/rsyslog.conf' around line 58 [v8.24.0.master try http://www.rsyslog.com/e/2207 ]
+Jan 13 12:53:21 localhost liblogging-stdlog: KSI Signature Provider: Started new block for signing, signature file /tmp/log/syslog.logsig.parts/blocks.dat, block size 10 [v8.24.0.master]
+Jan 13 12:53:22 localhost liblogging-stdlog: KSI Signature Provider: LMSIG: slept 1 sec, queue size 1 [v8.24.0.master]
+Jan 13 12:53:22 localhost liblogging-stdlog: KSI Signature Provider: LMSIG: new file, async [v8.24.0.master]
+Jan 13 12:53:26 localhost vagrant: logline 1
+Jan 13 12:53:26 localhost vagrant: logline 2
+Jan 13 12:53:26 localhost vagrant: logline 3
+Jan 13 12:53:26 localhost vagrant: logline 4
+Jan 13 12:53:26 localhost liblogging-stdlog: KSI Signature Provider: Started new block for signing, signature file /tmp/log/syslog.logsig.parts/blocks.dat, block size 10 [v8.24.0.master]
+Jan 13 12:53:26 localhost vagrant: logline 5
+Jan 13 12:53:26 localhost vagrant: logline 6
+Jan 13 12:53:26 localhost vagrant: logline 7
+Jan 13 12:53:26 localhost vagrant: logline 8
+Jan 13 12:53:26 localhost vagrant: logline 9
+Jan 13 12:53:26 localhost vagrant: logline 10
+Jan 13 12:53:26 localhost vagrant: logline 11
+Jan 13 12:53:26 localhost vagrant: logline 12
+Jan 13 12:53:26 localhost liblogging-stdlog: KSI Signature Provider: Started new block for signing, signature file /tmp/log/syslog.logsig.parts/blocks.dat, block size 10 [v8.24.0.master]
+Jan 13 12:53:26 localhost vagrant: logline 13
+Jan 13 12:53:26 localhost vagrant: logline 14
+Jan 13 12:53:26 localhost vagrant: logline 15
+Jan 13 12:53:26 localhost vagrant: logline 16
+Jan 13 12:53:26 localhost vagrant: logline 17
+Jan 13 12:53:26 localhost vagrant: logline 18
+Jan 13 12:53:26 localhost vagrant: logline 19
+Jan 13 12:53:26 localhost vagrant: logline 20
+Jan 13 12:53:26 localhost liblogging-stdlog: KSI Signature Provider: Started new block for signing, signature file /tmp/log/syslog.logsig.parts/blocks.dat, block size 10 [v8.24.0.master]
+Jan 13 12:53:26 localhost vagrant: logline 21
+Jan 13 12:53:26 localhost vagrant: logline 22
+Jan 13 12:53:26 localhost vagrant: logline 23
+Jan 13 12:53:26 localhost vagrant: logline 24
+Jan 13 12:53:26 localhost vagrant: logline 25
+Jan 13 12:53:26 localhost vagrant: logline 26
+Jan 13 12:53:26 localhost vagrant: logline 27
+Jan 13 12:53:26 localhost vagrant: logline 28
+Jan 13 12:53:26 localhost vagrant: logline 29
+Jan 13 12:53:26 localhost vagrant: logline 30
+Jan 13 12:53:26 localhost vagrant: logline 31
+Jan 13 12:53:26 localhost vagrant: logline 32
+Jan 13 12:53:26 localhost vagrant: logline 33
+Jan 13 12:53:26 localhost vagrant: logline 34
+Jan 13 12:53:26 localhost vagrant: logline 35
+Jan 13 12:53:26 localhost vagrant: logline 36
+Jan 13 12:53:26 localhost vagrant: logline 37
+Jan 13 12:53:26 localhost liblogging-stdlog: KSI Signature Provider: Started new block for signing, signature file /tmp/log/syslog.logsig.parts/blocks.dat, block size 10 [v8.24.0.master]
+Jan 13 12:53:26 localhost vagrant: logline 38
+Jan 13 12:53:26 localhost vagrant: logline 39
+Jan 13 12:53:26 localhost vagrant: logline 40
+Jan 13 12:53:26 localhost vagrant: logline 41
+Jan 13 12:53:26 localhost vagrant: logline 42
+Jan 13 12:53:26 localhost vagrant: logline 43
+Jan 13 12:53:26 localhost vagrant: logline 44
+Jan 13 12:53:26 localhost vagrant: logline 45
+Jan 13 12:53:26 localhost vagrant: logline 46
+Jan 13 12:53:26 localhost liblogging-stdlog: KSI Signature Provider: Started new block for signing, signature file /tmp/log/syslog.logsig.parts/blocks.dat, block size 10 [v8.24.0.master]
+Jan 13 12:53:26 localhost vagrant: logline 47
+Jan 13 12:53:26 localhost liblogging-stdlog: KSI Signature Provider: Started new block for signing, signature file /tmp/log/syslog.logsig.parts/blocks.dat, block size 10 [v8.24.0.master]
+Jan 13 12:53:26 localhost vagrant: logline 48
+Jan 13 12:53:26 localhost vagrant: logline 49
+Jan 13 12:53:26 localhost vagrant: logline 50
+Jan 13 12:53:26 localhost vagrant: logline 51
+Jan 13 12:53:26 localhost liblogging-stdlog: KSI Signature Provider: Started new block for signing, signature file /tmp/log/syslog.logsig.parts/blocks.dat, block size 10 [v8.24.0.master]
+Jan 13 12:53:26 localhost vagrant: logline 52
+Jan 13 12:53:26 localhost vagrant: logline 53
+Jan 13 12:53:26 localhost vagrant: logline 54
+Jan 13 12:53:26 localhost vagrant: logline 55
+Jan 13 12:53:26 localhost vagrant: logline 56
+Jan 13 12:53:26 localhost vagrant: logline 57
+Jan 13 12:53:26 localhost vagrant: logline 58
+Jan 13 12:53:26 localhost vagrant: logline 59
+Jan 13 12:53:26 localhost vagrant: logline 60
+Jan 13 12:53:26 localhost vagrant: logline 61
+Jan 13 12:53:26 localhost vagrant: logline 62
+Jan 13 12:53:26 localhost vagrant: logline 63
+Jan 13 12:53:26 localhost vagrant: logline 64
+Jan 13 12:53:26 localhost vagrant: logline 65
+Jan 13 12:53:26 localhost liblogging-stdlog: KSI Signature Provider: Started new block for signing, signature file /tmp/log/syslog.logsig.parts/blocks.dat, block size 10 [v8.24.0.master]
+Jan 13 12:53:26 localhost vagrant: logline 66
+Jan 13 12:53:26 localhost vagrant: logline 67
+Jan 13 12:53:26 localhost liblogging-stdlog: KSI Signature Provider: Started new block for signing, signature file /tmp/log/syslog.logsig.parts/blocks.dat, block size 10 [v8.24.0.master]
+Jan 13 12:53:26 localhost vagrant: logline 68
+Jan 13 12:53:26 localhost vagrant: logline 69
+Jan 13 12:53:26 localhost vagrant: logline 70
+Jan 13 12:53:26 localhost vagrant: logline 71
+Jan 13 12:53:26 localhost vagrant: logline 72
+Jan 13 12:53:26 localhost vagrant: logline 73
+Jan 13 12:53:26 localhost vagrant: logline 74
+Jan 13 12:53:26 localhost vagrant: logline 75
+Jan 13 12:53:26 localhost liblogging-stdlog: KSI Signature Provider: Started new block for signing, signature file /tmp/log/syslog.logsig.parts/blocks.dat, block size 10 [v8.24.0.master]
+Jan 13 12:53:26 localhost vagrant: logline 76
+Jan 13 12:53:26 localhost vagrant: logline 77
+Jan 13 12:53:26 localhost vagrant: logline 78
+Jan 13 12:53:26 localhost vagrant: logline 79
+Jan 13 12:53:26 localhost vagrant: logline 80
+Jan 13 12:53:26 localhost vagrant: logline 81
+Jan 13 12:53:26 localhost vagrant: logline 82
+Jan 13 12:53:26 localhost vagrant: logline 83
+Jan 13 12:53:26 localhost liblogging-stdlog: KSI Signature Provider: Started new block for signing, signature file /tmp/log/syslog.logsig.parts/blocks.dat, block size 10 [v8.24.0.master]
+Jan 13 12:53:26 localhost vagrant: logline 84
+Jan 13 12:53:26 localhost vagrant: logline 85
+Jan 13 12:53:26 localhost vagrant: logline 86
+Jan 13 12:53:26 localhost vagrant: logline 87
+Jan 13 12:53:26 localhost vagrant: logline 88
+Jan 13 12:53:26 localhost vagrant: logline 89
+Jan 13 12:53:26 localhost vagrant: logline 90
+Jan 13 12:53:26 localhost vagrant: logline 91
+Jan 13 12:53:26 localhost vagrant: logline 92
+Jan 13 12:53:26 localhost liblogging-stdlog: KSI Signature Provider: Started new block for signing, signature file /tmp/log/syslog.logsig.parts/blocks.dat, block size 10 [v8.24.0.master]
+Jan 13 12:53:26 localhost vagrant: logline 93
+Jan 13 12:53:26 localhost vagrant: logline 94
+Jan 13 12:53:26 localhost vagrant: logline 95
+Jan 13 12:53:26 localhost vagrant: logline 96
+Jan 13 12:53:26 localhost vagrant: logline 97
+Jan 13 12:53:26 localhost vagrant: logline 98
+Jan 13 12:53:26 localhost vagrant: logline 99
+Jan 13 12:53:26 localhost liblogging-stdlog: KSI Signature Provider: Started new block for signing, signature file /tmp/log/syslog.logsig.parts/blocks.dat, block size 10 [v8.24.0.master]
+Jan 13 12:53:26 localhost vagrant: logline 100
+Jan 13 12:53:26 localhost liblogging-stdlog: KSI Signature Provider: LMSIG: slept 1 sec, queue size 13 [v8.24.0.master]
+Jan 13 12:53:28 localhost liblogging-stdlog: KSI Signature Provider: KSI signature appended (async) to sig file, block size 10 [v8.24.0.master]
