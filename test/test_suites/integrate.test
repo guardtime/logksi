@@ -25,7 +25,7 @@ EXECUTABLE integrate test/out/integrate/syslog -d
 >>>= 0
 
 # logksi simple integrate and specify output.
-EXECUTABLE integrate test/out/integrate/syslog -o test/out/integrate/somelog.logsig -d
+EXECUTABLE integrate test/out/integrate/syslog -o test/out/sign/syslog.logsig -d
 >>>2 /Finalizing log signature... ok./
 >>>= 0
 
@@ -37,6 +37,6 @@ EXECUTABLE integrate test/out/integrate/syslog -d
 >>>= 9
 
 # logksi integrate and overwrite existing specified signature.
-EXECUTABLE integrate test/out/integrate/syslog -o test/out/integrate/somelog.logsig -d
+EXECUTABLE integrate test/out/integrate/syslog -o test/out/sign/syslog.logsig -d
 >>>2 /Error: overwriting of existing log signature file/
 >>>= 9
