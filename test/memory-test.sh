@@ -48,10 +48,10 @@ generate_test sign.test
 
 # If ksi tool in project directory is available use that one, if not
 # use the one installed in the machine.
-if [ ! -f src/ksi ]; then
-	tool=ksi
+if [ ! -f src/logksi ]; then
+	tool=logksi
 else
-	tool=src/ksi
+	tool=src/logksi
 fi
 
 shelltest \
