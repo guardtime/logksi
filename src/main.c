@@ -308,7 +308,7 @@ static int ksitool_compo_get(TASK_SET *tasks, PARAM_SET **set, TOOL_COMPONENT_LI
 	TASK_SET_add(tasks, TASK_ID_VERIFY, "Verify", "verify", NULL, NULL, NULL);
 	TASK_SET_add(tasks, TASK_ID_EXTEND, "Extend", "extend", NULL, NULL, NULL);
 	TASK_SET_add(tasks, TASK_ID_INTEGRATE, "Integrate", "integrate", NULL, NULL, NULL);
-	TASK_SET_add(tasks, 0xffff, "conf", "conf", NULL, NULL, NULL);
+	TASK_SET_add(tasks, TASK_ID_CONF, "conf", "conf", NULL, NULL, NULL);
 
 	/**
 	 * Define tool component as runnable.
@@ -317,7 +317,7 @@ static int ksitool_compo_get(TASK_SET *tasks, PARAM_SET **set, TOOL_COMPONENT_LI
 	TOOL_COMPONENT_LIST_add(tmp_compo, "verify", verify_run, verify_help_toString, verify_get_desc, TASK_ID_VERIFY);
 	TOOL_COMPONENT_LIST_add(tmp_compo, "extend", extend_run, extend_help_toString, extend_get_desc, TASK_ID_EXTEND);
 	TOOL_COMPONENT_LIST_add(tmp_compo, "integrate", integrate_run, integrate_help_toString, integrate_get_desc, TASK_ID_INTEGRATE);
-	TOOL_COMPONENT_LIST_add(tmp_compo, "conf", conf_run, conf_help_toString, conf_get_desc, 0xffff);
+	TOOL_COMPONENT_LIST_add(tmp_compo, "conf", conf_run, conf_help_toString, conf_get_desc, TASK_ID_CONF);
 
 	*set = tmp_set;
 	*compo = tmp_compo;
@@ -340,7 +340,7 @@ static int min_arg_cnt(TASK_ID id) {
 			return 0;
 		case TASK_ID_VERIFY:
 		case TASK_ID_INTEGRATE:
-		case 0xffff:
+		case TASK_ID_CONF:
 			return 1;
 		default:
 			return 0xff;
