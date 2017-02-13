@@ -40,14 +40,6 @@ else
 	tool=src/logksi
 fi
 
-if gttlvdump -h > /dev/null && gttlvgrep -h > /dev/null; then
-	TEST_DEPENDING_ON_TLVUTIL="test/test_suites/sign-metadata.test test/test_suites/sign-masking.test"
-	echo Info: Extra tests depending on gttlvutil added.
-else
-	TEST_DEPENDING_ON_TLVUTIL=""
-	echo Warning: gttlvutil is not installed. Tests depending on gttlvutil are ignored.
-fi
-
 shelltest \
 test/test_suites/integrate.test \
 test/test_suites/sign.test \
