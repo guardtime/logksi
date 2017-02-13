@@ -682,7 +682,7 @@ int process_metarecord(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO 
 	int d = 0;
 	KSI_DataHash *hash = NULL;
 	KSI_TlvElement *tlv = NULL;
-	size_t metarecord_index = 0;
+	KSI_uint64_t metarecord_index = 0;
 
 	if (set == NULL || err == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -754,7 +754,7 @@ int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNAT
 	KSI_DataHash *hash = NULL;
 	KSI_TlvElement *tlv = NULL;
 	KSI_TlvElement *tlvSig = NULL;
-	size_t record_count = 0;
+	KSI_uint64_t record_count = 0;
 
 	KSI_VerificationContext_init(&context, ksi);
 
@@ -879,7 +879,7 @@ static int process_partial_block(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, B
 	KSI_DataHash *rootHash = NULL;
 	KSI_TlvElement *tlv = NULL;
 	KSI_TlvElement *tlvNoSig = NULL;
-	size_t record_count = 0;
+	KSI_uint64_t record_count = 0;
 
 	if (set == NULL || err == NULL || ksi == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -941,7 +941,7 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 	KSI_TlvElement *tlv = NULL;
 	KSI_TlvElement *tlvSig = NULL;
 	KSI_TlvElement *tlvNoSig = NULL;
-	size_t record_count = 0;
+	KSI_uint64_t record_count = 0;
 
 	if (set == NULL || err == NULL || ksi == NULL || processors == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
