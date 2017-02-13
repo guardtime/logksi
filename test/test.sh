@@ -43,7 +43,7 @@ fi
 shelltest \
 test/test_suites/integrate.test \
 test/test_suites/sign.test \
---with=$tool -- -j1
+--with=$tool -- -j1 -a
 
 exit_code=$?
 

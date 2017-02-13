@@ -58,7 +58,7 @@ fi
 shelltest \
 $mem_test_dir/integrate.test \
 $mem_test_dir/sign.test \
---with="valgrind --leak-check=full $tool" -- -j1
+--with="valgrind --leak-check=full $tool" -- -j1 -a
 exit_code=$?
 
 exit $exit_code
