@@ -30,6 +30,7 @@ mkdir -p $mem_test_dir
 # Create some test files to output directory.
 cp -r test/resource/signature/syslog.logsig.parts $mem_test_dir/syslog.logsig.parts
 cp test/resource/file/syslog $mem_test_dir/syslog
+cp test/resource/file/syslog $mem_test_dir/extended
 
 # Configure temporary KSI_CONF.
 export KSI_CONF=test/resource/conf/default-not-working-conf.cfg

@@ -18,19 +18,16 @@
 # Guardtime, Inc., and no license to trademarks is granted; Guardtime
 # reserves and retains all trademark rights.
 
-# Remove test output directories.  
-rm -rf test/out/integrate 2> /dev/null
-rm -rf test/out/sign 2> /dev/null
-rm -rf test/out/extend 2> /dev/null
+# Remove test output directory.  
+rm -rf test/out 2> /dev/null
 
-# Create test output directories.
-mkdir -p test/out/integrate
-mkdir -p test/out/sign
-mkdir -p test/out/extend
+# Create test output directory.
+mkdir -p test/out
 
-# Create some test files to output directory.
-cp -r test/resource/signature/syslog.logsig.parts test/out/integrate/syslog.logsig.parts
-cp test/resource/file/syslog test/out/integrate/syslog
+# Copy some test files to output directory.
+cp -r test/resource/signature/syslog.logsig.parts test/out/syslog.logsig.parts
+cp test/resource/file/syslog test/out/syslog
+cp test/resource/file/syslog test/out/extended
 
 # Define KSI_CONF for temporary testing.
 export KSI_CONF=test/resource/conf/default-not-working-conf.cfg

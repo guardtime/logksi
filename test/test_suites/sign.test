@@ -20,11 +20,11 @@
 # Successful signing.
 
 # logksi simple sign.
-EXECUTABLE sign --conf test/test.cfg test/out/integrate/syslog -d
+EXECUTABLE sign --conf test/test.cfg test/out/syslog -d
 >>>2 /Finalizing log signature... ok./
 >>>= 0
 
 # logksi simple sign and specify output.
-EXECUTABLE sign --conf test/test.cfg test/out/sign/syslog -o test/out/sign/recovered.logsig -d
+EXECUTABLE sign --conf test/test.cfg test/out/integrated -o test/out/recovered.logsig -d
 >>>2 /Finalizing log signature... ok./
 >>>= 0

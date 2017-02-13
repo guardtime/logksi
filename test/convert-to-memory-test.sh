@@ -60,7 +60,8 @@ echo Generating memory test from $test_file_in
 cp  $test_file_in $memory_test_out 
 delete_from_to_1 '>>>2' '>>>=' $memory_test_out
 insert_memory_control "\/((LEAK SUMMARY.*)\n(.*definitely lost.*)(.* 0 .*)(.* 0 .*)\n(.*indirectly lost.*)(.* 0 .*)(.* 0 .*)\n(.*possibly lost.*)(.* 0 .*)(.* 0 .*))|(.*All heap blocks were freed.*no leaks are possible.*)\/" $memory_test_out
-sed -i 's/test\/out\/[^\/]*/test\/out\/memory/g' $memory_test_out 
+#sed -i 's/test\/out\/[^\/]*/test\/out\/memory/g' $memory_test_out 
+sed -i 's/test\/out/test\/out\/memory/g' $memory_test_out 
 
 
 

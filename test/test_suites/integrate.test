@@ -20,23 +20,23 @@
 # Successful integrating.
 
 # logksi simple integrate.
-EXECUTABLE integrate test/out/integrate/syslog -d
+EXECUTABLE integrate -d test/out/syslog
 >>>2 /Finalizing log signature... ok./
 >>>= 0
 
 # logksi simple integrate and specify output.
-EXECUTABLE integrate test/out/integrate/syslog -o test/out/sign/syslog.logsig -d
+EXECUTABLE integrate test/out/syslog -o test/out/integrated.logsig -d
 >>>2 /Finalizing log signature... ok./
 >>>= 0
 
 # Unsuccessful integrating
 
 # logksi integrate and overwrite existing signature.
-EXECUTABLE integrate test/out/integrate/syslog -d
+EXECUTABLE integrate test/out/syslog -d
 >>>2 /Error: overwriting of existing log signature file/
 >>>= 9
 
 # logksi integrate and overwrite existing specified signature.
-EXECUTABLE integrate test/out/integrate/syslog -o test/out/sign/syslog.logsig -d
+EXECUTABLE integrate test/out/syslog -o test/out/integrated.logsig -d
 >>>2 /Error: overwriting of existing log signature file/
 >>>= 9
