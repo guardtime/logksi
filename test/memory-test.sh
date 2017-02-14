@@ -26,6 +26,7 @@ rm -rf $mem_test_dir 2> /dev/null
 
 # Create a temporary output directory for memory tests.
 mkdir -p $mem_test_dir
+mkdir -p $mem_test_dir/logs
 
 # Create some test files to output directory.
 cp -r test/resource/signature/syslog.logsig.parts $mem_test_dir/syslog.logsig.parts

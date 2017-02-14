@@ -23,6 +23,7 @@ rm -rf test/out 2> /dev/null
 
 # Create test output directory.
 mkdir -p test/out
+mkdir -p test/out/logs
 
 # Copy some test files to output directory.
 cp -r test/resource/signature/syslog.logsig.parts test/out/syslog.logsig.parts
