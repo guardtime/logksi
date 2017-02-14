@@ -40,10 +40,10 @@ else
 	tool=src/logksi
 fi
 
-shelltest \
+shelltest -a \
 test/test_suites/integrate.test \
 test/test_suites/sign.test \
---with=$tool -- -j1 -a
+--with=$tool -- -j1
 
 exit_code=$?
 
