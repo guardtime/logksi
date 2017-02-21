@@ -1472,3 +1472,17 @@ int get_file_read_lock(PARAM_SET *set, FILE *in) {
 		return KT_OK;
 }
 #endif
+
+void logksi_filename_free(char **ptr) {
+	if (ptr != NULL && *ptr != NULL) {
+		KSI_free(*ptr);
+		*ptr = NULL;
+	}
+}
+
+void logksi_file_close(FILE **ptr) {
+	if (ptr != NULL && *ptr != NULL) {
+		fclose(*ptr);
+		*ptr = NULL;
+	}
+}

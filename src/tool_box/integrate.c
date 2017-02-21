@@ -287,43 +287,34 @@ static int open_input_and_output_files(PARAM_SET *set, ERR_TRCKR *err, IO_FILES 
 
 cleanup:
 
-	if (tmp.partsBlockName) {
-		KSI_free(tmp.partsBlockName);
-	}
-	if (tmp.partsSigName) {
-		KSI_free(tmp.partsSigName);
-	}
-	if (tmp.integratedSigName) {
-		KSI_free(tmp.integratedSigName);
-	}
+	logksi_filename_free(&tmp.partsBlockName);
+	logksi_filename_free(&tmp.partsSigName);
+	logksi_filename_free(&tmp.integratedSigName);
 
-	if (tmp.inBlockFile) fclose(tmp.inBlockFile);
-	if (tmp.inSigFile) fclose(tmp.inSigFile);
-	if (tmp.outSigFile) fclose(tmp.outSigFile);
+	logksi_file_close(&tmp.inBlockFile);
+	logksi_file_close(&tmp.inSigFile);
+	logksi_file_close(&tmp.outSigFile);
 
 	return res;
 }
 
-static void close_input_and_output_files(int result, IO_FILES *files) {
+void close_input_and_output_files(int result, IO_FILES *files) {
 	if (files == NULL) return;
-	if (files->partsBlockName) {
-		KSI_free(files->partsBlockName);
-	}
-	if (files->partsSigName) {
-		KSI_free(files->partsSigName);
-	}
+
 	if (files->integratedSigName) {
 		if (result != KT_OK) {
 			if (files->outSigFile) {
-				fclose(files->outSigFile);
-				files->outSigFile = NULL;
+				logksi_file_close(&files->outSigFile);
 				remove(files->integratedSigName);
 			}
 		}
-		KSI_free(files->integratedSigName);
 	}
 
-	if (files->inBlockFile) fclose(files->inBlockFile);
-	if (files->inSigFile) fclose(files->inSigFile);
-	if (files->outSigFile) fclose(files->outSigFile);
+	logksi_filename_free(&files->partsBlockName);
+	logksi_filename_free(&files->partsSigName);
+	logksi_filename_free(&files->integratedSigName);
+
+	logksi_file_close(&files->inBlockFile);
+	logksi_file_close(&files->inSigFile);
+	logksi_file_close(&files->outSigFile);
 }

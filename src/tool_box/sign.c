@@ -340,24 +340,18 @@ cleanup:
 	if (tmp.outSigFile == stdout) tmp.outSigFile = NULL;
 
 	if (tmp.backupSigName) {
-		if (tmp.inSigFile) fclose(tmp.inSigFile);
-		tmp.inSigFile = NULL;
+		logksi_file_close(&tmp.inSigFile);
 		rename(tmp.backupSigName, tmp.inSigName);
-		KSI_free(tmp.backupSigName);
 	}
-	if (tmp.tempSigName) {
-		if (tmp.outSigFile) fclose(tmp.outSigFile);
-		tmp.outSigFile = NULL;
-		KSI_free(tmp.tempSigName);
-	}
+
 	KSI_free(buf);
 
-	if (tmp.derivedSigName) {
-		KSI_free(tmp.derivedSigName);
-	}
+	logksi_filename_free(&tmp.backupSigName);
+	logksi_filename_free(&tmp.tempSigName);
+	logksi_filename_free(&tmp.derivedSigName);
 
-	if (tmp.inSigFile) fclose(tmp.inSigFile);
-	if (tmp.outSigFile) fclose(tmp.outSigFile);
+	logksi_file_close(&tmp.inSigFile);
+	logksi_file_close(&tmp.outSigFile);
 
 	return res;
 }
@@ -379,28 +373,23 @@ static void close_input_and_output_files(int result, IO_FILES *files) {
 				fwrite(buf, 1, count, stdout);
 			}
 		}
-		fclose(files->outSigFile);
-		files->outSigFile = NULL;
+		logksi_file_close(&files->outSigFile);
 		remove(files->tempSigName);
-		KSI_free(files->tempSigName);
 	}
 
 	if (files->backupSigName) {
 		if (result != KT_OK) {
-			fclose(files->outSigFile);
-			files->outSigFile = NULL;
+			logksi_file_close(&files->outSigFile);
 			remove(files->derivedSigName);
-			fclose(files->inSigFile);
-			files->inSigFile = NULL;
+			logksi_file_close(&files->inSigFile);
 			rename(files->backupSigName, files->derivedSigName);
 		}
-		KSI_free(files->backupSigName);
 	}
 
-	if (files->derivedSigName) {
-		KSI_free(files->derivedSigName);
-	}
+	logksi_filename_free(&files->tempSigName);
+	logksi_filename_free(&files->backupSigName);
+	logksi_filename_free(&files->derivedSigName);
 
-	if (files->inSigFile) fclose(files->inSigFile);
-	if (files->outSigFile) fclose(files->outSigFile);
+	logksi_file_close(&files->inSigFile);
+	logksi_file_close(&files->outSigFile);
 }

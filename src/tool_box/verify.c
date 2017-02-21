@@ -589,23 +589,17 @@ static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files) {
 
 cleanup:
 
-	if (tmp.derivedSigName) {
-		if (tmp.inSigFile) fclose(tmp.inSigFile);
-		tmp.inSigFile = NULL;
-		KSI_free(tmp.derivedSigName);
-	}
+	logksi_filename_free(&tmp.derivedSigName);
 
-	if (tmp.inSigFile) fclose(tmp.inSigFile);
-	if (tmp.inLogFile) fclose(tmp.inLogFile);
+	logksi_file_close(&tmp.inSigFile);
+	logksi_file_close(&tmp.inLogFile);
 
 	return res;
 }
 
 static void close_log_and_signature_files(IO_FILES *files) {
-	if (files->derivedSigName) {
-		KSI_free(files->derivedSigName);
-	}
+	logksi_filename_free(&files->derivedSigName);
 
-	if (files->inSigFile) fclose(files->inSigFile);
-	if (files->inLogFile) fclose(files->inLogFile);
+	logksi_file_close(&files->inSigFile);
+	logksi_file_close(&files->inLogFile);
 }

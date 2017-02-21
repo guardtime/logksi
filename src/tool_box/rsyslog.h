@@ -78,3 +78,5 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, VERIFYING_
 int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files);
 int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files);
 int get_file_read_lock(PARAM_SET *set, FILE *in);
+void logksi_filename_free(char **ptr);
+void logksi_file_close(FILE **ptr);
