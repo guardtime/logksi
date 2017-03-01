@@ -912,14 +912,17 @@ static int process_partial_block(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, B
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: expected %d record hashes, but found %d.", blocks->blockNo, record_count, blocks->nofRecordHashes);
 	}
 
-	res = calculate_root_hash(ksi, blocks, &rootHash);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to calculate root hash.", blocks->blockNo);
-	if (!KSI_DataHash_equals(hash, rootHash)) {
-		res = KT_VERIFICATION_FAILURE;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: root hashes not equal.", blocks->blockNo);
+	/* If the blocks file contains hashes, re-compute and compare the root hash against the provided root hash. */
+	if (blocks->nofRecordHashes) {
+		res = calculate_root_hash(ksi, blocks, &rootHash);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to calculate root hash.", blocks->blockNo);
+		if (!KSI_DataHash_equals(hash, rootHash)) {
+			res = KT_VERIFICATION_FAILURE;
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: root hashes not equal.", blocks->blockNo);
+		}
+		blocks->rootHash = hash;
+		hash = NULL;
 	}
-	blocks->rootHash = hash;
-	hash = NULL;
 
 	res = KT_OK;
 
@@ -980,14 +983,17 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 		res = KSI_Signature_getDocumentHash(sig, &docHash);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to get root hash from KSI signature.", blocks->blockNo);
 
-		if (blocks->rootHash == NULL) {
-			res = calculate_root_hash(ksi, blocks, &blocks->rootHash);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to calculate root hash.", blocks->blockNo);
-		}
+		/* If the blocks file contains hashes, re-compute and compare the root hash against the provided root hash. */
+		if (blocks->nofRecordHashes) {
+			if (blocks->rootHash == NULL) {
+				res = calculate_root_hash(ksi, blocks, &blocks->rootHash);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to calculate root hash.", blocks->blockNo);
+			}
 
-		if (!KSI_DataHash_equals(docHash, blocks->rootHash)) {
-			res = KT_VERIFICATION_FAILURE;
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: root hashes not equal.", blocks->blockNo);
+			if (!KSI_DataHash_equals(docHash, blocks->rootHash)) {
+				res = KT_VERIFICATION_FAILURE;
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: root hashes not equal.", blocks->blockNo);
+			}
 		}
 	} else if (tlvNoSig != NULL) {
 		res = tlv_element_get_hash(tlvNoSig, ksi, 0x01, &hash);
