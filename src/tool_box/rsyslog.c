@@ -159,12 +159,56 @@ static int get_aggregation_level(BLOCK_INFO *blocks) {
 	return level;
 }
 
-int add_record_hash_to_merkle_tree(KSI_CTX *ksi, BLOCK_INFO *blocks, int isMetaRecordHash, KSI_DataHash *hash) {
+int add_leaf_hash_to_merkle_tree(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *hash) {
 	int res;
 	unsigned char i = 0;
-	KSI_DataHash *lastHash = NULL;
 	KSI_DataHash *right = NULL;
 	KSI_DataHash *tmp = NULL;
+
+	if (ksi == NULL || blocks == NULL || hash == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	right = KSI_DataHash_ref(hash);
+
+	blocks->balanced = 0;
+	while (blocks->MerkleTree[i] != NULL) {
+		res = calculate_new_intermediate_hash(ksi, blocks, blocks->MerkleTree[i], right, i + 2, &tmp);
+		if (res != KT_OK) goto cleanup;
+		KSI_DataHash_free(blocks->notVerified[i]);
+		blocks->notVerified[i] = KSI_DataHash_ref(right);
+		KSI_DataHash_free(right);
+		right = tmp;
+		KSI_DataHash_free(blocks->MerkleTree[i]);
+		blocks->MerkleTree[i] = NULL;
+		i++;
+	}
+	blocks->MerkleTree[i] = right;
+	KSI_DataHash_free(blocks->notVerified[i]);
+	blocks->notVerified[i] = KSI_DataHash_ref(blocks->MerkleTree[i]);
+
+	if (i == blocks->treeHeight) {
+		blocks->treeHeight++;
+		blocks->balanced = 1;
+	}
+
+	KSI_DataHash_free(blocks->prevLeaf);
+	blocks->prevLeaf = KSI_DataHash_ref(hash);
+	right = NULL;
+	tmp = NULL;
+	res = KT_OK;
+
+cleanup:
+
+	KSI_DataHash_free(right);
+	KSI_DataHash_free(tmp);
+	return res;
+}
+
+int add_record_hash_to_merkle_tree(KSI_CTX *ksi, BLOCK_INFO *blocks, int isMetaRecordHash, KSI_DataHash *hash) {
+	int res;
+	KSI_DataHash *lastHash = NULL;
 
 	if (ksi == NULL || blocks == NULL || hash == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -174,93 +218,12 @@ int add_record_hash_to_merkle_tree(KSI_CTX *ksi, BLOCK_INFO *blocks, int isMetaR
 	res = calculate_new_leaf_hash(ksi, blocks, hash, isMetaRecordHash, &lastHash);
 	if (res != KT_OK) goto cleanup;
 
-	right = KSI_DataHash_ref(lastHash);
-
-	blocks->balanced = 0;
-	while (blocks->MerkleTree[i] != NULL) {
-		res = calculate_new_intermediate_hash(ksi, blocks, blocks->MerkleTree[i], right, i + 2, &tmp);
-		if (res != KT_OK) goto cleanup;
-		KSI_DataHash_free(blocks->notVerified[i]);
-		blocks->notVerified[i] = KSI_DataHash_ref(right);
-		KSI_DataHash_free(right);
-		right = tmp;
-		KSI_DataHash_free(blocks->MerkleTree[i]);
-		blocks->MerkleTree[i] = NULL;
-		i++;
-	}
-	blocks->MerkleTree[i] = right;
-	KSI_DataHash_free(blocks->notVerified[i]);
-	blocks->notVerified[i] = KSI_DataHash_ref(blocks->MerkleTree[i]);
-
-	if (i == blocks->treeHeight) {
-		blocks->treeHeight++;
-		blocks->balanced = 1;
-	}
-
-	KSI_DataHash_free(blocks->prevLeaf);
-	blocks->prevLeaf = lastHash;
-	lastHash = NULL;
-	right = NULL;
-	tmp = NULL;
-	res = KT_OK;
+	res = add_leaf_hash_to_merkle_tree(ksi, blocks, lastHash);
+	if (res != KT_OK) goto cleanup;
 
 cleanup:
 
 	KSI_DataHash_free(lastHash);
-	KSI_DataHash_free(right);
-	KSI_DataHash_free(tmp);
-	return res;
-}
-
-int add_leaf_hash_to_merkle_tree(KSI_CTX *ksi, BLOCK_INFO *blocks, int isMetaRecordHash, KSI_DataHash *hash) {
-	int res;
-	unsigned char i = 0;
-	KSI_DataHash *lastHash = NULL;
-	KSI_DataHash *right = NULL;
-	KSI_DataHash *tmp = NULL;
-
-	if (ksi == NULL || blocks == NULL || hash == NULL) {
-		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
-
-	lastHash = KSI_DataHash_ref(hash);
-
-	right = KSI_DataHash_ref(lastHash);
-
-	blocks->balanced = 0;
-	while (blocks->MerkleTree[i] != NULL) {
-		res = calculate_new_intermediate_hash(ksi, blocks, blocks->MerkleTree[i], right, i + 2, &tmp);
-		if (res != KT_OK) goto cleanup;
-		KSI_DataHash_free(blocks->notVerified[i]);
-		blocks->notVerified[i] = KSI_DataHash_ref(right);
-		KSI_DataHash_free(right);
-		right = tmp;
-		KSI_DataHash_free(blocks->MerkleTree[i]);
-		blocks->MerkleTree[i] = NULL;
-		i++;
-	}
-	blocks->MerkleTree[i] = right;
-	KSI_DataHash_free(blocks->notVerified[i]);
-	blocks->notVerified[i] = KSI_DataHash_ref(blocks->MerkleTree[i]);
-
-	if (i == blocks->treeHeight) {
-		blocks->treeHeight++;
-		blocks->balanced = 1;
-	}
-
-	KSI_DataHash_free(blocks->prevLeaf);
-	blocks->prevLeaf = lastHash;
-	lastHash = NULL;
-	right = NULL;
-	tmp = NULL;
-	res = KT_OK;
-
-cleanup:
-
-	KSI_DataHash_free(lastHash);
-	KSI_DataHash_free(right);
-	KSI_DataHash_free(tmp);
 	return res;
 }
 
@@ -701,10 +664,7 @@ static int process_intermediate_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 			hash = NULL;
 		} else {
 			blocks->nofRecordHashes++;
-			hash = KSI_DataHash_ref(tmpHash);
-			res = add_leaf_hash_to_merkle_tree(ksi, blocks, 0, hash);
-			KSI_DataHash_free(hash);
-			hash = NULL;
+			res = add_leaf_hash_to_merkle_tree(ksi, blocks, tmpHash);
 		}
 	}
 
