@@ -930,6 +930,7 @@ cleanup:
 
 	print_progressResult(res);
 	KSI_DataHash_free(rootHash);
+	KSI_DataHash_free(hash);
 	KSI_TlvElement_free(tlv);
 	KSI_TlvElement_free(tlvNoSig);
 	return res;
