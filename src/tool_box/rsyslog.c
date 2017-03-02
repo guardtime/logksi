@@ -159,7 +159,7 @@ static int get_aggregation_level(BLOCK_INFO *blocks) {
 	return level;
 }
 
-int add_hash_to_merkle_tree(KSI_CTX *ksi, BLOCK_INFO *blocks, int isMetaRecordHash, KSI_DataHash *hash) {
+int add_record_hash_to_merkle_tree(KSI_CTX *ksi, BLOCK_INFO *blocks, int isMetaRecordHash, KSI_DataHash *hash) {
 	int res;
 	unsigned char i = 0;
 	KSI_DataHash *lastHash = NULL;
@@ -173,6 +173,58 @@ int add_hash_to_merkle_tree(KSI_CTX *ksi, BLOCK_INFO *blocks, int isMetaRecordHa
 
 	res = calculate_new_leaf_hash(ksi, blocks, hash, isMetaRecordHash, &lastHash);
 	if (res != KT_OK) goto cleanup;
+
+	right = KSI_DataHash_ref(lastHash);
+
+	blocks->balanced = 0;
+	while (blocks->MerkleTree[i] != NULL) {
+		res = calculate_new_intermediate_hash(ksi, blocks, blocks->MerkleTree[i], right, i + 2, &tmp);
+		if (res != KT_OK) goto cleanup;
+		KSI_DataHash_free(blocks->notVerified[i]);
+		blocks->notVerified[i] = KSI_DataHash_ref(right);
+		KSI_DataHash_free(right);
+		right = tmp;
+		KSI_DataHash_free(blocks->MerkleTree[i]);
+		blocks->MerkleTree[i] = NULL;
+		i++;
+	}
+	blocks->MerkleTree[i] = right;
+	KSI_DataHash_free(blocks->notVerified[i]);
+	blocks->notVerified[i] = KSI_DataHash_ref(blocks->MerkleTree[i]);
+
+	if (i == blocks->treeHeight) {
+		blocks->treeHeight++;
+		blocks->balanced = 1;
+	}
+
+	KSI_DataHash_free(blocks->prevLeaf);
+	blocks->prevLeaf = lastHash;
+	lastHash = NULL;
+	right = NULL;
+	tmp = NULL;
+	res = KT_OK;
+
+cleanup:
+
+	KSI_DataHash_free(lastHash);
+	KSI_DataHash_free(right);
+	KSI_DataHash_free(tmp);
+	return res;
+}
+
+int add_leaf_hash_to_merkle_tree(KSI_CTX *ksi, BLOCK_INFO *blocks, int isMetaRecordHash, KSI_DataHash *hash) {
+	int res;
+	unsigned char i = 0;
+	KSI_DataHash *lastHash = NULL;
+	KSI_DataHash *right = NULL;
+	KSI_DataHash *tmp = NULL;
+
+	if (ksi == NULL || blocks == NULL || hash == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	lastHash = KSI_DataHash_ref(hash);
 
 	right = KSI_DataHash_ref(lastHash);
 
@@ -569,7 +621,7 @@ static int process_record_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLO
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: metarecord hashes not equal.", blocks->blockNo);
 		}
 
-		res = add_hash_to_merkle_tree(ksi, blocks, 1, blocks->metarecordHash);
+		res = add_record_hash_to_merkle_tree(ksi, blocks, 1, blocks->metarecordHash);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
 
 		KSI_DataHash_free(blocks->metarecordHash);
@@ -586,7 +638,7 @@ static int process_record_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLO
 			}
 		}
 
-		res = add_hash_to_merkle_tree(ksi, blocks, 0, recordHash);
+		res = add_record_hash_to_merkle_tree(ksi, blocks, 0, recordHash);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to add hash to Merkle tree.", blocks->blockNo);
 	}
 
@@ -644,7 +696,13 @@ static int process_intermediate_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 		if (files->inLogFile) {
 			blocks->nofRecordHashes++;
 			res = get_hash_of_logline(ksi, blocks, files, &hash);
-			res = add_hash_to_merkle_tree(ksi, blocks, 0, hash);
+			res = add_record_hash_to_merkle_tree(ksi, blocks, 0, hash);
+			KSI_DataHash_free(hash);
+			hash = NULL;
+		} else {
+			blocks->nofRecordHashes++;
+			hash = KSI_DataHash_ref(tmpHash);
+			res = add_leaf_hash_to_merkle_tree(ksi, blocks, 0, hash);
 			KSI_DataHash_free(hash);
 			hash = NULL;
 		}
@@ -705,7 +763,7 @@ int process_metarecord(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO 
 		if (blocks->metarecordHash != NULL) {
 			/* Add the previous metarecord to Merkle tree. */
 			blocks->nofRecordHashes++;
-			res = add_hash_to_merkle_tree(ksi, blocks, 1, blocks->metarecordHash);
+			res = add_record_hash_to_merkle_tree(ksi, blocks, 1, blocks->metarecordHash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
 		}
 
@@ -713,7 +771,7 @@ int process_metarecord(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO 
 			blocks->nofRecordHashes++;
 			res = get_hash_of_logline(ksi, blocks, files, &hash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to calculate hash of logline no. %3d.", blocks->blockNo, blocks->nofRecordHashes);
-			res = add_hash_to_merkle_tree(ksi, blocks, 0, hash);
+			res = add_record_hash_to_merkle_tree(ksi, blocks, 0, hash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to add hash to Merkle tree.", blocks->blockNo);
 			KSI_DataHash_free(hash);
 			hash = NULL;
@@ -793,7 +851,7 @@ int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNAT
 		if (blocks->metarecordHash != NULL) {
 			/* Add the previous metarecord to Merkle tree. */
 			blocks->nofRecordHashes++;
-			res = add_hash_to_merkle_tree(ksi, blocks, 1, blocks->metarecordHash);
+			res = add_record_hash_to_merkle_tree(ksi, blocks, 1, blocks->metarecordHash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
 		}
 		/* If the block contains neither record hashes nor intermediate hashes:
@@ -803,7 +861,7 @@ int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNAT
 			blocks->nofRecordHashes++;
 			res = get_hash_of_logline(ksi, blocks, files, &hash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to calculate hash of logline no. %3d.", blocks->blockNo, blocks->nofRecordHashes);
-			res = add_hash_to_merkle_tree(ksi, blocks, 0, hash);
+			res = add_record_hash_to_merkle_tree(ksi, blocks, 0, hash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to add hash to Merkle tree.", blocks->blockNo);
 			KSI_DataHash_free(hash);
 			hash = NULL;
