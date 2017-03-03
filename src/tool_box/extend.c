@@ -479,6 +479,11 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 		res = get_derived_name(files->inLogName, ".logsig", &tmp.derivedSigName);
 		ERR_CATCH_MSG(err, res, "Error: out of memory.");
 
+		if (!SMART_FILE_doFileExist(tmp.derivedSigName)) {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: no matching log signature file found for log file %s.", files->inLogName);
+		}
+
 		/* Default output file is the same as input, but a backup of the input file is retained. */
 		if (files->outSigName == NULL || !strcmp(tmp.derivedSigName, files->outSigName)) {
 			res = get_backup_name(tmp.derivedSigName, &buf);
