@@ -1035,6 +1035,9 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 				res = KT_VERIFICATION_FAILURE;
 				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: root hashes not equal.", blocks->blockNo);
 			}
+		} else {
+			KSI_DataHash_free(blocks->prevLeaf);
+			blocks->prevLeaf = NULL;
 		}
 	} else if (tlvNoSig != NULL) {
 		res = tlv_element_get_hash(tlvNoSig, ksi, 0x01, &hash);
