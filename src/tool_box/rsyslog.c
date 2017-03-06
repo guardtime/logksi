@@ -153,9 +153,23 @@ static int get_aggregation_level(BLOCK_INFO *blocks) {
 	int level = 0;
 	if (blocks != NULL) {
 		if (blocks->version == LOGSIG11) {
+			/* Accommodate the fixed level bug in LOGSIG11 format. */
 			level = 0;
 		} else {
-			level = blocks->treeHeight + 1;
+			/* Record hashes are concatenated with level = 1 */
+			level = 1;
+			/* Add the height of the Merkle tree to get the aggregation level. */
+			if (blocks->treeHeight != 0) {
+				level += blocks->treeHeight;
+			} else {
+				/* If the Merkle tree was not built, calculate the tree height from the record count. */
+				/* height = floor(log2(record_count)) + 1 */
+				size_t c = blocks->recordCount;
+				while (c) {
+					level++;
+					c = c / 2;
+				}
+			}
 		}
 	}
 	return level;
@@ -494,6 +508,7 @@ static int process_block_header(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BL
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: block signature data missing.", blocks->blockNo);
 	}
 	blocks->blockNo++;
+	blocks->recordCount = 0;
 	blocks->nofRecordHashes = 0;
 	blocks->nofIntermediateHashes = 0;
 
@@ -790,7 +805,6 @@ int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNAT
 	KSI_DataHash *hash = NULL;
 	KSI_TlvElement *tlv = NULL;
 	KSI_TlvElement *tlvSig = NULL;
-	KSI_uint64_t record_count = 0;
 
 	KSI_VerificationContext_init(&context, ksi);
 
@@ -811,7 +825,7 @@ int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNAT
 	res = KSI_TlvElement_parse(blocks->ftlv_raw, blocks->ftlv_len, &tlv);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse block signature as TLV element.", blocks->blockNo);
 
-	res = tlv_element_get_uint(tlv, ksi, 0x01, &record_count);
+	res = tlv_element_get_uint(tlv, ksi, 0x01, &blocks->recordCount);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: missing record count in block signature.", blocks->blockNo);
 
 	res = KSI_TlvElement_getElement(tlv, 0x905, &tlvSig);
@@ -835,7 +849,7 @@ int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNAT
 		/* If the block contains neither record hashes nor intermediate hashes:
 		 * Calculate missing record hashes from the records in the logfile and
 		 * build the Merkle tree according to the record count in the signature data. */
-		while (blocks->nofRecordHashes < record_count) {
+		while (blocks->nofRecordHashes < blocks->recordCount) {
 			blocks->nofRecordHashes++;
 			res = get_hash_of_logline(ksi, blocks, files, &hash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to calculate hash of logline no. %3d.", blocks->blockNo, blocks->nofRecordHashes);
@@ -846,9 +860,9 @@ int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNAT
 		}
 	}
 
-	if (blocks->nofRecordHashes && blocks->nofRecordHashes != record_count) {
+	if (blocks->nofRecordHashes && blocks->nofRecordHashes != blocks->recordCount) {
 		res = KT_INVALID_INPUT_FORMAT;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: expected %d record hashes, but found %d.", blocks->blockNo, record_count, blocks->nofRecordHashes);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: expected %d record hashes, but found %d.", blocks->blockNo, blocks->recordCount, blocks->nofRecordHashes);
 	}
 	print_progressResult(res);
 	print_progressDesc(d, "Block no. %3d: verifying KSI signature... ", blocks->blockNo);
@@ -915,7 +929,6 @@ static int process_partial_block(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, B
 	KSI_DataHash *rootHash = NULL;
 	KSI_TlvElement *tlv = NULL;
 	KSI_TlvElement *tlvNoSig = NULL;
-	KSI_uint64_t record_count = 0;
 
 	if (set == NULL || err == NULL || ksi == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -934,7 +947,7 @@ static int process_partial_block(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, B
 	res = KSI_TlvElement_parse(blocks->ftlv_raw, blocks->ftlv_len, &tlv);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse block signature as TLV element.", blocks->blockNo);
 
-	res = tlv_element_get_uint(tlv, ksi, 0x01, &record_count);
+	res = tlv_element_get_uint(tlv, ksi, 0x01, &blocks->recordCount);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: missing record count in blocks file.", blocks->blockNo);
 
 	res = KSI_TlvElement_getElement(tlv, 0x02, &tlvNoSig);
@@ -943,9 +956,9 @@ static int process_partial_block(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, B
 	res = tlv_element_get_hash(tlvNoSig, ksi, 0x01, &hash);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: missing root hash in blocks file.", blocks->blockNo);
 
-	if (blocks->nofRecordHashes && blocks->nofRecordHashes != record_count) {
+	if (blocks->nofRecordHashes && blocks->nofRecordHashes != blocks->recordCount) {
 		res = KT_INVALID_INPUT_FORMAT;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: expected %d records in blocks file, but found %d records.", blocks->blockNo, record_count, blocks->nofRecordHashes);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: expected %d records in blocks file, but found %d records.", blocks->blockNo, blocks->recordCount, blocks->nofRecordHashes);
 	}
 
 	/* If the blocks file contains hashes, re-compute and compare the root hash against the provided root hash. */
@@ -983,7 +996,6 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 	KSI_TlvElement *tlv = NULL;
 	KSI_TlvElement *tlvSig = NULL;
 	KSI_TlvElement *tlvNoSig = NULL;
-	KSI_uint64_t record_count = 0;
 
 	if (set == NULL || err == NULL || ksi == NULL || processors == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -1001,12 +1013,12 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 	res = KSI_TlvElement_parse(blocks->ftlv_raw, blocks->ftlv_len, &tlv);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse block signature as TLV element.", blocks->blockNo);
 
-	res = tlv_element_get_uint(tlv, ksi, 0x01, &record_count);
+	res = tlv_element_get_uint(tlv, ksi, 0x01, &blocks->recordCount);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: missing record count in signatures file.", blocks->blockNo);
 
-	if (blocks->nofRecordHashes && blocks->nofRecordHashes != record_count) {
+	if (blocks->nofRecordHashes && blocks->nofRecordHashes != blocks->recordCount) {
 		res = KT_INVALID_INPUT_FORMAT;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: expected %d records in signatures file, but found %d records in blocks file.", blocks->blockNo, record_count, blocks->nofRecordHashes);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: expected %d records in signatures file, but found %d records in blocks file.", blocks->blockNo, blocks->recordCount, blocks->nofRecordHashes);
 	}
 
 	res = KSI_TlvElement_getElement(tlv, 0x905, &tlvSig);
@@ -1065,7 +1077,7 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to serialize KSI signature.", blocks->blockNo);
 			tlvSig->ftlv.tag = 0x904;
 
-			res = tlv_element_set_uint(tlvSig, ksi, 0x01, record_count);
+			res = tlv_element_set_uint(tlvSig, ksi, 0x01, blocks->recordCount);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to serialize KSI signature.", blocks->blockNo);
 
 			res = tlv_element_set_signature(tlvSig, ksi, 0x905, sig);

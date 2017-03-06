@@ -59,6 +59,7 @@ typedef struct {
 	size_t blockNo;
 	size_t partNo;
 	size_t sigNo;
+	size_t recordCount;
 	size_t nofRecordHashes;
 	size_t nofIntermediateHashes;
 	KSI_HashAlgorithm hashAlgo;
