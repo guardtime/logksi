@@ -867,7 +867,7 @@ int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNAT
 	print_progressResult(res);
 	print_progressDesc(d, "Block no. %3d: verifying KSI signature... ", blocks->blockNo);
 
-	res = calculate_root_hash(ksi, blocks, &context.documentHash);
+	res = calculate_root_hash(ksi, blocks, (KSI_DataHash**)&context.documentHash);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to get root hash for verification.", blocks->blockNo);
 	context.docAggrLevel = get_aggregation_level(blocks);
 
@@ -875,7 +875,7 @@ int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNAT
 		res = KSI_Signature_parseWithPolicy(ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_EMPTY, NULL, &sig);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse KSI signature.", blocks->blockNo);
 
-		res = processors->verify_signature(set, err, ksi, sig, context.documentHash, context.docAggrLevel , &verificationResult);
+		res = processors->verify_signature(set, err, ksi, sig, (KSI_DataHash*)context.documentHash, context.docAggrLevel , &verificationResult);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: KSI signature verification failed.", blocks->blockNo);
 		/* TODO: add dumping of verification results. */
 		KSI_PolicyVerificationResult_free(verificationResult);
@@ -902,7 +902,7 @@ int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNAT
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to write extended signature to extended log signature file.", blocks->blockNo);
 		}
 
-		KSI_DataHash_free(context.documentHash);
+		KSI_DataHash_free((KSI_DataHash*)context.documentHash);
 		context.documentHash = NULL;
 		KSI_VerificationContext_clean(&context);
 	}
@@ -913,7 +913,7 @@ cleanup:
 	print_progressResult(res);
 	KSI_Signature_free(sig);
 	KSI_Signature_free(ext);
-	KSI_DataHash_free(context.documentHash);
+	KSI_DataHash_free((KSI_DataHash*)context.documentHash);
 	KSI_DataHash_free(hash);
 	KSI_VerificationContext_clean(&context);
 	KSI_PolicyVerificationResult_free(verificationResult);

@@ -175,21 +175,45 @@ void OBJPRINT_signatureInputHash(KSI_Signature *sig, int (*print)(const char *fo
 
 void OBJPRINT_signerIdentity(KSI_Signature *sig, int (*print)(const char *format, ... )){
 	int res = KSI_UNKNOWN_ERROR;
-	char *signerIdentity = NULL;
+	KSI_HashChainLinkIdentityList *identityList = NULL;
 
 	if (sig == NULL) goto cleanup;
 
 	print("Signer identity: ");
-	res = KSI_Signature_getSignerIdentity(sig, &signerIdentity);
+	res = KSI_Signature_getAggregationHashChainIdentity(sig, &identityList);
 	if (res != KSI_OK){
-		print("Unable to get signer identity.\n");
+		print("Unable to get signer identity list.\n");
 		goto cleanup;
 	}
 
-	print("'%s'.\n", signerIdentity == NULL || strlen(signerIdentity) == 0 ? "Unknown" : signerIdentity);
+	if (identityList != NULL) {
+		size_t k;
+
+		for (k = 0; k < KSI_HashChainLinkIdentityList_length(identityList); k++) {
+			KSI_HashChainLinkIdentity *identity = NULL;
+			KSI_Utf8String *clientId = NULL;
+
+			res = KSI_HashChainLinkIdentityList_elementAt(identityList, k, &identity);
+			if (res != KSI_OK || identity == NULL) {
+				print("Unable to get signer identity.\n");
+				goto cleanup;
+			}
+
+			res = KSI_HashChainLinkIdentity_getClientId(identity, &clientId);
+			if (res != KSI_OK || clientId == NULL) {
+				print("Unable to get client id.\n");
+				goto cleanup;
+			}
+
+			print("%s%s", (k > 0 ? " :: " : ""), KSI_Utf8String_cstr(clientId));
+		}
+
+		print("\n");
+	}
+
 cleanup:
 
-	KSI_free(signerIdentity);
+	KSI_HashChainLinkIdentityList_free(identityList);
 	return;
 }
 

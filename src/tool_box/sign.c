@@ -47,10 +47,11 @@
 static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
 static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err);
 static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files);
-static void close_input_and_output_files(int result, IO_FILES *files);
+static int close_input_and_output_files(ERR_TRCKR *err, int result, IO_FILES *files);
 
 int sign_run(int argc, char** argv, char **envp) {
 	int res;
+	int closing_res;
 	char buf[2048];
 	PARAM_SET *set = NULL;
 	TASK_SET *task_set = NULL;
@@ -105,7 +106,9 @@ int sign_run(int argc, char** argv, char **envp) {
 
 cleanup:
 
-	close_input_and_output_files(res, &files);
+	/* If there is an error while closing files, report it only if everything else was OK. */
+	closing_res = close_input_and_output_files(err, res, &files);
+	if (res == KT_OK) res = closing_res;
 
 	print_progressResult(res);
 	KSITOOL_KSI_ERRTrace_save(ksi);
@@ -361,21 +364,31 @@ cleanup:
 	return res;
 }
 
-static void close_input_and_output_files(int result, IO_FILES *files) {
+static int close_input_and_output_files(ERR_TRCKR *err, int result, IO_FILES *files) {
 	char buf[1024];
 	size_t count = 0;
+	int res = KT_UNKNOWN_ERROR;
 
-	if (files == NULL) return;
+	if (files == NULL || err == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
 
 	if (files->inSigFile == stdin) files->inSigFile = NULL;
 	if (files->outSigFile == stdout) files->outSigFile = NULL;
 
 	if (files->tempSigName) {
 		if (result == KT_OK) {
-			freopen(NULL, "rb", files->outSigFile);
+			if(freopen(NULL, "rb", files->outSigFile) != files->outSigFile) {
+				res = KT_IO_ERROR;
+				ERR_CATCH_MSG(err, res, "Error: could not reopen signature file for reading.");
+			}
 			while (!feof(files->outSigFile)) {
 				count = fread(buf, 1, sizeof(buf), files->outSigFile);
-				fwrite(buf, 1, count, stdout);
+				if (fwrite(buf, 1, count, stdout) != count) {
+					res = KT_IO_ERROR;
+					ERR_CATCH_MSG(err, res, "Error: could not write signature file to stdout.");
+				}
 			}
 		}
 		logksi_file_close(&files->outSigFile);
@@ -397,4 +410,10 @@ static void close_input_and_output_files(int result, IO_FILES *files) {
 
 	logksi_file_close(&files->inSigFile);
 	logksi_file_close(&files->outSigFile);
+
+	res = KT_OK;
+
+cleanup:
+
+	return res;
 }
