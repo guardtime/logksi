@@ -46,12 +46,13 @@
 
 static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
 static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err);
+static int generate_filenames(ERR_TRCKR *err, IO_FILES *files);
 static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files);
-static int close_input_and_output_files(ERR_TRCKR *err, int result, IO_FILES *files);
+static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files);
+static void close_input_and_output_files(int res, IO_FILES *files);
 
 int sign_run(int argc, char** argv, char **envp) {
 	int res;
-	int closing_res;
 	char buf[2048];
 	PARAM_SET *set = NULL;
 	TASK_SET *task_set = NULL;
@@ -92,11 +93,14 @@ int sign_run(int argc, char** argv, char **envp) {
 	res = check_pipe_errors(set, err);
 	if (res != KT_OK) goto cleanup;
 
-	res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.inLogName);
+	res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.user.log);
 	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
 
-	res = PARAM_SET_getStr(set, "o", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.outSigName);
+	res = PARAM_SET_getStr(set, "o", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.user.sig);
 	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
+
+	res = generate_filenames(err, &files);
+	if (res != KT_OK) goto cleanup;
 
 	res = open_input_and_output_files(err, &files);
 	if (res != KT_OK) goto cleanup;
@@ -104,11 +108,13 @@ int sign_run(int argc, char** argv, char **envp) {
 	res = logsignature_sign(set, err, ksi, &files);
 	if (res != KT_OK) goto cleanup;
 
+	res = rename_temporary_and_backup_files(err, &files);
+	if (res != KT_OK) goto cleanup;
+
 cleanup:
 
 	/* If there is an error while closing files, report it only if everything else was OK. */
-	closing_res = close_input_and_output_files(err, res, &files);
-	if (res == KT_OK) res = closing_res;
+	close_input_and_output_files(res, &files);
 
 	print_progressResult(res);
 	KSITOOL_KSI_ERRTrace_save(ksi);
@@ -214,206 +220,193 @@ cleanup:
 	return res;
 }
 
-static int get_derived_name(char *org, const char *extension, char **derived) {
+static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 	int res;
-	char *buf = NULL;
-
-	if (org == NULL || extension == NULL || derived == NULL) {
-		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
-	buf = (char*)KSI_malloc(strlen(org) + strlen(extension) + 1);
-	if (buf == NULL) {
-		res = KT_OUT_OF_MEMORY;
-		goto cleanup;
-	}
-	sprintf(buf, "%s%s", org, extension);
-	*derived = buf;
-	res = KT_OK;
-
-cleanup:
-
-	return res;
-}
-
-
-static int get_backup_name(char *org, char **backup) {
-	int res = KT_OUT_OF_MEMORY;
-	char *buf = NULL;
-
-	buf = (char*)KSI_malloc(strlen(org) + strlen(".bak") + 1);
-	if (buf == NULL) goto cleanup;
-	sprintf(buf, "%s%s", org, ".bak");
-	*backup = buf;
-	res = KT_OK;
-
-cleanup:
-
-	return res;
-}
-
-static int get_temp_name(char **name) {
-	int res = KT_OUT_OF_MEMORY;
-	char *buf = NULL;
-
-	buf = (char*)KSI_malloc(strlen("stdout.tmp") + 1);
-	if (buf == NULL) goto cleanup;
-	strcpy(buf, "stdout.tmp");
-	*name = buf;
-	res = KT_OK;
-
-cleanup:
-
-	return res;
-}
-
-static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
-	int res = KT_IO_ERROR;
 	IO_FILES tmp;
-	char *buf = NULL;
 
-	memset(&tmp, 0, sizeof(tmp));
+	memset(&tmp.internal, 0, sizeof(tmp.internal));
 
 	if (err == NULL || files == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
 
-	/* Default input file is stdin. */
-	if (files->inLogName == NULL) {
-		/* Default output file is a temporary file that is copied to stdout on success. */
-		if (files->outSigName == NULL || !strcmp(files->outSigName, "-")) {
-			res = get_temp_name(&tmp.tempSigName);
-			ERR_CATCH_MSG(err, res, "Error: out of memory.");
-			tmp.outSigName = tmp.tempSigName;
+	/* If not specified, the input signature is read from stdin. */
+	if (files->user.log == NULL) {
+		if (files->user.sig == NULL || !strcmp(files->user.sig, "-")) {
+			/* Output must go to a temporary file before redirecting it to stdout. */
+			res = concat_names("stdout", ".tmp", &tmp.internal.tempSig);
+			ERR_CATCH_MSG(err, res, "Error: could not generate temporary output log signature file name.");
 		} else {
-			tmp.outSigName = files->outSigName;
+			/* Output log signature is written directly to the specified file. */
+			tmp.internal.outSig = strdup(files->user.sig);
+			if (tmp.internal.outSig == NULL) {
+				res = KT_OUT_OF_MEMORY;
+				ERR_CATCH_MSG(err, res, "Error: could not duplicate output log signature file name.");
+			}
 		}
 	} else {
-		res = get_derived_name(files->inLogName, ".logsig", &tmp.derivedSigName);
-		ERR_CATCH_MSG(err, res, "Error: out of memory.");
+		/* Generate input log signature file name. */
+		res = concat_names(files->user.log, ".logsig", &tmp.internal.inSig);
+		ERR_CATCH_MSG(err, res, "Error: could not generate input log signature file name.");
 
-		if (!SMART_FILE_doFileExist(tmp.derivedSigName)) {
-			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: no matching log signature file found for log file %s.", files->inLogName);
-		}
-
-		/* Default output file is the same as input, but a backup of the input file is retained. */
-		if (files->outSigName == NULL || !strcmp(tmp.derivedSigName, files->outSigName)) {
-			res = get_backup_name(tmp.derivedSigName, &buf);
-			ERR_CATCH_MSG(err, res, "Error: out of memory.");
-			remove(buf);
-			res = (rename(tmp.derivedSigName, buf) == 0) ? KT_OK : KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: could not rename file %s to %s.", tmp.derivedSigName, buf);
-			tmp.backupSigName = buf;
-			buf = NULL;
-			tmp.inSigName = tmp.backupSigName;
-			tmp.outSigName = tmp.derivedSigName;
-		} else if (!strcmp(files->outSigName, "-")) {
-			res = get_temp_name(&tmp.tempSigName);
-			ERR_CATCH_MSG(err, res, "Error: out of memory.");
-			tmp.inSigName = tmp.derivedSigName;
-			tmp.outSigName = tmp.tempSigName;
+		/* Check if output would overwrite the input log signature file. */
+		if (files->user.sig == NULL || !strcmp(files->user.sig, tmp.internal.inSig)) {
+			/* Output must to go to a temporary file before overwriting the input log signature file. */
+			res = concat_names(tmp.internal.inSig, ".tmp", &tmp.internal.tempSig);
+			ERR_CATCH_MSG(err, res, "Error: could not generate temporary output log signature file name.");
+			/* Input must kept in a backup file when overwritten by the output log signature file. */
+			res = concat_names(tmp.internal.inSig, ".bak", &tmp.internal.backupSig);
+			ERR_CATCH_MSG(err, res, "Error: could not generate backup input log signature file name.");
+		} else if (!strcmp(files->user.sig, "-")) {
+			/* Output must go to a temporary file before redirecting it to stdout. */
+			res = concat_names(tmp.internal.inSig, ".tmp", &tmp.internal.tempSig);
+			ERR_CATCH_MSG(err, res, "Error: could not generate temporary output log signature file name.");
 		} else {
-			tmp.inSigName = tmp.derivedSigName;
-			tmp.outSigName = files->outSigName;
+			/* Output log signature is written directly to the specified file. */
+			tmp.internal.outSig = strdup(files->user.sig);
+			if (tmp.internal.outSig == NULL) {
+				res = KT_OUT_OF_MEMORY;
+				ERR_CATCH_MSG(err, res, "Error: could not duplicate output log signature file name.");
+			}
 		}
 	}
-
-	if (tmp.inSigName) {
-		tmp.inSigFile = fopen(tmp.inSigName, "rb");
-		res = (tmp.inSigFile == NULL) ? KT_IO_ERROR : KT_OK;
-		ERR_CATCH_MSG(err, res, "Error: could not open file %s.", tmp.inSigName);
-	} else {
-		tmp.inSigFile = stdin;
-	}
-
-	if (tmp.outSigName) {
-		tmp.outSigFile = fopen(tmp.outSigName, "wb");
-		res = (tmp.outSigFile == NULL) ? KT_IO_ERROR : KT_OK;
-		ERR_CATCH_MSG(err, res, "Error: could not create file %s.", tmp.outSigName);
-	} else {
-		tmp.outSigFile = stdout;
-	}
-
-	tmp.inLogName = files->inLogName;
-	tmp.outSigName = files->outSigName;
-	*files = tmp;
-	memset(&tmp, 0, sizeof(tmp));
+	files->internal = tmp.internal;
+	memset(&tmp.internal, 0, sizeof(tmp.internal));
 	res = KT_OK;
 
 cleanup:
 
-	if (tmp.inSigFile == stdin) tmp.inSigFile = NULL;
-	if (tmp.outSigFile == stdout) tmp.outSigFile = NULL;
-
-	if (tmp.backupSigName) {
-		logksi_file_close(&tmp.inSigFile);
-		rename(tmp.backupSigName, tmp.inSigName);
-	}
-
-	KSI_free(buf);
-
-	logksi_filename_free(&tmp.backupSigName);
-	logksi_filename_free(&tmp.tempSigName);
-	logksi_filename_free(&tmp.derivedSigName);
-
-	logksi_file_close(&tmp.inSigFile);
-	logksi_file_close(&tmp.outSigFile);
+	logksi_internal_filenames_free(&tmp.internal);
 
 	return res;
 }
 
-static int close_input_and_output_files(ERR_TRCKR *err, int result, IO_FILES *files) {
-	char buf[1024];
-	size_t count = 0;
-	int res = KT_UNKNOWN_ERROR;
+static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
+	int res;
+	IO_FILES tmp;
 
-	if (files == NULL || err == NULL) {
+	memset(&tmp.files, 0, sizeof(tmp.files));
+
+	if (err == NULL || files == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
 
-	if (files->inSigFile == stdin) files->inSigFile = NULL;
-	if (files->outSigFile == stdout) files->outSigFile = NULL;
-
-	if (files->tempSigName) {
-		if (result == KT_OK) {
-			if(freopen(NULL, "rb", files->outSigFile) != files->outSigFile) {
-				res = KT_IO_ERROR;
-				ERR_CATCH_MSG(err, res, "Error: could not reopen signature file for reading.");
-			}
-			while (!feof(files->outSigFile)) {
-				count = fread(buf, 1, sizeof(buf), files->outSigFile);
-				if (fwrite(buf, 1, count, stdout) != count) {
-					res = KT_IO_ERROR;
-					ERR_CATCH_MSG(err, res, "Error: could not write signature file to stdout.");
-				}
-			}
+	if (files->internal.inSig) {
+		/* Make sure that the input log signature exists. */
+		if (!SMART_FILE_doFileExist(files->internal.inSig)) {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: no matching log signature file found for log file %s.", files->internal.log);
 		}
-		logksi_file_close(&files->outSigFile);
-		remove(files->tempSigName);
+
+		tmp.files.inSig = fopen(files->internal.inSig, "rb");
+		if (tmp.files.inSig == NULL) {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: could not open input log signature file %s.", files->internal.inSig);
+		}
+	} else {
+		/* If not specified, the input is taken from stdin. */
+		tmp.files.inSig = stdin;
 	}
 
-	if (files->backupSigName) {
-		if (result != KT_OK) {
-			logksi_file_close(&files->outSigFile);
-			remove(files->derivedSigName);
-			logksi_file_close(&files->inSigFile);
-			rename(files->backupSigName, files->derivedSigName);
+	/* Output goes either to a temporary file or directly to output log signature file. */
+	if (files->internal.tempSig) {
+		tmp.files.outSig = fopen(files->internal.tempSig, "wb");
+		if (tmp.files.outSig == NULL) {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: could not open temporary output log signature file %s.", files->internal.tempSig);
+		}
+	} else if (files->internal.outSig) {
+		tmp.files.outSig = fopen(files->internal.outSig, "wb");
+		if (tmp.files.outSig == NULL) {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: could not open output log signature file %s.", files->internal.outSig);
 		}
 	}
 
-	logksi_filename_free(&files->tempSigName);
-	logksi_filename_free(&files->backupSigName);
-	logksi_filename_free(&files->derivedSigName);
-
-	logksi_file_close(&files->inSigFile);
-	logksi_file_close(&files->outSigFile);
+	files->files = tmp.files;
+	memset(&tmp.files, 0, sizeof(tmp.files));
 
 	res = KT_OK;
 
 cleanup:
 
+	logksi_files_close(&tmp.files);
 	return res;
+}
+
+static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files) {
+	int res;
+	char buf[1024];
+	size_t count = 0;
+
+	if (err == NULL || files == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	/* Check if input log signature must be backed up. */
+	if (files->internal.backupSig) {
+		/* Create a backup of the input log signature file by renaming it. */
+		logksi_file_close(&files->files.inSig);
+		if (SMART_FILE_doFileExist(files->internal.backupSig)) {
+			if(remove(files->internal.backupSig) != 0) {
+				res = KT_IO_ERROR;
+				ERR_CATCH_MSG(err, res, "Error: could not remove existing backup file %s.", files->internal.backupSig);
+			}
+		}
+		if (rename(files->internal.inSig, files->internal.backupSig) != 0) {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: could not rename input log signature file %s to backup file %s.", files->internal.inSig, files->internal.backupSig);
+		}
+		/* Output must be saved in input log signature file, so the temporary output log signature file is renamed. */
+		logksi_file_close(&files->files.outSig);
+		if (rename(files->internal.tempSig, files->internal.inSig) != 0) {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: could not rename temporary output log signature file %s to input log signature file %s.", files->internal.tempSig, files->internal.inSig);
+		}
+	} else if (files->internal.tempSig) {
+		/* Copy the contents of the temporary output log signature file to stdout. */
+		//fclose(files->files.outSig);
+		if (freopen(NULL, "rb",  files->files.outSig) == NULL) {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: could not access temporary output log signature file %s in read mode.", files->internal.tempSig);
+		}
+		while(!feof(files->files.outSig)) {
+			count = fread(buf, 1, sizeof(buf), files->files.outSig);
+			if (fwrite(buf, 1, count, stdout) != count) {
+				res = KT_IO_ERROR;
+				ERR_CATCH_MSG(err, res, "Error: could not write temporary output log signature file %s to stdout.", files->internal.tempSig);
+			}
+		}
+	}
+
+	logksi_filename_free(&files->internal.backupSig);
+	res = KT_OK;
+
+cleanup:
+
+	/* Restore initial situation if something failed. */
+	if (files->internal.backupSig) {
+		if (!SMART_FILE_doFileExist(files->internal.inSig)) {
+			if (rename(files->internal.backupSig, files->internal.inSig) != 0) {
+				res = KT_IO_ERROR;
+			}
+		}
+	}
+	return res;
+}
+
+static void close_input_and_output_files(int res, IO_FILES *files) {
+	if (files) {
+		logksi_files_close(&files->files);
+		if (files->internal.tempSig) {
+			remove(files->internal.tempSig);
+		}
+		if (files->internal.outSig && res != KT_OK) {
+			remove(files->internal.outSig);
+		}
+		logksi_internal_filenames_free(&files->internal);
+	}
 }

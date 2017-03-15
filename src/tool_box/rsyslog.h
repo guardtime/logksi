@@ -35,19 +35,35 @@ typedef enum {
 } LOGSIG_VERSION;
 
 typedef struct {
-	char *inSigName;
-	char *outSigName;
-	char *backupSigName;
-	char *tempSigName;
-	char *inLogName;
-	char *derivedSigName;
-	char *partsBlockName;
-	char *partsSigName;
-	char *integratedSigName;
-	FILE *inSigFile;
-	FILE *outSigFile;
-	FILE *inLogFile;
-	FILE *inBlockFile;
+	char *log;
+	char *sig;
+} USER_FILE_NAMES;
+
+typedef struct {
+	char *log;
+	char *inSig;
+	char *outSig;
+	char *tempSig;
+	char *backupSig;
+	char *partsBlk;
+	char *partsSig;
+} INTERNAL_FILE_NAMES;
+
+typedef struct {
+	FILE *log;
+	FILE *inSig;
+	FILE *outSig;
+	FILE *partsBlk;
+	FILE *partsSig;
+} INTERNAL_FILE_HANDLES;
+
+typedef struct {
+	/* File names received as parameters from the user. */
+	USER_FILE_NAMES user;
+	/* File names generated and allocated by logksi. */
+	INTERNAL_FILE_NAMES internal;
+	/* Files opened by logksi. */
+	INTERNAL_FILE_HANDLES files;
 } IO_FILES;
 
 #define MAX_TREE_HEIGHT 31
@@ -79,5 +95,8 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, VERIFYING_
 int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files);
 int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files);
 int get_file_read_lock(PARAM_SET *set, FILE *in);
+int concat_names(char *org, const char *extension, char **derived);
 void logksi_filename_free(char **ptr);
+void logksi_internal_filenames_free(INTERNAL_FILE_NAMES *internal);
 void logksi_file_close(FILE **ptr);
+void logksi_files_close(INTERNAL_FILE_HANDLES *files);

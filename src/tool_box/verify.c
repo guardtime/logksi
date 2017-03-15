@@ -67,6 +67,7 @@ static int signature_verify_key_based(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *k
 static int signature_verify_publication_based_with_user_pub(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
 static int signature_verify_publication_based_with_pubfile(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,  KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
 static int signature_verify_calendar_based(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
+static int generate_filenames(ERR_TRCKR *err, IO_FILES *files);
 static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files);
 static void close_log_and_signature_files(IO_FILES *files);
 
@@ -115,11 +116,11 @@ int verify_run(int argc, char **argv, char **envp) {
 	res = PARAM_SET_getValueCount(set, "input", NULL, PST_PRIORITY_NONE, &count);
 	if (res != KT_OK) goto cleanup;
 
-	res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, 0, &files.inLogName);
+	res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, 0, &files.user.log);
 	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
 
 	if (count > 1) {
-		res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, 1, &files.inSigName);
+		res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, 1, &files.user.sig);
 		if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
 	}
 
@@ -159,6 +160,9 @@ int verify_run(int argc, char **argv, char **envp) {
 			goto cleanup;
 		break;
 	}
+
+	res = generate_filenames(err, &files);
+	if (res != KT_OK) goto cleanup;
 
 	res = open_log_and_signature_files(err, &files);
 	if (res != KT_OK) goto cleanup;
@@ -519,24 +523,53 @@ cleanup:
 	return res;
 }
 
-static int get_derived_name(char *org, const char *extension, char **derived) {
+static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 	int res;
-	char *buf = NULL;
+	IO_FILES tmp;
 
-	if (org == NULL || extension == NULL || derived == NULL) {
+	memset(&tmp.internal, 0, sizeof(tmp.internal));
+
+	if (err == NULL || files == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
-	buf = (char*)KSI_malloc(strlen(org) + strlen(extension) + 1);
-	if (buf == NULL) {
+
+	tmp.internal.log = strdup(files->user.log);
+	if (tmp.internal.log == NULL) {
 		res = KT_OUT_OF_MEMORY;
-		goto cleanup;
+		ERR_CATCH_MSG(err, res, "Error: could not duplicate input log file name.");
 	}
-	sprintf(buf, "%s%s", org, extension);
-	*derived = buf;
+
+	/* If input log signature file name is not specified, it is generared from the input log file name. */
+	if (files->user.sig == NULL) {
+		int i = 0;
+		char *extensions[] = {".logsig", ".ksisig", NULL};
+		while (extensions[i]) {
+			res = concat_names(files->user.log, extensions[i], &tmp.internal.inSig);
+			ERR_CATCH_MSG(err, res, "Error: could not generate input log signature file name.");
+			if (SMART_FILE_doFileExist(tmp.internal.inSig)) break;
+			logksi_filename_free(&tmp.internal.inSig);
+			i++;
+		}
+		if (tmp.internal.inSig == NULL) {
+			res = KT_KSI_SIG_VER_IMPOSSIBLE;
+			ERR_CATCH_MSG(err, res, "Error: no matching input log signature file found for input log file %s.", files->user.log);
+		}
+	} else {
+		tmp.internal.inSig = strdup(files->user.sig);
+		if (tmp.internal.inSig == NULL) {
+			res = KT_OUT_OF_MEMORY;
+			ERR_CATCH_MSG(err, res, "Error: could not duplicate input log signature file name.");
+		}
+	}
+
+	files->internal = tmp.internal;
+	memset(&tmp.internal, 0, sizeof(tmp.internal));
 	res = KT_OK;
 
 cleanup:
+
+	logksi_internal_filenames_free(&tmp.internal);
 
 	return res;
 }
@@ -544,62 +577,40 @@ cleanup:
 static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files) {
 	int res = KT_IO_ERROR;
 	IO_FILES tmp;
-	int i = 0;
 
-	memset(&tmp, 0, sizeof(tmp));
+	memset(&tmp.files, 0, sizeof(tmp.files));
 
-	if (files->inSigName == NULL) {
-		/* Default log signature file name is derived from the log file name. */
-		const char *extensions[] = {".logsig", ".ksisig", NULL};
-		while (extensions[i]) {
-			res = get_derived_name(files->inLogName, extensions[i], &tmp.derivedSigName);
-			ERR_CATCH_MSG(err, res, "Error: out of memory.");
-			if (SMART_FILE_doFileExist(tmp.derivedSigName)) break;
-			KSI_free(tmp.derivedSigName);
-			tmp.derivedSigName = NULL;
-			i++;
-		}
-		if (tmp.derivedSigName == NULL) {
-			res = KT_KSI_SIG_VER_IMPOSSIBLE;
-			ERR_CATCH_MSG(err, res, "Error: no matching log signature file found for log file %s.", files->inLogName);
-		}
-		tmp.inSigName = tmp.derivedSigName;
-	} else {
-		tmp.inSigName = files->inSigName;
-	}
-	tmp.inLogName = files->inLogName;
-
-	if (tmp.inSigName) {
-		tmp.inSigFile = fopen(tmp.inSigName, "rb");
-		res = (tmp.inSigFile == NULL) ? KT_IO_ERROR : KT_OK;
-		ERR_CATCH_MSG(err, res, "Error: could not open file %s.", tmp.inSigName);
+	if (err == NULL || files == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
 	}
 
-	if (tmp.inLogName) {
-		tmp.inLogFile = fopen(tmp.inLogName, "rb");
-		res = (tmp.inLogFile == NULL) ? KT_IO_ERROR : KT_OK;
-		ERR_CATCH_MSG(err, res, "Error: could not open file %s.", tmp.inLogName);
+	tmp.files.log = fopen(files->internal.log, "rb");
+	if (tmp.files.log == NULL) {
+		res = KT_IO_ERROR;
+		ERR_CATCH_MSG(err, res, "Error: could not open input log file %s.", files->internal.log);
 	}
 
-	tmp.inSigName = files->inSigName;
-	tmp.inLogName = files->inLogName;
-	*files = tmp;
-	memset(&tmp, 0, sizeof(tmp));
+	tmp.files.inSig = fopen(files->internal.inSig, "rb");
+	if (tmp.files.inSig == NULL) {
+		res = KT_IO_ERROR;
+		ERR_CATCH_MSG(err, res, "Error: could not open input log signature file %s.", files->internal.inSig);
+	}
+
+	files->files = tmp.files;
+	memset(&tmp.files, 0, sizeof(tmp.files));
+
 	res = KT_OK;
 
 cleanup:
 
-	logksi_filename_free(&tmp.derivedSigName);
-
-	logksi_file_close(&tmp.inSigFile);
-	logksi_file_close(&tmp.inLogFile);
-
+	logksi_files_close(&tmp.files);
 	return res;
 }
 
 static void close_log_and_signature_files(IO_FILES *files) {
-	logksi_filename_free(&files->derivedSigName);
-
-	logksi_file_close(&files->inSigFile);
-	logksi_file_close(&files->inLogFile);
+	if (files) {
+		logksi_files_close(&files->files);
+		logksi_internal_filenames_free(&files->internal);
+	}
 }

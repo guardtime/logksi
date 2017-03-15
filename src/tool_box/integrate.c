@@ -36,8 +36,10 @@
 #include "rsyslog.h"
 
 static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
-static int open_input_and_output_files(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files);
-static void close_input_and_output_files(int result, IO_FILES *files);
+static int generate_filenames(ERR_TRCKR *err, IO_FILES *files);
+static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files);
+static int acquire_file_locks(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files);
+static void close_input_and_output_files(int res, IO_FILES *files);
 
 int integrate_run(int argc, char **argv, char **envp) {
 	int res;
@@ -78,20 +80,23 @@ int integrate_run(int argc, char **argv, char **envp) {
 
 	d = PARAM_SET_isSetByName(set, "d");
 
-	res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.inLogName);
+	res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.user.log);
 	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
 
-	res = PARAM_SET_getStr(set, "o", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.outSigName);
+	res = PARAM_SET_getStr(set, "o", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.user.sig);
 	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
 
-	res = open_input_and_output_files(set, err, &files);
+	res = generate_filenames(err, &files);
 	if (res != KT_OK) goto cleanup;
 
-	if (files.inBlockFile == NULL && files.inSigFile == NULL) {
-		/* Special task of waiting until *.logsig file is ready. No integration required. */
+	res = open_input_and_output_files(err, &files);
+	if (res != KT_OK) goto cleanup;
+
+	res = acquire_file_locks(set, err, &files);
+	if (res == KT_VERIFICATION_SKIPPED) {
 		res = KT_OK;
 		goto cleanup;
-	}
+	} else if (res != KT_OK) goto cleanup;
 
 	res = logsignature_integrate(set, err, ksi, &files);
 	if (res != KT_OK) goto cleanup;
@@ -186,135 +191,157 @@ cleanup:
 	return res;
 }
 
-static int get_derived_name(char *org, const char *extension, char **derived) {
+static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 	int res;
-	char *buf = NULL;
+	IO_FILES tmp;
 
-	if (org == NULL || extension == NULL || derived == NULL) {
+	memset(&tmp.internal, 0, sizeof(tmp.internal));
+
+	if (err == NULL || files == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
-	buf = (char*)KSI_malloc(strlen(org) + strlen(extension) + 1);
-	if (buf == NULL) {
-		res = KT_OUT_OF_MEMORY;
-		goto cleanup;
+
+	/* Input consists of two parts - blocks and signatures. Names of these files are generated from the log file name. */
+	res = concat_names(files->user.log, ".logsig.parts/blocks.dat", &tmp.internal.partsBlk);
+	ERR_CATCH_MSG(err, res, "Error: could not generate input blocks file name.");
+
+	res = concat_names(files->user.log, ".logsig.parts/block-signatures.dat", &tmp.internal.partsSig);
+	ERR_CATCH_MSG(err, res, "Error: could not generate input signatures file name.");
+
+	/* Output log signature file name, if not specified, is generated from the log file name. */
+	if (files->user.sig == NULL) {
+		res = concat_names(files->user.log, ".logsig", &tmp.internal.outSig);
+		ERR_CATCH_MSG(err, res, "Error: could not generate output log signature file name.");
+	} else {
+		tmp.internal.outSig = strdup(files->user.sig);
+		if (tmp.internal.outSig == NULL) {
+			res = KT_OUT_OF_MEMORY;
+			ERR_CATCH_MSG(err, res, "Error: could not duplicate output log signature file name.");
+		}
 	}
-	sprintf(buf, "%s%s", org, extension);
-	*derived = buf;
+
+	files->internal = tmp.internal;
+	memset(&tmp.internal, 0, sizeof(tmp.internal));
 	res = KT_OK;
 
 cleanup:
 
+	logksi_internal_filenames_free(&tmp.internal);
+
 	return res;
 }
 
-static int open_input_and_output_files(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files) {
-	int res = KT_IO_ERROR;
+static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
+	int res;
 	IO_FILES tmp;
 
-	memset(&tmp, 0, sizeof(tmp));
+	memset(&tmp.files, 0, sizeof(tmp.files));
+
+	if (err == NULL || files == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	if (SMART_FILE_doFileExist(files->internal.partsBlk) && SMART_FILE_doFileExist(files->internal.partsSig)) {
+		/* If both of the input files exist and the output log signature file also exists,
+		 * the output log signature file must not be overwritten because it may contain KSI signatures
+		 * obtained by sign recovery but not present in the input signatures file. */
+		if (SMART_FILE_doFileExist(files->internal.outSig)) {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: overwriting of existing output log signature file %s not supported.", files->internal.outSig);
+		}
+
+		tmp.files.partsBlk = fopen(files->internal.partsBlk, "rb");
+		if (tmp.files.partsBlk == NULL) {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: could not open input blocks file %s.", files->internal.partsBlk);
+		}
+
+		tmp.files.partsSig = fopen(files->internal.partsSig, "rb");
+		if (tmp.files.partsSig == NULL) {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: could not open input signatures file %s.", files->internal.partsSig);
+		}
+
+		tmp.files.outSig = fopen(files->internal.outSig, "wb");
+		if (tmp.files.outSig == NULL) {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: could not open output log signature file %s.", files->internal.outSig);
+		}
+	} else if (!SMART_FILE_doFileExist(files->internal.partsBlk) && !SMART_FILE_doFileExist(files->internal.partsSig)) {
+		/* If none of the input files exist, but the output log signature file exists,
+		 * the output log signature file is the result of the synchronous signing process
+		 * and must not be overwritten. A read mode file handle is needed for acquiring a file lock. */
+		if (SMART_FILE_doFileExist(files->internal.outSig)) {
+			/* Reassign ouput file name as input file name to avoid potential removal as an incomplete output file. */
+			files->internal.inSig = files->internal.outSig;
+			files->internal.outSig = NULL;
+			tmp.files.inSig = fopen(files->internal.inSig, "rb");
+			if (tmp.files.inSig == NULL) {
+				res = KT_IO_ERROR;
+				ERR_CATCH_MSG(err, res, "Error: could not open output log signature file %s in read mode.", files->internal.inSig);
+			}
+		} else {
+			res = KT_KSI_SIG_VER_IMPOSSIBLE;
+			ERR_CATCH_MSG(err, res, "Error: unable to find input blocks file %s.", files->internal.partsBlk);
+		}
+	} else {
+		res = KT_KSI_SIG_VER_IMPOSSIBLE;
+		if (!SMART_FILE_doFileExist(files->internal.partsBlk)) {
+			ERR_CATCH_MSG(err, res, "Error: unable to find blocks file %s.", files->internal.partsBlk);
+		} else {
+			ERR_CATCH_MSG(err, res, "Error: unable to find signatures file %s.", files->internal.partsSig);
+		}
+	}
+
+	files->files = tmp.files;
+	memset(&tmp.files, 0, sizeof(tmp.files));
+
+	res = KT_OK;
+
+cleanup:
+
+	logksi_files_close(&tmp.files);
+	return res;
+}
+
+static int acquire_file_locks(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files) {
+	int res = KT_UNKNOWN_ERROR;
 
 	if (set == NULL || err == NULL || files == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
 
-	res = get_derived_name(files->inLogName, ".logsig.parts/blocks.dat", &tmp.partsBlockName);
-	ERR_CATCH_MSG(err, res, "Error: out of memory.");
-
-	res = get_derived_name(files->inLogName, ".logsig.parts/block-signatures.dat", &tmp.partsSigName);
-	ERR_CATCH_MSG(err, res, "Error: out of memory.");
-
-	if (files->outSigName == NULL) {
-		res = get_derived_name(files->inLogName, ".logsig", &tmp.integratedSigName);
-		ERR_CATCH_MSG(err, res, "Error: out of memory");
-		tmp.outSigName = tmp.integratedSigName;
-	} else {
-		tmp.outSigName = files->outSigName;
-	}
-
-	if (SMART_FILE_doFileExist(tmp.partsBlockName) && SMART_FILE_doFileExist(tmp.partsSigName)) {
-		/* Do not overwrite an exisiting log signature file as it may contain KSI signatures obtained by sign recovery. */
-		if (SMART_FILE_doFileExist(tmp.outSigName)) {
-			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: overwriting of existing log signature file %s not supported.", tmp.outSigName);
-		}
-		tmp.inBlockFile = fopen(tmp.partsBlockName, "rb");
-		res = (tmp.inBlockFile == NULL) ? KT_IO_ERROR : KT_OK;
-		ERR_CATCH_MSG(err, res, "Error: could not open file %s.", tmp.partsBlockName);
-
-		tmp.inSigFile = fopen(tmp.partsSigName, "rb");
-		res = (tmp.inSigFile == NULL) ? KT_IO_ERROR : KT_OK;
-		ERR_CATCH_MSG(err, res, "Error: could not open file %s.", tmp.partsSigName);
-
+	if (files->files.partsBlk && files->files.partsSig) {
 		/* Check that the asynchronous signing process has completed writing to blocks and signatures files. */
-		res = get_file_read_lock(set, tmp.inBlockFile);
-		ERR_CATCH_MSG(err, res, "Error: could not acquire read lock for file %s.", tmp.partsBlockName);
-		res = get_file_read_lock(set, tmp.inSigFile);
-		ERR_CATCH_MSG(err, res, "Error: could not acquire read lock for file %s.", tmp.partsSigName);
-
-		tmp.outSigFile = fopen(tmp.outSigName, "wb");
-		res = (tmp.outSigFile == NULL) ? KT_IO_ERROR : KT_OK;
-		ERR_CATCH_MSG(err, res, "Error: could not open file %s.", tmp.outSigName);
-	} else if (!SMART_FILE_doFileExist(tmp.partsBlockName) && !SMART_FILE_doFileExist(tmp.partsSigName)) {
-		/* If blocks and signatures files don't exist, an existing log signature file is probably the result of the synchronous signing process. */
-		/* Check that the synchronous signing process has completed writing to log signature file. */
-		if (SMART_FILE_doFileExist(tmp.outSigName)) {
-			tmp.outSigFile = fopen(tmp.outSigName, "rb");
-			res = (tmp.outSigFile == NULL) ? KT_IO_ERROR : KT_OK;
-			ERR_CATCH_MSG(err, res, "Error: could not open file %s.", tmp.outSigName);
-
-			res = get_file_read_lock(set, tmp.outSigFile);
-			ERR_CATCH_MSG(err, res, "Error: could not acquire read lock for file %s.", tmp.outSigName);
-		} else {
-			res = KT_KSI_SIG_VER_IMPOSSIBLE;
-			ERR_CATCH_MSG(err, res, "Error: unable to find block file %s.", tmp.partsBlockName);
-		}
-	} else {
-		res = KT_KSI_SIG_VER_IMPOSSIBLE;
-		if (!SMART_FILE_doFileExist(tmp.partsBlockName)) {
-			ERR_CATCH_MSG(err, res, "Error: unable to find blocks file %s.", tmp.partsBlockName);
-		} else {
-			ERR_CATCH_MSG(err, res, "Error: unable to find signatures file %s.", tmp.partsSigName);
-		}
+		res = get_file_read_lock(set, files->files.partsBlk);
+		ERR_CATCH_MSG(err, res, "Error: could not acquire read lock for input blocks file %s.", files->internal.partsBlk);
+		res = get_file_read_lock(set, files->files.partsSig);
+		ERR_CATCH_MSG(err, res, "Error: could not acquire read lock for input signatures file %s.", files->internal.partsSig);
+		res = KT_OK;
+	} else if (files->files.partsBlk == NULL && files->files.partsSig == NULL) {
+		res = get_file_read_lock(set, files->files.inSig);
+		ERR_CATCH_MSG(err, res, "Error: could not acquire read lock for output log signature file %s.", files->internal.inSig);
+		res = KT_VERIFICATION_SKIPPED;
 	}
-
-	tmp.inLogName = files->inLogName;
-	tmp.outSigName = files->outSigName;
-	*files = tmp;
-	memset(&tmp, 0, sizeof(tmp));
-	res = KT_OK;
 
 cleanup:
 
-	logksi_filename_free(&tmp.partsBlockName);
-	logksi_filename_free(&tmp.partsSigName);
-	logksi_filename_free(&tmp.integratedSigName);
-
-	logksi_file_close(&tmp.inBlockFile);
-	logksi_file_close(&tmp.inSigFile);
-	logksi_file_close(&tmp.outSigFile);
-
 	return res;
+
+
 }
 
-void close_input_and_output_files(int result, IO_FILES *files) {
-	if (files == NULL) return;
-
-	if (files->integratedSigName) {
-		if (result != KT_OK) {
-			if (files->outSigFile) {
-				logksi_file_close(&files->outSigFile);
-				remove(files->integratedSigName);
-			}
+void close_input_and_output_files(int res, IO_FILES *files) {
+	if (files) {
+		/* If something failed, remove the incomplete output log signature file. */
+		if (files->files.outSig && res != KT_OK) {
+			logksi_file_close(&files->files.outSig);
+			remove(files->internal.outSig);
 		}
+		logksi_files_close(&files->files);
+		logksi_internal_filenames_free(&files->internal);
 	}
-
-	logksi_filename_free(&files->partsBlockName);
-	logksi_filename_free(&files->partsSigName);
-	logksi_filename_free(&files->integratedSigName);
-
-	logksi_file_close(&files->inBlockFile);
-	logksi_file_close(&files->inSigFile);
-	logksi_file_close(&files->outSigFile);
 }
