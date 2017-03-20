@@ -33,10 +33,10 @@ EXECUTABLE integrate test/out/syslog -o test/out/integrated.logsig -d --log test
 
 # logksi integrate and overwrite existing signature.
 EXECUTABLE integrate test/out/syslog -d --log test/out/logs/integrate3.log
->>>2 /Error: overwriting of existing log signature file/
+>>>2 /Error: overwriting of existing output log signature file/
 >>>= 9
 
 # logksi integrate and overwrite existing specified signature.
 EXECUTABLE integrate test/out/syslog -o test/out/integrated.logsig -d --log test/out/logs/integrate4.log
->>>2 /Error: overwriting of existing log signature file/
+>>>2 /Error: overwriting of existing output log signature file/
 >>>= 9
