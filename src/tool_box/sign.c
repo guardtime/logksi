@@ -69,7 +69,7 @@ int sign_run(int argc, char** argv, char **envp) {
 	 * Extract command line parameters.
 	 */
 	res = PARAM_SET_new(
-			CONF_generate_param_set_desc("{input}{o}{d}{log}{conf}{h|help}", "S", buf, sizeof(buf)),
+			CONF_generate_param_set_desc("{input}{o}{d}{show-progress}{log}{conf}{h|help}", "S", buf, sizeof(buf)),
 			&set);
 	if (res != KT_OK) goto cleanup;
 
@@ -160,6 +160,8 @@ char *sign_help_toString(char*buf, size_t len) {
 		" --aggr-key <key>\n"
 		"           - HMAC key for signing service.\n"
 		" -d        - Print detailed information about processes and errors to stderr.\n"
+		" --show-progress"
+		"           - Print signing progress. Only valid with -d.\n"
 		" --conf <file>\n"
 		"           - Read configuration options from the given file. It must be noted\n"
 		"             that configuration options given explicitly on command line will\n"
@@ -193,7 +195,7 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	PARAM_SET_addControl(set, "{conf}", isFormatOk_inputFile, isContentOk_inputFileRestrictPipe, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{o}{log}", isFormatOk_path, NULL, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{input}", isFormatOk_path, NULL, convertRepair_path, NULL);
-	PARAM_SET_addControl(set, "{d}", isFormatOk_flag, NULL, NULL, NULL);
+	PARAM_SET_addControl(set, "{d}{show-progress}", isFormatOk_flag, NULL, NULL, NULL);
 
 
 	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);

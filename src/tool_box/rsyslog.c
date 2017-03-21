@@ -436,7 +436,6 @@ static int process_magic_number(PARAM_SET *set, ERR_TRCKR *err, BLOCK_INFO *bloc
 	char *logSignatureHeaders[] = {"LOGSIG11", "LOGSIG12"};
 	char *blocksFileHeaders[] = {"LOG12BLK"};
 	char *signaturesFileHeaders[] = {"LOG12SIG"};
-	int d = 0;
 	FILE *in = NULL;
 
 	if (set == NULL || err == NULL || files == NULL) {
@@ -450,8 +449,7 @@ static int process_magic_number(PARAM_SET *set, ERR_TRCKR *err, BLOCK_INFO *bloc
 		goto cleanup;
 	}
 
-	d = PARAM_SET_isSetByName(set, "d");
-	print_progressDesc(d, "Processing magic number... ");
+	print_progressDesc(0, "Processing magic number... ");
 
 	res = KT_INVALID_INPUT_FORMAT;
 
@@ -488,7 +486,6 @@ cleanup:
 
 static int process_block_header(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
-	int d = 0;
 	KSI_OctetString *seed = NULL;
 	KSI_DataHash *hash = NULL;
 	unsigned char i = 0;
@@ -500,8 +497,7 @@ static int process_block_header(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BL
 		goto cleanup;
 	}
 
-	d = PARAM_SET_isSetByName(set, "d");
-	print_progressDesc(d, "Block no. %3d: processing block header... ", blocks->blockNo + 1);
+	print_progressDesc(0, "Block no. %3d: processing block header... ", blocks->blockNo + 1);
 
 	if (blocks->blockNo > blocks->sigNo) {
 		res = KT_INVALID_INPUT_FORMAT;
@@ -575,7 +571,6 @@ cleanup:
 
 static int process_record_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
-	int d = 0;
 	KSI_DataHash *recordHash = NULL;
 	KSI_DataHash *hash = NULL;
 
@@ -584,8 +579,7 @@ static int process_record_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLO
 		goto cleanup;
 	}
 
-	d = PARAM_SET_isSetByName(set, "d");
-	print_progressDesc(d, "Block no. %3d: processing record hash... ", blocks->blockNo);
+	print_progressDesc(0, "Block no. %3d: processing record hash... ", blocks->blockNo);
 
 	if (blocks->blockNo == blocks->sigNo) {
 		res = KT_INVALID_INPUT_FORMAT;
@@ -646,7 +640,6 @@ cleanup:
 
 static int process_intermediate_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
-	int d = 0;
 	KSI_DataHash *tmpHash = NULL;
 	KSI_DataHash *hash = NULL;
 	unsigned char i;
@@ -656,8 +649,7 @@ static int process_intermediate_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 		goto cleanup;
 	}
 
-	d = PARAM_SET_isSetByName(set, "d");
-	print_progressDesc(d, "Block no. %3d: processing intermediate hash... ", blocks->blockNo);
+	print_progressDesc(0, "Block no. %3d: processing intermediate hash... ", blocks->blockNo);
 
 	if (blocks->blockNo == blocks->sigNo) {
 		res = KT_INVALID_INPUT_FORMAT;
@@ -730,7 +722,6 @@ cleanup:
 
 int process_metarecord(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
-	int d = 0;
 	KSI_DataHash *hash = NULL;
 	KSI_TlvElement *tlv = NULL;
 	KSI_uint64_t metarecord_index = 0;
@@ -740,8 +731,7 @@ int process_metarecord(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO 
 		goto cleanup;
 	}
 
-	d = PARAM_SET_isSetByName(set, "d");
-	print_progressDesc(d, "Block no. %3d: processing metarecord... ", blocks->blockNo);
+	print_progressDesc(0, "Block no. %3d: processing metarecord... ", blocks->blockNo);
 
 	res = KSI_TlvElement_parse(blocks->ftlv_raw, blocks->ftlv_len, &tlv);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse metarecord as TLV element.", blocks->blockNo);
@@ -797,7 +787,6 @@ cleanup:
 
 int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PROCESSORS *processors, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
-	int d = 0;
 	KSI_Signature *sig = NULL;
 	KSI_Signature *ext = NULL;
 	KSI_VerificationContext context;
@@ -813,8 +802,7 @@ int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNAT
 		goto cleanup;
 	}
 
-	d = PARAM_SET_isSetByName(set, "d");
-	print_progressDesc(d, "Block no. %3d: processing block signature data... ", blocks->blockNo);
+	print_progressDesc(0, "Block no. %3d: processing block signature data... ", blocks->blockNo);
 
 	blocks->sigNo++;
 	if (blocks->sigNo > blocks->blockNo) {
@@ -865,7 +853,7 @@ int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNAT
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: expected %d record hashes, but found %d.", blocks->blockNo, blocks->recordCount, blocks->nofRecordHashes);
 	}
 	print_progressResult(res);
-	print_progressDesc(d, "Block no. %3d: verifying KSI signature... ", blocks->blockNo);
+	print_progressDesc(1, "Block no. %3d: verifying KSI signature... ", blocks->blockNo);
 
 	res = calculate_root_hash(ksi, blocks, (KSI_DataHash**)&context.documentHash);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to get root hash for verification.", blocks->blockNo);
@@ -886,7 +874,7 @@ int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNAT
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse KSI signature.", blocks->blockNo);
 
 		print_progressResult(res);
-		print_progressDesc(d, "Block no. %3d: extending KSI signature... ", blocks->blockNo);
+		print_progressDesc(1, "Block no. %3d: extending KSI signature... ", blocks->blockNo);
 
 		res = processors->extend_signature(set, err, ksi, sig, &context, &ext);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to extend KSI signature.", blocks->blockNo);
@@ -894,7 +882,7 @@ int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNAT
 		res = tlv_element_set_signature(tlv, ksi, 0x905, ext);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to serialize extended KSI signature.", blocks->blockNo);
 
-		res = KSI_TlvElement_serialize(tlv, blocks->ftlv_raw, 0xffff + 4, &blocks->ftlv_len, 0);
+		res = KSI_TlvElement_serialize(tlv, blocks->ftlv_raw, SOF_FTLV_BUFFER, &blocks->ftlv_len, 0);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to serialize extended block signature.", blocks->blockNo);
 
 		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->files.outSig) != blocks->ftlv_len) {
@@ -924,7 +912,6 @@ cleanup:
 
 static int process_partial_block(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
-	int d = 0;
 	KSI_DataHash *hash = NULL;
 	KSI_DataHash *rootHash = NULL;
 	KSI_TlvElement *tlv = NULL;
@@ -935,8 +922,7 @@ static int process_partial_block(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, B
 		goto cleanup;
 	}
 
-	d = PARAM_SET_isSetByName(set, "d");
-	print_progressDesc(d, "Block no. %3d: processing partial block data... ", blocks->blockNo);
+	print_progressDesc(0, "Block no. %3d: processing partial block data... ", blocks->blockNo);
 
 	blocks->partNo++;
 	if (blocks->partNo > blocks->blockNo) {
@@ -989,7 +975,6 @@ cleanup:
 
 static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PROCESSORS *processors, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
-	int d = 0;
 	KSI_Signature *sig = NULL;
 	KSI_DataHash *hash = NULL;
 	KSI_DataHash *docHash = NULL;
@@ -1002,8 +987,7 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 		goto cleanup;
 	}
 
-	d = PARAM_SET_isSetByName(set, "d");
-	print_progressDesc(d, "Block no. %3d: processing partial signature data... ", blocks->blockNo);
+	print_progressDesc(0, "Block no. %3d: processing partial signature data... ", blocks->blockNo);
 
 	blocks->sigNo++;
 	if (blocks->sigNo > blocks->blockNo) {
@@ -1052,6 +1036,7 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 			blocks->prevLeaf = NULL;
 		}
 	} else if (tlvNoSig != NULL) {
+		blocks->noSigNo++;
 		res = tlv_element_get_hash(tlvNoSig, ksi, 0x01, &hash);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse root hash.", blocks->blockNo);
 
@@ -1068,7 +1053,7 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 
 		if (processors->create_signature) {
 			print_progressResult(res);
-			print_progressDesc(d, "Block no. %3d: creating missing KSI signature... ", blocks->blockNo);
+			print_progressDesc(1, "Block no. %3d: creating missing KSI signature... ", blocks->blockNo);
 
 			res = processors->create_signature(err, ksi, hash, get_aggregation_level(blocks), &sig);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to sign root hash.", blocks->blockNo);
@@ -1083,7 +1068,7 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 			res = tlv_element_set_signature(tlvSig, ksi, 0x905, sig);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to serialize KSI signature.", blocks->blockNo);
 
-			res = KSI_TlvElement_serialize(tlvSig, blocks->ftlv_raw, 0xffff + 4, &blocks->ftlv_len, 0);
+			res = KSI_TlvElement_serialize(tlvSig, blocks->ftlv_raw, SOF_FTLV_BUFFER, &blocks->ftlv_len, 0);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to serialize KSI signature.", blocks->blockNo);
 		}
 	} else {
@@ -1093,7 +1078,7 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 
 	if (files->files.outSig) {
 		print_progressResult(res);
-		print_progressDesc(d, "Block no. %3d: writing KSI signature to file... ", blocks->blockNo);
+		print_progressDesc(0, "Block no. %3d: writing KSI signature to file... ", blocks->blockNo);
 
 		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->files.outSig) != blocks->ftlv_len) {
 			res = KT_IO_ERROR;
@@ -1116,15 +1101,13 @@ cleanup:
 
 static int finalize_log_signature(PARAM_SET *set, ERR_TRCKR *err, BLOCK_INFO *blocks) {
 	int res;
-	int d = 0;
 
 	if (set == NULL || err == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
 
-	d = PARAM_SET_isSetByName(set, "d");
-	print_progressDesc(d, "Finalizing log signature... ");
+	print_progressDesc(0, "Finalizing log signature... ");
 
 	if (blocks->blockNo == 0) {
 		res = KT_INVALID_INPUT_FORMAT;
@@ -1162,10 +1145,88 @@ static void free_blocks(BLOCK_INFO *blocks) {
 	}
 }
 
+int count_blocks(ERR_TRCKR *err, BLOCK_INFO *blocks, FILE *in) {
+	int res;
+	long int pos = -1;
+	KSI_TlvElement *tlv = NULL;
+	KSI_TlvElement *tlvNoSig = NULL;
+
+	if (err == NULL || in == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	/* Do not count records, if input comes from stdin. */
+	if (in == stdin) {
+		res = KT_OK;
+		goto cleanup;
+	}
+
+	blocks->blockCount = 0;
+	blocks->noSigCount = 0;
+	blocks->noSigNo = 0;
+	pos = ftell(in);
+	if (pos == -1) {
+		res = KT_IO_ERROR;
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to get file handle position.");
+	}
+
+	while (!feof(in)) {
+		res = KSI_FTLV_fileRead(in, blocks->ftlv_raw, SOF_FTLV_BUFFER, &blocks->ftlv_len, &blocks->ftlv);
+		if (res == KSI_OK) {
+			switch (blocks->ftlv.tag) {
+				case 0x901:
+					blocks->blockCount++;
+				break;
+
+				case 0x904:
+					res = KSI_TlvElement_parse(blocks->ftlv_raw, blocks->ftlv_len, &tlv);
+					ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to parse block signature as TLV element.", blocks->blockNo);
+					res = KSI_TlvElement_getElement(tlv, 0x02, &tlvNoSig);
+					ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to extract 'no-sig' element in signatures file.", blocks->blockNo);
+
+					if (tlvNoSig) blocks->noSigCount++;
+
+					KSI_TlvElement_free(tlvNoSig);
+					tlvNoSig = NULL;
+					KSI_TlvElement_free(tlv);
+					tlv = NULL;
+				break;
+
+				default:
+				/* Ignore hashes and other TLVs as we are just counting blocks. */
+				break;
+			}
+		} else {
+			if (feof(in)) {
+				res = KT_OK;
+				break;
+			} else {
+				/* File reading failed. */
+				res = KT_IO_ERROR;
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to read next TLV.");
+			}
+		}
+	}
+
+	res = KT_OK;
+
+cleanup:
+
+	/* Rewind input stream. */
+	if (pos != -1) {
+		fseek(in, pos, SEEK_SET);
+	}
+	KSI_TlvElement_free(tlvNoSig);
+	KSI_TlvElement_free(tlv);
+
+	return res;
+}
+
 int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_FUNCTION extend_signature, IO_FILES *files) {
 	int res;
 	BLOCK_INFO blocks;
-	unsigned char ftlv_raw[0xffff + 4];
+	unsigned char ftlv_raw[SOF_FTLV_BUFFER];
 	SIGNATURE_PROCESSORS processors;
 
 	if (set == NULL || err == NULL || ksi == NULL || extend_signature == NULL || files == NULL) {
@@ -1182,7 +1243,7 @@ int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_
 	if (res != KT_OK) goto cleanup;
 
 	while (!feof(files->files.inSig)) {
-		res = KSI_FTLV_fileRead(files->files.inSig, blocks.ftlv_raw, sizeof(ftlv_raw), &blocks.ftlv_len, &blocks.ftlv);
+		res = KSI_FTLV_fileRead(files->files.inSig, blocks.ftlv_raw, SOF_FTLV_BUFFER, &blocks.ftlv_len, &blocks.ftlv);
 		if (res == KSI_OK) {
 			switch (blocks.ftlv.tag) {
 				case 0x901:
@@ -1247,7 +1308,7 @@ cleanup:
 int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, VERIFYING_FUNCTION verify_signature, IO_FILES *files) {
 	int res;
 	BLOCK_INFO blocks;
-	unsigned char ftlv_raw[0xffff + 4];
+	unsigned char ftlv_raw[SOF_FTLV_BUFFER];
 	SIGNATURE_PROCESSORS processors;
 
 	if (set == NULL || err == NULL || ksi == NULL || verify_signature == NULL || files == NULL) {
@@ -1264,7 +1325,7 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, VERIFYING_
 	if (res != KT_OK) goto cleanup;
 
 	while (!feof(files->files.inSig)) {
-		res = KSI_FTLV_fileRead(files->files.inSig, blocks.ftlv_raw, sizeof(ftlv_raw), &blocks.ftlv_len, &blocks.ftlv);
+		res = KSI_FTLV_fileRead(files->files.inSig, blocks.ftlv_raw, SOF_FTLV_BUFFER, &blocks.ftlv_len, &blocks.ftlv);
 		if (res == KSI_OK) {
 			switch (blocks.ftlv.tag) {
 				case 0x901:
@@ -1329,7 +1390,7 @@ cleanup:
 int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files) {
 	int res;
 	BLOCK_INFO blocks;
-	unsigned char ftlv_raw[0xffff + 4];
+	unsigned char ftlv_raw[SOF_FTLV_BUFFER];
 	SIGNATURE_PROCESSORS processors;
 
 	if (set == NULL || err == NULL || ksi == NULL || files == NULL) {
@@ -1345,7 +1406,7 @@ int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILE
 	if (res != KT_OK) goto cleanup;
 
 	while (!feof(files->files.partsBlk)) {
-		res = KSI_FTLV_fileRead(files->files.partsBlk, blocks.ftlv_raw, sizeof(ftlv_raw), &blocks.ftlv_len, &blocks.ftlv);
+		res = KSI_FTLV_fileRead(files->files.partsBlk, blocks.ftlv_raw, SOF_FTLV_BUFFER, &blocks.ftlv_len, &blocks.ftlv);
 		if (res == KSI_OK) {
 			switch (blocks.ftlv.tag) {
 				case 0x901:
@@ -1373,7 +1434,7 @@ int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILE
 					res = process_partial_block(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 
-					res = KSI_FTLV_fileRead(files->files.partsSig, blocks.ftlv_raw, sizeof(ftlv_raw), &blocks.ftlv_len, &blocks.ftlv);
+					res = KSI_FTLV_fileRead(files->files.partsSig, blocks.ftlv_raw, SOF_FTLV_BUFFER, &blocks.ftlv_len, &blocks.ftlv);
 					if (res != KT_OK) goto cleanup;
 
 					if (blocks.ftlv.tag != 0x904) {
@@ -1420,8 +1481,9 @@ cleanup:
 
 int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files) {
 	int res;
+	int progress;
 	BLOCK_INFO blocks;
-	unsigned char ftlv_raw[0xffff + 4];
+	unsigned char ftlv_raw[SOF_FTLV_BUFFER];
 	SIGNATURE_PROCESSORS processors;
 
 	if (set == NULL || err == NULL || ksi == NULL || files == NULL) {
@@ -1436,8 +1498,21 @@ int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *fi
 	res = process_magic_number(set, err, &blocks, files);
 	if (res != KT_OK) goto cleanup;
 
+	if (files->files.inSig != stdin) {
+		progress = (PARAM_SET_isSetByName(set, "d")&& PARAM_SET_isSetByName(set, "show-progress"));
+	} else {
+		/* Impossible to estimate signing progress if input is from stdin. */
+		progress = 0;
+	}
+
+	if (progress) {
+		res = count_blocks(err, &blocks, files->files.inSig);
+		if (res != KT_OK) goto cleanup;
+		print_debug("Signing progress: %3d of %3d blocks need signing. Estimated signing time: %3d seconds.\n", blocks.noSigCount, blocks.blockCount, blocks.noSigCount);
+	}
+
 	while (!feof(files->files.inSig)) {
-		res = KSI_FTLV_fileRead(files->files.inSig, blocks.ftlv_raw, sizeof(ftlv_raw), &blocks.ftlv_len, &blocks.ftlv);
+		res = KSI_FTLV_fileRead(files->files.inSig, blocks.ftlv_raw, SOF_FTLV_BUFFER, &blocks.ftlv_len, &blocks.ftlv);
 		if (res == KSI_OK) {
 			switch (blocks.ftlv.tag) {
 				case 0x901:
@@ -1464,6 +1539,10 @@ int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *fi
 				{
 					res = process_partial_signature(set, err, ksi, &processors, &blocks, files);
 					if (res != KT_OK) goto cleanup;
+
+					if (progress) {
+						print_debug("Signing progress: %3d of %3d unsigned blocks signed. Estimated time remaining: %3d seconds.\n", blocks.noSigNo, blocks.noSigCount, blocks.noSigCount - blocks.noSigNo);
+					}
 				}
 				break;
 
@@ -1503,11 +1582,8 @@ cleanup:
 int get_file_read_lock(PARAM_SET *set, FILE *in) {
 	struct flock lock;
 	int fres;
-	int d = PARAM_SET_isSetByName(set, "d");
 
 	if (set == NULL || in == NULL) return KT_INVALID_ARGUMENT;
-
-	d = PARAM_SET_isSetByName(set, "d");
 
 	lock.l_type = F_RDLCK;
 	lock.l_whence = SEEK_SET;
@@ -1516,7 +1592,7 @@ int get_file_read_lock(PARAM_SET *set, FILE *in) {
 	fres = fcntl(fileno(in), F_SETLK, &lock);
 	if (fres != 0) {
 		if (errno == EAGAIN || errno == EACCES) {
-			print_progressDesc(d, "Waiting to acquire read lock... ");
+			print_progressDesc(1, "Waiting to acquire read lock... ");
 			fres = fcntl(fileno(in), F_SETLKW, &lock);
 			print_progressResult(fres);
 		}
