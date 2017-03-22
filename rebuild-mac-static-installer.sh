@@ -18,9 +18,9 @@
 # Guardtime, Inc., and no license to trademarks is granted; Guardtime
 # reserves and retains all trademark rights.
 
-KSITOOL_VER=$(<VERSION)
+LOGKSI_VER=$(<VERSION)
 
-MAC_KSITOOL_INSTALLER_VERSION="ksitool-mac-installer-$KSITOOL_VER.$MACHTYPE.pkg"
+MAC_LOGKSI_INSTALLER_VERSION="logksi-mac-installer-$LOGKSI_VER.$MACHTYPE.pkg"
 
 OLD_STRING='</installer-gui-script>'
 ADD_LICENSE_BACKGROUND="<background file='background.png' mime-type='image/png' /> \
@@ -30,7 +30,7 @@ ADD_LICENSE_BACKGROUND="<background file='background.png' mime-type='image/png' 
 MAC_STATIC_DIR="packaging/MacOS/mac_static_content"
 
 
-PRF=ksitool-$(tr -d [:space:] < VERSION)
+PRF=logksi-$(tr -d [:space:] < VERSION)
 
 rm -f ${PRF}*.tar.gz && \
 mkdir -p config m4 && \
@@ -43,12 +43,12 @@ make clean && \
 make && \
 mkdir -p $MAC_STATIC_DIR/Source && \
 cp license.txt $MAC_STATIC_DIR/Resources/license.txt && \
-cp src/ksitool $MAC_STATIC_DIR/Source/ksitool && \
+cp src/logksi $MAC_STATIC_DIR/Source/logksi && \
 #create content needed for installer package
-pkgbuild --root $MAC_STATIC_DIR/Source/ --identifier KsitoolInstaller --install-location /usr/local/bin $MAC_STATIC_DIR/Source.pkg && \
+pkgbuild --root $MAC_STATIC_DIR/Source/ --identifier LogksiInstaller --install-location /usr/local/bin $MAC_STATIC_DIR/Source.pkg && \
 productbuild --synthesize --package $MAC_STATIC_DIR/Source.pkg $MAC_STATIC_DIR/Distribution.xml && \
 #configure xml file must be modified so that license and background picture will be included in the installer package
 sed -i '' "s:${OLD_STRING}:${ADD_LICENSE_BACKGROUND}:g" $MAC_STATIC_DIR/Distribution.xml && \
-productbuild --distribution $MAC_STATIC_DIR/Distribution.xml --resources $MAC_STATIC_DIR/Resources --package-path $MAC_STATIC_DIR $MAC_STATIC_DIR/$MAC_KSITOOL_INSTALLER_VERSION && \
+productbuild --distribution $MAC_STATIC_DIR/Distribution.xml --resources $MAC_STATIC_DIR/Resources --package-path $MAC_STATIC_DIR $MAC_STATIC_DIR/$MAC_LOGKSI_INSTALLER_VERSION && \
 rm $MAC_STATIC_DIR/Source.pkg && \
 rm $MAC_STATIC_DIR/Distribution.xml

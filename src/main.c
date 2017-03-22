@@ -27,7 +27,7 @@
 #include "tool_box/default_tasks.h"
 #include "tool_box.h"
 #include "component.h"
-#include "ksitool_err.h"
+#include "logksi_err.h"
 #include "printer.h"
 #include "conf_file.h"
 
@@ -134,7 +134,7 @@ static void print_general_help(PARAM_SET *set, const char *KSI_CONF){
 		hash_algorithms_to_string(buf, sizeof(buf)));
 }
 
-static int ksitool_compo_get(TASK_SET *tasks, PARAM_SET **set, TOOL_COMPONENT_LIST **compo);
+static int logksi_compo_get(TASK_SET *tasks, PARAM_SET **set, TOOL_COMPONENT_LIST **compo);
 static int min_arg_cnt(TASK_ID id);
 
 int main(int argc, char** argv, char **envp) {
@@ -179,7 +179,7 @@ int main(int argc, char** argv, char **envp) {
 	/**
 	 * Get all possible components to run.
 	 */
-	res = ksitool_compo_get(tasks, &set_task_name, &components);
+	res = logksi_compo_get(tasks, &set_task_name, &components);
 	if (res != PST_OK) {
 		print_errors("Error: Unable get ksi components.\n");
 		goto cleanup;
@@ -275,7 +275,7 @@ int main(int argc, char** argv, char **envp) {
 cleanup:
 
 	if (res != KT_OK && retval == EXIT_SUCCESS) {
-		retval = KSITOOL_errToExitCode(res);
+		retval = LOGKSI_errToExitCode(res);
 	}
 
 	PARAM_SET_free(set);
@@ -287,7 +287,7 @@ cleanup:
 	return retval;
 }
 
-static int ksitool_compo_get(TASK_SET *tasks, PARAM_SET **set, TOOL_COMPONENT_LIST **compo) {
+static int logksi_compo_get(TASK_SET *tasks, PARAM_SET **set, TOOL_COMPONENT_LIST **compo) {
 	int res;
 	TOOL_COMPONENT_LIST *tmp_compo = NULL;
 	PARAM_SET *tmp_set = NULL;

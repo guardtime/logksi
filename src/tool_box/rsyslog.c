@@ -21,7 +21,7 @@
 #include "param_set/param_set.h"
 #include "err_trckr.h"
 #include <ksi/ksi.h>
-#include "ksitool_err.h"
+#include "logksi_err.h"
 #include "api_wrapper.h"
 #include "printer.h"
 #include "obj_printer.h"
@@ -1493,7 +1493,7 @@ int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *fi
 
 	memset(&blocks, 0, sizeof(blocks));
 	blocks.ftlv_raw = ftlv_raw;
-	processors.create_signature = KSITOOL_createSignature;
+	processors.create_signature = LOGKSI_createSignature;
 
 	res = process_magic_number(set, err, &blocks, files);
 	if (res != KT_OK) goto cleanup;

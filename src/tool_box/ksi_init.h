@@ -27,7 +27,7 @@ extern "C" {
 
 #include <stdio.h>	
 #include <ksi/ksi.h>
-#include "ksitool_err.h"	
+#include "logksi_err.h"	
 #include "smart_file.h"
 #include "err_trckr.h"
 

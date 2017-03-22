@@ -117,11 +117,11 @@ cleanup:
 	close_input_and_output_files(res, &files);
 
 	print_progressResult(res);
-	KSITOOL_KSI_ERRTrace_save(ksi);
+	LOGKSI_KSI_ERRTrace_save(ksi);
 
 	if (res != KT_OK) {
 		if (ERR_TRCKR_getErrCount(err) == 0) {ERR_TRCKR_ADD(err, res, NULL);}
-		KSITOOL_KSI_ERRTrace_LOG(ksi);
+		LOGKSI_KSI_ERRTrace_LOG(ksi);
 
 		print_errors("\n");
 		if (d) 	ERR_TRCKR_printExtendedErrors(err);
@@ -134,7 +134,7 @@ cleanup:
 	ERR_TRCKR_free(err);
 	KSI_CTX_free(ksi);
 
-	return KSITOOL_errToExitCode(res);
+	return LOGKSI_errToExitCode(res);
 }
 
 char *sign_help_toString(char*buf, size_t len) {

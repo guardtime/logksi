@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include <ksi/compatibility.h>
 #include "param_set/param_set.h"
-#include "ksitool_err.h"
+#include "logksi_err.h"
 #include "printer.h"
 #include "conf_file.h"
 #include "tool.h"
@@ -78,7 +78,7 @@ cleanup:
 
 	PARAM_SET_free(set);
 
-	return KSITOOL_errToExitCode(res);
+	return LOGKSI_errToExitCode(res);
 }
 
 char *conf_help_toString(char *buf, size_t len) {

@@ -208,7 +208,7 @@ cleanup:
 	return res;
 }
 
-int KSITOOL_extendSignature(ERR_TRCKR *err, KSI_CTX *ctx, KSI_Signature *sig, KSI_VerificationContext *context, KSI_Signature **ext) {
+int LOGKSI_extendSignature(ERR_TRCKR *err, KSI_CTX *ctx, KSI_Signature *sig, KSI_VerificationContext *context, KSI_Signature **ext) {
 	int res;
 
 	if (err == NULL || ctx == NULL || sig == NULL || ext == NULL) {
@@ -217,7 +217,7 @@ int KSITOOL_extendSignature(ERR_TRCKR *err, KSI_CTX *ctx, KSI_Signature *sig, KS
 	}
 
 	res = KSI_extendSignatureWithPolicy(ctx, sig, KSI_VERIFICATION_POLICY_INTERNAL, context, ext);
-	if (res != KSI_OK) KSITOOL_KSI_ERRTrace_save(ctx);
+	if (res != KSI_OK) LOGKSI_KSI_ERRTrace_save(ctx);
 
 	if (appendBaseErrorIfPresent(err, res, ctx, __LINE__) == 0) {
 		appendNetworkErrors(err, res);
@@ -228,7 +228,7 @@ int KSITOOL_extendSignature(ERR_TRCKR *err, KSI_CTX *ctx, KSI_Signature *sig, KS
 	return res;
 }
 
-int KSITOOL_Signature_extendTo(ERR_TRCKR *err, const KSI_Signature *signature, KSI_CTX *ctx, KSI_Integer *to, KSI_VerificationContext *context, KSI_Signature **extended) {
+int LOGKSI_Signature_extendTo(ERR_TRCKR *err, const KSI_Signature *signature, KSI_CTX *ctx, KSI_Integer *to, KSI_VerificationContext *context, KSI_Signature **extended) {
 	int res;
 
 	if (err == NULL || ctx == NULL || signature == NULL || to == NULL || extended == NULL) {
@@ -237,7 +237,7 @@ int KSITOOL_Signature_extendTo(ERR_TRCKR *err, const KSI_Signature *signature, K
 	}
 
 	res = KSI_Signature_extendToWithPolicy(signature, ctx, to, KSI_VERIFICATION_POLICY_INTERNAL, context, extended);
-	if (res != KSI_OK) KSITOOL_KSI_ERRTrace_save(ctx);
+	if (res != KSI_OK) LOGKSI_KSI_ERRTrace_save(ctx);
 
 	if (appendBaseErrorIfPresent(err, res, ctx, __LINE__) == 0) {
 		appendNetworkErrors(err, res);
@@ -246,7 +246,7 @@ int KSITOOL_Signature_extendTo(ERR_TRCKR *err, const KSI_Signature *signature, K
 	return res;
 }
 
-int KSITOOL_Signature_extend(ERR_TRCKR *err, const KSI_Signature *signature, KSI_CTX *ctx, const KSI_PublicationRecord *pubRec, KSI_VerificationContext *context, KSI_Signature **extended) {
+int LOGKSI_Signature_extend(ERR_TRCKR *err, const KSI_Signature *signature, KSI_CTX *ctx, const KSI_PublicationRecord *pubRec, KSI_VerificationContext *context, KSI_Signature **extended) {
 	int res;
 
 	if (err == NULL || ctx == NULL || signature == NULL || pubRec == NULL || extended == NULL) {
@@ -255,7 +255,7 @@ int KSITOOL_Signature_extend(ERR_TRCKR *err, const KSI_Signature *signature, KSI
 	}
 
 	res = KSI_Signature_extendWithPolicy(signature, ctx, pubRec, KSI_VERIFICATION_POLICY_INTERNAL, context, extended);
-	if (res != KSI_OK) KSITOOL_KSI_ERRTrace_save(ctx);
+	if (res != KSI_OK) LOGKSI_KSI_ERRTrace_save(ctx);
 
 	if (appendBaseErrorIfPresent(err, res, ctx, __LINE__) == 0) {
 		appendNetworkErrors(err, res);
@@ -265,7 +265,7 @@ int KSITOOL_Signature_extend(ERR_TRCKR *err, const KSI_Signature *signature, KSI
 	return res;
 }
 
-int KSITOOL_RequestHandle_getExtendResponse(ERR_TRCKR *err, KSI_CTX *ctx, KSI_RequestHandle *handle, KSI_ExtendResp **resp) {
+int LOGKSI_RequestHandle_getExtendResponse(ERR_TRCKR *err, KSI_CTX *ctx, KSI_RequestHandle *handle, KSI_ExtendResp **resp) {
 	int res;
 
 	if (err == NULL || ctx == NULL || handle == NULL || resp == NULL) {
@@ -274,7 +274,7 @@ int KSITOOL_RequestHandle_getExtendResponse(ERR_TRCKR *err, KSI_CTX *ctx, KSI_Re
 	}
 
 	res = KSI_RequestHandle_getExtendResponse(handle, resp);
-	if (res != KSI_OK) KSITOOL_KSI_ERRTrace_save(ctx);
+	if (res != KSI_OK) LOGKSI_KSI_ERRTrace_save(ctx);
 
 	if (appendBaseErrorIfPresent(err, res, ctx, __LINE__) == 0) {
 		appendNetworkErrors(err, res);
@@ -284,7 +284,7 @@ int KSITOOL_RequestHandle_getExtendResponse(ERR_TRCKR *err, KSI_CTX *ctx, KSI_Re
 	return res;
 }
 
-int KSITOOL_SignatureVerify_general(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
+int LOGKSI_SignatureVerify_general(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
 									KSI_PublicationData *pubdata, int extperm,
 									KSI_PolicyVerificationResult **result) {
 	int res;
@@ -296,22 +296,22 @@ int KSITOOL_SignatureVerify_general(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX 
 
 	/* First check if user has provided publications */
 	if (pubdata != NULL) {
-		res = KSITOOL_SignatureVerify_userProvidedPublicationBased(err, sig, ctx, hsh, rootLevel, pubdata, extperm, result);
+		res = LOGKSI_SignatureVerify_userProvidedPublicationBased(err, sig, ctx, hsh, rootLevel, pubdata, extperm, result);
 	} else {
 		/* Get available trust anchor from the signature */
-		if (KSITOOL_Signature_isCalendarAuthRecPresent(sig)) {
-			res = KSITOOL_SignatureVerify_keyBased(err, sig, ctx, hsh, rootLevel, result);
-		} else if (KSITOOL_Signature_isPublicationRecordPresent(sig)) {
-			res = KSITOOL_SignatureVerify_publicationsFileBased(err, sig, ctx, hsh, rootLevel, extperm, result);
+		if (LOGKSI_Signature_isCalendarAuthRecPresent(sig)) {
+			res = LOGKSI_SignatureVerify_keyBased(err, sig, ctx, hsh, rootLevel, result);
+		} else if (LOGKSI_Signature_isPublicationRecordPresent(sig)) {
+			res = LOGKSI_SignatureVerify_publicationsFileBased(err, sig, ctx, hsh, rootLevel, extperm, result);
 		} else {
-			res = KSITOOL_SignatureVerify_calendarBased(err, sig, ctx, hsh, rootLevel, result);
+			res = LOGKSI_SignatureVerify_calendarBased(err, sig, ctx, hsh, rootLevel, result);
 		}
 	}
 
 	return res;
 }
 
-int KSITOOL_SignatureVerify_internally(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
+int LOGKSI_SignatureVerify_internally(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
 									   KSI_PolicyVerificationResult **result) {
 	int res;
 
@@ -321,13 +321,13 @@ int KSITOOL_SignatureVerify_internally(ERR_TRCKR *err, KSI_Signature *sig, KSI_C
 	}
 
 	res = verify_signature(sig, ctx, hsh, rootLevel, 0, NULL, NULL, KSI_VERIFICATION_POLICY_INTERNAL, result);
-	if (res != KSI_OK) KSITOOL_KSI_ERRTrace_save(ctx);
+	if (res != KSI_OK) LOGKSI_KSI_ERRTrace_save(ctx);
 	appendBaseErrorIfPresent(err, res, ctx, __LINE__);
 
 	return res;
 }
 
-int KSITOOL_SignatureVerify_calendarBased(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
+int LOGKSI_SignatureVerify_calendarBased(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
 										  KSI_PolicyVerificationResult **result) {
 	int res;
 
@@ -337,7 +337,7 @@ int KSITOOL_SignatureVerify_calendarBased(ERR_TRCKR *err, KSI_Signature *sig, KS
 	}
 
 	res = verify_signature(sig, ctx, hsh, rootLevel, 1, NULL, NULL, KSI_VERIFICATION_POLICY_CALENDAR_BASED, result);
-	if (res != KSI_OK) KSITOOL_KSI_ERRTrace_save(ctx);
+	if (res != KSI_OK) LOGKSI_KSI_ERRTrace_save(ctx);
 
 	if (appendBaseErrorIfPresent(err, res, ctx, __LINE__) == 0) {
 		appendNetworkErrors(err, res);
@@ -346,7 +346,7 @@ int KSITOOL_SignatureVerify_calendarBased(ERR_TRCKR *err, KSI_Signature *sig, KS
 	return res;
 }
 
-int KSITOOL_SignatureVerify_keyBased(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
+int LOGKSI_SignatureVerify_keyBased(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
 									 KSI_PolicyVerificationResult **result){
 	int res;
 
@@ -356,7 +356,7 @@ int KSITOOL_SignatureVerify_keyBased(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX
 	}
 
 	res = verify_signature(sig, ctx, hsh, rootLevel, 0, NULL, NULL, KSI_VERIFICATION_POLICY_KEY_BASED, result);
-	if (res != KSI_OK) KSITOOL_KSI_ERRTrace_save(ctx);
+	if (res != KSI_OK) LOGKSI_KSI_ERRTrace_save(ctx);
 
 	if (appendBaseErrorIfPresent(err, res, ctx, __LINE__) == 0) {
 		appendPubFileErros(err, res);
@@ -364,7 +364,7 @@ int KSITOOL_SignatureVerify_keyBased(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX
 	return res;
 }
 
-int KSITOOL_SignatureVerify_publicationsFileBased(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
+int LOGKSI_SignatureVerify_publicationsFileBased(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
 												  int extperm,
 												  KSI_PolicyVerificationResult **result){
 	int res;
@@ -375,7 +375,7 @@ int KSITOOL_SignatureVerify_publicationsFileBased(ERR_TRCKR *err, KSI_Signature 
 	}
 
 	res = verify_signature(sig, ctx, hsh, rootLevel, extperm, NULL, NULL, KSI_VERIFICATION_POLICY_PUBLICATIONS_FILE_BASED, result);
-	if (res != KSI_OK) KSITOOL_KSI_ERRTrace_save(ctx);
+	if (res != KSI_OK) LOGKSI_KSI_ERRTrace_save(ctx);
 
 	if (appendBaseErrorIfPresent(err, res, ctx, __LINE__) == 0) {
 		appendPubFileErros(err, res);
@@ -385,7 +385,7 @@ int KSITOOL_SignatureVerify_publicationsFileBased(ERR_TRCKR *err, KSI_Signature 
 	return res;
 }
 
-int KSITOOL_SignatureVerify_userProvidedPublicationBased(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
+int LOGKSI_SignatureVerify_userProvidedPublicationBased(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
 														 KSI_PublicationData *pubdata, int extperm,
 														 KSI_PolicyVerificationResult **result){
 	int res;
@@ -398,7 +398,7 @@ int KSITOOL_SignatureVerify_userProvidedPublicationBased(ERR_TRCKR *err, KSI_Sig
 	if (pubdata == NULL) return KSI_INVALID_FORMAT;
 
 	res = verify_signature(sig, ctx, hsh, rootLevel, extperm, NULL, pubdata, KSI_VERIFICATION_POLICY_USER_PUBLICATION_BASED, result);
-	if (res != KSI_OK) KSITOOL_KSI_ERRTrace_save(ctx);
+	if (res != KSI_OK) LOGKSI_KSI_ERRTrace_save(ctx);
 
 	if (appendBaseErrorIfPresent(err, res, ctx, __LINE__) == 0) {
 		appendNetworkErrors(err, res);
@@ -407,10 +407,10 @@ int KSITOOL_SignatureVerify_userProvidedPublicationBased(ERR_TRCKR *err, KSI_Sig
 	return res;
 }
 
-int KSITOOL_createSignature(ERR_TRCKR *err, KSI_CTX *ctx, KSI_DataHash *dataHash, KSI_uint64_t rootLevel, KSI_Signature **sig) {
+int LOGKSI_createSignature(ERR_TRCKR *err, KSI_CTX *ctx, KSI_DataHash *dataHash, KSI_uint64_t rootLevel, KSI_Signature **sig) {
 	int res;
 	res = KSI_Signature_signAggregated(ctx, dataHash, rootLevel, sig);
-	if (res != KSI_OK) KSITOOL_KSI_ERRTrace_save(ctx);
+	if (res != KSI_OK) LOGKSI_KSI_ERRTrace_save(ctx);
 	if (appendBaseErrorIfPresent(err, res, ctx, __LINE__) == 0) {
 		appendNetworkErrors(err, res);
 		appendAggreErrors(err, res);
@@ -418,7 +418,7 @@ int KSITOOL_createSignature(ERR_TRCKR *err, KSI_CTX *ctx, KSI_DataHash *dataHash
 	return res;
 }
 
-int KSITOOL_receivePublicationsFile(ERR_TRCKR *err, KSI_CTX *ctx, KSI_PublicationsFile **pubFile) {
+int LOGKSI_receivePublicationsFile(ERR_TRCKR *err, KSI_CTX *ctx, KSI_PublicationsFile **pubFile) {
 	int res;
 
 	if (err == NULL || ctx == NULL || pubFile == NULL) {
@@ -427,7 +427,7 @@ int KSITOOL_receivePublicationsFile(ERR_TRCKR *err, KSI_CTX *ctx, KSI_Publicatio
 	}
 
 	res = KSI_receivePublicationsFile(ctx, pubFile);
-	if (res != KSI_OK) KSITOOL_KSI_ERRTrace_save(ctx);
+	if (res != KSI_OK) LOGKSI_KSI_ERRTrace_save(ctx);
 
 	if (appendBaseErrorIfPresent(err, res, ctx, __LINE__) == 0) {
 		appendPubFileErros(err, res);
@@ -436,7 +436,7 @@ int KSITOOL_receivePublicationsFile(ERR_TRCKR *err, KSI_CTX *ctx, KSI_Publicatio
 	return res;
 }
 
-int KSITOOL_verifyPublicationsFile(ERR_TRCKR *err, KSI_CTX *ctx, KSI_PublicationsFile *pubfile) {
+int LOGKSI_verifyPublicationsFile(ERR_TRCKR *err, KSI_CTX *ctx, KSI_PublicationsFile *pubfile) {
 	int res;
 
 	if (err == NULL || ctx == NULL || pubfile == NULL) {
@@ -445,14 +445,14 @@ int KSITOOL_verifyPublicationsFile(ERR_TRCKR *err, KSI_CTX *ctx, KSI_Publication
 	}
 
 	res = KSI_verifyPublicationsFile(ctx, pubfile);
-	if (res != KSI_OK) KSITOOL_KSI_ERRTrace_save(ctx);
+	if (res != KSI_OK) LOGKSI_KSI_ERRTrace_save(ctx);
 	appendBaseErrorIfPresent(err, res, ctx, __LINE__);
 	appendPubFileErros(err, res);
 
 	return res;
 }
 
-int KSITOOL_Signature_isPublicationRecordPresent(const KSI_Signature *sig) {
+int LOGKSI_Signature_isPublicationRecordPresent(const KSI_Signature *sig) {
 	KSI_PublicationRecord *pubRec = NULL;
 
 	if (sig == NULL) return 0;
@@ -461,7 +461,7 @@ int KSITOOL_Signature_isPublicationRecordPresent(const KSI_Signature *sig) {
 	return pubRec == NULL ? 0 : 1;
 }
 
-int KSITOOL_Signature_isCalendarAuthRecPresent(const KSI_Signature *sig) {
+int LOGKSI_Signature_isCalendarAuthRecPresent(const KSI_Signature *sig) {
 	KSI_CalendarAuthRec *calRec = NULL;
 
 	if (sig == NULL) return 0;
@@ -472,7 +472,7 @@ int KSITOOL_Signature_isCalendarAuthRecPresent(const KSI_Signature *sig) {
 
 char err_buf[0x2000] = "";
 
-void KSITOOL_KSI_ERRTrace_save(KSI_CTX *ctx) {
+void LOGKSI_KSI_ERRTrace_save(KSI_CTX *ctx) {
 	static int lock = 0;
 	int error = KSI_UNKNOWN_ERROR;
 	char dummybuf[1];
@@ -486,21 +486,21 @@ void KSITOOL_KSI_ERRTrace_save(KSI_CTX *ctx) {
 	}
 }
 
-const char *KSITOOL_KSI_ERRTrace_get(void) {
+const char *LOGKSI_KSI_ERRTrace_get(void) {
 	return err_buf;
 }
 
-void KSITOOL_KSI_ERRTrace_LOG(KSI_CTX *ksi) {
+void LOGKSI_KSI_ERRTrace_LOG(KSI_CTX *ksi) {
 	const char *err_trace = NULL;
 	if (ksi == NULL) return;
 
-	err_trace = KSITOOL_KSI_ERRTrace_get();
+	err_trace = LOGKSI_KSI_ERRTrace_get();
 	if (err_trace != NULL && err_trace[0] != '\0') {
-		KSI_LOG_debug(ksi, "\n%s", KSITOOL_KSI_ERRTrace_get());
+		KSI_LOG_debug(ksi, "\n%s", LOGKSI_KSI_ERRTrace_get());
 	}
 }
 
-char *KSITOOL_DataHash_toString(KSI_DataHash *hsh, char *buf, size_t buf_len) {
+char *LOGKSI_DataHash_toString(KSI_DataHash *hsh, char *buf, size_t buf_len) {
 	char tmp[1024];
 	char alg_hex_str[3] = {0, 0, 0};
 	KSI_HashAlgorithm alg = KSI_HASHALG_INVALID;
@@ -516,7 +516,7 @@ char *KSITOOL_DataHash_toString(KSI_DataHash *hsh, char *buf, size_t buf_len) {
 	return buf;
 }
 
-char *KSITOOL_PublicationData_toString(KSI_PublicationData *data, char *buf, size_t buf_len) {
+char *LOGKSI_PublicationData_toString(KSI_PublicationData *data, char *buf, size_t buf_len) {
 	char *ret = NULL;
 	int res;
 	char tmp[1024];
@@ -537,7 +537,7 @@ char *KSITOOL_PublicationData_toString(KSI_PublicationData *data, char *buf, siz
 		res = KSI_PublicationData_getImprint(data, &data_hash);
 		if (res != KT_OK) goto cleanup;
 
-		if (KSITOOL_DataHash_toString(data_hash, hash_str, sizeof(hash_str)) == NULL) goto cleanup;
+		if (LOGKSI_DataHash_toString(data_hash, hash_str, sizeof(hash_str)) == NULL) goto cleanup;
 		KSI_snprintf(buf, buf_len, "%s%s%s", tmp, "Published hash: ", hash_str);
 	}
 
@@ -548,7 +548,7 @@ cleanup:
 	return ret;
 }
 
-char *KSITOOL_PublicationRecord_toString(KSI_PublicationRecord *rec, char *buf, size_t buf_len) {
+char *LOGKSI_PublicationRecord_toString(KSI_PublicationRecord *rec, char *buf, size_t buf_len) {
 	int res;
 	KSI_PublicationData *pub_data = NULL;
 	KSI_Utf8StringList *pub_ref_list = NULL;
@@ -567,7 +567,7 @@ char *KSITOOL_PublicationRecord_toString(KSI_PublicationRecord *rec, char *buf, 
 	res = KSI_PublicationRecord_getPublicationRefList(rec, &pub_ref_list);
 	if (res != KSI_OK) goto cleanup;
 
-	count += KSI_snprintf(buf + count, buf_len - count, "%s", KSITOOL_PublicationData_toString(pub_data, tmp, sizeof(tmp)));
+	count += KSI_snprintf(buf + count, buf_len - count, "%s", LOGKSI_PublicationData_toString(pub_data, tmp, sizeof(tmp)));
 
 	for (i = 0; i < KSI_Utf8StringList_length(pub_ref_list); i++) {
 		KSI_Utf8String *ref = NULL;
@@ -597,7 +597,7 @@ static const char *level2str(int level) {
 	}
 }
 
-int KSITOOL_LOG_SmartFile(void *logCtx, int logLevel, const char *message) {
+int LOGKSI_LOG_SmartFile(void *logCtx, int logLevel, const char *message) {
 	char time_buf[32];
 	char buf[0xffff];
 	struct tm *tm_info;
@@ -644,7 +644,7 @@ static int load_ksi_obj(ERR_TRCKR *err, KSI_CTX *ksi, const char *path, const ch
 
 	res = SMART_FILE_open(path, mode, &file);
 	if (res != KT_OK) {
-		ERR_TRCKR_ADD(err, res, "Error: %s", KSITOOL_errToString(res));
+		ERR_TRCKR_ADD(err, res, "Error: %s", LOGKSI_errToString(res));
 		goto cleanup;
 	}
 
@@ -710,7 +710,7 @@ static int saveKsiObj(ERR_TRCKR *err, KSI_CTX *ksi, const char *mode, void *obj,
 
 	res = SMART_FILE_open(path, mode, &file);
 	if (res != KT_OK) {
-		ERR_TRCKR_ADD(err, res, "Error: %s", KSITOOL_errToString(res));
+		ERR_TRCKR_ADD(err, res, "Error: %s", LOGKSI_errToString(res));
 		goto cleanup;
 	}
 
@@ -801,7 +801,7 @@ int KSI_OBJ_isSignatureExtended(const KSI_Signature *sig) {
 	return pubRec == NULL ? 0 : 1;
 }
 
-int KSITOOL_KSI_ERR_toExitCode(int error_code) {
+int LOGKSI_KSI_ERR_toExitCode(int error_code) {
 
 	switch (error_code) {
 		case KSI_OK:

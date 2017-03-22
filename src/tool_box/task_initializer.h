@@ -23,7 +23,7 @@
 #include <ksi/ksi.h>
 #include "param_set/param_set.h"
 #include "param_set/task_def.h"
-#include "ksitool_err.h"
+#include "logksi_err.h"
 
 #ifdef	__cplusplus
 extern "C" {

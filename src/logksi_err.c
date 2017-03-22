@@ -21,12 +21,12 @@
 #include <string.h>
 #include <stdarg.h>
 #include <ksi/ksi.h>
-#include "ksitool_err.h"
+#include "logksi_err.h"
 #include "param_set/param_set.h"
 #include "smart_file.h"
 #include "api_wrapper.h"
 
-static int ksitool_ErrToExitcode(int error_code) {
+static int logksi_ErrToExitcode(int error_code) {
 	switch (error_code) {
 		case KSI_OK:
 			return EXIT_SUCCESS;
@@ -100,7 +100,7 @@ static int smart_file_ErrToExitcode(int error_code) {
 	}
 }
 
-static const char* ksitoolErrToString(int error_code) {
+static const char* logksiErrToString(int error_code) {
 	switch (error_code) {
 		case KSI_OK:
 			return "OK.";
@@ -142,13 +142,13 @@ static const char* ksitoolErrToString(int error_code) {
 }
 
 
-int KSITOOL_errToExitCode(int error) {
+int LOGKSI_errToExitCode(int error) {
 	int exit;
 
-	if (error < KSITOOL_ERR_BASE)
-		exit = KSITOOL_KSI_ERR_toExitCode(error);
-	else if (error >= KSITOOL_ERR_BASE && error < PARAM_SET_ERROR_BASE)
-		exit = ksitool_ErrToExitcode(error);
+	if (error < LOGKSI_ERR_BASE)
+		exit = LOGKSI_KSI_ERR_toExitCode(error);
+	else if (error >= LOGKSI_ERR_BASE && error < PARAM_SET_ERROR_BASE)
+		exit = logksi_ErrToExitcode(error);
 	else if (error >= PARAM_SET_ERROR_BASE && error < SMART_FILE_ERROR_BASE)
 		exit = param_set_ErrToExitcode(error);
 	else
@@ -157,13 +157,13 @@ int KSITOOL_errToExitCode(int error) {
 	return exit;
 }
 
-const char* KSITOOL_errToString(int error) {
+const char* LOGKSI_errToString(int error) {
 	const char* str;
 
-	if (error < KSITOOL_ERR_BASE)
+	if (error < LOGKSI_ERR_BASE)
 		str = KSI_getErrorString(error);
-	else if (error >= KSITOOL_ERR_BASE && error < PARAM_SET_ERROR_BASE)
-		str = ksitoolErrToString(error);
+	else if (error >= LOGKSI_ERR_BASE && error < PARAM_SET_ERROR_BASE)
+		str = logksiErrToString(error);
 	else if (error >= PARAM_SET_ERROR_BASE && error < SMART_FILE_ERROR_BASE)
 		str = PARAM_SET_errorToString(error);
 	else

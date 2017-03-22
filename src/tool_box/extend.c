@@ -136,11 +136,11 @@ cleanup:
 	close_input_and_output_files(res, &files);
 
 	print_progressResult(res);
-	KSITOOL_KSI_ERRTrace_save(ksi);
+	LOGKSI_KSI_ERRTrace_save(ksi);
 
 	if (res != KT_OK) {
 		if (ERR_TRCKR_getErrCount(err) == 0) {ERR_TRCKR_ADD(err, res, NULL);}
-		KSITOOL_KSI_ERRTrace_LOG(ksi);
+		LOGKSI_KSI_ERRTrace_LOG(ksi);
 
 		print_errors("\n");
 		if (d) ERR_TRCKR_printExtendedErrors(err);
@@ -153,7 +153,7 @@ cleanup:
 	ERR_TRCKR_free(err);
 	KSI_CTX_free(ksi);
 
-	return KSITOOL_errToExitCode(res);
+	return LOGKSI_errToExitCode(res);
 }
 char *extend_help_toString(char*buf, size_t len) {
 	size_t count = 0;
@@ -222,19 +222,19 @@ static int extend_to_nearest_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX
 	d = PARAM_SET_isSetByName(set, "d");
 
 	print_progressDesc(d, "%s", getPublicationsFileRetrieveDescriptionString(set));
-	res = KSITOOL_receivePublicationsFile(err, ksi, &pubFile);
+	res = LOGKSI_receivePublicationsFile(err, ksi, &pubFile);
 	ERR_CATCH_MSG(err, res, "Error: Unable receive publications file.");
 	print_progressResult(res);
 
 	if (!PARAM_SET_isSetByName(set, "publications-file-no-verify")) {
 		print_progressDesc(d, "Verifying publications file... ");
-		res = KSITOOL_verifyPublicationsFile(err, ksi, pubFile);
+		res = LOGKSI_verifyPublicationsFile(err, ksi, pubFile);
 		ERR_CATCH_MSG(err, res, "Error: Unable to verify publications file.");
 		print_progressResult(res);
 	}
 
 	print_progressDesc(d, "Extend the signature to the earliest available publication... ");
-	res = KSITOOL_extendSignature(err, ksi, sig, context, &tmp);
+	res = LOGKSI_extendSignature(err, ksi, sig, context, &tmp);
 	ERR_CATCH_MSG(err, res, "Error: Unable to extend signature.");
 	print_progressResult(res);
 
@@ -280,7 +280,7 @@ static int extend_to_specified_time(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi
 	print_progressDesc(d, "Extending the signature to %s (%i)... ",
 			KSI_Integer_toDateString(pubTime, buf, sizeof(buf)),
 			KSI_Integer_getUInt64(pubTime));
-	res = KSITOOL_Signature_extendTo(err, sig, ksi, pubTime, context, &tmp);
+	res = LOGKSI_Signature_extendTo(err, sig, ksi, pubTime, context, &tmp);
 	ERR_CATCH_MSG(err, res, "Error: Unable to extend signature.");
 	print_progressResult(res);
 
@@ -316,7 +316,7 @@ static int extend_to_specified_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_C
 	ERR_CATCH_MSG(err, res, "Error: Unable get publication string.");
 
 	print_progressDesc(d, "%s", getPublicationsFileRetrieveDescriptionString(set));
-	res = KSITOOL_receivePublicationsFile(err, ksi, &pubFile);
+	res = LOGKSI_receivePublicationsFile(err, ksi, &pubFile);
 	ERR_CATCH_MSG(err, res, "Error: Unable receive publications file.");
 	print_progressResult(res);
 
@@ -332,13 +332,13 @@ static int extend_to_specified_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_C
 
 	if (!PARAM_SET_isSetByName(set, "publications-file-no-verify")) {
 		print_progressDesc(d, "Verifying publications file... ");
-		res = KSITOOL_verifyPublicationsFile(err, ksi, pubFile);
+		res = LOGKSI_verifyPublicationsFile(err, ksi, pubFile);
 		ERR_CATCH_MSG(err, res, "Error: Unable to verify publications file.");
 		print_progressResult(res);
 	}
 
 	print_progressDesc(d, "Extend the signature to the specified publication... ");
-	res = KSITOOL_Signature_extend(err, sig, ksi, pub_rec, context, &tmp);
+	res = LOGKSI_Signature_extend(err, sig, ksi, pub_rec, context, &tmp);
 	ERR_CATCH_MSG(err, res, "Error: Unable to extend signature.");
 	print_progressResult(res);
 

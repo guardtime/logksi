@@ -25,7 +25,7 @@
 #include "tool_box/ksi_init.h"
 #include "smart_file.h"
 #include "err_trckr.h"
-#include "ksitool_err.h"
+#include "logksi_err.h"
 #include "printer.h"
 #include "api_wrapper.h"
 
@@ -54,11 +54,11 @@ static int tool_init_ksi_logger(KSI_CTX *ksi, ERR_TRCKR *err, PARAM_SET *set, SM
 	if (outLogfile != NULL) {
 		res = SMART_FILE_open(outLogfile, "ws", &tmp);
 		if (res != KT_OK) {
-			ERR_TRCKR_ADD(err, res, "Error: %s", KSITOOL_errToString(res));
+			ERR_TRCKR_ADD(err, res, "Error: %s", LOGKSI_errToString(res));
 			goto cleanup;
 		}
 
-		res = KSI_CTX_setLoggerCallback(ksi, KSITOOL_LOG_SmartFile, tmp);
+		res = KSI_CTX_setLoggerCallback(ksi, LOGKSI_LOG_SmartFile, tmp);
 		ERR_CATCH_MSG(err, res, "Error: Unable to set logger callback function.");
 
 		res = KSI_CTX_setLogLevel(ksi, KSI_LOG_DEBUG);
@@ -341,7 +341,7 @@ int TOOL_init_ksi(PARAM_SET *set, KSI_CTX **ksi, ERR_TRCKR **error, SMART_FILE *
 	 * Initialize error tracker and configure output parameter immediately to be
 	 * able to track errors if this function fails.
      */
-	err = ERR_TRCKR_new(print_errors, KSITOOL_errToString);
+	err = ERR_TRCKR_new(print_errors, LOGKSI_errToString);
 	if (err == NULL) {
 		res = KT_OUT_OF_MEMORY;
 		print_errors("Error: Unable to initialize error tracker.");

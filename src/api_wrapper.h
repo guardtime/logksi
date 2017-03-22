@@ -20,7 +20,7 @@
 #ifndef API_WRAPPER_H
 #define	API_WRAPPER_H
 
-#include "ksitool_err.h"
+#include "logksi_err.h"
 #include <ksi/ksi.h>
 #include <ksi/policy.h>
 #include "err_trckr.h"
@@ -42,39 +42,39 @@ extern "C" {
 			ERR_TRCKR_add(err, res, __FILE__, __LINE__, "Error: %s", KSI_getErrorString(res)); \
 		}
 
-int KSITOOL_extendSignature(ERR_TRCKR *err, KSI_CTX *ctx, KSI_Signature *sig, KSI_VerificationContext *context, KSI_Signature **ext);
-int KSITOOL_Signature_extendTo(ERR_TRCKR *err, const KSI_Signature *signature, KSI_CTX *ctx, KSI_Integer *to, KSI_VerificationContext *context, KSI_Signature **extended);
-int KSITOOL_Signature_extend(ERR_TRCKR *err, const KSI_Signature *signature, KSI_CTX *ctx, const KSI_PublicationRecord *pubRec, KSI_VerificationContext *context, KSI_Signature **extended);
-int KSITOOL_RequestHandle_getExtendResponse(ERR_TRCKR *err, KSI_CTX *ctx, KSI_RequestHandle *handle, KSI_ExtendResp **resp);
-int KSITOOL_Signature_isCalendarAuthRecPresent(const KSI_Signature *sig);
-int KSITOOL_Signature_isPublicationRecordPresent(const KSI_Signature *sig);
-int KSITOOL_receivePublicationsFile(ERR_TRCKR *err ,KSI_CTX *ctx, KSI_PublicationsFile **pubFile);
-int KSITOOL_verifyPublicationsFile(ERR_TRCKR *err, KSI_CTX *ctx, KSI_PublicationsFile *pubfile);
-void KSITOOL_KSI_ERRTrace_save(KSI_CTX *ctx);
-const char *KSITOOL_KSI_ERRTrace_get(void);
-void KSITOOL_KSI_ERRTrace_LOG(KSI_CTX *ksi);
+int LOGKSI_extendSignature(ERR_TRCKR *err, KSI_CTX *ctx, KSI_Signature *sig, KSI_VerificationContext *context, KSI_Signature **ext);
+int LOGKSI_Signature_extendTo(ERR_TRCKR *err, const KSI_Signature *signature, KSI_CTX *ctx, KSI_Integer *to, KSI_VerificationContext *context, KSI_Signature **extended);
+int LOGKSI_Signature_extend(ERR_TRCKR *err, const KSI_Signature *signature, KSI_CTX *ctx, const KSI_PublicationRecord *pubRec, KSI_VerificationContext *context, KSI_Signature **extended);
+int LOGKSI_RequestHandle_getExtendResponse(ERR_TRCKR *err, KSI_CTX *ctx, KSI_RequestHandle *handle, KSI_ExtendResp **resp);
+int LOGKSI_Signature_isCalendarAuthRecPresent(const KSI_Signature *sig);
+int LOGKSI_Signature_isPublicationRecordPresent(const KSI_Signature *sig);
+int LOGKSI_receivePublicationsFile(ERR_TRCKR *err ,KSI_CTX *ctx, KSI_PublicationsFile **pubFile);
+int LOGKSI_verifyPublicationsFile(ERR_TRCKR *err, KSI_CTX *ctx, KSI_PublicationsFile *pubfile);
+void LOGKSI_KSI_ERRTrace_save(KSI_CTX *ctx);
+const char *LOGKSI_KSI_ERRTrace_get(void);
+void LOGKSI_KSI_ERRTrace_LOG(KSI_CTX *ksi);
 
-int KSITOOL_SignatureVerify_general(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PublicationData *pubdata, int extperm, KSI_PolicyVerificationResult **result);
-int KSITOOL_SignatureVerify_internally(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **result);
-int KSITOOL_SignatureVerify_calendarBased(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **result);
-int KSITOOL_SignatureVerify_keyBased(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **result);
-int KSITOOL_SignatureVerify_publicationsFileBased(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel, int extperm, KSI_PolicyVerificationResult **result);
-int KSITOOL_SignatureVerify_userProvidedPublicationBased(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PublicationData *pubdata, int extperm, KSI_PolicyVerificationResult **result);
+int LOGKSI_SignatureVerify_general(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PublicationData *pubdata, int extperm, KSI_PolicyVerificationResult **result);
+int LOGKSI_SignatureVerify_internally(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **result);
+int LOGKSI_SignatureVerify_calendarBased(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **result);
+int LOGKSI_SignatureVerify_keyBased(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **result);
+int LOGKSI_SignatureVerify_publicationsFileBased(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel, int extperm, KSI_PolicyVerificationResult **result);
+int LOGKSI_SignatureVerify_userProvidedPublicationBased(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PublicationData *pubdata, int extperm, KSI_PolicyVerificationResult **result);
 
-int KSITOOL_createSignature(ERR_TRCKR *err, KSI_CTX *ctx, KSI_DataHash *dataHash, KSI_uint64_t rootLevel, KSI_Signature **sig);
+int LOGKSI_createSignature(ERR_TRCKR *err, KSI_CTX *ctx, KSI_DataHash *dataHash, KSI_uint64_t rootLevel, KSI_Signature **sig);
 
-char *KSITOOL_DataHash_toString(KSI_DataHash *hsh, char *buf, size_t buf_len);
-char *KSITOOL_PublicationData_toString(KSI_PublicationData *data, char *buf, size_t buf_len);
-char *KSITOOL_PublicationRecord_toString(KSI_PublicationRecord *rec, char *buf, size_t buf_len);
+char *LOGKSI_DataHash_toString(KSI_DataHash *hsh, char *buf, size_t buf_len);
+char *LOGKSI_PublicationData_toString(KSI_PublicationData *data, char *buf, size_t buf_len);
+char *LOGKSI_PublicationRecord_toString(KSI_PublicationRecord *rec, char *buf, size_t buf_len);
 
 int KSI_OBJ_saveSignature(ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sign, const char *mode, const char *fname, char *f, size_t f_len);
 int KSI_OBJ_savePublicationsFile(ERR_TRCKR *err, KSI_CTX *ksi, KSI_PublicationsFile *pubfile, const char *mode, const char *fname) ;
 int KSI_OBJ_loadSignature(ERR_TRCKR *err, KSI_CTX *ksi, const char *fname, const char* mode, KSI_Signature **sig);
 int KSI_OBJ_isSignatureExtended(const KSI_Signature *sig);
 
-int KSITOOL_LOG_SmartFile(void *logCtx, int logLevel, const char *message);
+int LOGKSI_LOG_SmartFile(void *logCtx, int logLevel, const char *message);
 
-int KSITOOL_KSI_ERR_toExitCode(int error_code);
+int LOGKSI_KSI_ERR_toExitCode(int error_code);
 
 #ifdef	__cplusplus
 }

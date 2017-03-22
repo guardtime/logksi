@@ -76,7 +76,7 @@ void OBJPRINT_publicationsFileReferences(const KSI_PublicationsFile *pubFile, in
 		res = KSI_PublicationRecordList_elementAt(list_publicationRecord, i, &publicationRecord);
 		if (res != KSI_OK) return;
 
-		if (KSITOOL_PublicationRecord_toString(publicationRecord, buf, sizeof(buf)) == NULL) return;
+		if (LOGKSI_PublicationRecord_toString(publicationRecord, buf, sizeof(buf)) == NULL) return;
 
 		pStart = buf;
 		j=1;
@@ -119,7 +119,7 @@ void OBJPRINT_signaturePublicationReference(KSI_Signature *sig, int (*print)(con
 		return;
 	}
 
-	if (KSITOOL_PublicationRecord_toString(publicationRecord, buf, sizeof(buf)) == NULL) return;
+	if (LOGKSI_PublicationRecord_toString(publicationRecord, buf, sizeof(buf)) == NULL) return;
 	pStart = buf;
 
 	while ((pLineBreak = strchr(pStart, '\n')) != NULL){
@@ -147,7 +147,7 @@ void OBJPRINT_Hash(KSI_DataHash *hsh, const char *prefix, int (*print)(const cha
 
 	if (hsh == NULL) return;
 
-	if (KSITOOL_DataHash_toString(hsh, buf, sizeof(buf)) == NULL) return;
+	if (LOGKSI_DataHash_toString(hsh, buf, sizeof(buf)) == NULL) return;
 
 	print("%s%s\n",
 			prefix == NULL ? "" : prefix,
@@ -369,10 +369,10 @@ void OBJPRINT_signatureDump(KSI_Signature *sig, int (*print)(const char *format,
 	OBJPRINT_signerIdentity(sig, print);
 	print("  Trust anchor: ");
 
-	if (KSITOOL_Signature_isCalendarAuthRecPresent(sig)) {
+	if (LOGKSI_Signature_isCalendarAuthRecPresent(sig)) {
 		print("Calendar Authentication Record.\n\n");
 		OBJPRINT_signatureCertificate(sig, print);
-	} else if (KSITOOL_Signature_isPublicationRecordPresent(sig)) {
+	} else if (LOGKSI_Signature_isPublicationRecordPresent(sig)) {
 		print("Publication Record.\n\n");
 		OBJPRINT_signaturePublicationReference(sig, print);
 	} else {

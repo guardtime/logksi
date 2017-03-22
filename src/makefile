@@ -39,7 +39,7 @@ TOOL_BOX_DIR = tool_box
 LIB_OBJ = \
 	$(OBJ_DIR)\main.obj \
 	$(OBJ_DIR)\conf_file.obj \
-	$(OBJ_DIR)\ksitool_err.obj \
+	$(OBJ_DIR)\logksi_err.obj \
 	$(OBJ_DIR)\api_wrapper.obj \
 	$(OBJ_DIR)\printer.obj \
 	$(OBJ_DIR)\obj_printer.obj \

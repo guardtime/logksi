@@ -31,7 +31,7 @@
 #include "tool_box.h"
 #include "printer.h"
 #include "conf_file.h"
-#include "ksitool_err.h"
+#include "logksi_err.h"
 
 static int isKSIUserInfoInsideUrl(const char *url, char *buf_u, char *buf_k, size_t buf_len);
 static int extract_user_info_from_url_if_needed(PARAM_SET *set, const char *flag_name, const char *usr_name, const char *key_name);

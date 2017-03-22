@@ -310,7 +310,7 @@ cleanup:
 
 	if (res != KT_OK) {
 		ERR_TRCKR_ADD(err, res, "Error: Unable to get hash from command-line");
-		ERR_TRCKR_ADD(err, res, "Error: %s", KSITOOL_errToString(res));
+		ERR_TRCKR_ADD(err, res, "Error: %s", LOGKSI_errToString(res));
 	}
 
 	return res;
@@ -348,14 +348,14 @@ static int file_get_hash(ERR_TRCKR *err, KSI_CTX *ctx, const char *open_mode, co
 	 */
 	res = SMART_FILE_open(fname_in, open_mode, &in);
 	if (res != KT_OK) {
-		ERR_TRCKR_ADD(err, res, "Error: Unable to open file for reading. %s", KSITOOL_errToString(res));
+		ERR_TRCKR_ADD(err, res, "Error: Unable to open file for reading. %s", LOGKSI_errToString(res));
 		goto cleanup;
 	}
 
 	if (fname_out != NULL) {
 		res = SMART_FILE_open(fname_out, "wbs", &out);
 		if (res != KT_OK) {
-			ERR_TRCKR_ADD(err, res, "Error: Unable to open file for writing. %s", KSITOOL_errToString(res));
+			ERR_TRCKR_ADD(err, res, "Error: Unable to open file for writing. %s", LOGKSI_errToString(res));
 			goto cleanup;
 		}
 	}
@@ -1008,7 +1008,7 @@ int extract_utcTime(void *extra, const char* str, void** obj) {
 	 */
 
 	res = KSI_Integer_new(ctx, time, &tmp);
-	ERR_CATCH_MSG(err, res, "Error: %s.", KSITOOL_errToString(res));
+	ERR_CATCH_MSG(err, res, "Error: %s.", LOGKSI_errToString(res));
 
 	*obj = (void*)tmp;
 	tmp = NULL;

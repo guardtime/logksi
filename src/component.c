@@ -24,7 +24,7 @@
 #include <string.h>
 #include "tool_box.h"
 #include "param_set/strn.h"
-#include "ksitool_err.h"
+#include "logksi_err.h"
 #include "tool.h"
 
 #ifdef _WIN32

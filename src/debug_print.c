@@ -24,7 +24,7 @@
 #include "param_set/param_set.h"
 #include "tool_box.h"
 #include "ksi/compatibility.h"
-#include "ksitool_err.h"
+#include "logksi_err.h"
 
 #ifdef _WIN32
 #	include <windows.h>

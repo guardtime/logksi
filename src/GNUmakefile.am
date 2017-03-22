@@ -69,8 +69,8 @@ logksi_SOURCES = \
 	conf_file.h \
 	printer.c \
 	printer.h \
-	ksitool_err.c \
-	ksitool_err.h \
+	logksi_err.c \
+	logksi_err.h \
 	api_wrapper.c \
 	api_wrapper.h \
 	obj_printer.c \

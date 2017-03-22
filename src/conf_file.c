@@ -26,7 +26,7 @@
 #include "param_set/parameter.h"
 #include "tool_box/param_control.h"
 #include "tool_box.h"
-#include "ksitool_err.h"
+#include "logksi_err.h"
 #include "smart_file.h"
 #include "printer.h"
 

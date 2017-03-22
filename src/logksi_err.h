@@ -17,8 +17,8 @@
  * reserves and retains all trademark rights.
  */
 
-#ifndef KSITOOL_ERR_H
-#define	KSITOOL_ERR_H
+#ifndef LOGKSI_ERR_H
+#define	LOGKSI_ERR_H
 
 
 
@@ -26,13 +26,13 @@
 extern "C" {
 #endif
 
-//    KSITOOL_ERR_BASE  0x10001
+//    LOGKSI_ERR_BASE  0x10001
 //PARAM_SET_ERROR_BASE  0x30001
 //SMART_FILE_ERROR_BASE 0x40001
 
-#define KSITOOL_ERR_BASE 0x10001
+#define LOGKSI_ERR_BASE 0x10001
 
-enum Ksitool_exit {
+enum Logksi_exit {
 	EXIT_INVALID_CL_PARAMETERS = 3,
 	EXIT_INVALID_FORMAT = 4,
 	EXIT_NETWORK_ERROR = 5,
@@ -49,9 +49,9 @@ enum Ksitool_exit {
 	EXIT_INVALID_CONF = 16,
 };
 
-enum Ksitool_errors {
+enum Logksi_errors {
 	KT_OK = 0,
-	KT_OUT_OF_MEMORY = KSITOOL_ERR_BASE,
+	KT_OUT_OF_MEMORY = LOGKSI_ERR_BASE,
 	KT_INVALID_ARGUMENT,
 	KT_UNABLE_TO_SET_STREAM_MODE,
 	KT_IO_ERROR,
@@ -77,8 +77,8 @@ enum Ksitool_errors {
 	KT_UNKNOWN_ERROR,
 };
 
-int KSITOOL_errToExitCode(int error);
-const char* KSITOOL_errToString(int error);
+int LOGKSI_errToExitCode(int error);
+const char* LOGKSI_errToString(int error);
 
 
 
@@ -86,5 +86,5 @@ const char* KSITOOL_errToString(int error);
 }
 #endif
 
-#endif	/* KSITOOL_ERR_H */
+#endif	/* LOGKSI_ERR_H */
 

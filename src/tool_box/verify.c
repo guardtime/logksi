@@ -175,11 +175,11 @@ cleanup:
 	close_log_and_signature_files(&files);
 
 	print_progressResult(res);
-	KSITOOL_KSI_ERRTrace_save(ksi);
+	LOGKSI_KSI_ERRTrace_save(ksi);
 
 	if (res != KT_OK) {
 		if (ERR_TRCKR_getErrCount(err) == 0) {ERR_TRCKR_ADD(err, res, NULL);}
-		KSITOOL_KSI_ERRTrace_LOG(ksi);
+		LOGKSI_KSI_ERRTrace_LOG(ksi);
 
 		print_errors("\n");
 		if (d) ERR_TRCKR_printExtendedErrors(err);
@@ -193,7 +193,7 @@ cleanup:
 	ERR_TRCKR_free(err);
 	KSI_CTX_free(ksi);
 
-	return KSITOOL_errToExitCode(res);
+	return LOGKSI_errToExitCode(res);
 }
 
 char *verify_help_toString(char *buf, size_t len) {
@@ -346,7 +346,7 @@ static int signature_verify_general(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi
 	 * Verify signature.
 	 */
 	print_progressDesc(d, "%s... ", task);
-	res = KSITOOL_SignatureVerify_general(err, sig, ksi, hsh, rootLevel, pub_data, x, out);
+	res = LOGKSI_SignatureVerify_general(err, sig, ksi, hsh, rootLevel, pub_data, x, out);
 	if (*out != NULL) {
 		ERR_CATCH_MSG(err, res, "Error: [%s] %s. %s failed.", OBJPRINT_getVerificationErrorCode((*out)->finalResult.errorCode),
 				OBJPRINT_getVerificationErrorDescription((*out)->finalResult.errorCode), task);
@@ -375,7 +375,7 @@ static int signature_verify_internally(PARAM_SET *set, ERR_TRCKR *err,
 	d = PARAM_SET_isSetByName(set, "d");
 
 	print_progressDesc(d, "%s... ", task);
-	res = KSITOOL_SignatureVerify_internally(err, sig, ksi, hsh, rootLevel, out);
+	res = LOGKSI_SignatureVerify_internally(err, sig, ksi, hsh, rootLevel, out);
 	if (*out != NULL) {
 		ERR_CATCH_MSG(err, res, "Error: [%s] %s. %s failed.", OBJPRINT_getVerificationErrorCode((*out)->finalResult.errorCode),
 				OBJPRINT_getVerificationErrorDescription((*out)->finalResult.errorCode), task);
@@ -404,7 +404,7 @@ static int signature_verify_key_based(PARAM_SET *set, ERR_TRCKR *err,
 	 * Verify signature.
 	 */
 	print_progressDesc(d, "%s... ", task);
-	res = KSITOOL_SignatureVerify_keyBased(err, sig, ksi, hsh, rootLevel, out);
+	res = LOGKSI_SignatureVerify_keyBased(err, sig, ksi, hsh, rootLevel, out);
 	if (*out != NULL) {
 		ERR_CATCH_MSG(err, res, "Error: [%s] %s. %s failed.", OBJPRINT_getVerificationErrorCode((*out)->finalResult.errorCode),
 				OBJPRINT_getVerificationErrorDescription((*out)->finalResult.errorCode), task);
@@ -444,7 +444,7 @@ static int signature_verify_publication_based_with_user_pub(PARAM_SET *set, ERR_
 	 * Verify signature.
 	 */
 	print_progressDesc(d, "%s... ", task);
-	res = KSITOOL_SignatureVerify_userProvidedPublicationBased(err, sig, ksi, hsh, rootLevel, pub_data, x, out);
+	res = LOGKSI_SignatureVerify_userProvidedPublicationBased(err, sig, ksi, hsh, rootLevel, pub_data, x, out);
 	if (*out != NULL) {
 		ERR_CATCH_MSG(err, res, "Error: [%s] %s. %s failed.", OBJPRINT_getVerificationErrorCode((*out)->finalResult.errorCode),
 				OBJPRINT_getVerificationErrorDescription((*out)->finalResult.errorCode), task);
@@ -475,7 +475,7 @@ static int signature_verify_publication_based_with_pubfile(PARAM_SET *set, ERR_T
 	 * Verify signature.
 	 */
 	print_progressDesc(d, "%s... ", task);
-	res = KSITOOL_SignatureVerify_publicationsFileBased(err, sig, ksi, hsh, rootLevel, x, out);
+	res = LOGKSI_SignatureVerify_publicationsFileBased(err, sig, ksi, hsh, rootLevel, x, out);
 	if (*out != NULL) {
 		ERR_CATCH_MSG(err, res, "Error: [%s] %s. %s failed.", OBJPRINT_getVerificationErrorCode((*out)->finalResult.errorCode),
 				OBJPRINT_getVerificationErrorDescription((*out)->finalResult.errorCode), task);
@@ -504,7 +504,7 @@ static int signature_verify_calendar_based(PARAM_SET *set, ERR_TRCKR *err,
 	 * Verify signature.
 	 */
 	print_progressDesc(d, "%s... ", task);
-	res = KSITOOL_SignatureVerify_calendarBased(err, sig, ksi, hsh, rootLevel, out);
+	res = LOGKSI_SignatureVerify_calendarBased(err, sig, ksi, hsh, rootLevel, out);
 	if (*out != NULL) {
 		ERR_CATCH_MSG(err, res, "Error: [%s] %s. %s failed.", OBJPRINT_getVerificationErrorCode((*out)->finalResult.errorCode),
 				OBJPRINT_getVerificationErrorDescription((*out)->finalResult.errorCode), task);
