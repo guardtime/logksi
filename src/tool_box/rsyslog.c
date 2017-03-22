@@ -1099,10 +1099,11 @@ cleanup:
 	return res;
 }
 
-static int finalize_log_signature(PARAM_SET *set, ERR_TRCKR *err, BLOCK_INFO *blocks) {
+static int finalize_log_signature(PARAM_SET *set, ERR_TRCKR *err, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
+	char buf[2];
 
-	if (set == NULL || err == NULL || blocks == NULL) {
+	if (set == NULL || err == NULL || blocks == NULL || files == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
@@ -1120,6 +1121,22 @@ static int finalize_log_signature(PARAM_SET *set, ERR_TRCKR *err, BLOCK_INFO *bl
 	if (blocks->partNo > blocks->sigNo) {
 		res = KT_INVALID_INPUT_FORMAT;
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3d: block signature data missing.", blocks->blockNo);
+	}
+
+	/* Log file must not contain more records than log signature file. */
+	if (files->files.log) {
+		if (fread(buf, 1, 1, files->files.log) > 0) {
+			res = KT_VERIFICATION_FAILURE;
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: end of log file contains unexpected records.", blocks->blockNo);
+		}
+	}
+
+	/* Signatures file must not contain more blocks than blocks file. */
+	if (files->files.partsSig) {
+		if (fread(buf, 1, 1, files->files.partsSig) > 0) {
+			res = KT_VERIFICATION_FAILURE;
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: end of signatures file contains unexpected data.", blocks->blockNo);
+		}
 	}
 	res = KT_OK;
 
@@ -1282,18 +1299,17 @@ int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_
 				break;
 			}
 		} else {
-			if (feof(files->files.inSig)) {
+			if (blocks.ftlv_len > 0) {
+				res = KT_INVALID_INPUT_FORMAT;
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: incomplete data found in log signature file.", blocks.blockNo);
+			} else {
 				res = KT_OK;
 				break;
-			} else {
-				/* File reading failed. */
-				res = KT_IO_ERROR;
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to read next TLV.");
 			}
 		}
 	}
 
-	res = finalize_log_signature(set, err, &blocks);
+	res = finalize_log_signature(set, err, &blocks, files);
 	if (res != KT_OK) goto cleanup;
 
 	res = KT_OK;
@@ -1364,18 +1380,17 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, VERIFYING_
 				break;
 			}
 		} else {
-			if (feof(files->files.inSig)) {
+			if (blocks.ftlv_len > 0) {
+				res = KT_INVALID_INPUT_FORMAT;
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: incomplete data found in log signature file.", blocks.blockNo);
+			} else {
 				res = KT_OK;
 				break;
-			} else {
-				/* File reading failed. */
-				res = KT_IO_ERROR;
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to read next TLV.");
 			}
 		}
 	}
 
-	res = finalize_log_signature(set, err, &blocks);
+	res = finalize_log_signature(set, err, &blocks, files);
 	if (res != KT_OK) goto cleanup;
 
 	res = KT_OK;
@@ -1435,8 +1450,15 @@ int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILE
 					if (res != KT_OK) goto cleanup;
 
 					res = KSI_FTLV_fileRead(files->files.partsSig, blocks.ftlv_raw, SOF_FTLV_BUFFER, &blocks.ftlv_len, &blocks.ftlv);
-					if (res != KT_OK) goto cleanup;
-
+					if (res != KT_OK) {
+						if (blocks.ftlv_len > 0) {
+							res = KT_INVALID_INPUT_FORMAT;
+							ERR_CATCH_MSG(err, res, "Error: Block no. %3d: incomplete data found in signatures file.", blocks.blockNo);
+						} else {
+							res = KT_VERIFICATION_FAILURE;
+							ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unexpected end of signatures file.", blocks.blockNo);
+						}
+					}
 					if (blocks.ftlv.tag != 0x904) {
 						res = KT_INVALID_INPUT_FORMAT;
 						ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unexpected TLV %04X read from block-signatures file.", blocks.blockNo, blocks.ftlv.tag);
@@ -1456,18 +1478,17 @@ int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILE
 				break;
 			}
 		} else {
-			if (feof(files->files.partsBlk)) {
+			if (blocks.ftlv_len > 0) {
+				res = KT_INVALID_INPUT_FORMAT;
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: incomplete data found in blocks file.", blocks.blockNo);
+			} else {
 				res = KT_OK;
 				break;
-			} else {
-				/* File reading failed. */
-				res = KT_IO_ERROR;
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to read next TLV.");
 			}
 		}
 	}
 
-	res = finalize_log_signature(set, err, &blocks);
+	res = finalize_log_signature(set, err, &blocks, files);
 	if (res != KT_OK) goto cleanup;
 
 	res = KT_OK;
@@ -1555,18 +1576,17 @@ int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *fi
 				break;
 			}
 		} else {
-			if (feof(files->files.inSig)) {
+			if (blocks.ftlv_len > 0) {
+				res = KT_INVALID_INPUT_FORMAT;
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: incomplete data found in log signature file.", blocks.blockNo);
+			} else {
 				res = KT_OK;
 				break;
-			} else {
-				/* File reading failed. */
-				res = KT_IO_ERROR;
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to read next TLV.");
 			}
 		}
 	}
 
-	res = finalize_log_signature(set, err, &blocks);
+	res = finalize_log_signature(set, err, &blocks, files);
 	if (res != KT_OK) goto cleanup;
 
 	res = KT_OK;
