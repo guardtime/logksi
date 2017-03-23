@@ -38,7 +38,7 @@
 static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
 static int generate_filenames(ERR_TRCKR *err, IO_FILES *files);
 static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files);
-static int acquire_file_locks(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files);
+static int acquire_file_locks(ERR_TRCKR *err, IO_FILES *files);
 static void close_input_and_output_files(int res, IO_FILES *files);
 
 int integrate_run(int argc, char **argv, char **envp) {
@@ -92,13 +92,13 @@ int integrate_run(int argc, char **argv, char **envp) {
 	res = open_input_and_output_files(err, &files);
 	if (res != KT_OK) goto cleanup;
 
-	res = acquire_file_locks(set, err, &files);
+	res = acquire_file_locks(err, &files);
 	if (res == KT_VERIFICATION_SKIPPED) {
 		res = KT_OK;
 		goto cleanup;
 	} else if (res != KT_OK) goto cleanup;
 
-	res = logsignature_integrate(set, err, ksi, &files);
+	res = logsignature_integrate(err, ksi, &files);
 	if (res != KT_OK) goto cleanup;
 
 	res = KT_OK;
@@ -306,23 +306,23 @@ cleanup:
 	return res;
 }
 
-static int acquire_file_locks(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files) {
+static int acquire_file_locks(ERR_TRCKR *err, IO_FILES *files) {
 	int res = KT_UNKNOWN_ERROR;
 
-	if (set == NULL || err == NULL || files == NULL) {
+	if (err == NULL || files == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
 
 	if (files->files.partsBlk && files->files.partsSig) {
 		/* Check that the asynchronous signing process has completed writing to blocks and signatures files. */
-		res = get_file_read_lock(set, files->files.partsBlk);
+		res = get_file_read_lock(files->files.partsBlk);
 		ERR_CATCH_MSG(err, res, "Error: could not acquire read lock for input blocks file %s.", files->internal.partsBlk);
-		res = get_file_read_lock(set, files->files.partsSig);
+		res = get_file_read_lock(files->files.partsSig);
 		ERR_CATCH_MSG(err, res, "Error: could not acquire read lock for input signatures file %s.", files->internal.partsSig);
 		res = KT_OK;
 	} else if (files->files.partsBlk == NULL && files->files.partsSig == NULL) {
-		res = get_file_read_lock(set, files->files.inSig);
+		res = get_file_read_lock(files->files.inSig);
 		ERR_CATCH_MSG(err, res, "Error: could not acquire read lock for output log signature file %s.", files->internal.inSig);
 		res = KT_VERIFICATION_SKIPPED;
 	}

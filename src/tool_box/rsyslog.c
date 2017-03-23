@@ -430,7 +430,7 @@ static size_t find_header_in_file(FILE *in, char **headers, size_t len) {
 	return res;
 }
 
-static int process_magic_number(PARAM_SET *set, ERR_TRCKR *err, BLOCK_INFO *blocks, IO_FILES *files) {
+static int process_magic_number(ERR_TRCKR *err, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	size_t count = 0;
 	char *logSignatureHeaders[] = {"LOGSIG11", "LOGSIG12"};
@@ -438,7 +438,7 @@ static int process_magic_number(PARAM_SET *set, ERR_TRCKR *err, BLOCK_INFO *bloc
 	char *signaturesFileHeaders[] = {"LOG12SIG"};
 	FILE *in = NULL;
 
-	if (set == NULL || err == NULL || files == NULL) {
+	if (err == NULL || files == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
@@ -484,7 +484,7 @@ cleanup:
 	return res;
 }
 
-static int process_block_header(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
+static int process_block_header(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	KSI_OctetString *seed = NULL;
 	KSI_DataHash *hash = NULL;
@@ -492,7 +492,7 @@ static int process_block_header(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BL
 	KSI_TlvElement *tlv = NULL;
 	KSI_uint64_t algo;
 
-	if (set == NULL || err == NULL || ksi == NULL || files == NULL || blocks == NULL) {
+	if (err == NULL || ksi == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
@@ -569,12 +569,12 @@ cleanup:
 	return res;
 }
 
-static int process_record_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
+static int process_record_hash(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	KSI_DataHash *recordHash = NULL;
 	KSI_DataHash *hash = NULL;
 
-	if (set == NULL || err == NULL || files == NULL || blocks == NULL) {
+	if (err == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
@@ -638,13 +638,13 @@ cleanup:
 	return res;
 }
 
-static int process_intermediate_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
+static int process_intermediate_hash(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	KSI_DataHash *tmpHash = NULL;
 	KSI_DataHash *hash = NULL;
 	unsigned char i;
 
-	if (set == NULL || err == NULL || files == NULL || blocks == NULL) {
+	if (err == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
@@ -720,13 +720,13 @@ cleanup:
 	return res;
 }
 
-int process_metarecord(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
+int process_metarecord(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	KSI_DataHash *hash = NULL;
 	KSI_TlvElement *tlv = NULL;
 	KSI_uint64_t metarecord_index = 0;
 
-	if (set == NULL || err == NULL || files == NULL || blocks == NULL) {
+	if (err == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
@@ -909,14 +909,14 @@ cleanup:
 	return res;
 }
 
-static int process_partial_block(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
+static int process_partial_block(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	KSI_DataHash *hash = NULL;
 	KSI_DataHash *rootHash = NULL;
 	KSI_TlvElement *tlv = NULL;
 	KSI_TlvElement *tlvNoSig = NULL;
 
-	if (set == NULL || err == NULL || ksi == NULL || files == NULL || blocks == NULL) {
+	if (err == NULL || ksi == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
@@ -972,7 +972,7 @@ cleanup:
 	return res;
 }
 
-static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PROCESSORS *processors, BLOCK_INFO *blocks, IO_FILES *files) {
+static int process_partial_signature(ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PROCESSORS *processors, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	KSI_Signature *sig = NULL;
 	KSI_DataHash *hash = NULL;
@@ -981,7 +981,7 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 	KSI_TlvElement *tlvSig = NULL;
 	KSI_TlvElement *tlvNoSig = NULL;
 
-	if (set == NULL || err == NULL || ksi == NULL || processors == NULL || files == NULL || blocks == NULL) {
+	if (err == NULL || ksi == NULL || processors == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
@@ -1098,11 +1098,11 @@ cleanup:
 	return res;
 }
 
-static int finalize_log_signature(PARAM_SET *set, ERR_TRCKR *err, BLOCK_INFO *blocks, IO_FILES *files) {
+static int finalize_log_signature(ERR_TRCKR *err, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	char buf[2];
 
-	if (set == NULL || err == NULL || blocks == NULL || files == NULL) {
+	if (err == NULL || blocks == NULL || files == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
@@ -1255,7 +1255,7 @@ int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_
 	processors.verify_signature = NULL;
 	processors.extend_signature = extend_signature;
 
-	res = process_magic_number(set, err, &blocks, files);
+	res = process_magic_number(err, &blocks, files);
 	if (res != KT_OK) goto cleanup;
 
 	while (!feof(files->files.inSig)) {
@@ -1263,22 +1263,22 @@ int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_
 		if (res == KSI_OK) {
 			switch (blocks.ftlv.tag) {
 				case 0x901:
-					res = process_block_header(set, err, ksi, &blocks, files);
+					res = process_block_header(err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
 				case 0x902:
-					res = process_record_hash(set, err, ksi, &blocks, files);
+					res = process_record_hash(err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
 				case 0x903:
-					res = process_intermediate_hash(set, err, ksi, &blocks, files);
+					res = process_intermediate_hash(err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
 				case 0x911:
-					res = process_metarecord(set, err, ksi, &blocks, files);
+					res = process_metarecord(err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
@@ -1308,7 +1308,7 @@ int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_
 		}
 	}
 
-	res = finalize_log_signature(set, err, &blocks, files);
+	res = finalize_log_signature(err, &blocks, files);
 	if (res != KT_OK) goto cleanup;
 
 	res = KT_OK;
@@ -1336,7 +1336,7 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, VERIFYING_
 	processors.verify_signature = verify_signature;
 	processors.extend_signature = NULL;
 
-	res = process_magic_number(set, err, &blocks, files);
+	res = process_magic_number(err, &blocks, files);
 	if (res != KT_OK) goto cleanup;
 
 	while (!feof(files->files.inSig)) {
@@ -1344,22 +1344,22 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, VERIFYING_
 		if (res == KSI_OK) {
 			switch (blocks.ftlv.tag) {
 				case 0x901:
-					res = process_block_header(set, err, ksi, &blocks, files);
+					res = process_block_header(err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
 				case 0x902:
-					res = process_record_hash(set, err, ksi, &blocks, files);
+					res = process_record_hash(err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
 				case 0x903:
-					res = process_intermediate_hash(set, err, ksi, &blocks, files);
+					res = process_intermediate_hash(err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
 				case 0x911:
-					res = process_metarecord(set, err, ksi, &blocks, files);
+					res = process_metarecord(err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
@@ -1389,7 +1389,7 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, VERIFYING_
 		}
 	}
 
-	res = finalize_log_signature(set, err, &blocks, files);
+	res = finalize_log_signature(err, &blocks, files);
 	if (res != KT_OK) goto cleanup;
 
 	res = KT_OK;
@@ -1401,13 +1401,13 @@ cleanup:
 	return res;
 }
 
-int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files) {
+int logsignature_integrate(ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files) {
 	int res;
 	BLOCK_INFO blocks;
 	unsigned char ftlv_raw[SOF_FTLV_BUFFER];
 	SIGNATURE_PROCESSORS processors;
 
-	if (set == NULL || err == NULL || ksi == NULL || files == NULL) {
+	if (err == NULL || ksi == NULL || files == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
@@ -1416,7 +1416,7 @@ int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILE
 	blocks.ftlv_raw = ftlv_raw;
 	processors.create_signature = NULL;
 
-	res = process_magic_number(set, err, &blocks, files);
+	res = process_magic_number(err, &blocks, files);
 	if (res != KT_OK) goto cleanup;
 
 	while (!feof(files->files.partsBlk)) {
@@ -1424,28 +1424,28 @@ int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILE
 		if (res == KSI_OK) {
 			switch (blocks.ftlv.tag) {
 				case 0x901:
-					res = process_block_header(set, err, ksi, &blocks, files);
+					res = process_block_header(err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
 				case 0x902:
-					res = process_record_hash(set, err, ksi, &blocks, files);
+					res = process_record_hash(err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
 				case 0x903:
-					res = process_intermediate_hash(set, err, ksi, &blocks, files);
+					res = process_intermediate_hash(err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
 				case 0x911:
-					res = process_metarecord(set, err, ksi, &blocks, files);
+					res = process_metarecord(err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
 				case 0x904:
 				{
-					res = process_partial_block(set, err, ksi, &blocks, files);
+					res = process_partial_block(err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 
 					res = KSI_FTLV_fileRead(files->files.partsSig, blocks.ftlv_raw, SOF_FTLV_BUFFER, &blocks.ftlv_len, &blocks.ftlv);
@@ -1463,7 +1463,7 @@ int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILE
 						ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unexpected TLV %04X read from block-signatures file.", blocks.blockNo, blocks.ftlv.tag);
 					}
 
-					res = process_partial_signature(set, err, ksi, &processors, &blocks, files);
+					res = process_partial_signature(err, ksi, &processors, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				}
 				break;
@@ -1487,7 +1487,7 @@ int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILE
 		}
 	}
 
-	res = finalize_log_signature(set, err, &blocks, files);
+	res = finalize_log_signature(err, &blocks, files);
 	if (res != KT_OK) goto cleanup;
 
 	res = KT_OK;
@@ -1515,7 +1515,7 @@ int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *fi
 	blocks.ftlv_raw = ftlv_raw;
 	processors.create_signature = LOGKSI_createSignature;
 
-	res = process_magic_number(set, err, &blocks, files);
+	res = process_magic_number(err, &blocks, files);
 	if (res != KT_OK) goto cleanup;
 
 	if (files->files.inSig != stdin) {
@@ -1536,28 +1536,28 @@ int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *fi
 		if (res == KSI_OK) {
 			switch (blocks.ftlv.tag) {
 				case 0x901:
-					res = process_block_header(set, err, ksi, &blocks, files);
+					res = process_block_header(err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
 				case 0x902:
-					res = process_record_hash(set, err, ksi, &blocks, files);
+					res = process_record_hash(err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
 				case 0x903:
-					res = process_intermediate_hash(set, err, ksi, &blocks, files);
+					res = process_intermediate_hash(err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
 				case 0x911:
-					res = process_metarecord(set, err, ksi, &blocks, files);
+					res = process_metarecord(err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
 				case 0x904:
 				{
-					res = process_partial_signature(set, err, ksi, &processors, &blocks, files);
+					res = process_partial_signature(err, ksi, &processors, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 
 					if (progress) {
@@ -1585,7 +1585,7 @@ int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *fi
 		}
 	}
 
-	res = finalize_log_signature(set, err, &blocks, files);
+	res = finalize_log_signature(err, &blocks, files);
 	if (res != KT_OK) goto cleanup;
 
 	res = KT_OK;
@@ -1598,11 +1598,11 @@ cleanup:
 }
 
 #ifndef _WIN32
-int get_file_read_lock(PARAM_SET *set, FILE *in) {
+int get_file_read_lock(FILE *in) {
 	struct flock lock;
 	int fres;
 
-	if (set == NULL || in == NULL) return KT_INVALID_ARGUMENT;
+	if (in == NULL) return KT_INVALID_ARGUMENT;
 
 	lock.l_type = F_RDLCK;
 	lock.l_whence = SEEK_SET;
@@ -1624,8 +1624,8 @@ int get_file_read_lock(PARAM_SET *set, FILE *in) {
 	}
 }
 #else
-int get_file_read_lock(PARAM_SET *set, FILE *in) {
-	if (set == NULL || in == NULL)
+int get_file_read_lock(FILE *in) {
+	if (in == NULL)
 		return KT_INVALID_ARGUMENT;
 	else
 		return KT_OK;
