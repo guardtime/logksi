@@ -5,15 +5,14 @@
  tests will be described.
 
  Tests can be run with KSI built within the project or with KSI installed on the
- machine. On unix platforms KSI binary file is located in `src` and on Windoes
- in `bin` directory. If the platform specific binary exists the tests are run
- with the corresponding binary, otherwise the installed binary is used.
+ machine. KSI binary file is located in `src` directory. If the binary built from source
+ exists, the tests are run with it, otherwise the installed binary is used.
 
 
 ## DEPENDECES
 
  * shelltestrunner - Mandatory for every test.
- * valgrind - For memory tests only, unix.
+ * valgrind - For memory tests only.
  * gttlvutil - When available extra tests for metadata and masking are performed.
 
 
@@ -31,10 +30,9 @@
  TEST-README      - You are reading it right now.
  convert-to-memory-test.sh 
                   - helper scrip that converts regular test to valgrind
-                    memory test (unix only). Should not be called by the user.
+                    memory test. Should not be called by the user.
                     Is used by memory-test.sh internally.
- windows-test.bat - run tests on windows platform.
- test.sh          - run tests on unix platform.
+ test.sh          - run tests.
  memory-test.sh   - run valgrind memory tests.
 ```
 
@@ -54,10 +52,6 @@
  found from test folder to ensure that test environment is configured
  properly. The exit code is `0` on success and `1` on failure.
  
- To run tests on windows call:
-```
-    test\windows-test.bat
-```
  To run tests on centos:
 ```
     test/test.sh

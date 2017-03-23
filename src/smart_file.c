@@ -26,18 +26,8 @@
 #include "smart_file.h"
 #include "tool_box.h"
 
-#ifdef _WIN32
-#	include <windows.h>
-#	include <io.h>
-#	include <fcntl.h>
-#	define WIN_HANDLE
-#	define F_OK 0
-#	define W_OK 2
-#	define R_OK 4
-#else
-#	include <unistd.h>
-#	define OPENF
-#endif
+#include <unistd.h>
+#define OPENF
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -57,40 +47,21 @@ struct SMART_FILE_st {
 	int mustBeFreed;
 };
 
-
-/**
- * Select the implementation.
- */
-#ifdef WIN_HANDLE
-static int smart_file_open_win(const char *fname, const char *mode, void **file);
-static void smart_file_close_win(void *file);
-static int smart_file_read_win(void *file, char *raw, size_t raw_len, size_t *count);
-static int smart_file_write_win(void *file, char *raw, size_t raw_len, size_t *count);
-static int smart_file_get_error_win(unsigned);
-static int smart_file_get_stream_win(const char *mode, void **stream, int *is_close_mandatory);
-
-#else
-static int smart_file_open_unix(const char *fname, const char *mode, void **file);
-static void smart_file_close_unix(void *file);
-static int smart_file_read_unix(void *file, char *raw, size_t raw_len, size_t *count);
-static int smart_file_write_unix(void *file, char *raw, size_t raw_len, size_t *count);
-static int smart_file_get_stream_unix(const char *mode, void **stream, int *is_close_mandatory);
-static int smart_file_get_error_unix(void);
-#endif
+static int smart_file_open(const char *fname, const char *mode, void **file);
+static void smart_file_close(void *file);
+static int smart_file_read(void *file, char *raw, size_t raw_len, size_t *count);
+static int smart_file_write(void *file, char *raw, size_t raw_len, size_t *count);
+static int smart_file_get_stream(const char *mode, void **stream, int *is_close_mandatory);
+static int smart_file_get_error(void);
 
 static int is_access(const char *path, int mode) {
 	int res;
 	if (path == NULL) return 0;
-#ifdef _WIN32
-	res = _access(path, mode) == 0 ? 1 : 0;
-#else
 	res = access(path, mode) == 0 ? 1 : 0;
-#endif
 	return res;
 }
 
-#ifdef WIN_HANDLE
-static int smart_file_init_win(SMART_FILE *file) {
+static int smart_file_init(SMART_FILE *file) {
 	int res;
 
 	if (file == NULL) {
@@ -99,11 +70,11 @@ static int smart_file_init_win(SMART_FILE *file) {
 	}
 
 	file->file = NULL;
-	file->file_open = smart_file_open_win;
-	file->file_close = smart_file_close_win;
-	file->file_read = smart_file_read_win;
-	file->file_write = smart_file_write_win;
-	file->file_get_stream = smart_file_get_stream_win;
+	file->file_open = smart_file_open;
+	file->file_close = smart_file_close;
+	file->file_read = smart_file_read;
+	file->file_write = smart_file_write;
+	file->file_get_stream = smart_file_get_stream;
 
 	res = SMART_FILE_OK;
 
@@ -112,294 +83,7 @@ cleanup:
 	return res;
 }
 
-static int smart_file_open_win(const char *fname, const char *mode, void **file) {
-	int res;
-	int is_plus = 0;
-	int is_b = 0;
-	int is_r = 0;
-	int is_w = 0;
-	int is_a = 0;
-	HANDLE tmp = NULL;
-	DWORD access = 0;
-	DWORD open_mode = 0;
-
-	if (fname == NULL || mode == NULL) {
-		res = SMART_FILE_INVALID_ARG;
-		goto cleanup;
-	}
-
-	is_plus = strchr(mode, '+') == NULL ? 0 : 1;
-	is_b = strchr(mode, 'b') == NULL ? 0 : 1;
-	is_r = strchr(mode, 'r') == NULL ? 0 : 1;
-	is_w = strchr(mode, 'w') == NULL ? 0 : 1;
-	is_a = strchr(mode, 'a') == NULL ? 0 : 1;
-
-	/**
-	 * Configure the IO mode.
-	 */
-	if (is_r) {
-		access |= GENERIC_READ;
-		open_mode |= OPEN_EXISTING;
-	} else if (is_w) {
-		access |= GENERIC_WRITE;
-		if (is_plus) {
-			open_mode |= (OPEN_ALWAYS | TRUNCATE_EXISTING);
-		} else {
-			open_mode |= CREATE_ALWAYS;
-		}
-	} else {
-		res = SMART_FILE_INVALID_MODE;
-		goto cleanup;
-	}
-
-	tmp = CreateFile(fname, access, 0, NULL, open_mode, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (tmp == INVALID_HANDLE_VALUE) {
-		res = smart_file_get_error_win(GetLastError());
-		res = (res == SMART_FILE_UNKNOWN_ERROR) ? SMART_FILE_UNABLE_TO_OPEN : res;
-		goto cleanup;
-	}
-
-	*file = (void*)tmp;
-	tmp = NULL;
-	res = SMART_FILE_OK;
-
-cleanup:
-
-	smart_file_close_win(tmp);
-
-	return res;
-}
-
-static void smart_file_close_win(void *file) {
-	HANDLE tmp = file;
-	if (file == NULL) return;
-	CloseHandle(tmp);
-}
-
-static int smart_file_read_win(void *file, char *raw, size_t raw_len, size_t *count) {
-	int res;
-	HANDLE tmp = file;
-	DWORD read_count = 0;
-	DWORD raw_size = 0;
-	DWORD error_code = 0;
-
-	if (file == NULL || raw == NULL || raw_len == 0) {
-		res = SMART_FILE_INVALID_ARG;
-		goto cleanup;
-	}
-
-	raw_size = (raw_len > ULONG_MAX) ? ULONG_MAX : (DWORD)raw_len;
-
-	if (!ReadFile(tmp, (void*)raw, raw_size, &read_count, NULL)) {
-		/**
-		 * When ReadFile reads from pipe (stdin HANDLE) it finishes with success
-		 * and the next read operation fails with ERROR_BROKEN_PIPE that means
-		 * PIPE has been closed. Set status code to success and read count to zero
-		 * to indicate EOF.
-		 */
-		error_code = GetLastError();
-		if (GetFileType(tmp) == FILE_TYPE_PIPE && error_code == ERROR_BROKEN_PIPE) {
-			res = SMART_FILE_OK;
-			read_count = 0;
-		} else {
-			res = smart_file_get_error_win(error_code);
-			res = (res == SMART_FILE_UNKNOWN_ERROR) ? SMART_FILE_UNABLE_TO_READ : res;
-			goto cleanup;
-		}
-	}
-
-	if (count != NULL) {
-		*count = (size_t)read_count;
-	}
-
-	res = SMART_FILE_OK;
-
-cleanup:
-
-	return res;
-}
-
-static int smart_file_write_win(void *file, char *raw, size_t raw_len, size_t *count) {
-	int res;
-	HANDLE tmp = file;
-	DWORD write_count = 0;
-	DWORD raw_size = 0;
-
-	if (file == NULL || raw == NULL || raw_len == 0) {
-		res = SMART_FILE_INVALID_ARG;
-		goto cleanup;
-	}
-
-	raw_size = (raw_len > ULONG_MAX) ? ULONG_MAX : (DWORD)raw_len;
-
-	if (!WriteFile(tmp, (void*)raw, raw_size, &write_count, NULL)) {
-		res = smart_file_get_error_win(GetLastError());
-		res = (res == SMART_FILE_UNKNOWN_ERROR) ? SMART_FILE_UNABLE_TO_WRITE : res;
-		goto cleanup;
-	}
-
-	if (count != NULL) {
-		*count = (size_t)write_count;
-	}
-
-	res = SMART_FILE_OK;
-
-cleanup:
-
-	return res;
-}
-
-static int smart_file_get_error_win(unsigned error) {
-	int smart_file_error_code = 0;
-
-
-	switch(error) {
-		case ERROR_SUCCESS:
-			smart_file_error_code = SMART_FILE_OK;
-		break;
-
-		case ERROR_BAD_PIPE:
-		case ERROR_PIPE_BUSY:
-		case ERROR_BROKEN_PIPE:
-		case ERROR_NO_DATA:
-		case ERROR_PIPE_NOT_CONNECTED:
-			smart_file_error_code = SMART_FILE_PIPE_ERROR;
-		break;
-
-		case ERROR_DISK_FULL:
-		case ERROR_NOT_ENOUGH_MEMORY:
-		case ERROR_OUTOFMEMORY:
-			smart_file_error_code = SMART_FILE_OUT_OF_MEM;
-		break;
-
-		case ERROR_INSUFFICIENT_BUFFER:
-		case ERROR_MORE_DATA:
-			smart_file_error_code =  SMART_FILE_BUFFER_TOO_SMALL;
-		break;
-
-		case ERROR_FILE_NOT_FOUND:
-		case ERROR_INVALID_DRIVE:
-			smart_file_error_code =  SMART_FILE_DOES_NOT_EXIST;
-		break;
-
-		case ERROR_BUSY:
-		case ERROR_OPEN_FAILED:
-		case ERROR_DRIVE_LOCKED:
-			smart_file_error_code =  SMART_FILE_UNABLE_TO_OPEN;
-		break;
-
-		case ERROR_FILE_TOO_LARGE:
-			smart_file_error_code =  SMART_FILE_UNABLE_TO_WRITE;
-		break;
-
-		case ERROR_ACCESS_DENIED:
-		case ERROR_WRITE_PROTECT:
-			smart_file_error_code =  SMART_FILE_ACCESS_DENIED;
-		break;
-
-		case ERROR_DIRECTORY:
-		case ERROR_INVALID_NAME:
-		case ERROR_BAD_PATHNAME:
-			smart_file_error_code =  SMART_FILE_INVALID_PATH;
-		break;
-
-		default:
-			smart_file_error_code = SMART_FILE_UNKNOWN_ERROR;
-		break;
-	}
-
-	return smart_file_error_code;
-}
-
-static int smart_file_get_stream_win(const char *mode, void **stream, int *is_close_mandatory) {
-	int res;
-	int is_r = 0;
-	int is_w = 0;
-	int is_b = 0;
-	HANDLE fp = NULL;
-
-	if (mode == NULL || stream == NULL) {
-		res = SMART_FILE_INVALID_ARG;
-		goto cleanup;
-	}
-
-	is_r = strchr(mode, 'r') == NULL ? 0 : 1;
-	is_w = strchr(mode, 'w') == NULL ? 0 : 1;
-	is_b = strchr(mode, 'b') == NULL ? 0 : 1;
-
-
-	if (is_r) {
-		fp = GetStdHandle(STD_INPUT_HANDLE);
-	} else if (is_w) {
-		fp = GetStdHandle(STD_OUTPUT_HANDLE);
-	} else {
-		res = SMART_FILE_INVALID_MODE;
-		goto cleanup;
-	}
-
-	if (fp == INVALID_HANDLE_VALUE || fp == NULL) {
-		res = smart_file_get_error_win(GetLastError());
-		res = (res == SMART_FILE_UNKNOWN_ERROR) ? SMART_FILE_UNABLE_TO_OPEN : res;
-		goto cleanup;
-	}
-
-	/**
-	 * Handle to stdin or stdout must be closed.
-	 */
-	*is_close_mandatory = 1;
-	*stream = fp;
-	fp = NULL;
-
-	res = SMART_FILE_OK;
-
-cleanup:
-
-	return res;
-}
-
-static int file_get_type(const char *path, int *type) {
-	int res = 0;
-	struct _stat status;
-	int tmp = SMART_FILE_TYPE_UNKNOWN;
-
-	if (path == NULL || type == NULL) return SMART_FILE_INVALID_ARG;
-
-	res = _stat(path, &status);
-	if (res != 0) return SMART_FILE_UNABLE_TO_GET_STATUS;
-
-	if (status.st_mode & _S_IFDIR) tmp = SMART_FILE_TYPE_DIR;
-	else if (status.st_mode & _S_IFREG) tmp = SMART_FILE_TYPE_REGULAR;
-	else tmp = SMART_FILE_TYPE_UNKNOWN;
-
-	*type = tmp;
-
-	return SMART_FILE_OK;
-}
-
-#else
-static int smart_file_init_unix(SMART_FILE *file) {
-	int res;
-
-	if (file == NULL) {
-		res = SMART_FILE_INVALID_ARG;
-		goto cleanup;
-	}
-
-	file->file = NULL;
-	file->file_open = smart_file_open_unix;
-	file->file_close = smart_file_close_unix;
-	file->file_read = smart_file_read_unix;
-	file->file_write = smart_file_write_unix;
-	file->file_get_stream = smart_file_get_stream_unix;
-
-	res = SMART_FILE_OK;
-
-cleanup:
-
-	return res;
-}
-
-static int smart_file_open_unix(const char *fname, const char *mode, void **file) {
+static int smart_file_open(const char *fname, const char *mode, void **file) {
 	int res;
 	FILE *tmp = NULL;
 
@@ -416,7 +100,7 @@ static int smart_file_open_unix(const char *fname, const char *mode, void **file
 
 	tmp = fopen(fname, mode);
 	if (tmp == NULL) {
-		res = smart_file_get_error_unix();
+		res = smart_file_get_error();
 		res = (res == SMART_FILE_UNKNOWN_ERROR) ? SMART_FILE_UNABLE_TO_OPEN : res;
 		goto cleanup;
 	}
@@ -427,18 +111,18 @@ static int smart_file_open_unix(const char *fname, const char *mode, void **file
 
 cleanup:
 
-	smart_file_close_unix(tmp);
+	smart_file_close(tmp);
 
 	return res;
 }
 
-static void smart_file_close_unix(void *file) {
+static void smart_file_close(void *file) {
 	FILE *tmp = file;
 	if (file == NULL) return;
 	fclose(tmp);
 }
 
-static int smart_file_read_unix(void *file, char *raw, size_t raw_len, size_t *count) {
+static int smart_file_read(void *file, char *raw, size_t raw_len, size_t *count) {
 	int res;
 	FILE *fp = file;
 	size_t read_count = 0;
@@ -451,7 +135,7 @@ static int smart_file_read_unix(void *file, char *raw, size_t raw_len, size_t *c
 	read_count = fread(raw, 1, raw_len, fp);
 	/* TODO: Improve error handling.*/
 	if (read_count == 0 && !feof(fp)) {
-		res = smart_file_get_error_unix();
+		res = smart_file_get_error();
 		res = (res == SMART_FILE_UNKNOWN_ERROR) ? SMART_FILE_UNABLE_TO_READ : res;
 		goto cleanup;
 	}
@@ -468,7 +152,7 @@ cleanup:
 	return res;
 }
 
-static int smart_file_write_unix(void *file, char *raw, size_t raw_len, size_t *count) {
+static int smart_file_write(void *file, char *raw, size_t raw_len, size_t *count) {
 	int res;
 	FILE *fp = file;
 	size_t write_count = 0;
@@ -481,7 +165,7 @@ static int smart_file_write_unix(void *file, char *raw, size_t raw_len, size_t *
 	write_count = fwrite(raw, 1, raw_len, fp);
 
 	if (write_count != raw_len) {
-		res = smart_file_get_error_unix();
+		res = smart_file_get_error();
 		res = (res == SMART_FILE_UNKNOWN_ERROR) ? SMART_FILE_UNABLE_TO_WRITE : res;
 		goto cleanup;
 	}
@@ -497,7 +181,7 @@ cleanup:
 	return res;
 }
 
-static int smart_file_get_stream_unix(const char *mode, void **stream, int *is_close_mandatory) {
+static int smart_file_get_stream(const char *mode, void **stream, int *is_close_mandatory) {
 	int res;
 	int is_r = 0;
 	int is_w = 0;
@@ -532,7 +216,7 @@ cleanup:
 	return res;
 }
 
-static int smart_file_get_error_unix(void) {
+static int smart_file_get_error(void) {
 	int error_code = 0;
 	int smart_file_error_code = 0;
 
@@ -582,8 +266,6 @@ static int file_get_type(const char *path, int *type) {
 
 	return SMART_FILE_OK;
 }
-
-#endif
 
 char *generate_file_name(const char *fname, int count, char *buf, size_t buf_len) {
 	char *ret = NULL;
@@ -724,13 +406,8 @@ int SMART_FILE_open(const char *fname, const char *mode, SMART_FILE **file) {
 	/**
 	 * Initialize implementations.
 	 */
-#ifdef WIN_HANDLE
-	res = smart_file_init_win(tmp);
+	res = smart_file_init(tmp);
 	if (res != SMART_FILE_OK) goto cleanup;
-#else
-	res = smart_file_init_unix(tmp);
-	if (res != SMART_FILE_OK) goto cleanup;
-#endif
 
 	/**
 	 * If standard strem is wanted, extract the stream object. Otherwise use

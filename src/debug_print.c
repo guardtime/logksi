@@ -25,16 +25,8 @@
 #include "tool_box.h"
 #include "ksi/compatibility.h"
 #include "logksi_err.h"
-
-#ifdef _WIN32
-#	include <windows.h>
-#	include <io.h>
-#	include <fcntl.h>
-#include <stdlib.h>
-#else
-#   include <limits.h>
-#	include <sys/time.h>
-#endif
+#include <limits.h>
+#include <sys/time.h>
 
 void DEBUG_verifySignature(KSI_CTX *ksi, int res, KSI_Signature *sig, KSI_PolicyVerificationResult *result, KSI_DataHash *hsh) {
 	KSI_PublicationsFile *pubFile = NULL;
@@ -103,23 +95,12 @@ static int timerOn = 0;
 
 
 static unsigned int measureLastCall(void){
-#ifdef _WIN32
-	static LARGE_INTEGER thisCall;
-	static LARGE_INTEGER lastCall;
-	LARGE_INTEGER frequency;        // ticks per second
-
-	QueryPerformanceFrequency(&frequency);
-	QueryPerformanceCounter(&thisCall);
-
-	elapsed_time_ms = (unsigned)((thisCall.QuadPart - lastCall.QuadPart) * 1000.0 / frequency.QuadPart);
-#else
 	static struct timeval thisCall = {0, 0};
 	static struct timeval lastCall = {0, 0};
 
 	gettimeofday(&thisCall, NULL);
 
 	elapsed_time_ms = (unsigned)((thisCall.tv_sec - lastCall.tv_sec) * 1000.0 + (thisCall.tv_usec - lastCall.tv_usec) / 1000.0);
-#endif
 
 	lastCall = thisCall;
 	return elapsed_time_ms;
@@ -168,14 +149,4 @@ void print_progressResult(int res) {
 
 		timerOn = 0;
 	}
-}
-
-int PROGRESS_BAR_display(int progress) {
-	char buf[65] = "################################################################";
-	int count = progress * 64 / 100;
-
-	print_debug("\r");
-	print_debug("[%-*.*s]", 64, count, buf);
-
-	return 0;
 }

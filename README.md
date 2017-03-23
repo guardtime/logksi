@@ -41,9 +41,8 @@ platform check out source code from Github and build it using gcc or VS.
 To build KSI tool libksi and libksi-devel (KSI C SDK) packages are needed.
 Libksi is available in Guardtime repository or as source code in GitHub:
 [https://github.com/GuardTime/libksi](https://github.com/GuardTime/libksi).
-Use rebuild.sh script to build logksi tool on CentOS /RHEL. See `WinBuild.txt`
-to read how to build logksi tool on Windows. See `test/TEST-README.md` to
-learn how to run logksi command-line tool tests on Windows and linux.
+Use rebuild.sh script to build logksi tool on CentOS /RHEL. See `test/TEST-README.md` to
+learn how to run logksi command-line tool tests.
 
 
 ## USAGE
@@ -82,13 +81,13 @@ OpenSSL   0.9.8>     BSD           https://github.com/openssl/
 Curl      7.37.0>    MIT           https://github.com/curl/curl.git
 ```
 
-Note 1: OpenSSL is libksi dependency. On Windows platform it's optional.
+Note 1: OpenSSL is libksi dependency.
 This product includes software developed by the OpenSSL Project for use
 in the OpenSSL Toolkit (http://www.openssl.org/). This product includes
 cryptographic software written by Eric Young (eay@cryptsoft.com). This
 product includes software written by Tim Hudson (tjh@cryptsoft.com).
 
-Note 2: Curl is libksi dependency. On Windows platform it's optional.
+Note 2: Curl is libksi dependency.
 
 
 ## COMPATIBILITY
@@ -99,6 +98,6 @@ OS / PLatform                       Compatibility
 RHEL 6 and 7, x86_64 architecture   Fully compatible and tested.
 CentOS 6 and 7, x86_64 architecture Fully Compatible and tested.
 Debian                              Compatible but not tested on regular basis.
-OS X                                Compatible but not tested on regular basis.
-Windows 7, 8, 10                    Compatible but not tested on regular basis.
+OS X                                Not supported.
+Windows                             Not supported.
 ```

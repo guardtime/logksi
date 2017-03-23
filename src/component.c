@@ -27,10 +27,6 @@
 #include "logksi_err.h"
 #include "tool.h"
 
-#ifdef _WIN32
-#include <Windows.h>
-#endif
-
 typedef struct TOOL_COMPONENT_st TOOL_COMPONENT;
 
 struct TOOL_COMPONENT_st {

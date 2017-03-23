@@ -39,10 +39,6 @@
 #include "debug_print.h"
 #include "param_set/parameter.h"
 
-#ifdef _WIN32
-	#include <windows.h>
-#endif
-
 static int analyze_hexstring_format(const char *hex, double *cor) {
 	int i = 0;
 	int C;
@@ -551,12 +547,7 @@ int convertRepair_url(const char* arg, char* buf, unsigned len) {
 		while (arg[i] && i < len - 1) {
 			if (&arg[i] < scheme) {
 				buf[i] = (char)tolower(arg[i]);
-#ifdef _WIN32
-			} else if (arg[i] == '\\' && isFile) {
-				buf[i] = '/';
-#else
 				VARIABLE_IS_NOT_USED(isFile);
-#endif
 			} else {
 				buf[i] = arg[i];
 			}
@@ -1391,82 +1382,3 @@ int get_pipe_out_error(PARAM_SET *set, ERR_TRCKR *err, const char *check_all_fil
 int get_pipe_in_error(PARAM_SET *set, ERR_TRCKR *err, const char *check_all_files, const char *in_file_names, const char *read_in_flags) {
 	return get_io_pipe_error(set, err, 1, check_all_files, in_file_names, read_in_flags);
 }
-
-#ifdef _WIN32
-/**
- * This Wildcard expander enables wildcard usage on Windows platform. It takes
- * a PARAM_VAL as input, examines if there are some files or directories matching
- * the value string and appends new values after the specified PARAM_VAL obj.
- *
- * @param param_value
- * @param ctx
- * @param value_shift
- * @return
- */
-int Win32FileWildcard(PARAM_VAL *param_value, void *ctx, int *value_shift) {
-	int res;
-	HANDLE hfile = INVALID_HANDLE_VALUE;
-	WIN32_FIND_DATA found;
-	const char *value;
-	const char *source;
-	int prio = 0;
-	PARAM_VAL *tmp = NULL;
-	int count = 0;
-	char buf[1024] = "";
-	char path[1024] = "";
-
-
-	if (param_value == NULL || ctx != NULL || value_shift == NULL) {
-		return PST_INVALID_ARGUMENT;
-	}
-
-	res = PARAM_VAL_extract(param_value, &value, &source, &prio);
-	if (res != PST_OK) goto cleanup;
-
-	/**
-	 * Search for a files and directories matching the wildcard.
-	 * Ignore "." and "..". If the current value is t and a, b and c are expaned
-	 * value, the resulting array is [... t, a, b, c ...].
-	 */
-
-	convertRepair_path(value, buf, sizeof(buf));
-
-	STRING_extractAbstract(buf, NULL, "/", path, sizeof(path), NULL, find_charBeforeLastStrn, NULL);
-
-	/**
-	 * In the case nothing was found, return as OK.
-	 */
-	hfile = FindFirstFile(value, &found);
-	if (hfile == INVALID_HANDLE_VALUE) {
-		res = PST_OK;
-		goto cleanup;
-	}
-
-	do {
-		if (strcmp(found.cFileName, ".") == 0 || strcmp(found.cFileName, "..") == 0) continue;
-
-		PST_snprintf(buf, sizeof(buf), "%s%s%s",
-				path[0] == '\0' ? "" : path,
-				path[0] == '\0' ? "" : "/",
-				found.cFileName);
-
-		res = PARAM_VAL_new(buf, source, prio, &tmp);
-		if (res != PST_OK) goto cleanup;
-
-		res = PARAM_VAL_insert(param_value, NULL, PST_PRIORITY_NONE, count, tmp);
-		if (res != PST_OK) goto cleanup;
-
-		tmp = NULL;
-		count++;
-	} while (FindNextFile(hfile, &found) != 0);
-
-	*value_shift = count;
-	res = PST_OK;
-
-cleanup:
-
-	if (hfile != INVALID_HANDLE_VALUE) FindClose(hfile);
-	PARAM_VAL_free(tmp);
-	return res;
-}
-#endif

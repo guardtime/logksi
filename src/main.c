@@ -32,10 +32,8 @@
 #include "conf_file.h"
 
 
-#ifndef _WIN32
-#  ifdef HAVE_CONFIG_H
-#    include "config.h"
-#  endif
+#ifdef HAVE_CONFIG_H
+#  include "config.h"
 #endif
 
 const char *TOOL_getVersion(void) {

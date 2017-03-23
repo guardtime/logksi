@@ -309,15 +309,7 @@ static const char *path_removeFile(const char *origPath, char *buf, size_t buf_l
 	size_t path_len;
 	char *ret = NULL;
 
-#ifdef _WIN32
-	beginingOfFile = strrchr(origPath, '\\');
-	if (beginingOfFile == NULL) {
-		beginingOfFile = strrchr(origPath, '/');
-	}
-#else
 	beginingOfFile = strrchr(origPath, '/');
-#endif
-
 	if (beginingOfFile ==  NULL) {
 		buf[0] = '\0';
 		return buf;
@@ -345,16 +337,11 @@ const char *PATH_getPathRelativeToFile(const char *refFilePath, const char *orig
 	origPath_len = strlen(origPath);
 	if (origPath_len == 0) return NULL;
 
-		/**
+	/**
 	 * Check if origPath is relative or absolute path.
 	 */
-#ifndef _WIN32
 	if (origPath[0] == '/') isAbsolute = 1;
 	else isAbsolute = 0;
-#else
-	if (origPath_len >= 3 && origPath[1] == ':' && (origPath[2] == '/' || origPath[2] == '\\')) isAbsolute = 1;
-	else isAbsolute = 0;
-#endif
 
 	if (isAbsolute == 1) {
 		return origPath;

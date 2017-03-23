@@ -28,11 +28,8 @@
 #include "debug_print.h"
 #include <ksi/tlv_element.h>
 #include "rsyslog.h"
-
-#ifndef _WIN32
 #include <fcntl.h>
 #include <errno.h>
-#endif
 
 #define SOF_ARRAY(x) (sizeof(x) / sizeof((x)[0]))
 
@@ -1597,7 +1594,6 @@ cleanup:
 	return res;
 }
 
-#ifndef _WIN32
 int get_file_read_lock(FILE *in) {
 	struct flock lock;
 	int fres;
@@ -1623,14 +1619,6 @@ int get_file_read_lock(FILE *in) {
 		return KT_OK;
 	}
 }
-#else
-int get_file_read_lock(FILE *in) {
-	if (in == NULL)
-		return KT_INVALID_ARGUMENT;
-	else
-		return KT_OK;
-}
-#endif
 
 int concat_names(char *org, const char *extension, char **derived) {
 	int res;

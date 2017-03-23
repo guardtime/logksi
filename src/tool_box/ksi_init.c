@@ -28,15 +28,8 @@
 #include "logksi_err.h"
 #include "printer.h"
 #include "api_wrapper.h"
-
-#ifdef _WIN32
-#	include <io.h>
-#	include <fcntl.h>
-#include <stdlib.h>
-#else
-#	include <limits.h>
-#	include <sys/time.h>
-#endif
+#include <limits.h>
+#include <sys/time.h>
 
 static int tool_init_ksi_logger(KSI_CTX *ksi, ERR_TRCKR *err, PARAM_SET *set, SMART_FILE **log) {
 	int res;
@@ -266,8 +259,6 @@ static int tool_init_ksi_trust_store(KSI_CTX *ksi, ERR_TRCKR *err, PARAM_SET *se
 
 	/**
 	 * Configure KSI trust store.
-	 * TODO: look over Windows and Linux compatibility related with trust store
-	 * configuration.
      */
 	if (V || W) {
 		res = KSI_PKITruststore_new(ksi, 0, &tmp);
