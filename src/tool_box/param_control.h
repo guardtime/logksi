@@ -95,11 +95,6 @@ int isFormatOk_string(const char *str);
 int isFormatOk_hex(const char *hexin);
 int extract_OctetString(void *extra, const char* str, void** obj);
 
-int isFormatOk_hashAlg(const char *hashAlg);
-int isContentOk_hashAlg(const char *alg);
-/** extra is not used.*/
-int extract_hashAlg(void *extra, const char* str, void** obj);
-
 int isFormatOk_inputFile(const char *path);
 int isContentOk_inputFile(const char* path);
 int isContentOk_inputFileWithPipe(const char* path);
@@ -108,21 +103,6 @@ int isContentOk_inputFileRestrictPipe(const char* path);
 int isFormatOk_path(const char *path);
 int convertRepair_path(const char* arg, char* buf, unsigned len);
 
-int isFormatOk_inputHash(const char *str);
-int isContentOk_inputHash(const char *str);
-
-int isContentOk_imprint(const char *imprint);
-int isFormatOk_imprint(const char *imprint);
-int extract_imprint(void *extra, const char* str, void** obj);
-int extract_inputHashFromFile(void *extra, const char* str, void** obj);
-
-/**
- * Requires \c COMPOSITE as extra. \c ctx, and \c err must not be NULL. \c h_alg
- * can be omitted if extracting imprint. \c fname_out must be NULL if input data
- * is not written into file / stream.
- */
-int extract_inputHash(void *extra, const char* str, void** obj);
-
 int isFormatOk_int(const char *integer);
 int isFormatOk_int_can_be_null(const char *integer);
 int isContentOk_uint_can_be_null(const char* integer);
@@ -130,8 +110,6 @@ int isContentOk_uint(const char* integer);
 int isContentOk_uint_not_zero(const char* integer);
 int isContentOk_int(const char* integer);
 int extract_int(void *extra, const char* str,  void** obj);
-
-int isContentOk_tree_level(const char *integer);
 
 int isFormatOk_url(const char *url);
 int convertRepair_url(const char* arg, char* buf, unsigned len);
@@ -151,23 +129,9 @@ int isFormatOk_userPass(const char *uss_pass);
 int isFormatOk_oid(const char *constraint);
 int convertRepair_constraint(const char* arg, char* buf, unsigned len);
 
-int isFormatOk_mask(const char* mask);
-int isContentOk_mask(const char* mask);
-int convertRepair_mask(const char* arg, char* buf, unsigned len);
-int extract_mask(void *extra, const char* str, void** obj);
-
-int extract_inputSignature(void *extra, const char* str, void** obj);
-
-
 int get_pipe_out_error(PARAM_SET *set, ERR_TRCKR *err, const char *check_all_files, const char *out_file_names, const char *print_out_names);
 
 int get_pipe_in_error(PARAM_SET *set, ERR_TRCKR *err, const char *check_all_files, const char *in_file_names, const char *read_in_flags);
-
-int is_imprint(const char *str);
-
-#ifdef _WIN32
-int Win32FileWildcard(PARAM_VAL *param_value, void *ctx, int *value_shift);
-#endif
 
 #ifdef	__cplusplus
 }

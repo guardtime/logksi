@@ -55,51 +55,6 @@ static const verificationErrorDetail_st verification_error[] = {
 	{ KSI_VER_ERR_NONE,		""}
 };
 
-void OBJPRINT_publicationsFileReferences(const KSI_PublicationsFile *pubFile, int (*print)(const char *format, ... )){
-	int res = KSI_UNKNOWN_ERROR;
-	KSI_LIST(KSI_PublicationRecord)* list_publicationRecord = NULL;
-	KSI_PublicationRecord *publicationRecord = NULL;
-	char buf[1024];
-	unsigned int i, j;
-	char *pLineBreak = NULL;
-	char *pStart = NULL;
-
-	if (pubFile == NULL) return;
-
-	print("Publication Records:\n");
-
-	res = KSI_PublicationsFile_getPublications(pubFile, &list_publicationRecord);
-	if (res != KSI_OK) return;
-
-	for (i = 0; i < KSI_PublicationRecordList_length(list_publicationRecord); i++) {
-		int h=0;
-		res = KSI_PublicationRecordList_elementAt(list_publicationRecord, i, &publicationRecord);
-		if (res != KSI_OK) return;
-
-		if (LOGKSI_PublicationRecord_toString(publicationRecord, buf, sizeof(buf)) == NULL) return;
-
-		pStart = buf;
-		j=1;
-		h=0;
-		if (i) print("\n");
-		while ((pLineBreak = strchr(pStart, '\n')) != NULL){
-			*pLineBreak = 0;
-			if (h++ < 3)
-				print("%s %s\n", "  ", pStart);
-			else
-				print("%s %2i) %s\n", "    ", j++, pStart);
-			pStart = pLineBreak+1;
-		}
-
-		if (h < 3)
-			print("%s %s\n", "  ", pStart);
-		else
-			print("%s %2i) %s\n", "    ", j++, pStart);
-	}
-	print("\n");
-	return;
-}
-
 void OBJPRINT_signaturePublicationReference(KSI_Signature *sig, int (*print)(const char *format, ... )){
 	int res = KSI_UNKNOWN_ERROR;
 	KSI_PublicationRecord *publicationRecord;
@@ -296,62 +251,6 @@ cleanup:
 	return;
 }
 
-void OBJPRINT_publicationsFileCertificates(const KSI_PublicationsFile *pubfile, int (*print)(const char *format, ... )){
-	KSI_CertificateRecordList *certReclist = NULL;
-	KSI_CertificateRecord *certRec = NULL;
-	KSI_PKICertificate *cert = NULL;
-	char buf[1024];
-	unsigned int i=0;
-	int res = 0;
-
-	if (pubfile == NULL) goto cleanup;
-	print("Certificates for key-based signature verification:\n");
-
-	res = KSI_PublicationsFile_getCertificates(pubfile, &certReclist);
-	if (res != KSI_OK || certReclist == NULL) goto cleanup;
-
-	for (i = 0; i < KSI_CertificateRecordList_length(certReclist); i++){
-		res = KSI_CertificateRecordList_elementAt(certReclist, i, &certRec);
-		if (res != KSI_OK || certRec == NULL) goto cleanup;
-
-		res = KSI_CertificateRecord_getCert(certRec, &cert);
-		if (res != KSI_OK || cert == NULL) goto cleanup;
-
-		if (KSI_PKICertificate_toString(cert, buf, sizeof(buf)) != NULL)
-			print("%s\n", buf);
-	}
-
-cleanup:
-
-	return;
-}
-
-void OBJPRINT_publicationsFileSigningCert(KSI_PublicationsFile *pubfile, int (*print)(const char *format, ... )) {
-	int res;
-	KSI_PKISignature *sig = NULL;
-	KSI_PKICertificate *cert = NULL;
-	char buf[2048];
-	char *tmp = NULL;
-
-	res = KSI_PublicationsFile_getSignature(pubfile, &sig);
-	if (res != KSI_OK) goto cleanup;
-
-	res = KSI_PKISignature_extractCertificate(sig, &cert);
-	if (res != KSI_OK) goto cleanup;
-
-	tmp = KSI_PKICertificate_toString(cert, buf, sizeof(buf));
-	if (tmp != buf) goto cleanup;
-
-	print("Publications file signing %s", buf);
-	print("\n", buf);
-
-cleanup:
-
-	KSI_PKICertificate_free(cert);
-
-	return;
-}
-
 void OBJPRINT_signatureDump(KSI_Signature *sig, int (*print)(const char *format, ... )) {
 
 	print("KSI Signature dump:\n");
@@ -381,23 +280,6 @@ void OBJPRINT_signatureDump(KSI_Signature *sig, int (*print)(const char *format,
 
 	return;
 }
-
-void OBJPRINT_publicationsFileDump(KSI_PublicationsFile *pubfile, int (*print)(const char *format, ... )) {
-
-	print("KSI Publications file dump:\n");
-
-	if (pubfile == NULL) {
-		print("(null)\n");
-		return;
-	}
-
-	OBJPRINT_publicationsFileReferences(pubfile, print);
-	OBJPRINT_publicationsFileCertificates(pubfile, print);
-	OBJPRINT_publicationsFileSigningCert(pubfile, print);
-
-	return;
-}
-
 
 static const char *getVerificationResultCode(KSI_VerificationResultCode code) {
 	switch (code) {

@@ -67,11 +67,6 @@ char *LOGKSI_DataHash_toString(KSI_DataHash *hsh, char *buf, size_t buf_len);
 char *LOGKSI_PublicationData_toString(KSI_PublicationData *data, char *buf, size_t buf_len);
 char *LOGKSI_PublicationRecord_toString(KSI_PublicationRecord *rec, char *buf, size_t buf_len);
 
-int KSI_OBJ_saveSignature(ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sign, const char *mode, const char *fname, char *f, size_t f_len);
-int KSI_OBJ_savePublicationsFile(ERR_TRCKR *err, KSI_CTX *ksi, KSI_PublicationsFile *pubfile, const char *mode, const char *fname) ;
-int KSI_OBJ_loadSignature(ERR_TRCKR *err, KSI_CTX *ksi, const char *fname, const char* mode, KSI_Signature **sig);
-int KSI_OBJ_isSignatureExtended(const KSI_Signature *sig);
-
 int LOGKSI_LOG_SmartFile(void *logCtx, int logLevel, const char *message);
 
 int LOGKSI_KSI_ERR_toExitCode(int error_code);

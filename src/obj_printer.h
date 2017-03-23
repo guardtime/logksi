@@ -36,11 +36,6 @@ void OBJPRINT_signatureDump(KSI_Signature *sig, int (*print)(const char *format,
 
 void OBJPRINT_Hash(KSI_DataHash *hsh, const char *prefix, int (*print)(const char *format, ... ));
 
-void OBJPRINT_publicationsFileReferences(const KSI_PublicationsFile *pubFile, int (*print)(const char *format, ... ));
-void OBJPRINT_publicationsFileCertificates(const KSI_PublicationsFile *pubfile, int (*print)(const char *format, ... ));
-void OBJPRINT_publicationsFileSigningCert(KSI_PublicationsFile *pubfile, int (*print)(const char *format, ... ));
-void OBJPRINT_publicationsFileDump(KSI_PublicationsFile *pubfile, int (*print)(const char *format, ... ));
-
 const char *OBJPRINT_getVerificationErrorCode(KSI_VerificationErrorCode code);
 const char *OBJPRINT_getVerificationErrorDescription(KSI_VerificationErrorCode code);
 
