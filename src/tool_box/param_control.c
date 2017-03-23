@@ -56,49 +56,6 @@ static int xx(char c1, char c2){
 	return x(c1) * 16 + x(c2);
 }
 
-static int hex_string_to_bin(const char *hexin, unsigned char *buf, size_t buf_len, size_t *lenout){
-	int res;
-	size_t len;
-	size_t arraySize;
-	unsigned int i, j;
-	int tmp;
-
-	if (hexin == NULL || buf == NULL || lenout == NULL || buf_len == 0) {
-		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
-
-	len = strlen(hexin);
-	arraySize = len / 2;
-
-	if (len%2 != 0) {
-		res = KT_HASH_LENGTH_IS_NOT_EVEN;
-		goto cleanup;
-	}
-
-	for (i = 0, j = 0; i < arraySize; i++, j += 2){
-		tmp = xx(hexin[j], hexin[j+1]);
-		if (tmp == -1) {
-			res = KT_INVALID_HEX_CHAR;
-			goto cleanup;
-		}
-
-		if (i < buf_len) {
-			buf[i] = (unsigned char)tmp;
-		} else {
-			res = KT_INDEX_OVF;
-			goto cleanup;
-		}
-	}
-
-	*lenout = arraySize;
-	res = KT_OK;
-
-cleanup:
-
-	return res;
-}
-
 int isFormatOk_hex(const char *hexin){
 	size_t len;
 	size_t arraySize;
@@ -120,35 +77,6 @@ int isFormatOk_hex(const char *hexin){
 	}
 
 	return FORMAT_OK;
-}
-
-int extract_OctetString(void *extra, const char* str, void** obj) {
-	int res;
-	void **extra_array = (void**)extra;
-	COMPOSITE *comp = NULL;
-	KSI_CTX *ctx = NULL;
-	KSI_OctetString *tmp = NULL;
-	unsigned char binary[0xffff];
-	size_t binary_len = 0;
-
-	comp = (COMPOSITE*)extra_array[1];
-	ctx = comp->ctx;
-
-	res = hex_string_to_bin(str, binary, sizeof(binary), &binary_len);
-	if (res != KT_OK && res != KT_INDEX_OVF) goto cleanup;
-
-	res = KSI_OctetString_new(ctx, binary, binary_len, &tmp);
-	if (res != KT_OK) goto cleanup;
-
-	*obj = (void*)tmp;
-	tmp = NULL;
-	res = KT_OK;
-
-cleanup:
-
-	KSI_OctetString_free(tmp);
-
-	return res;
 }
 
 static int date_is_valid(struct tm *time_st) {

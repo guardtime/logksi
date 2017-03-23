@@ -33,17 +33,13 @@ static int logksi_ErrToExitcode(int error_code) {
 		case KT_OUT_OF_MEMORY:
 			return EXIT_OUT_OF_MEMORY;
 		case KT_INVALID_ARGUMENT:
-		case KT_COMPONENT_HAS_NO_IMPLEMENTATION:
 		case KT_INDEX_OVF:
 		case KT_UNKNOWN_ERROR:
 			return EXIT_FAILURE;
-		case KT_UNABLE_TO_SET_STREAM_MODE:
 		case KT_IO_ERROR:
 			return EXIT_IO_ERROR;
 		case KT_INVALID_INPUT_FORMAT:
 			return EXIT_INVALID_FORMAT;
-		case KT_UNKNOWN_HASH_ALG:
-			return EXIT_CRYPTO_ERROR;
 		case KT_INVALID_CMD_PARAM:
 			return EXIT_INVALID_CL_PARAMETERS;
 		case KT_NO_PRIVILEGES:
@@ -55,8 +51,6 @@ static int logksi_ErrToExitcode(int error_code) {
 			return EXIT_VERIFY_ERROR;
 		case KT_PUBFILE_HAS_NO_PUBREC_TO_EXTEND_TO:
 			return EXIT_EXTEND_ERROR;
-		case KT_AGGR_LVL_LIMIT_TOO_SMALL:
-			return EXIT_AGGRE_ERROR;
 		default:
 			return EXIT_FAILURE;
 	}
@@ -108,20 +102,12 @@ static const char* logksiErrToString(int error_code) {
 			return "Logksi tool out of memory.";
 		case KT_INVALID_ARGUMENT:
 			return "Invalid argument.";
-		case KT_UNABLE_TO_SET_STREAM_MODE:
-			return "Unable to set stream mode.";
 		case KT_IO_ERROR:
 			return "IO error.";
 		case KT_INDEX_OVF:
 			return "Index is too large.";
 		case KT_INVALID_INPUT_FORMAT:
 			return "Invalid input data format";
-		case KT_HASH_LENGTH_IS_NOT_EVEN:
-			return "The hash length is not even number.";
-		case KT_INVALID_HEX_CHAR:
-			return "The hex data contains invalid characters.";
-		case KT_UNKNOWN_HASH_ALG:
-			return "The hash algorithm is unknown or unimplemented.";
 		case KT_INVALID_CMD_PARAM:
 			return "The command-line parameters is invalid or missing.";
 		case KT_NO_PRIVILEGES:
@@ -132,8 +118,6 @@ static const char* logksiErrToString(int error_code) {
 			return "Log signature verification failed.";
 		case KT_PUBFILE_HAS_NO_PUBREC_TO_EXTEND_TO:
 			return "No publication record found to extend to.";
-		case KT_AGGR_LVL_LIMIT_TOO_SMALL:
-			return "Local aggregation tree size limit is too small.";
 		case KT_UNKNOWN_ERROR:
 			return "Unknown error.";
 		default:

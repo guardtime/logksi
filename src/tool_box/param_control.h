@@ -93,7 +93,6 @@ const char *getParameterErrorString(int res);
 
 int isFormatOk_string(const char *str);
 int isFormatOk_hex(const char *hexin);
-int extract_OctetString(void *extra, const char* str, void** obj);
 
 int isFormatOk_inputFile(const char *path);
 int isContentOk_inputFile(const char* path);
