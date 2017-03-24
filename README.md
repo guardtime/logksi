@@ -14,11 +14,10 @@ system logs, financial transactions, call records, etc. For more, see
 Log signature tool can be used for KSI-signing, extending and verifying log
 signatures.
 
-// TODO: rewrite the remaining sections.
-## INSTALLION
+## INSTALLATION
 
 ### Latest release from Guardtime repository
-In order to install the ksi CentOS / RHEL packages directly from the Guardtime
+In order to install the logksi CentOS / RHEL packages directly from the Guardtime
 public repository, download and save the repository configuration to the
 /etc/yum.repos.d/ folder:
 
@@ -37,8 +36,8 @@ yum install logksi
 ### From source code
 
 If the latest version is needed or the package is not available for the
-platform check out source code from Github and build it using gcc or VS.
-To build KSI tool libksi and libksi-devel (KSI C SDK) packages are needed.
+platform check out source code from Github and build it using gcc.
+To build the logksi tool, libksi and libksi-devel (KSI C SDK) packages are needed.
 Libksi is available in Guardtime repository or as source code in GitHub:
 [https://github.com/GuardTime/libksi](https://github.com/GuardTime/libksi).
 Use rebuild.sh script to build logksi tool on CentOS /RHEL. See `test/TEST-README.md` to
@@ -51,12 +50,12 @@ In order to get trial access to the KSI platform, go to
 [https://guardtime.com/blockchain-developers](https://guardtime.com/blockchain-developers)
 
 
-The first argument of the tool is the KSI command followed by the KSI service
-configuration parameters and options. An example of adding a signature to a
-log signature file:
+The first argument of the tool is the logksi command followed by the KSI service
+configuration parameters and options. An example of how to add missing KSI signatures
+to a log signature file:
 
 ```
-  logksi sign [ksioptions] [logsignaturefiles]
+  logksi sign logfile [ksioptions]
 ```
 
 See `man logksi` for detailed usage instructions or read documentation formatted
@@ -76,7 +75,7 @@ See `CONTRIBUTING.md` file.
 ```
 Library   Version    License type  Source
 
-libksi    3.9>       Apache 2.0    https://github.com/GuardTime/libksi
+libksi    3.13>      Apache 2.0    https://github.com/GuardTime/libksi
 OpenSSL   0.9.8>     BSD           https://github.com/openssl/
 Curl      7.37.0>    MIT           https://github.com/curl/curl.git
 ```

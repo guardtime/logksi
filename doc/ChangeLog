@@ -1,12 +1,9 @@
-Version 1.0.0
+Version 0.1.0
 
-2017-01-19 1.0.0
+2017-03-24 0.1.0
 
-* FEATURE: Temporary files from asynchronous signing can be integrated into a single log signature file.
-* FEATURE: Sign recovery: missing KSI signatures can be added to log signature file.
-* FEATURE: Verification of log signature files.
-* FEATURE: Extending of log signature files.
-* FEATURE: Support of meta records.
-* FEATURE: Man-pages.
-* FEATURE: Actual or fixed aggregation level used depending on LOGSIG12 or LOGSIG11 format.
-
+* FEATURE: Integration: blocks and signatures files from asynchronous signing can be integrated into a single log signature file.
+* FEATURE: Sign recovery: missing KSI signatures can be added to a log signature file.
+* FEATURE: Verification: log signature files can be verified against log files.
+* FEATURE: Extending: KSI signatures in a log signature file can be extended.
+* FEATURE: Support of LOGSIG12 format, including meta-records.
