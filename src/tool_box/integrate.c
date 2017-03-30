@@ -39,7 +39,7 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
 static int generate_filenames(ERR_TRCKR *err, IO_FILES *files);
 static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files);
 static int acquire_file_locks(ERR_TRCKR *err, IO_FILES *files);
-static void close_input_and_output_files(int res, IO_FILES *files);
+static void close_input_and_output_files(ERR_TRCKR *err, int res, IO_FILES *files);
 
 int integrate_run(int argc, char **argv, char **envp) {
 	int res;
@@ -105,7 +105,7 @@ int integrate_run(int argc, char **argv, char **envp) {
 
 cleanup:
 
-	close_input_and_output_files(res, &files);
+	close_input_and_output_files(err, res, &files);
 	print_progressResult(res);
 
 	LOGKSI_KSI_ERRTrace_save(ksi);
@@ -129,9 +129,7 @@ cleanup:
 }
 
 char *integrate_help_toString(char *buf, size_t len) {
-	size_t count = 0;
-
-	count += KSI_snprintf(buf + count, len - count,
+	KSI_snprintf(buf, len,
 		"Usage:\n"
 		" %s integrate <logfile> [-o <out.logsig>]\n"
 		"\n"
@@ -334,12 +332,14 @@ cleanup:
 
 }
 
-void close_input_and_output_files(int res, IO_FILES *files) {
+void close_input_and_output_files(ERR_TRCKR *err, int res, IO_FILES *files) {
 	if (files) {
 		/* If something failed, remove the incomplete output log signature file. */
 		if (files->files.outSig && res != KT_OK) {
 			logksi_file_close(&files->files.outSig);
-			remove(files->internal.outSig);
+			if (remove(files->internal.outSig) != 0) {
+				if (err) ERR_TRCKR_ADD(err, KT_IO_ERROR, "Error: could not remove output log signature %s.", files->internal.outSig);
+			}
 		}
 		logksi_files_close(&files->files);
 		logksi_internal_filenames_free(&files->internal);

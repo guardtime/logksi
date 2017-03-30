@@ -678,13 +678,16 @@ static int process_intermediate_hash(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *b
 				blocks->metarecordHash = NULL;
 			} else {
 				res = get_hash_of_logline(ksi, blocks, files, &hash);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to calculate hash of logline no. %3d.", blocks->blockNo, blocks->nofRecordHashes);
 				res = add_record_hash_to_merkle_tree(ksi, blocks, 0, hash);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to add record hash to Merkle tree.", blocks->blockNo);
 				KSI_DataHash_free(hash);
 				hash = NULL;
 			}
 		} else {
 			blocks->nofRecordHashes++;
 			res = add_leaf_hash_to_merkle_tree(ksi, blocks, tmpHash);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to add leaf hash to Merkle tree.", blocks->blockNo);
 		}
 	}
 
@@ -1211,13 +1214,11 @@ int count_blocks(ERR_TRCKR *err, BLOCK_INFO *blocks, FILE *in) {
 				break;
 			}
 		} else {
-			if (feof(in)) {
-				res = KT_OK;
-				break;
+			if (blocks->ftlv_len > 0) {
+				res = KT_INVALID_INPUT_FORMAT;
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: incomplete data found in log signature file.", blocks->blockNo);
 			} else {
-				/* File reading failed. */
-				res = KT_IO_ERROR;
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unable to read next TLV.");
+				break;
 			}
 		}
 	}
@@ -1228,7 +1229,12 @@ cleanup:
 
 	/* Rewind input stream. */
 	if (pos != -1) {
-		fseek(in, pos, SEEK_SET);
+		if (fseek(in, pos, SEEK_SET) != 0) {
+			if (res == KT_OK) {
+				res = KT_IO_ERROR;
+				if (err) ERR_TRCKR_ADD(err, res, "Error: could not rewind input stream.");
+			}
+		}
 	}
 	KSI_TlvElement_free(tlvNoSig);
 	KSI_TlvElement_free(tlv);
@@ -1299,7 +1305,6 @@ int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_
 				res = KT_INVALID_INPUT_FORMAT;
 				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: incomplete data found in log signature file.", blocks.blockNo);
 			} else {
-				res = KT_OK;
 				break;
 			}
 		}
@@ -1380,7 +1385,6 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, VERIFYING_
 				res = KT_INVALID_INPUT_FORMAT;
 				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: incomplete data found in log signature file.", blocks.blockNo);
 			} else {
-				res = KT_OK;
 				break;
 			}
 		}
@@ -1478,7 +1482,6 @@ int logsignature_integrate(ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files) {
 				res = KT_INVALID_INPUT_FORMAT;
 				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: incomplete data found in blocks file.", blocks.blockNo);
 			} else {
-				res = KT_OK;
 				break;
 			}
 		}
@@ -1576,7 +1579,6 @@ int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *fi
 				res = KT_INVALID_INPUT_FORMAT;
 				ERR_CATCH_MSG(err, res, "Error: Block no. %3d: incomplete data found in log signature file.", blocks.blockNo);
 			} else {
-				res = KT_OK;
 				break;
 			}
 		}

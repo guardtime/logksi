@@ -25,9 +25,7 @@
 
 static size_t param_set_vsnprintf(char *buf, size_t n, const char *format, va_list va){
 	size_t ret = 0;
-	int tmp;
 	if (buf == NULL || n > INT_MAX || n == 0 || format == NULL) goto cleanup;
-	(void)tmp;
 	ret = vsnprintf(buf, n, format, va);
 	if (ret >= n) {
 		ret = n - 1;

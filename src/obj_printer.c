@@ -64,8 +64,6 @@ void OBJPRINT_signaturePublicationReference(KSI_Signature *sig, int (*print)(con
 	char buf[1024];
 	char *pLineBreak = NULL;
 	char *pStart = buf;
-	int i=1;
-	int h=0;
 	if (sig == NULL) return;
 
 	print("Publication Record:\n");
@@ -83,18 +81,11 @@ void OBJPRINT_signaturePublicationReference(KSI_Signature *sig, int (*print)(con
 	while ((pLineBreak = strchr(pStart, '\n')) != NULL){
 		*pLineBreak = 0;
 
-		if (h < 3)
-			print("%s %s\n", "  ", pStart);
-		else
-			print("%s %2i) %s\n", "    ", i++, pStart);
-
+		print("%s %s\n", "  ", pStart);
 		pStart = pLineBreak+1;
 	}
 
-	if (h < 3)
-		print("%s %s\n", "  ", pStart);
-	else
-		print("%s %2i) %s\n", "    ", i++, pStart);
+	print("%s %s\n", "  ", pStart);
 	print("\n");
 
 	return;

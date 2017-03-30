@@ -639,7 +639,7 @@ int TASK_SET_analyzeConsistency(TASK_SET *task_set, PARAM_SET *set, double sensi
 	int i = 0;
 	int j = 0;
 	double cons = 0;
-	double tmp_cons_small = 0;
+	double tmp_cons_small;
 	int tmp_index_for_small = 0;
 	int smaller_index = -1;
 	int bigger_index = -1;
@@ -851,7 +851,7 @@ cleanup:
 int TASK_SET_isOneFromSetTheTarget(TASK_SET *task_set, double diff, int *ID) {
 	int i;
 	TASK_DEFINITION *tmp = NULL;
-	double cons = 0;
+	double cons;
 
 	if (task_set == NULL || diff <= 0) return 0;
 	if (task_set->count == 0) return 0;

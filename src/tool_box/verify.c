@@ -197,9 +197,7 @@ cleanup:
 }
 
 char *verify_help_toString(char *buf, size_t len) {
-	size_t count = 0;
-
-	count += KSI_snprintf(buf + count, len - count,
+	KSI_snprintf(buf, len,
 		"Usage:\n"
 		" %s verify <logfile> [<logfile.logsig>] [more_options]\n"
 		" %s verify --ver-int <logfile> [<logfile.logsig>] [more_options]\n"

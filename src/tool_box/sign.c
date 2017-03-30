@@ -49,7 +49,7 @@ static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err);
 static int generate_filenames(ERR_TRCKR *err, IO_FILES *files);
 static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files);
 static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files);
-static void close_input_and_output_files(int res, IO_FILES *files);
+static void close_input_and_output_files(ERR_TRCKR *err, int res, IO_FILES *files);
 
 int sign_run(int argc, char** argv, char **envp) {
 	int res;
@@ -114,7 +114,7 @@ int sign_run(int argc, char** argv, char **envp) {
 cleanup:
 
 	/* If there is an error while closing files, report it only if everything else was OK. */
-	close_input_and_output_files(res, &files);
+	close_input_and_output_files(err, res, &files);
 
 	print_progressResult(res);
 	LOGKSI_KSI_ERRTrace_save(ksi);
@@ -138,9 +138,7 @@ cleanup:
 }
 
 char *sign_help_toString(char*buf, size_t len) {
-	size_t count = 0;
-
-	count += KSI_snprintf(buf + count, len - count,
+	KSI_snprintf(buf, len,
 		"Usage:\n"
 		" %s sign [<logfile>] [-o <out.logsig>] -S <URL> [--aggr-user <user> --aggr-key <key>]\n"
 		"          [more_options]\n"
@@ -390,7 +388,7 @@ static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files) {
 cleanup:
 
 	/* Restore initial situation if something failed. */
-	if (files->internal.backupSig) {
+	if (files && files->internal.backupSig) {
 		if (!SMART_FILE_doFileExist(files->internal.inSig)) {
 			if (rename(files->internal.backupSig, files->internal.inSig) != 0) {
 				res = KT_IO_ERROR;
@@ -400,14 +398,18 @@ cleanup:
 	return res;
 }
 
-static void close_input_and_output_files(int res, IO_FILES *files) {
+static void close_input_and_output_files(ERR_TRCKR *err, int res, IO_FILES *files) {
 	if (files) {
 		logksi_files_close(&files->files);
 		if (files->internal.tempSig) {
-			remove(files->internal.tempSig);
+			if (remove(files->internal.tempSig) != 0) {
+				if (err) ERR_TRCKR_ADD(err, KT_IO_ERROR, "Error: could not remove temporary output log signature %s.", files->internal.tempSig);
+			}
 		}
 		if (files->internal.outSig && res != KT_OK) {
-			remove(files->internal.outSig);
+			if (remove(files->internal.outSig) != 0) {
+				if (err) ERR_TRCKR_ADD(err, KT_IO_ERROR, "Error: could not remove output log signature %s.", files->internal.outSig);
+			}
 		}
 		logksi_internal_filenames_free(&files->internal);
 	}

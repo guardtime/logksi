@@ -810,7 +810,7 @@ int PARAM_SET_new(const char *names, PARAM_SET **set){
 	tmp->syntax = NULL;
 
 	tmp_param = (PARAM**)calloc(paramCount, sizeof(PARAM*));
-	if (tmp == NULL) {
+	if (tmp_param == NULL) {
 		res = PST_OUT_OF_MEMORY;
 		goto cleanup;
 	}
@@ -1787,7 +1787,7 @@ int PARAM_SET_parseCMD(PARAM_SET *set, int argc, char **argv, const char *source
 			dpgprint("Token '%10s' %8s %10s\n", token, token_type_to_string(token_type, buf, sizeof(buf)), pars_flags_to_string(tmp_parameter != NULL ? tmp_parameter->parsing_options : 0, buf2, sizeof(buf2)));
 
 
-			if (is_parameter_opend) {
+			if (is_parameter_opend && opend_parameter) {
 				token_match_break = (TOKEN_IS_MATCH(token_type) && PARAM_isParsOptionSet(opend_parameter, PST_PRSCMD_BREAK_VALUE_WITH_EXISTING_PARAMETER_MATCH)) ? 1 : 0;
 				token_pot_param_break = ((TOKE_IS_VALID_POT_PARAM_BREAKER(token_type)
 						|| (TOKEN_IS_NULL_HAS_DOUBLE_DASH(token_type) && COLLECTORS_doCollectorsExist(collector)))
