@@ -972,7 +972,7 @@ cleanup:
 	return res;
 }
 
-static int process_partial_signature(ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PROCESSORS *processors, BLOCK_INFO *blocks, IO_FILES *files) {
+static int process_partial_signature(ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PROCESSORS *processors, BLOCK_INFO *blocks, IO_FILES *files, int progress) {
 	int res;
 	KSI_Signature *sig = NULL;
 	KSI_DataHash *hash = NULL;
@@ -1052,6 +1052,9 @@ static int process_partial_signature(ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PRO
 
 		if (processors->create_signature) {
 			print_progressResult(res);
+			if (progress) {
+				print_debug("Progress: signing block %3d of %3d unsigned blocks. Estimated time remaining: %3d seconds.\n", blocks->noSigNo, blocks->noSigCount, blocks->noSigCount - blocks->noSigNo + 1);
+			}
 			print_progressDesc(1, "Block no. %3d: creating missing KSI signature... ", blocks->blockNo);
 
 			res = processors->create_signature(err, ksi, hash, get_aggregation_level(blocks), &sig);
@@ -1464,7 +1467,7 @@ int logsignature_integrate(ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files) {
 						ERR_CATCH_MSG(err, res, "Error: Block no. %3d: unexpected TLV %04X read from block-signatures file.", blocks.blockNo, blocks.ftlv.tag);
 					}
 
-					res = process_partial_signature(err, ksi, &processors, &blocks, files);
+					res = process_partial_signature(err, ksi, &processors, &blocks, files, 0);
 					if (res != KT_OK) goto cleanup;
 				}
 				break;
@@ -1528,7 +1531,7 @@ int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *fi
 	if (progress) {
 		res = count_blocks(err, &blocks, files->files.inSig);
 		if (res != KT_OK) goto cleanup;
-		print_debug("Signing progress: %3d of %3d blocks need signing. Estimated signing time: %3d seconds.\n", blocks.noSigCount, blocks.blockCount, blocks.noSigCount);
+		print_debug("Progress: %3d of %3d blocks need signing. Estimated signing time: %3d seconds.\n", blocks.noSigCount, blocks.blockCount, blocks.noSigCount);
 	}
 
 	while (!feof(files->files.inSig)) {
@@ -1557,12 +1560,8 @@ int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *fi
 
 				case 0x904:
 				{
-					res = process_partial_signature(err, ksi, &processors, &blocks, files);
+					res = process_partial_signature(err, ksi, &processors, &blocks, files, progress);
 					if (res != KT_OK) goto cleanup;
-
-					if (progress) {
-						print_debug("Signing progress: %3d of %3d unsigned blocks signed. Estimated time remaining: %3d seconds.\n", blocks.noSigNo, blocks.noSigCount, blocks.noSigCount - blocks.noSigNo);
-					}
 				}
 				break;
 
