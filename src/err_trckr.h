@@ -34,7 +34,7 @@ extern "C" {
 
 ERR_TRCKR *ERR_TRCKR_new(int (*printErrors)(const char*, ...), const char *(*errCodeToString)(int));
 void ERR_TRCKR_free(ERR_TRCKR *obj);
-void ERR_TRCKR_add(ERR_TRCKR *err, int code, const char *fname, int lineN, const char *msg, ...);
+void ERR_TRCKR_add(ERR_TRCKR *err, int code, const char *fname, int lineN, const char *msg, ...) __attribute__ ((format(printf, 5, 6)));
 void ERR_TRCKR_reset(ERR_TRCKR *err);
 void ERR_TRCKR_printErrors(ERR_TRCKR *err);
 void ERR_TRCKR_printExtendedErrors(ERR_TRCKR *err);

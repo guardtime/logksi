@@ -39,11 +39,11 @@ void print_init(void);
 void print_setStream(unsigned print, FILE *stream);
 void print_enable(unsigned print);
 void print_disable(unsigned print);
-int print_result(const char *format, ... );
-int print_info(const char *format, ... );
-int print_warnings(const char *format, ... );
-int print_errors(const char *format, ... );
-int print_debug(const char *format, ... );
+int print_result(const char *format, ... ) __attribute__ ((format(printf, 1, 2)));
+int print_info(const char *format, ... ) __attribute__ ((format(printf, 1, 2)));
+int print_warnings(const char *format, ... ) __attribute__ ((format(printf, 1, 2)));
+int print_errors(const char *format, ... ) __attribute__ ((format(printf, 1, 2)));
+int print_debug(const char *format, ... ) __attribute__ ((format(printf, 1, 2)));
 #ifdef	__cplusplus
 }
 #endif

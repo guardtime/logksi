@@ -273,7 +273,7 @@ char* TOOL_COMPONENT_LIST_toString(TOOL_COMPONENT_LIST *list, const char* preffi
 		}
 	}
 
-	PST_snprintf(format, sizeof(format), "%%s%%-%is ", max_size);
+	PST_snprintf(format, sizeof(format), "%%s%%-%lus ", max_size);
 
 	/**
 	 * Generate help string for all known tasks.

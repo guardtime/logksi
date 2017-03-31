@@ -275,7 +275,7 @@ static int extend_to_specified_time(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi
 	}
 
 	/* Extend the signature. */
-	print_progressDesc(d, "Extending the signature to %s (%i)... ",
+	print_progressDesc(d, "Extending the signature to %s (%lu)... ",
 			KSI_Integer_toDateString(pubTime, buf, sizeof(buf)),
 			KSI_Integer_getUInt64(pubTime));
 	res = LOGKSI_Signature_extendTo(err, sig, ksi, pubTime, context, &tmp);
@@ -421,7 +421,7 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 	if (files->user.log == NULL) {
 		if (files->user.sig == NULL || !strcmp(files->user.sig, "-")) {
 			/* Output must go to a temporary file before redirecting it to stdout. */
-			res = concat_names("stdout", ".tmp", &tmp.internal.tempSig);
+			res = temp_name("stdout", &tmp.internal.tempSig);
 			ERR_CATCH_MSG(err, res, "Error: could not generate temporary output log signature file name.");
 		} else {
 			/* Output log signature is written directly to the specified file. */
@@ -439,14 +439,14 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 		/* Check if output would overwrite the input log signature file. */
 		if (files->user.sig == NULL || !strcmp(files->user.sig, tmp.internal.inSig)) {
 			/* Output must to go to a temporary file before overwriting the input log signature file. */
-			res = concat_names(tmp.internal.inSig, ".tmp", &tmp.internal.tempSig);
+			res = temp_name(tmp.internal.inSig, &tmp.internal.tempSig);
 			ERR_CATCH_MSG(err, res, "Error: could not generate temporary output log signature file name.");
 			/* Input must kept in a backup file when overwritten by the output log signature file. */
 			res = concat_names(tmp.internal.inSig, ".bak", &tmp.internal.backupSig);
 			ERR_CATCH_MSG(err, res, "Error: could not generate backup input log signature file name.");
 		} else if (!strcmp(files->user.sig, "-")) {
 			/* Output must go to a temporary file before redirecting it to stdout. */
-			res = concat_names(tmp.internal.inSig, ".tmp", &tmp.internal.tempSig);
+			res = temp_name(tmp.internal.inSig, &tmp.internal.tempSig);
 			ERR_CATCH_MSG(err, res, "Error: could not generate temporary output log signature file name.");
 		} else {
 			/* Output log signature is written directly to the specified file. */

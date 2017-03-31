@@ -1413,12 +1413,12 @@ int PARAM_SET_readFromFile(PARAM_SET *set, const char *fname, const char* source
 		arg[0] = '\0';
 		res = parse_key_value_pair(line, flag, arg, sizeof(flag));
 		if (res == PST_INVALID_FORMAT) {
-			PST_snprintf(buf, sizeof(buf), "Syntax error at line %4i. Unknown character. '%.60s'.\n", line_nr, line);
+			PST_snprintf(buf, sizeof(buf), "Syntax error at line %4lu. Unknown character. '%.60s'.\n", line_nr, line);
 			PARAM_addValue(set->syntax, buf, source, priority);
 			error_count++;
 			res = PST_OK;
 		} else if (flag[0] != '-' && flag[0] != '\0') {
-			PST_snprintf(buf, sizeof(buf) , "Syntax error at line %4i. Missing character '-'. '%.60s'.\n", line_nr, line);
+			PST_snprintf(buf, sizeof(buf) , "Syntax error at line %4lu. Missing character '-'. '%.60s'.\n", line_nr, line);
 			PARAM_addValue(set->syntax, buf, source, priority);
 			error_count++;
 			res = PST_OK;
@@ -1921,6 +1921,7 @@ int PARAM_SET_IncludeSet(PARAM_SET *target, PARAM_SET *src) {
 	 * name and it has values, add those values to the target set.
 	 */
 	for (i = 0; i < src->count; i++) {
+		if (src->parameter[i] == NULL) continue;
 		/**
 		 * If the count is zero, skip that round.
 		*/

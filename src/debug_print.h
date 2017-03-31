@@ -28,7 +28,7 @@
 extern "C" {
 #endif
 
-void print_progressDesc(int showTiming, const char *msg, ...);
+void print_progressDesc(int showTiming, const char *msg, ...) __attribute__ ((format(printf, 2, 3)));
 void print_progressResult(int res);
 
 #ifdef	__cplusplus

@@ -35,7 +35,7 @@ extern "C" {
  * \param[in]		...		Extra parameters for formatting.
  * \return The number of characters written, not including terminating NUL character. On error 0 is returned.
  */
-size_t PST_snprintf(char *buf, size_t n, const char *format, ... );
+size_t PST_snprintf(char *buf, size_t n, const char *format, ... ) __attribute__ ((format(printf, 3, 4)));
 
 /**
  * Platform independent version of strncpy that guarantees NULL terminated

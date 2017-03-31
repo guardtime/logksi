@@ -100,6 +100,7 @@ int logsignature_integrate(ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files);
 int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files);
 int get_file_read_lock(FILE *in);
 int concat_names(char *org, const char *extension, char **derived);
+int temp_name(char *org, char **derived);
 void logksi_filename_free(char **ptr);
 void logksi_internal_filenames_free(INTERNAL_FILE_NAMES *internal);
 void logksi_file_close(FILE **ptr);

@@ -69,11 +69,11 @@ static int appendInvalidServiceUrlError(ERR_TRCKR *err, int res, KSI_CTX *ksi, l
 		ret = STRING_extractRmWhite(KSI_ERR_toString(ksi, errTrcae, sizeof(errTrcae)), "Unable to parse", "pdu", serviceName, sizeof(serviceName));
 		if (ret == NULL) return 0;
 		if (strcmp(serviceName, "aggregation") == 0 || strcmp(serviceName, "extend") == 0) {
-			ERR_TRCKR_add(err, res, __FILE__, line, "Error: Service returned unknown PDU and HTTP error 400. Check the service URL!", serviceName);
+			ERR_TRCKR_add(err, res, __FILE__, line, "Error: Service returned unknown PDU and HTTP error 400. Check the service URL!");
 			return 1;
 		}
 	} else if (res == KSI_PUBLICATIONS_FILE_NOT_CONFIGURED) {
-			ERR_TRCKR_add(err, res, __FILE__, line, "Error: Publications file must be configured (-P <URL>)!", serviceName);
+			ERR_TRCKR_add(err, res, __FILE__, line, "Error: Publications file must be configured (-P <URL>)!");
 	} else {
 		appendInvalidPubfileUrlOrFileError(err, res, ksi, line);
 	}
