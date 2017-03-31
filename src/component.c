@@ -58,7 +58,6 @@ struct TOOL_COMPONENT_LIST_st {
 static int tool_component_new(char *name, int (*run)(int argc, char **argv, char **envp), char* (*help_toString)(char *buf, size_t buf_len), const char* (*getDesc)(void), int id, TOOL_COMPONENT **new) {
 	int res;
 	TOOL_COMPONENT *tmp = NULL;
-	size_t name_len = 0;
 	char *tmp_name = NULL;
 
 
@@ -87,16 +86,11 @@ static int tool_component_new(char *name, int (*run)(int argc, char **argv, char
 	/**
 	 * Initialize name.
 	 */
-	name_len = strlen(name);
-
-	tmp_name = (char*)malloc(name_len + 1);
+	tmp_name = strdup(name);
 	if (tmp_name == NULL) {
 		res = KT_OUT_OF_MEMORY;
 		goto cleanup;
 	}
-
-	strcpy(tmp_name, name);
-	tmp_name[name_len] = '\0';
 
 	tmp->name = tmp_name;
 	*new = tmp;
@@ -280,7 +274,7 @@ char* TOOL_COMPONENT_LIST_toString(TOOL_COMPONENT_LIST *list, const char* preffi
 	 */
 	for (i = 0; i < list->count; i++) {
 		/*TODO: If lines are too long make it possible to fix the format.*/
-		tmp = strlen(list->component[i]->name);
+		/* tmp = strlen(list->component[i]->name); */
 		/**
 		 * Print the tasks name.
 		 */

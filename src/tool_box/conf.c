@@ -151,7 +151,7 @@ char *conf_help_toString(char *buf, size_t len) {
 		"\n"
 		);
 
-	count += KSI_snprintf(buf + count, len - count,
+	/*count += */KSI_snprintf(buf + count, len - count,
 		"An example configuration file:\n\n"
 		" # --- BEGINNING ---\n"
 		" # KSI Signing service parameters:\n"

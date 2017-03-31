@@ -40,11 +40,10 @@ static int new_string(const char *str, char **out) {
 		return PST_OK;
 	}
 
-	tmp = (char*)malloc(strlen(str)*sizeof(char) + 1);
+	tmp = strdup(str);
 	if (tmp == NULL) return PST_OUT_OF_MEMORY;
-
-	strcpy(tmp, str);
 	*out = tmp;
+
 	return PST_OK;
 }
 
@@ -426,10 +425,9 @@ char* TASK_DEFINITION_toString(TASK_DEFINITION *def, char *buf, size_t buf_len) 
 			round++;
 		}
 
-		count += PST_snprintf(buf + count, buf_len - count, ")");
+		PST_snprintf(buf, buf_len, ")");
 	}
 
-//	count += PST_snprintf(buf + count, buf_len - count, "\n");
 	return buf;
 }
 
@@ -507,7 +505,7 @@ char *TASK_DEFINITION_howToRepiar_toString(TASK_DEFINITION *def, PARAM_SET *set,
 			}
 		}
 	}
-	if (err_printed) count += PST_snprintf(buf + count, buf_len - count, ".\n");
+	if (err_printed) PST_snprintf(buf + count, buf_len - count, ".\n");
 
 	return buf;
 }
@@ -541,7 +539,7 @@ char* TASK_DEFINITION_ignoredParametersToString(TASK_DEFINITION *def, PARAM_SET 
 		}
 	}
 
-	if (err_printed) count += PST_snprintf(buf + count, buf_len - count, ".\n");
+	if (err_printed) PST_snprintf(buf + count, buf_len - count, ".\n");
 
 	return buf;
 }

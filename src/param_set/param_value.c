@@ -27,11 +27,7 @@
 #include "strn.h"
 
 static char *new_string(const char *str) {
-	char *tmp = NULL;
-	if (str == NULL) return NULL;
-	tmp = (char*)malloc(strlen(str)*sizeof(char)+1);
-	if (tmp == NULL) return NULL;
-	return strcpy(tmp, str);
+	return strdup(str);
 }
 
 int PARAM_VAL_insert(PARAM_VAL *target, const char* source, int priority, int at, PARAM_VAL *obj) {

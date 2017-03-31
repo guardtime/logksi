@@ -30,11 +30,7 @@
 #define FORMAT_OK 0
 
 static char *new_string(const char *str) {
-	char *tmp = NULL;
-	if (str == NULL) return NULL;
-	tmp = (char*)malloc(strlen(str)*sizeof(char)+1);
-	if (tmp == NULL) return NULL;
-	return strcpy(tmp, str);
+	return strdup(str);
 }
 
 static int param_constraint_isFlagSet(const PARAM *obj, int state) {
@@ -434,7 +430,7 @@ char* PARAM_constraintErrorToString(const PARAM *param, const char *prefix, char
 	}
 
 	if (constraints & PARAM_SINGLE_VALUE_FOR_PRIORITY_LEVEL) {
-		count += param_add_constraint_error_to_buf(param, "Duplicate parameters in priority levels ", prefix, buf + count, buf_len - count);
+		/*count += */param_add_constraint_error_to_buf(param, "Duplicate parameters in priority levels ", prefix, buf + count, buf_len - count);
 	}
 
 	return buf;
@@ -538,12 +534,11 @@ cleanup:
 
 char* PARAM_toString(const PARAM *param, char *buf, size_t buf_len)  {
 	char sub_buf[2048];
-	size_t count = 0;
 
 	if (param == NULL || buf == NULL || buf_len == 0) return 0;
 
 
-	count += PST_snprintf(buf + count, buf_len - count, "%s(%i)->%s", param->flagName, param->argCount,
+	PST_snprintf(buf, buf_len, "%s(%i)->%s", param->flagName, param->argCount,
 			PARAM_VAL_toString(param->arg, sub_buf, sizeof(sub_buf)));
 
 	return buf;

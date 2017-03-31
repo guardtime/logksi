@@ -1921,7 +1921,6 @@ int PARAM_SET_IncludeSet(PARAM_SET *target, PARAM_SET *src) {
 	 * name and it has values, add those values to the target set.
 	 */
 	for (i = 0; i < src->count; i++) {
-		if (src->parameter[i] == NULL) continue;
 		/**
 		 * If the count is zero, skip that round.
 		*/
@@ -1944,9 +1943,10 @@ int PARAM_SET_IncludeSet(PARAM_SET *target, PARAM_SET *src) {
 		 */
 		n = 0;
 		while (PARAM_getValue(src->parameter[i], NULL, PST_PRIORITY_NONE, n, &param_value) == PST_OK) {
-			res = PARAM_SET_add(target, src->parameter[i]->flagName, param_value->cstr_value, param_value->source, param_value->priority);
-			if (res != PST_OK) 	goto cleanup;
-
+			if (param_value) {
+				res = PARAM_SET_add(target, src->parameter[i]->flagName, param_value->cstr_value, param_value->source, param_value->priority);
+				if (res != PST_OK) 	goto cleanup;
+			}
 			n++;
 		}
 	}
@@ -2236,7 +2236,7 @@ char* PARAM_SET_toString(PARAM_SET *set, char *buf, size_t buf_len) {
 			n++;
 		}
 	}
-	count += PST_snprintf(buf + count, buf_len - count, "\n");
+	/*count += */PST_snprintf(buf + count, buf_len - count, "\n");
 
 	buf[buf_len - 1] = '\0';
 	return buf;

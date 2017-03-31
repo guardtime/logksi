@@ -62,7 +62,7 @@ char* CONF_generate_param_set_desc(char *description, const char *flags, char *b
 	}
 
 	if (is_P) {
-		count += KSI_snprintf(buf + count, buf_len - count, "{P}{cnstr}{V}{W}{publications-file-no-verify}");
+		/*count += */KSI_snprintf(buf + count, buf_len - count, "{P}{cnstr}{V}{W}{publications-file-no-verify}");
 	}
 
 	return buf;
@@ -278,7 +278,7 @@ char *CONF_errorsToString(PARAM_SET *set, const char *prefix, char *buf, size_t 
 	}
 
 	if (PARAM_SET_isSetByName(set, "publications-file-no-verify")) {
-		count += KSI_snprintf(buf + count, buf_len - count, "%sconfiguration flag 'publications-file-no-verify' can only be defined on command-line.\n",
+		/*count += */KSI_snprintf(buf + count, buf_len - count, "%sconfiguration flag 'publications-file-no-verify' can only be defined on command-line.\n",
 				prefix == NULL ? "" : prefix);
 
 	}

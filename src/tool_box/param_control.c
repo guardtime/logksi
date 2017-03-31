@@ -220,7 +220,7 @@ int convertRepair_url(const char* arg, char* buf, unsigned len) {
 	if (scheme == NULL) {
 		KSI_strncpy(buf, "http://", len-1);
 		if (strlen(buf)+strlen(arg) < len)
-			strcat(buf, arg);
+			strncat(buf, arg, strlen(arg));
 		else
 			return 0;
 	} else {

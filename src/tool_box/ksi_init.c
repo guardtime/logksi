@@ -204,15 +204,12 @@ static int tool_init_ksi_pub_cert_constraints(KSI_CTX *ksi, ERR_TRCKR *err, PARA
 			*value = '\0';
 			value++;
 
-		constraintArray[i].oid = KSI_malloc(strlen(oid) + 1);
-		constraintArray[i].val = KSI_malloc(strlen(value) + 1);
+		constraintArray[i].oid = strdup(oid);
+		constraintArray[i].val = strdup(value);
 		if (constraintArray[i].oid == NULL || constraintArray[i].val == NULL) {
 			ERR_TRCKR_ADD(err, res = KSI_OUT_OF_MEMORY, NULL);
 			goto cleanup;
 		}
-
-		strcpy(constraintArray[i].oid, oid);
-		strcpy(constraintArray[i].val, value);
 	}
 
 	/**

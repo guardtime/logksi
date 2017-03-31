@@ -64,7 +64,7 @@ static char *hash_algorithms_to_string(char *buf, size_t buf_len) {
 		}
 	}
 	if (count > 0) {
-		count += KSI_snprintf(buf + count, buf_len - count, ".");
+		/*count += */KSI_snprintf(buf + count, buf_len - count, ".");
 	}
 
 	return buf;
