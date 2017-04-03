@@ -536,12 +536,8 @@ static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files) {
 	if (files->internal.backupSig) {
 		/* Create a backup of the input log signature file by renaming it. */
 		logksi_file_close(&files->files.inSig);
-		if (SMART_FILE_doFileExist(files->internal.backupSig)) {
-			if(remove(files->internal.backupSig) != 0) {
-				res = KT_IO_ERROR;
-				ERR_CATCH_MSG(err, res, "Error: could not remove existing backup file %s.", files->internal.backupSig);
-			}
-		}
+		res = logksi_remove_file(files->internal.backupSig);
+		ERR_CATCH_MSG(err, res, "Error: could not remove existing backup file %s.", files->internal.backupSig);
 		if (rename(files->internal.inSig, files->internal.backupSig) != 0) {
 			res = KT_IO_ERROR;
 			ERR_CATCH_MSG(err, res, "Error: could not rename input log signature file %s to backup file %s.", files->internal.inSig, files->internal.backupSig);

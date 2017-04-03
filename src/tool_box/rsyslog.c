@@ -1712,3 +1712,24 @@ void logksi_files_close(INTERNAL_FILE_HANDLES *files) {
 		logksi_file_close(&files->partsSig);
 	}
 }
+
+int logksi_remove_file(char *name) {
+	int res;
+	if (name == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	if (unlink(name) != 0) {
+		if (errno != ENOENT) {
+			res = KT_IO_ERROR;
+			goto cleanup;
+		}
+	}
+
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
