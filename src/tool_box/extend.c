@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <ksi/ksi.h>
 #include <ksi/compatibility.h>
 #include <ksi/policy.h>
@@ -481,15 +482,15 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 
 	if (files->internal.inSig) {
 		/* Make sure that the input log signature exists. */
-		if (!SMART_FILE_doFileExist(files->internal.inSig)) {
-			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: no matching log signature file found for log file %s.", files->internal.log);
-		}
-
 		tmp.files.inSig = fopen(files->internal.inSig, "rb");
 		if (tmp.files.inSig == NULL) {
-			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: could not open input log signature file %s.", files->internal.inSig);
+			if (errno == ENOENT) {
+				res = KT_IO_ERROR;
+				ERR_CATCH_MSG(err, res, "Error: no matching log signature file found for log file %s.", files->user.log);
+			} else {
+				res = KT_IO_ERROR;
+				ERR_CATCH_MSG(err, res, "Error: could not open input log signature file %s.", files->internal.inSig);
+			}
 		}
 	} else {
 		/* If not specified, the input is taken from stdin. */
