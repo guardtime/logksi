@@ -198,6 +198,7 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 
 	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
 	PARAM_SET_setParseOptions(set, "d", PST_PRSCMD_HAS_NO_VALUE | PST_PRSCMD_NO_TYPOS);
+	PARAM_SET_setParseOptions(set, "show-progress", PST_PRSCMD_HAS_NO_VALUE);
 
 	/*					  ID	DESC										MAN					ATL		FORBIDDEN		IGN	*/
 	TASK_SET_add(task_set, 0,	"Sign data.",								"S",				NULL,	NULL,		NULL);
