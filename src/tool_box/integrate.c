@@ -254,11 +254,11 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 		/* If both of the input files exist and the output log signature file also exists,
 		 * the output log signature file must not be overwritten because it may contain KSI signatures
 		 * obtained by sign recovery but not present in the input signatures file. */
-		if (SMART_FILE_doFileExist(files->internal.outSig)) {
+		tmp.files.outSig = fopen(files->internal.outSig, "rb");
+		if (tmp.files.outSig != NULL) {
 			res = KT_IO_ERROR;
 			ERR_CATCH_MSG(err, res, "Error: overwriting of existing output log signature file %s not supported.", files->internal.outSig);
 		}
-
 		tmp.files.outSig = fopen(files->internal.outSig, "wb");
 		if (tmp.files.outSig == NULL) {
 			res = KT_IO_ERROR;
