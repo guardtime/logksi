@@ -197,5 +197,6 @@ static void print_conf_file(const char *fname, int (*print)(const char *format, 
 		if (feof(f)) buf[count] = '\0';
 		print("%s", buf);
 	}
+	fclose(f);
 	return;
 }
