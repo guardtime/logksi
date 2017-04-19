@@ -342,6 +342,7 @@ static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files) {
 	int res;
 	char buf[1024];
 	size_t count = 0;
+	FILE *tmp = NULL;
 
 	if (err == NULL || files == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -367,7 +368,8 @@ static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files) {
 	} else if (files->internal.tempSig) {
 		/* Copy the contents of the temporary output log signature file to stdout. */
 		//fclose(files->files.outSig);
-		if (freopen(NULL, "rb",  files->files.outSig) == NULL) {
+		tmp = freopen(NULL, "rb",  files->files.outSig);
+		if (tmp == NULL) {
 			res = KT_IO_ERROR;
 			ERR_CATCH_MSG(err, res, "Error: could not access temporary output log signature file %s in read mode.", files->internal.tempSig);
 		}
