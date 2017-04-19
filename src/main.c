@@ -186,10 +186,10 @@ int main(int argc, char** argv, char **envp) {
 	/**
 	 * Add the values to the set.
 	 */
-	res = PARAM_SET_add(set_task_name, argv[1], NULL, NULL, 0);
+	PARAM_SET_add(set_task_name, argv[1], NULL, NULL, 0);
 
 	if (argc > 1) {
-		res = PARAM_SET_readFromCMD(set, argc, argv, NULL, 0);
+		PARAM_SET_readFromCMD(set, argc, argv, NULL, 0);
 	}
 
 	/**

@@ -596,6 +596,7 @@ int LOGKSI_LOG_SmartFile(void *logCtx, int logLevel, const char *message) {
 	time_t timer;
 	SMART_FILE *f = (SMART_FILE *) logCtx;
 	size_t count = 0;
+	size_t dummy = 0;
 
 	timer = time(NULL);
 
@@ -607,7 +608,7 @@ int LOGKSI_LOG_SmartFile(void *logCtx, int logLevel, const char *message) {
 	if (f != NULL) {
 		strftime(time_buf, sizeof(time_buf), "%d.%m.%Y %H:%M:%S", tm_info);
 		count = KSI_snprintf(buf, sizeof(buf), "%s [%s] - %s\n", level2str(logLevel), time_buf, message);
-		SMART_FILE_write(f, buf, count, NULL);
+		SMART_FILE_write(f, buf, count, &dummy);
 	}
 
 	return KSI_OK;

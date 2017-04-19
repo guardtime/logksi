@@ -258,7 +258,7 @@ char *CONF_errorsToString(PARAM_SET *set, const char *prefix, char *buf, size_t 
 
 	if (PARAM_SET_isSyntaxError(set)) {
 		PARAM_SET_syntaxErrorsToString(set, prefix, tmp, sizeof(tmp));
-		count += KSI_snprintf(buf + count, buf_len - count, "%s", tmp);
+		KSI_snprintf(buf, buf_len, "%s", tmp);
 		goto cleanup;
 	}
 
