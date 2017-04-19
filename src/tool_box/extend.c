@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <ksi/ksi.h>
 #include <ksi/compatibility.h>
 #include <ksi/policy.h>
@@ -481,15 +482,15 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 
 	if (files->internal.inSig) {
 		/* Make sure that the input log signature exists. */
-		if (!SMART_FILE_doFileExist(files->internal.inSig)) {
-			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: no matching log signature file found for log file %s.", files->internal.log);
-		}
-
 		tmp.files.inSig = fopen(files->internal.inSig, "rb");
 		if (tmp.files.inSig == NULL) {
-			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: could not open input log signature file %s.", files->internal.inSig);
+			if (errno == ENOENT) {
+				res = KT_IO_ERROR;
+				ERR_CATCH_MSG(err, res, "Error: no matching log signature file found for log file %s.", files->user.log);
+			} else {
+				res = KT_IO_ERROR;
+				ERR_CATCH_MSG(err, res, "Error: could not open input log signature file %s.", files->internal.inSig);
+			}
 		}
 	} else {
 		/* If not specified, the input is taken from stdin. */
@@ -536,12 +537,8 @@ static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files) {
 	if (files->internal.backupSig) {
 		/* Create a backup of the input log signature file by renaming it. */
 		logksi_file_close(&files->files.inSig);
-		if (SMART_FILE_doFileExist(files->internal.backupSig)) {
-			if(remove(files->internal.backupSig) != 0) {
-				res = KT_IO_ERROR;
-				ERR_CATCH_MSG(err, res, "Error: could not remove existing backup file %s.", files->internal.backupSig);
-			}
-		}
+		res = logksi_remove_file(files->internal.backupSig);
+		ERR_CATCH_MSG(err, res, "Error: could not remove existing backup file %s.", files->internal.backupSig);
 		if (rename(files->internal.inSig, files->internal.backupSig) != 0) {
 			res = KT_IO_ERROR;
 			ERR_CATCH_MSG(err, res, "Error: could not rename input log signature file %s to backup file %s.", files->internal.inSig, files->internal.backupSig);

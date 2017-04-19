@@ -18,6 +18,7 @@
  */
 
 #include <string.h>
+#include <errno.h>
 #include <ksi/ksi.h>
 #include <ksi/compatibility.h>
 #include "param_set/param_set.h"
@@ -232,6 +233,8 @@ cleanup:
 
 static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 	int res;
+	int partsBlkErr = 0;
+	int partsSigErr = 0;
 	IO_FILES tmp;
 
 	memset(&tmp.files, 0, sizeof(tmp.files));
@@ -241,55 +244,50 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 		goto cleanup;
 	}
 
-	if (SMART_FILE_doFileExist(files->internal.partsBlk) && SMART_FILE_doFileExist(files->internal.partsSig)) {
+	tmp.files.partsBlk = fopen(files->internal.partsBlk, "rb");
+	if (tmp.files.partsBlk == NULL) partsBlkErr = errno;
+
+	tmp.files.partsSig = fopen(files->internal.partsSig, "rb");
+	if (tmp.files.partsSig == NULL) partsSigErr = errno;
+
+	if (partsBlkErr == 0 && partsSigErr == 0) {
 		/* If both of the input files exist and the output log signature file also exists,
 		 * the output log signature file must not be overwritten because it may contain KSI signatures
 		 * obtained by sign recovery but not present in the input signatures file. */
-		if (SMART_FILE_doFileExist(files->internal.outSig)) {
+		tmp.files.outSig = fopen(files->internal.outSig, "rb");
+		if (tmp.files.outSig != NULL) {
 			res = KT_IO_ERROR;
 			ERR_CATCH_MSG(err, res, "Error: overwriting of existing output log signature file %s not supported.", files->internal.outSig);
 		}
-
-		tmp.files.partsBlk = fopen(files->internal.partsBlk, "rb");
-		if (tmp.files.partsBlk == NULL) {
-			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: could not open input blocks file %s.", files->internal.partsBlk);
-		}
-
-		tmp.files.partsSig = fopen(files->internal.partsSig, "rb");
-		if (tmp.files.partsSig == NULL) {
-			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: could not open input signatures file %s.", files->internal.partsSig);
-		}
-
 		tmp.files.outSig = fopen(files->internal.outSig, "wb");
 		if (tmp.files.outSig == NULL) {
 			res = KT_IO_ERROR;
 			ERR_CATCH_MSG(err, res, "Error: could not open output log signature file %s.", files->internal.outSig);
 		}
-	} else if (!SMART_FILE_doFileExist(files->internal.partsBlk) && !SMART_FILE_doFileExist(files->internal.partsSig)) {
+	} else if (partsBlkErr == ENOENT && partsSigErr == ENOENT) {
 		/* If none of the input files exist, but the output log signature file exists,
 		 * the output log signature file is the result of the synchronous signing process
 		 * and must not be overwritten. A read mode file handle is needed for acquiring a file lock. */
-		if (SMART_FILE_doFileExist(files->internal.outSig)) {
+		tmp.files.inSig = fopen(files->internal.outSig, "rb");
+		if (tmp.files.inSig != NULL) {
 			/* Reassign ouput file name as input file name to avoid potential removal as an incomplete output file. */
 			files->internal.inSig = files->internal.outSig;
 			files->internal.outSig = NULL;
-			tmp.files.inSig = fopen(files->internal.inSig, "rb");
-			if (tmp.files.inSig == NULL) {
+		} else {
+			if (errno == ENOENT) {
+				res = KT_KSI_SIG_VER_IMPOSSIBLE;
+				ERR_CATCH_MSG(err, res, "Error: unable to find input blocks file %s.", files->internal.partsBlk);
+			} else {
 				res = KT_IO_ERROR;
 				ERR_CATCH_MSG(err, res, "Error: could not open output log signature file %s in read mode.", files->internal.inSig);
 			}
-		} else {
-			res = KT_KSI_SIG_VER_IMPOSSIBLE;
-			ERR_CATCH_MSG(err, res, "Error: unable to find input blocks file %s.", files->internal.partsBlk);
 		}
 	} else {
 		res = KT_KSI_SIG_VER_IMPOSSIBLE;
-		if (!SMART_FILE_doFileExist(files->internal.partsBlk)) {
-			ERR_CATCH_MSG(err, res, "Error: unable to find blocks file %s.", files->internal.partsBlk);
+		if (partsBlkErr != 0) {
+			ERR_CATCH_MSG(err, res, "Error: unable to %s blocks file %s.", partsBlkErr == ENOENT ? "find ": "open", files->internal.partsBlk);
 		} else {
-			ERR_CATCH_MSG(err, res, "Error: unable to find signatures file %s.", files->internal.partsSig);
+			ERR_CATCH_MSG(err, res, "Error: unable to %s signatures file %s.", partsSigErr == ENOENT ? "find ": "open", files->internal.partsSig);
 		}
 	}
 
