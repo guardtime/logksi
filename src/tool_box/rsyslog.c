@@ -34,6 +34,7 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <inttypes.h>
 
 #define SOF_ARRAY(x) (sizeof(x) / sizeof((x)[0]))
 
@@ -757,7 +758,7 @@ int process_metarecord(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILE
 		while (blocks->nofRecordHashes < metarecord_index) {
 			blocks->nofRecordHashes++;
 			res = get_hash_of_logline(ksi, blocks, files, &hash);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing logline no. %3zu up to metarecord index %3lu.", blocks->blockNo, blocks->nofRecordHashes, metarecord_index);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing logline no. %3zu up to metarecord index %3" PRIu64 "u.", blocks->blockNo, blocks->nofRecordHashes, metarecord_index);
 			res = add_record_hash_to_merkle_tree(ksi, blocks, 0, hash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
 			KSI_DataHash_free(hash);
@@ -766,7 +767,7 @@ int process_metarecord(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILE
 	}
 
 	res = get_hash_of_metarecord(ksi, blocks, tlv, &hash);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate metarecord hash with index %3lu.", blocks->blockNo, metarecord_index);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate metarecord hash with index %3" PRIu64 "u.", blocks->blockNo, metarecord_index);
 
 	if (files->files.outSig) {
 		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->files.outSig) != blocks->ftlv_len) {

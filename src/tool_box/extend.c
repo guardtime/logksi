@@ -40,6 +40,7 @@
 #include "conf_file.h"
 #include "tool.h"
 #include "rsyslog.h"
+#include <inttypes.h>
 
 static int extend_to_nearest_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_VerificationContext *context, KSI_Signature **ext);
 static int extend_to_specified_time(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_VerificationContext *context, KSI_Signature **ext);
@@ -276,7 +277,7 @@ static int extend_to_specified_time(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi
 	}
 
 	/* Extend the signature. */
-	print_progressDesc(d, "Extending the signature to %s (%lu)... ",
+	print_progressDesc(d, "Extending the signature to %s (%" PRIu64 "u)... ",
 			KSI_Integer_toDateString(pubTime, buf, sizeof(buf)),
 			KSI_Integer_getUInt64(pubTime));
 	res = LOGKSI_Signature_extendTo(err, sig, ksi, pubTime, context, &tmp);
