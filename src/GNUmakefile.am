@@ -22,6 +22,7 @@ man_MANS = \
 	../doc/logksi-conf.5 \
 	../doc/logksi-sign.1 \
 	../doc/logksi-extend.1 \
+	../doc/logksi-integrate.1 \
 	../doc/logksi-verify.1
 
 dist_doc_DATA = ../LICENSE ../doc/ChangeLog
