@@ -32,6 +32,8 @@
 #include "rsyslog.h"
 #include <fcntl.h>
 #include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #define SOF_ARRAY(x) (sizeof(x) / sizeof((x)[0]))
 
@@ -1649,6 +1651,7 @@ int temp_name(char *org, char **derived) {
 	int res;
 	int fd = -1;
 	char *tmp = NULL;
+	mode_t prev;
 
 	if (org == NULL || derived == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -1658,7 +1661,10 @@ int temp_name(char *org, char **derived) {
 	res = concat_names(org, "XXXXXX", &tmp);
 	if (res != KT_OK) goto cleanup;
 
+	prev = umask(077);
 	fd = mkstemp(tmp);
+	umask(prev);
+
 	if (fd == -1) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
