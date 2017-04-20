@@ -818,7 +818,7 @@ int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNAT
 	res = KSI_TlvElement_parse(blocks->ftlv_raw, blocks->ftlv_len, &tlv);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse block signature as TLV element.", blocks->blockNo);
 
-	res = tlv_element_get_uint(tlv, ksi, 0x01, &blocks->recordCount);
+	res = tlv_element_get_uint(tlv, ksi, 0x01, (size_t*)&blocks->recordCount);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing record count in block signature.", blocks->blockNo);
 
 	res = KSI_TlvElement_getElement(tlv, 0x905, &tlvSig);
@@ -937,7 +937,7 @@ static int process_partial_block(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *block
 	res = KSI_TlvElement_parse(blocks->ftlv_raw, blocks->ftlv_len, &tlv);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse block signature as TLV element.", blocks->blockNo);
 
-	res = tlv_element_get_uint(tlv, ksi, 0x01, &blocks->recordCount);
+	res = tlv_element_get_uint(tlv, ksi, 0x01, (size_t*)&blocks->recordCount);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing record count in blocks file.", blocks->blockNo);
 
 	res = KSI_TlvElement_getElement(tlv, 0x02, &tlvNoSig);
@@ -1001,7 +1001,7 @@ static int process_partial_signature(ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PRO
 	res = KSI_TlvElement_parse(blocks->ftlv_raw, blocks->ftlv_len, &tlv);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse block signature as TLV element.", blocks->blockNo);
 
-	res = tlv_element_get_uint(tlv, ksi, 0x01, &blocks->recordCount);
+	res = tlv_element_get_uint(tlv, ksi, 0x01, (size_t*)&blocks->recordCount);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing record count in signatures file.", blocks->blockNo);
 
 	if (blocks->nofRecordHashes && blocks->nofRecordHashes != blocks->recordCount) {
