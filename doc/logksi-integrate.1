@@ -17,8 +17,10 @@ the log signature file containing the respective KSI signatures: \fIlogfile.logs
 .LP
 If the output file name is not specified, it is derived from the name of the log file \fIlogfile\fR by adding the standard suffix \fI.logsig\fR. An attempt to overwrite an existing log signature file will result in an error.
 .LP
-The integration of the files can be performed once both files are complete. Under Linux \fBlogksi integrate \fR waits to acquire a read lock on the files before integrating them. The read lock is advisory and relies on the same implementation in the signing application.
+The integration of the files can be performed once both files are complete. \fBlogksi integrate \fR waits to acquire a read lock on the files before integrating them. The read lock is advisory and relies on the same implementation in the signing application.
 .LP
+If the temporary files do not exist, but a matching log signature exists, it is assumed that the log signature is the output of a synchronous signing process. \fBlogksi integrate \fR waits to acquire a read lock on the log signature file and then skips the actual integration. The read lock is advisory and relies on the same implementation in the signing application.
+.LP 
 During integration the following is checked:
 .LP
 .IP \(bu 4
