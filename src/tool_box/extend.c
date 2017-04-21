@@ -423,8 +423,11 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 	if (files->user.log == NULL) {
 		if (files->user.sig == NULL || !strcmp(files->user.sig, "-")) {
 			/* Output must go to a temporary file before redirecting it to stdout. */
-			res = temp_name("stdout", &tmp.internal.tempSig);
-			ERR_CATCH_MSG(err, res, "Error: could not generate temporary output log signature file name.");
+			tmp.internal.tempSig = strdup("stdout.tmp");
+			if (tmp.internal.tempSig == NULL) {
+				res = KT_OUT_OF_MEMORY;
+				ERR_CATCH_MSG(err, res, "Error: could not generate temporary output log signature file name.");
+			}
 		} else {
 			/* Output log signature is written directly to the specified file. */
 			tmp.internal.outSig = strdup(files->user.sig);
@@ -500,7 +503,12 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 
 	/* Output goes either to a temporary file or directly to output log signature file. */
 	if (files->internal.tempSig) {
-		tmp.files.outSig = fopen(files->internal.tempSig, "wb");
+		if (files->internal.backupSig) {
+			tmp.files.outSig = fopen(files->internal.tempSig, "wb");
+		} else {
+			/* If the temporary output log signature file is for stdout, we do not need to reference it by name. */
+			tmp.files.outSig = tmpfile();
+		}
 		if (tmp.files.outSig == NULL) {
 			res = KT_IO_ERROR;
 			ERR_CATCH_MSG(err, res, "Error: could not open temporary output log signature file %s.", files->internal.tempSig);
@@ -552,17 +560,19 @@ static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files) {
 		}
 	} else if (files->internal.tempSig) {
 		/* Copy the contents of the temporary output log signature file to stdout. */
-		logksi_file_close(&files->files.outSig);
-		files->files.outSig = fopen(files->internal.tempSig, "rb");
 		if (files->files.outSig == NULL) {
 			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: could not access temporary output log signature file %s in read mode.", files->internal.tempSig);
+			ERR_CATCH_MSG(err, res, "Error: could not access temporary output log signature file in read mode.");
+		}
+		if (fseek(files->files.outSig, 0, SEEK_SET) != 0) {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: could not seek temporary output log signature file.");
 		}
 		while(!feof(files->files.outSig)) {
 			count = fread(buf, 1, sizeof(buf), files->files.outSig);
 			if (fwrite(buf, 1, count, stdout) != count) {
 				res = KT_IO_ERROR;
-				ERR_CATCH_MSG(err, res, "Error: could not write temporary output log signature file %s to stdout.", files->internal.tempSig);
+				ERR_CATCH_MSG(err, res, "Error: could not write temporary output log signature file to stdout.");
 			}
 		}
 	}
@@ -586,7 +596,7 @@ cleanup:
 static void close_input_and_output_files(ERR_TRCKR *err, int res, IO_FILES *files) {
 	if (files) {
 		logksi_files_close(&files->files);
-		if (files->internal.tempSig) {
+		if (files->internal.tempSig && res != KT_OK) {
 			if (remove(files->internal.tempSig) != 0) {
 				if (err) ERR_TRCKR_ADD(err, KT_IO_ERROR, "Error: could not remove temporary output log signature %s.", files->internal.tempSig);
 			}
