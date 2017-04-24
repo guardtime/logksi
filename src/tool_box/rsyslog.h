@@ -47,6 +47,7 @@ typedef struct {
 	char *backupSig;
 	char *partsBlk;
 	char *partsSig;
+	char bStdout;
 } INTERNAL_FILE_NAMES;
 
 typedef struct {

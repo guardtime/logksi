@@ -236,14 +236,12 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 	/* If not specified, the input signature is read from stdin. */
 	if (files->user.log == NULL) {
 		if (files->user.sig == NULL || !strcmp(files->user.sig, "-")) {
-			/* Output must go to a temporary file before redirecting it to stdout. */
-			tmp.internal.tempSig = strdup("stdout.tmp");
-			if (tmp.internal.tempSig == NULL) {
-				res = KT_OUT_OF_MEMORY;
-				ERR_CATCH_MSG(err, res, "Error: could not generate temporary output log signature file name.");
-			}
+			/* Output must go to a nameless temporary file before redirecting it to stdout. */
+			tmp.internal.bStdout = 1;
 		} else {
-			/* Output log signature is written directly to the specified file. */
+			/* Output must go to a named temporary file that is renamed appropriately on success. */
+			res = temp_name(files->user.sig, &tmp.internal.tempSig);
+			ERR_CATCH_MSG(err, res, "Error: could not generate temporary output log signature file name.");
 			tmp.internal.outSig = strdup(files->user.sig);
 			if (tmp.internal.outSig == NULL) {
 				res = KT_OUT_OF_MEMORY;
@@ -264,14 +262,12 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 			res = concat_names(tmp.internal.inSig, ".bak", &tmp.internal.backupSig);
 			ERR_CATCH_MSG(err, res, "Error: could not generate backup input log signature file name.");
 		} else if (!strcmp(files->user.sig, "-")) {
-			/* Output must go to a temporary file before redirecting it to stdout. */
-			tmp.internal.tempSig = strdup("stdout.tmp");
-			if (tmp.internal.tempSig == NULL) {
-				res = KT_OUT_OF_MEMORY;
-				ERR_CATCH_MSG(err, res, "Error: could not generate temporary output log signature file name.");
-			}
+			/* Output must go to a nameless temporary file before redirecting it to stdout. */
+			tmp.internal.bStdout = 1;
 		} else {
-			/* Output log signature is written directly to the specified file. */
+			/* Output must go to a named temporary file that is renamed appropriately on success. */
+			res = temp_name(files->user.sig, &tmp.internal.tempSig);
+			ERR_CATCH_MSG(err, res, "Error: could not generate temporary output log signature file name.");
 			tmp.internal.outSig = strdup(files->user.sig);
 			if (tmp.internal.outSig == NULL) {
 				res = KT_OUT_OF_MEMORY;
@@ -318,24 +314,15 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 		tmp.files.inSig = stdin;
 	}
 
-	/* Output goes either to a temporary file or directly to output log signature file. */
-	if (files->internal.tempSig) {
-		if (files->internal.backupSig) {
-			tmp.files.outSig = fopen(files->internal.tempSig, "wb");
-		} else {
-			/* If the temporary output log signature file is for stdout, we do not need to reference it by name. */
-			tmp.files.outSig = tmpfile();
-		}
-		if (tmp.files.outSig == NULL) {
-			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: could not open temporary output log signature file %s.", files->internal.tempSig);
-		}
-	} else if (files->internal.outSig) {
-		tmp.files.outSig = fopen(files->internal.outSig, "wb");
-		if (tmp.files.outSig == NULL) {
-			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: could not open output log signature file %s.", files->internal.outSig);
-		}
+	/* Output goes either to a named or nameless temporary file. */
+	if (files->internal.bStdout) {
+		tmp.files.outSig = tmpfile();
+	} else {
+		tmp.files.outSig = fopen(files->internal.tempSig, "wb");
+	}
+	if (tmp.files.outSig == NULL) {
+		res = KT_IO_ERROR;
+		ERR_CATCH_MSG(err, res, "Error: could not create temporary output log signature file.");
 	}
 
 	files->files = tmp.files;
@@ -369,13 +356,23 @@ static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files) {
 			res = KT_IO_ERROR;
 			ERR_CATCH_MSG(err, res, "Error: could not rename input log signature file %s to backup file %s.", files->internal.inSig, files->internal.backupSig);
 		}
-		/* Output must be saved in input log signature file, so the temporary output log signature file is renamed. */
+		/* Output must be saved in input log signature file, so the temporary file is renamed. */
 		logksi_file_close(&files->files.outSig);
 		if (rename(files->internal.tempSig, files->internal.inSig) != 0) {
 			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: could not rename temporary output log signature file %s to input log signature file %s.", files->internal.tempSig, files->internal.inSig);
+			ERR_CATCH_MSG(err, res, "Error: could not rename temporary file %s to input log signature file %s.", files->internal.tempSig, files->internal.inSig);
 		}
 	} else if (files->internal.tempSig) {
+		logksi_file_close(&files->files.inSig);
+		res = logksi_remove_file(files->internal.outSig);
+		ERR_CATCH_MSG(err, res, "Error: could not remove existing output log signature file %s.", files->internal.outSig);
+		/* Output must be saved in output log signature file, so the temporary file is renamed. */
+		logksi_file_close(&files->files.outSig);
+		if (rename(files->internal.tempSig, files->internal.outSig) != 0) {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: could not rename temporary file %s to output log signature file %s.", files->internal.tempSig, files->internal.outSig);
+		}
+	} else if (files->internal.bStdout) {
 		/* Copy the contents of the (nameless) temporary output log signature file to stdout. */
 		if (files->files.outSig == NULL) {
 			res = KT_IO_ERROR;
@@ -416,11 +413,6 @@ static void close_input_and_output_files(ERR_TRCKR *err, int res, IO_FILES *file
 		if (files->internal.tempSig && res != KT_OK) {
 			if (remove(files->internal.tempSig) != 0) {
 				if (err) ERR_TRCKR_ADD(err, KT_IO_ERROR, "Error: could not remove temporary output log signature %s.", files->internal.tempSig);
-			}
-		}
-		if (files->internal.outSig && res != KT_OK) {
-			if (remove(files->internal.outSig) != 0) {
-				if (err) ERR_TRCKR_ADD(err, KT_IO_ERROR, "Error: could not remove output log signature %s.", files->internal.outSig);
 			}
 		}
 		logksi_internal_filenames_free(&files->internal);
