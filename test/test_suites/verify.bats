@@ -18,4 +18,9 @@ cp -r test/resource/logfiles/unsigned test/out
 	[[ "$output" =~ "missing KSI signature in block signature." ]]
 }
 
+@test "try verifying nonexistent logsignature" {
+	run ./src/logksi verify test/out/nothing -d
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
+}
 
