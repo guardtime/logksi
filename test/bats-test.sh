@@ -3,7 +3,7 @@
 rm -rf test/out
 mkdir test/out
 
-bats test/test_suites/integrate.bats test/test_suites/verify.bats
+bats test/test_suites/integrate.bats test/test_suites/verify.bats test/test_suites/sign.bats
 
 exit_code=$?
 
