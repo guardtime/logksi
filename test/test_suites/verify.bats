@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export KSI_CONF=conf.txt
+export KSI_CONF=test/test.cfg
 
 cp -r test/resource/logfiles/signed test/out
 
