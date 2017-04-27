@@ -2,23 +2,27 @@
 
 export KSI_CONF=test/test.cfg
 
-@test "sign signed parts" {
+@test "sign signed.logsig" {
 	run ./src/logksi sign test/out/signed -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	run test -f test/out/signed.logsig
 	[ "$status" -eq 0 ]
+	run test -f test/out/signed.logsig.bak
+	[ "$status" -eq 0 ]
 }
 
-@test "sign signed parts to different output" {
-	run ./src/logksi sign test/out/signed -o test/out/signed2.logsig -d
+@test "sign signed2.logsig to output signed3.logsig" {
+	run ./src/logksi sign test/out/signed2 -o test/out/signed3.logsig -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run test -f test/out/signed2.logsig
+	run test -f test/out/signed3.logsig
 	[ "$status" -eq 0 ]
+	run test -f test/out/signed2.logsig.bak
+	[ "$status" -ne 0 ]
 }
 
-@test "sign unsigned parts" {
+@test "sign unsigned.logsig" {
 	run ./src/logksi sign test/out/unsigned -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]

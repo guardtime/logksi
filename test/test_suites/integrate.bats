@@ -4,7 +4,7 @@ export KSI_CONF=test/test.cfg
 
 cp -r test/resource/logsignatures/signed.logsig.parts test/out
 
-@test "integrate signed parts" {
+@test "integrate signed.parts" {
 	run ./src/logksi integrate test/out/signed -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
@@ -12,7 +12,7 @@ cp -r test/resource/logsignatures/signed.logsig.parts test/out
 	[ "$status" -eq 0 ]
 }
 
-@test "integrate signed parts to different output" {
+@test "integrate signed.parts to output signed2.logsig" {
 	run ./src/logksi integrate test/out/signed -o test/out/signed2.logsig -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
@@ -20,7 +20,7 @@ cp -r test/resource/logsignatures/signed.logsig.parts test/out
 	[ "$status" -eq 0 ]
 }
 
-@test "try integrating signed parts again" {
+@test "try integrating signed.parts again" {
 	run chmod 0444 test/out/signed.logsig
 	run ./src/logksi integrate test/out/signed -d
 	[ "$status" -ne 0 ]
@@ -34,7 +34,7 @@ cp -r test/resource/logsignatures/signed.logsig.parts test/out
 
 cp -r test/resource/logsignatures/unsigned.logsig.parts test/out
 
-@test "integrate unsigned parts" {
+@test "integrate unsigned.parts" {
 	run ./src/logksi integrate test/out/unsigned -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
@@ -44,7 +44,7 @@ cp -r test/resource/logsignatures/unsigned.logsig.parts test/out
 
 cp test/resource/logsignatures/synchronous.logsig test/out
 
-@test "integrate synchronous log signature" {
+@test "integrate synchronous.logsig" {
 	run chmod 0444 test/out/synchronous.logsig
 	run ./src/logksi integrate test/out/synchronous -d
 	[ "$status" -eq 0 ]
