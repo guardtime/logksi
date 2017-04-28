@@ -1,5 +1,7 @@
 #!/bin/bash
 
+export KSI_CONF=test/test.cfg
+
 @test "extend signed.logsig to earliest publication" {
 	run ./src/logksi extend test/out/signed \
 	-P file://test/resource/publication/dummy-publications.bin \
