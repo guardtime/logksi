@@ -1,6 +1,6 @@
-Version 0.1.0
+Version 1.0.157
 
-2017-03-24 0.1.0
+2017-04-28 1.0.157
 
 * FEATURE: Integration: blocks and signatures files from asynchronous signing can be integrated into a single log signature file.
 * FEATURE: Sign recovery: missing KSI signatures can be added to a log signature file.
