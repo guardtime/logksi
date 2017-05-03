@@ -52,7 +52,7 @@ Guardtime signing and verification tool. Execute
 
 
 %post
-echo "Warning: Package logksi is legacy version of the package logksi-tools and will be obsolated in the future."
+echo "Warning: Package logksi is legacy version of the package logksi and will be obsolated in the future."
 
 %prep
 %setup -q -n %{name_package}-%{version}

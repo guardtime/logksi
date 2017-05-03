@@ -39,7 +39,7 @@ make clean && \
 make dist && \
 mkdir -p $BUILD_DIR/{BUILD,RPMS,SOURCES,SPECS,SRPMS,tmp} && \
 cp packaging/redhat/ksi.spec $BUILD_DIR/SPECS/ && \
-cp logksi-tools-*.tar.gz $BUILD_DIR/SOURCES/ && \
+cp logksi-*.tar.gz $BUILD_DIR/SOURCES/ && \
 rpmbuild -ba $BUILD_DIR/SPECS/ksi.spec && \
-cp $BUILD_DIR/RPMS/*/logksi-tools-*$version*.rpm . && \
-cp $BUILD_DIR/SRPMS/logksi-tools-*$version*.rpm .
+cp $BUILD_DIR/RPMS/*/logksi-*$version*.rpm . && \
+cp $BUILD_DIR/SRPMS/logksi-*$version*.rpm .
