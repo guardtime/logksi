@@ -50,10 +50,6 @@ Obsoletes: logksi <= 1.0.0
 Guardtime signing and verification tool. Execute
 %{name_tool} -h to view brief usage instructions.
 
-
-%post
-echo "Warning: Package logksi is legacy version of the package logksi and will be obsolated in the future."
-
 %prep
 %setup -q -n %{name_package}-%{version}
 
