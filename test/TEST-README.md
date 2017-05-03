@@ -1,4 +1,4 @@
-# KSI COMMAND-LINE TOOL TEST README
+# KSI log signature command-line tool test readme
 
  This document will describe how to configure and run the KSI log signature  
  command-line tool tests properly. Also the dependences and brief overview of 
