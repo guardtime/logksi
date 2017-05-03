@@ -1,7 +1,7 @@
 #!/bin/bash
 
 rm -rf test/out
-mkdir test/out
+mkdir -p test/out
 
 bats \
 test/test_suites/integrate.bats \
