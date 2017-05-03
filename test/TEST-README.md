@@ -19,7 +19,6 @@
  resource         - directory containing all test resource files
                     (e.g. signatures, files to be signed, server responses).
  test_suites      - directory containing all test suites.
- 
  test.cfg.sample  - sample configurations file that is needed to run tests.
  TEST-README      - You are reading it right now.
  test.sh          - run tests.
