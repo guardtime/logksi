@@ -39,10 +39,6 @@ Packager: Guardtime AS <info@guardtime.com>
 Distribution: Guardtime utilities
 BuildRoot: %{_tmppath}/%{name_package}-%{version}-build
 
-# Obsolete logksi in the future.
-# Obsoletes: logksi <= 1.10.0-2
-Obsoletes: logksi <= 1.0.0
-
 # Dependencies are set in config.ac
 @KSI_BUILD_DEPENDECY@
 
