@@ -1,4 +1,4 @@
-# LOG SIGNATURE TOOL
+# KSI log signature command-line tool
 
 Guardtime Keyless Signature Infrastructure (KSI) is an industrial scale
 blockchain platform that cryptographically ensures data integrity and
@@ -37,11 +37,11 @@ yum install logksi
 
 If the latest version is needed or the package is not available for the
 platform check out source code from Github and build it using gcc.
-To build the logksi tool, libksi and libksi-devel (KSI C SDK) packages are needed.
-Libksi is available in Guardtime repository or as source code in GitHub:
-[https://github.com/GuardTime/libksi](https://github.com/GuardTime/libksi).
-Use rebuild.sh script to build logksi tool on CentOS /RHEL. See `test/TEST-README.md` to
-learn how to run logksi command-line tool tests.
+To build the KSI log signature command-line tool, libksi and libksi-devel 
+(KSI C SDK) packages are needed. Libksi is available in Guardtime repository or 
+as source code in GitHub: [https://github.com/GuardTime/libksi](https://github.com/GuardTime/libksi).
+Use rebuild.sh script to build KSI log signature command-line tool on CentOS /RHEL.
+See `test/TEST-README.md` to learn how to run KSI log signature command-line tool tests.
 
 
 ## USAGE
@@ -50,16 +50,15 @@ In order to get trial access to the KSI platform, go to
 [https://guardtime.com/blockchain-developers](https://guardtime.com/blockchain-developers)
 
 
-The first argument of the tool is the logksi command followed by the KSI service
-configuration parameters and options. An example of how to add missing KSI signatures
-to a log signature file:
+The first argument of the KSI log signature command-line tool is the logksi command 
+followed by the KSI service configuration parameters and options. 
+An example of how to add missing KSI signatures to a log signature file:
 
 ```
   logksi sign logfile [ksioptions]
 ```
 
-See `man logksi` for detailed usage instructions or read documentation formatted
-as pdf from `doc/` directory.
+See `man logksi` for detailed usage instructions.
 
 
 ## LICENSE
