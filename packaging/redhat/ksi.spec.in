@@ -26,7 +26,7 @@
 %define upstream_release 0
 
 
-Summary: Command-line access to Guardtime Keyless Signature services
+Summary: Log signature command-line tool for Keyless Signature Infrastructure
 Name: %{name_package}
 Version: %(cat VERSION)
 Release: 1%{?dist}
@@ -43,8 +43,12 @@ BuildRoot: %{_tmppath}/%{name_package}-%{version}-build
 @KSI_BUILD_DEPENDECY@
 
 %description
-Guardtime signing and verification tool. Execute
-%{name_tool} -h to view brief usage instructions.
+Log signature command-line tool for KSI blockchain. Provides the
+functions for signing recovery; extension of KSI signatures in the log
+signature file; verification of logs; extraction of record-level
+signatures; integration of log signature files.
+
+For detailed usage instructions see `man %{name_tool}`.
 
 %prep
 %setup -q -n %{name_package}-%{version}
