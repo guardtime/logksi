@@ -26,7 +26,7 @@
 %define upstream_release 0
 
 
-Summary: Log signature command-line tool for Keyless Signature Infrastructure.
+Summary: Log signature command-line tool for Keyless Signature Infrastructure
 Name: %{name_package}
 Version: %(cat VERSION)
 Release: 1%{?dist}
@@ -43,13 +43,12 @@ BuildRoot: %{_tmppath}/%{name_package}-%{version}-build
 @KSI_BUILD_DEPENDECY@
 
 %description
-Command-line tool for managing KSI signatures of logs, supports the  
-Guardtime's log signature specification LOGSIG12. logksi provides the 
-functions for signing recovery; extension of KSI signatures in the log 
-signature file; verification of logs; extraction of record-level 
+Log signature command-line tool for KSI blockchain. Provides the
+functions for signing recovery; extension of KSI signatures in the log
+signature file; verification of logs; extraction of record-level
 signatures; integration of log signature files.
 
-For detailed usage instructions see man %{name_tool}
+For detailed usage instructions see `man %{name_tool}`.
 
 %prep
 %setup -q -n %{name_package}-%{version}
