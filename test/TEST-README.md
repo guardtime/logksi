@@ -1,4 +1,4 @@
-# KSI log signature command-line tool TEST-README
+# KSI Log Signature Command-line Tool TEST-README
 
 This document will describe how to properly configure and run the KSI log signature command-line tool tests. Also the dependencies and brief overview of files related to the tests will be described.
 
