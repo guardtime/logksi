@@ -20,7 +20,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.59])
-AC_INIT([logksi-tools], m4_esyscmd([tr -d [:space:] < VERSION]), [support@guardtime.com])
+AC_INIT([logksi], m4_esyscmd([tr -d [:space:] < VERSION]), [support@guardtime.com])
 TOOL_NAME=logksi
 AC_CONFIG_AUX_DIR(config)
 AC_CONFIG_MACRO_DIR([m4])
