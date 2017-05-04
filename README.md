@@ -10,7 +10,7 @@ Log signature command-line tool `logksi` provides the functions for signing reco
 
 ### Latest Release from Guardtime Repository
 
-In order to install the logksi CentOS/RHEL packages directly from the Guardtime public repository, download and save the repository configuration to the `/etc/yum.repos.d/` folder:
+In order to install the `logksi` CentOS/RHEL packages directly from the Guardtime public repository, download and save the repository configuration to the `/etc/yum.repos.d/` folder:
 
 ```
 cd /etc/yum.repos.d
@@ -42,7 +42,7 @@ The first argument of the KSI log signature command-line tool is the `logksi` co
 For example, to add missing KSI signatures to a log signature file:
 
 ```
-  logksi sign logfile [ksioptions]
+logksi sign logfile [ksioptions]
 ```
 
 See `man logksi` for detailed usage instructions.
@@ -80,7 +80,7 @@ Curl      7.37.0>    MIT           https://github.com/curl/curl.git
 ## COMPATIBILITY
 
 ```
-OS / PLatform                       Compatibility
+OS/PLatform                       Compatibility
 
 RHEL 6 and 7, x86_64 architecture   Fully compatible and tested.
 CentOS 6 and 7, x86_64 architecture Fully Compatible and tested.
