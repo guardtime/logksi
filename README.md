@@ -1,4 +1,4 @@
-# KSI log signature command-line tool
+# KSI Log Signature Command-line Tool
 
 Guardtime Keyless Signature Infrastructure (KSI) is an industrial scale blockchain platform that cryptographically ensures data integrity and proves time of existence. Its keyless signatures, based on hash chains, link data to global calendar blockchain. The checkpoints of the blockchain, published in newspapers and electronic media, enable long term integrity of any digital asset without the need to trust any system.
 
@@ -8,9 +8,9 @@ Log signature command-line tool `logksi` provides the functions for signing reco
 
 ## INSTALLATION
 
-### Latest release from Guardtime repository
+### Latest Release from Guardtime Repository
 
-In order to install the logksi CentOS/RHEL packages directly from the Guardtime public repository, download and save the repository configuration to the `/etc/yum.repos.d/` folder:
+In order to install the `logksi` CentOS/RHEL packages directly from the Guardtime public repository, download and save the repository configuration to the `/etc/yum.repos.d/` folder:
 
 ```
 cd /etc/yum.repos.d
@@ -24,7 +24,7 @@ sudo curl -O http://download.guardtime.com/ksi/configuration/guardtime.el7.repo
 yum install logksi
 ```
 
-### From source code
+### From Source Code
 
 If the latest version is needed or the package is not available for the platform you are using, check out source code from Github and build it using `gcc`. To build the KSI log signature command-line tool, `libksi` and `libksi-devel` (KSI C SDK) packages are needed. `libksi` is available in Guardtime repository or as source code in GitHub: [https://github.com/GuardTime/libksi](https://github.com/GuardTime/libksi).
 
@@ -42,7 +42,7 @@ The first argument of the KSI log signature command-line tool is the `logksi` co
 For example, to add missing KSI signatures to a log signature file:
 
 ```
-  logksi sign logfile [ksioptions]
+logksi sign logfile [ksioptions]
 ```
 
 See `man logksi` for detailed usage instructions.
@@ -73,14 +73,14 @@ Curl      7.37.0>    MIT           https://github.com/curl/curl.git
   in the OpenSSL Toolkit (http://www.openssl.org/). This product includes
   cryptographic software written by Eric Young (eay@cryptsoft.com). This
   product includes software written by Tim Hudson (tjh@cryptsoft.com).
-  
+
 * Note 2: `Curl` is `libksi` dependency.
 
 
 ## COMPATIBILITY
 
 ```
-OS / PLatform                       Compatibility
+OS/Platform                         Compatibility
 
 RHEL 6 and 7, x86_64 architecture   Fully compatible and tested.
 CentOS 6 and 7, x86_64 architecture Fully Compatible and tested.
