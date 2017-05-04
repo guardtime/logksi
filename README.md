@@ -80,7 +80,7 @@ Curl      7.37.0>    MIT           https://github.com/curl/curl.git
 ## COMPATIBILITY
 
 ```
-OS/PLatform                       Compatibility
+OS/Platform                         Compatibility
 
 RHEL 6 and 7, x86_64 architecture   Fully compatible and tested.
 CentOS 6 and 7, x86_64 architecture Fully Compatible and tested.
