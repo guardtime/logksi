@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2016 Guardtime, Inc.
+ * Copyright 2013-2017 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -59,7 +59,8 @@ typedef enum {
 	TASK_ID_VERIFY = 1,
 	TASK_ID_EXTEND = 2,
 	TASK_ID_INTEGRATE = 3,
-	TASK_ID_CONF = 4
+	TASK_ID_EXTRACT = 4,
+	TASK_ID_CONF = 5
 } TASK_ID;
 
 #ifdef	__cplusplus

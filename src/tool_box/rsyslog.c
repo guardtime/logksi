@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2016 Guardtime, Inc.
+ * Copyright 2013-2017 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include "param_set/param_set.h"
+#include "tool_box/param_control.h"
 #include "err_trckr.h"
 #include <ksi/ksi.h>
 #include "logksi_err.h"
@@ -38,7 +39,7 @@
 
 #define SOF_ARRAY(x) (sizeof(x) / sizeof((x)[0]))
 
-static int calculate_new_intermediate_hash(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *leftHash, KSI_DataHash *rightHash, unsigned char level, KSI_DataHash **nodeHash) {
+int calculate_new_intermediate_hash(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *leftHash, KSI_DataHash *rightHash, unsigned char level, KSI_DataHash **nodeHash) {
 	int res;
 	KSI_DataHasher *hasher = NULL;
 	KSI_DataHash *tmp = NULL;
@@ -70,7 +71,7 @@ cleanup:
 	return res;
 }
 
-static int calculate_new_leaf_hash(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *recordHash, int isMetaRecordHash, KSI_DataHash **leafHash) {
+int calculate_new_leaf_hash(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *recordHash, int isMetaRecordHash, KSI_DataHash **leafHash) {
 	int res;
 	KSI_DataHasher *hasher = NULL;
 	KSI_DataHash *mask = NULL;
@@ -90,6 +91,9 @@ static int calculate_new_leaf_hash(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHas
 	res = KSI_DataHasher_close(hasher, &mask);
 	if (res != KSI_OK) goto cleanup;
 
+	KSI_DataHash_free(blocks->extractMask);
+	blocks->extractMask = KSI_DataHash_ref(mask);
+
 	if (isMetaRecordHash) {
 		res = calculate_new_intermediate_hash(ksi, blocks, recordHash, mask, 1, &tmp);
 		if (res != KT_OK) goto cleanup;
@@ -107,6 +111,61 @@ cleanup:
 	KSI_DataHash_free(mask);
 	KSI_DataHash_free(tmp);
 	KSI_DataHasher_free(hasher);
+	return res;
+}
+
+int add_hash_to_record_chain(EXTRACT_INFO *extracts, LINK_DIRECTION dir, KSI_DataHash *hash, int corr) {
+	int res;
+
+	if (extracts == NULL || hash == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	extracts->extractChain[extracts->extractLevel].dir = dir;
+	extracts->extractChain[extracts->extractLevel].corr = corr;
+	extracts->extractChain[extracts->extractLevel].sibling = KSI_DataHash_ref(hash);
+	extracts->extractLevel = extracts->extractLevel + corr + 1;
+
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
+
+int update_record_chain(BLOCK_INFO *blocks, unsigned char level, int finalize, KSI_DataHash *leftLink) {
+	int res;
+	size_t j;
+	int condition;
+
+	if (blocks == NULL || leftLink == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	for (j = 0; j < blocks->nofExtractPositionsInBlock; j++) {
+		if (blocks->extractInfo[j].extractOffset <= blocks->nofRecordHashes) {
+			if (finalize) {
+				condition = (level + 1 >= blocks->extractInfo[j].extractLevel);
+			} else {
+				condition = (level + 1 == blocks->extractInfo[j].extractLevel);
+			}
+			if (condition) {
+				if (((blocks->extractInfo[j].extractOffset - 1) >> level) & 1L) {
+					res = add_hash_to_record_chain(blocks->extractInfo + j, RIGHT_LINK, blocks->MerkleTree[level], level + 1 - blocks->extractInfo[j].extractLevel);
+				} else {
+					res = add_hash_to_record_chain(blocks->extractInfo + j, LEFT_LINK, leftLink, level + 1 - blocks->extractInfo[j].extractLevel);
+				}
+				if (res != KT_OK) goto cleanup;
+			}
+		}
+	}
+
+	res = KT_OK;
+
+cleanup:
+
 	return res;
 }
 
@@ -133,6 +192,10 @@ int calculate_root_hash(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash **hash) {
 			if (blocks->MerkleTree[i]) {
 				res = calculate_new_intermediate_hash(ksi, blocks, blocks->MerkleTree[i], root, i + 2, &tmp);
 				if (res != KT_OK) goto cleanup;
+
+				res = update_record_chain(blocks, i, 1, root);
+				if (res != KT_OK) goto cleanup;
+
 				KSI_DataHash_free(root);
 				root = tmp;
 			}
@@ -177,7 +240,88 @@ static int get_aggregation_level(BLOCK_INFO *blocks) {
 	return level;
 }
 
-int add_leaf_hash_to_merkle_tree(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *hash) {
+int expand_extract_info(BLOCK_INFO *blocks) {
+	int res;
+	EXTRACT_INFO *tmp = NULL;
+
+	if (blocks == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+	if (blocks->extractInfo == NULL) {
+		tmp = (EXTRACT_INFO*)malloc(sizeof(EXTRACT_INFO));
+	} else {
+		tmp = (EXTRACT_INFO*)realloc(blocks->extractInfo, sizeof(EXTRACT_INFO) * (blocks->nofExtractPositionsInBlock + 1));
+	}
+
+	if (tmp == NULL) {
+		res = KT_OUT_OF_MEMORY;
+		goto cleanup;
+	}
+
+	blocks->extractInfo = tmp;
+	tmp = NULL;
+	memset(blocks->extractInfo + blocks->nofExtractPositionsInBlock, 0, sizeof(EXTRACT_INFO));
+	blocks->nofExtractPositionsInBlock++;
+	res = KT_OK;
+
+cleanup:
+
+	free(tmp);
+	return res;
+}
+
+int update_extract_info(BLOCK_INFO *blocks, int isMetaRecordHash, KSI_DataHash *hash) {
+	int res;
+	EXTRACT_INFO *extractInfo = NULL;
+
+	if (blocks == NULL || hash == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	if (blocks->nofExtractPositionsFound < blocks->nofExtractPositions && blocks->extractPositions[blocks->nofExtractPositionsFound] - blocks->nofTotalRecordHashes == blocks->nofRecordHashes) {
+		/* make room in extractInfo */
+		res = expand_extract_info(blocks);
+		if (res != KT_OK) goto cleanup;
+
+		extractInfo = &blocks->extractInfo[blocks->nofExtractPositionsInBlock - 1];
+
+		extractInfo->extractPos = blocks->extractPositions[blocks->nofExtractPositionsFound];
+		extractInfo->extractOffset = blocks->extractPositions[blocks->nofExtractPositionsFound] - blocks->nofTotalRecordHashes;
+		extractInfo->extractRecord = KSI_DataHash_ref(hash);
+		if (!isMetaRecordHash) {
+			extractInfo->metaRecord = NULL;
+			extractInfo->logLine = strdup(blocks->logLine);
+			if (extractInfo->logLine == NULL) {
+				res = KT_OUT_OF_MEMORY;
+				goto cleanup;
+			}
+		} else {
+			extractInfo->logLine = NULL;
+			res = KSI_TlvElement_parse(blocks->metaRecord, 0xffff, &extractInfo->metaRecord);
+			if (res != KT_OK) goto cleanup;
+		}
+		blocks->nofExtractPositionsFound++;
+	}
+
+	if (blocks->nofExtractPositionsInBlock && extractInfo->extractOffset == blocks->nofRecordHashes) {
+		if (isMetaRecordHash) {
+			add_hash_to_record_chain(extractInfo, LEFT_LINK, blocks->extractMask, 0);
+		} else {
+			add_hash_to_record_chain(extractInfo, RIGHT_LINK, blocks->extractMask, 0);
+		}
+	}
+
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
+
+
+int add_leaf_hash_to_merkle_tree(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *hash, int isMetaRecordHash) {
 	int res;
 	unsigned char i = 0;
 	KSI_DataHash *right = NULL;
@@ -191,9 +335,14 @@ int add_leaf_hash_to_merkle_tree(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash 
 	right = KSI_DataHash_ref(hash);
 
 	blocks->balanced = 0;
+
 	while (blocks->MerkleTree[i] != NULL) {
 		res = calculate_new_intermediate_hash(ksi, blocks, blocks->MerkleTree[i], right, i + 2, &tmp);
 		if (res != KT_OK) goto cleanup;
+
+		res = update_record_chain(blocks, i, 0, right);
+		if (res != KT_OK) goto cleanup;
+
 		KSI_DataHash_free(blocks->notVerified[i]);
 		blocks->notVerified[i] = KSI_DataHash_ref(right);
 		KSI_DataHash_free(right);
@@ -236,12 +385,43 @@ int add_record_hash_to_merkle_tree(KSI_CTX *ksi, BLOCK_INFO *blocks, int isMetaR
 	res = calculate_new_leaf_hash(ksi, blocks, hash, isMetaRecordHash, &lastHash);
 	if (res != KT_OK) goto cleanup;
 
-	res = add_leaf_hash_to_merkle_tree(ksi, blocks, lastHash);
+	res = update_extract_info(blocks, isMetaRecordHash, hash);
+	if (res != KT_OK) goto cleanup;
+
+	res = add_leaf_hash_to_merkle_tree(ksi, blocks, lastHash, isMetaRecordHash);
 	if (res != KT_OK) goto cleanup;
 
 cleanup:
 
 	KSI_DataHash_free(lastHash);
+	return res;
+}
+
+int store_logline(BLOCK_INFO *blocks, char *buf) {
+	int res;
+	char *tmp = NULL;
+
+	if (blocks == NULL || buf == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	tmp = (char*)malloc(strlen(buf) + 1);
+	if (tmp == NULL) {
+		res = KT_OUT_OF_MEMORY;
+		goto cleanup;
+	}
+
+	strncpy(tmp, buf, strlen(buf) + 1);
+	free(blocks->logLine);
+	blocks->logLine = tmp;
+	tmp = NULL;
+
+	res = KT_OK;
+
+cleanup:
+
+	free(tmp);
 	return res;
 }
 
@@ -263,6 +443,10 @@ int get_hash_of_logline(KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_D
 		/* Last character (newline) is not used in hash calculation. */
 		res = KSI_DataHash_create(ksi, buf, strlen(buf) - 1, blocks->hashAlgo, &tmp);
 		if (res != KSI_OK) goto cleanup;
+
+		/* Store logline for extraction. */
+		res = store_logline(blocks, buf);
+		if (res != KT_OK) goto cleanup;
 	}
 	*hash = tmp;
 	tmp = NULL;
@@ -271,6 +455,40 @@ int get_hash_of_logline(KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_D
 cleanup:
 
 	KSI_DataHash_free(tmp);
+	return res;
+}
+
+int store_metarecord(BLOCK_INFO *blocks, KSI_TlvElement *tlv) {
+	int res;
+	size_t len = 0;
+	unsigned char *buf = NULL;
+
+	if (blocks == NULL || tlv == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	res = KSI_TlvElement_serialize(tlv, NULL, 0, &len, 0);
+	if (res != KSI_OK) goto cleanup;
+
+	buf = (unsigned char*)malloc(len);
+	if (buf == NULL) {
+		res = KT_OUT_OF_MEMORY;
+		goto cleanup;
+	}
+
+	res = KSI_TlvElement_serialize(tlv, buf, len, &len, 0);
+	if (res != KSI_OK) goto cleanup;
+
+	free(blocks->metaRecord);
+	blocks->metaRecord = buf;
+	buf = NULL;
+
+	res = KT_OK;
+
+cleanup:
+
+	free(buf);
 	return res;
 }
 
@@ -286,6 +504,10 @@ int get_hash_of_metarecord(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_TlvElement *tlv
 	/* The complete metarecord TLV us used in hash calculation. */
 	res = KSI_DataHash_create(ksi, tlv->ptr, tlv->ftlv.hdr_len + tlv->ftlv.dat_len, blocks->hashAlgo, &tmp);
 	if (res != KSI_OK) goto cleanup;
+
+	/* Store metarecord for extraction. */
+	res = store_metarecord(blocks, tlv);
+	if (res != KT_OK) goto cleanup;
 
 	*hash = tmp;
 	tmp = NULL;
@@ -389,6 +611,27 @@ cleanup:
 	return res;
 }
 
+int tlv_element_set_hash(KSI_TlvElement *tlv, KSI_CTX *ksi, unsigned tag, KSI_DataHash *hash) {
+	int res;
+	KSI_OctetString *tmp = NULL;
+	const unsigned char *buf = NULL;
+	size_t len = 0;
+
+	res = KSI_DataHash_getImprint(hash, &buf, &len);
+	if (res != KSI_OK) goto cleanup;
+
+	res = KSI_OctetString_new(ksi, buf, len, &tmp);
+	if (res != KSI_OK) goto cleanup;
+
+	res = KSI_TlvElement_setOctetString(tlv, tag, tmp);
+	if (res != KSI_OK) goto cleanup;
+
+cleanup:
+
+	KSI_OctetString_free(tmp);
+	return res;
+}
+
 int tlv_element_set_signature(KSI_TlvElement *tlv, KSI_CTX *ksi, unsigned tag, KSI_Signature *sig) {
 	int res;
 	KSI_OctetString *tmp = NULL;
@@ -438,6 +681,7 @@ static int process_magic_number(ERR_TRCKR *err, BLOCK_INFO *blocks, IO_FILES *fi
 	char *logSignatureHeaders[] = {"LOGSIG11", "LOGSIG12"};
 	char *blocksFileHeaders[] = {"LOG12BLK"};
 	char *signaturesFileHeaders[] = {"LOG12SIG"};
+	char *proofFileHeaders[] = {"RECSIG11", "RECSIG12"};
 	FILE *in = NULL;
 
 	if (err == NULL || files == NULL) {
@@ -476,6 +720,12 @@ static int process_magic_number(ERR_TRCKR *err, BLOCK_INFO *blocks, IO_FILES *fi
 			res = KT_IO_ERROR;
 			ERR_CATCH_MSG(err, res, "Error: Could not copy magic number to log signature file.");
 		}
+	} else if (files->files.outProof) {
+		count = fwrite(proofFileHeaders[blocks->version], 1, strlen(proofFileHeaders[blocks->version]), files->files.outProof);
+		if (count != strlen(proofFileHeaders[blocks->version])) {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: Could not write magic number to integrity proof file.");
+		}
 	}
 
 	res = KT_OK;
@@ -493,6 +743,7 @@ static int process_block_header(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks
 	unsigned char i = 0;
 	KSI_TlvElement *tlv = NULL;
 	KSI_uint64_t algo;
+	size_t j;
 
 	if (err == NULL || ksi == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -559,6 +810,25 @@ static int process_block_header(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks
 	blocks->rootHash = NULL;
 	KSI_DataHash_free(blocks->metarecordHash);
 	blocks->metarecordHash = NULL;
+
+	KSI_DataHash_free(blocks->extractMask);
+	blocks->extractMask = NULL;
+	for (j = 0; j < blocks->nofExtractPositionsInBlock; j++) {
+		for (i = 0; i < blocks->extractInfo[j].extractLevel; i++) {
+			KSI_DataHash_free(blocks->extractInfo[j].extractChain[i].sibling);
+			blocks->extractInfo[j].extractChain[i].sibling = NULL;
+		}
+		blocks->extractInfo[j].extractLevel = 0;
+		KSI_DataHash_free(blocks->extractInfo[j].extractRecord);
+		blocks->extractInfo[j].extractRecord = NULL;
+		free(blocks->extractInfo[j].logLine);
+		blocks->extractInfo[j].logLine = NULL;
+		KSI_TlvElement_free(blocks->extractInfo[j].metaRecord);
+		blocks->extractInfo[j].metaRecord = NULL;
+	}
+	free(blocks->extractInfo);
+	blocks->extractInfo = NULL;
+	blocks->nofExtractPositionsInBlock = 0;
 
 	res = KT_OK;
 
@@ -691,7 +961,7 @@ static int process_intermediate_hash(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *b
 			}
 		} else {
 			blocks->nofRecordHashes++;
-			res = add_leaf_hash_to_merkle_tree(ksi, blocks, tmpHash);
+			res = add_leaf_hash_to_merkle_tree(ksi, blocks, tmpHash, 0);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to add leaf hash to Merkle tree.", blocks->blockNo);
 		}
 	}
@@ -725,7 +995,7 @@ cleanup:
 	return res;
 }
 
-int process_metarecord(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
+static int process_metarecord(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	KSI_DataHash *hash = NULL;
 	KSI_TlvElement *tlv = NULL;
@@ -790,7 +1060,7 @@ cleanup:
 	return res;
 }
 
-int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PROCESSORS *processors, BLOCK_INFO *blocks, IO_FILES *files) {
+static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PROCESSORS *processors, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	KSI_Signature *sig = NULL;
 	KSI_Signature *ext = NULL;
@@ -799,6 +1069,9 @@ int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNAT
 	KSI_DataHash *hash = NULL;
 	KSI_TlvElement *tlv = NULL;
 	KSI_TlvElement *tlvSig = NULL;
+	KSI_TlvElement *recChain = NULL;
+	KSI_TlvElement *hashStep = NULL;
+	size_t j;
 
 	KSI_VerificationContext_init(&context, ksi);
 
@@ -860,6 +1133,7 @@ int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNAT
 	print_progressResult(res);
 	print_progressDesc(1, "Block no. %3zu: verifying KSI signature... ", blocks->blockNo);
 
+	blocks->nofTotalRecordHashes += blocks->nofRecordHashes;
 	res = calculate_root_hash(ksi, blocks, (KSI_DataHash**)&context.documentHash);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to get root hash for verification.", blocks->blockNo);
 
@@ -897,6 +1171,77 @@ int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNAT
 		KSI_DataHash_free((KSI_DataHash*)context.documentHash);
 		context.documentHash = NULL;
 		KSI_VerificationContext_clean(&context);
+	} else if (processors->extract_signature) {
+		res = KSI_Signature_parseWithPolicy(ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_INTERNAL, &context, &sig);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse KSI signature.", blocks->blockNo);
+
+		if (blocks->nofExtractPositionsInBlock) {
+			if (fwrite(tlvSig->ptr, 1, tlvSig->ftlv.dat_len + tlvSig->ftlv.hdr_len, files->files.outProof) != tlvSig->ftlv.dat_len + tlvSig->ftlv.hdr_len) {
+				res = KT_IO_ERROR;
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to write KSI signature to integrity proof file.", blocks->blockNo);
+			}
+		}
+
+		print_progressResult(res);
+		print_progressDesc(0, "Block no. %3zu: extracting log records... ", blocks->blockNo);
+
+		for (j = 0; j < blocks->nofExtractPositionsInBlock; j++) {
+			unsigned char buf[0xFFFF + 4];
+			size_t len = 0;
+			size_t i;
+
+			if (blocks->extractInfo[j].extractOffset && blocks->extractInfo[j].extractOffset <= blocks->nofRecordHashes) {
+				res = KSI_TlvElement_new(&recChain);
+				ERR_CATCH_MSG(err, res, "Error: Record no. %4zu: unable to create record chain.", blocks->extractInfo[j].extractPos);
+				recChain->ftlv.tag = 0x0907;
+
+				if (blocks->extractInfo[j].logLine) {
+					if (fwrite(blocks->extractInfo[j].logLine, 1, strlen(blocks->extractInfo[j].logLine), files->files.outLog) != strlen(blocks->extractInfo[j].logLine)) {
+						res = KT_IO_ERROR;
+						ERR_CATCH_MSG(err, res, "Error: Record no. %4zu: unable to write log record to log records file.", blocks->extractInfo[j].extractPos);
+					}
+				} else if (blocks->extractInfo[j].metaRecord){
+					res = KSI_TlvElement_setElement(recChain, blocks->extractInfo[j].metaRecord);
+					ERR_CATCH_MSG(err, res, "Error: Record no. %4zu: unable to add metarecord to record chain.", blocks->extractInfo[j].extractPos);
+				}
+				res = tlv_element_set_hash(recChain, ksi, 0x01, blocks->extractInfo[j].extractRecord);
+				ERR_CATCH_MSG(err, res, "Error: Record no. %4zu: unable to add record hash to record chain.", blocks->extractInfo[j].extractPos);
+
+				for (i = 0; i < blocks->extractInfo[j].extractLevel; i++) {
+					if (blocks->extractInfo[j].extractChain[i].sibling) {
+						res = KSI_TlvElement_new(&hashStep);
+						ERR_CATCH_MSG(err, res, "Error: Record no. %4zu: unable to create hash step no. %2zu.", blocks->extractInfo[j].extractPos, i + 1);
+
+						if (blocks->extractInfo[j].extractChain[i].dir == LEFT_LINK) {
+							hashStep->ftlv.tag = 0x02;
+						}
+						else {
+							hashStep->ftlv.tag = 0x03;
+						}
+						if (blocks->extractInfo[j].extractChain[i].corr) {
+							res = tlv_element_set_uint(hashStep, ksi, 0x01, blocks->extractInfo[j].extractChain[i].corr);
+							ERR_CATCH_MSG(err, res, "Error: Record no. %4zu: unable to add level correction to hash step no. %2zu.", blocks->extractInfo[j].extractPos, i + 1);
+						}
+						res = tlv_element_set_hash(hashStep, ksi, 0x02, blocks->extractInfo[j].extractChain[i].sibling);
+						ERR_CATCH_MSG(err, res, "Error: Record no. %4zu: unable to add sibling hash to hash step no. %2zu.", blocks->extractInfo[j].extractPos, i + 1);
+						res = KSI_TlvElement_appendElement(recChain, hashStep);
+						ERR_CATCH_MSG(err, res, "Error: Record no. %4zu: unable to add hash step no. %2zu.", blocks->extractInfo[j].extractPos, i + 1);
+
+						KSI_TlvElement_free(hashStep);
+						hashStep = NULL;
+					}
+				}
+				res = KSI_TlvElement_serialize(recChain, buf, sizeof(buf), &len, 0);
+				ERR_CATCH_MSG(err, res, "Error: Record no. %4zu: unable to serialize record chain.", blocks->extractInfo[j].extractPos);
+
+				if (fwrite(buf, 1, len, files->files.outProof) != len) {
+					res = KT_IO_ERROR;
+					ERR_CATCH_MSG(err, res, "Error: Record no. %4zu: unable to write record chain to integrity proof file.", blocks->extractInfo[j].extractPos);
+				}
+				KSI_TlvElement_free(recChain);
+				recChain = NULL;
+			}
+		}
 	}
 	res = KT_OK;
 
@@ -911,6 +1256,8 @@ cleanup:
 	KSI_PolicyVerificationResult_free(verificationResult);
 	KSI_TlvElement_free(tlvSig);
 	KSI_TlvElement_free(tlv);
+	KSI_TlvElement_free(hashStep);
+	KSI_TlvElement_free(recChain);
 	return res;
 }
 
@@ -1155,6 +1502,7 @@ cleanup:
 
 static void free_blocks(BLOCK_INFO *blocks) {
 	unsigned char i = 0;
+	size_t j;
 
 	if (blocks) {
 		KSI_DataHash_free(blocks->prevLeaf);
@@ -1166,10 +1514,23 @@ static void free_blocks(BLOCK_INFO *blocks) {
 		}
 		KSI_DataHash_free(blocks->rootHash);
 		KSI_DataHash_free(blocks->metarecordHash);
+		KSI_DataHash_free(blocks->extractMask);
+		for (j = 0; j < blocks->nofExtractPositionsInBlock; j++) {
+			KSI_DataHash_free(blocks->extractInfo[j].extractRecord);
+			free(blocks->extractInfo[j].logLine);
+			KSI_TlvElement_free(blocks->extractInfo[j].metaRecord);
+			for (i = 0; i < blocks->extractInfo[j].extractLevel; i++) {
+				KSI_DataHash_free(blocks->extractInfo[j].extractChain[i].sibling);
+			}
+		}
+		free(blocks->extractPositions);
+		free(blocks->extractInfo);
+		free(blocks->logLine);
+		free(blocks->metaRecord);
 	}
 }
 
-int count_blocks(ERR_TRCKR *err, BLOCK_INFO *blocks, FILE *in) {
+static int count_blocks(ERR_TRCKR *err, BLOCK_INFO *blocks, FILE *in) {
 	int res;
 	long int pos = -1;
 	KSI_TlvElement *tlv = NULL;
@@ -1263,7 +1624,7 @@ int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_
 
 	memset(&blocks, 0, sizeof(blocks));
 	blocks.ftlv_raw = ftlv_raw;
-	processors.verify_signature = NULL;
+	memset(&processors, 0, sizeof(processors));
 	processors.extend_signature = extend_signature;
 
 	res = process_magic_number(err, &blocks, files);
@@ -1343,8 +1704,173 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, VERIFYING_
 
 	memset(&blocks, 0, sizeof(blocks));
 	blocks.ftlv_raw = ftlv_raw;
+	memset(&processors, 0, sizeof(processors));
 	processors.verify_signature = verify_signature;
-	processors.extend_signature = NULL;
+
+	res = process_magic_number(err, &blocks, files);
+	if (res != KT_OK) goto cleanup;
+
+	while (!feof(files->files.inSig)) {
+		res = KSI_FTLV_fileRead(files->files.inSig, blocks.ftlv_raw, SOF_FTLV_BUFFER, &blocks.ftlv_len, &blocks.ftlv);
+		if (res == KSI_OK) {
+			switch (blocks.ftlv.tag) {
+				case 0x901:
+					res = process_block_header(err, ksi, &blocks, files);
+					if (res != KT_OK) goto cleanup;
+				break;
+
+				case 0x902:
+					res = process_record_hash(err, ksi, &blocks, files);
+					if (res != KT_OK) goto cleanup;
+				break;
+
+				case 0x903:
+					res = process_intermediate_hash(err, ksi, &blocks, files);
+					if (res != KT_OK) goto cleanup;
+				break;
+
+				case 0x911:
+					res = process_metarecord(err, ksi, &blocks, files);
+					if (res != KT_OK) goto cleanup;
+				break;
+
+				case 0x904:
+				{
+					res = process_block_signature(set, err, ksi, &processors, &blocks, files);
+					if (res != KT_OK) goto cleanup;
+				}
+				break;
+
+				default:
+					/* TODO: unknown TLV found. Either
+					 * 1) Warn user and skip TLV
+					 * 2) Copy TLV (maybe warn user)
+					 * 3) Abort extending with an error
+					 */
+				break;
+			}
+		} else {
+			if (blocks.ftlv_len > 0) {
+				res = KT_INVALID_INPUT_FORMAT;
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: incomplete data found in log signature file.", blocks.blockNo);
+			} else {
+				break;
+			}
+		}
+	}
+
+	res = finalize_log_signature(err, &blocks, files);
+	if (res != KT_OK) goto cleanup;
+
+	res = KT_OK;
+
+cleanup:
+
+	free_blocks(&blocks);
+
+	return res;
+}
+
+int add_position(long int n, BLOCK_INFO *blocks) {
+	int res;
+	size_t *tmp = NULL;
+
+	if (n == 0 || blocks == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	if (blocks->extractPositions == NULL) {
+		tmp = (size_t*)malloc(sizeof(size_t));
+	} else {
+		tmp = (size_t*)realloc(blocks->extractPositions, sizeof(size_t) * (blocks->nofExtractPositions + 1));
+	}
+
+	if (tmp == NULL) {
+		res = KT_OUT_OF_MEMORY;
+		goto cleanup;
+	}
+
+	blocks->extractPositions = tmp;
+	tmp = NULL;
+	blocks->extractPositions[blocks->nofExtractPositions] = n;
+	blocks->nofExtractPositions++;
+	res = KT_OK;
+
+
+cleanup:
+
+	return res;
+}
+
+int extract_positions(char *records, BLOCK_INFO *blocks) {
+	int res;
+	long int n = 0;
+	long int from = 0;
+	char *endp = NULL;
+
+	if (records == NULL || blocks == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	while (*records) {
+		if (*records == ',') {
+			records++;
+			from = 0;
+			continue;
+		}
+		if (*records == '-') {
+			records++;
+			from = n;
+			continue;
+		}
+
+		n = strtol(records, &endp, 0);
+		if (endp == records) {
+			res = KT_INVALID_INPUT_FORMAT;
+			goto cleanup;
+		} else {
+			if (from == 0) {
+				add_position(n, blocks);
+			} else {
+				while (from++ < n) {
+					add_position(from, blocks);
+				}
+			}
+			from = 0;
+			records = endp;
+		}
+	}
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
+
+int logsignature_extract(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files) {
+	int res;
+	BLOCK_INFO blocks;
+	unsigned char ftlv_raw[SOF_FTLV_BUFFER];
+	SIGNATURE_PROCESSORS processors;
+	char *records = NULL;
+
+	if (set == NULL || err == NULL || ksi == NULL || files == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	memset(&blocks, 0, sizeof(blocks));
+	blocks.ftlv_raw = ftlv_raw;
+	memset(&processors, 0, sizeof(processors));
+	processors.extract_signature = 1;
+
+	res = PARAM_SET_getStr(set, "r", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &records);
+	if (res != KT_OK) goto cleanup;
+
+	res = extract_positions(records, &blocks);
+	if (res != KT_OK) goto cleanup;
 
 	res = process_magic_number(err, &blocks, files);
 	if (res != KT_OK) goto cleanup;
@@ -1423,7 +1949,7 @@ int logsignature_integrate(ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files) {
 
 	memset(&blocks, 0, sizeof(blocks));
 	blocks.ftlv_raw = ftlv_raw;
-	processors.create_signature = NULL;
+	memset(&processors, 0, sizeof(processors));
 
 	res = process_magic_number(err, &blocks, files);
 	if (res != KT_OK) goto cleanup;
@@ -1521,6 +2047,7 @@ int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *fi
 
 	memset(&blocks, 0, sizeof(blocks));
 	blocks.ftlv_raw = ftlv_raw;
+	memset(&processors, 0, sizeof(processors));
 	processors.create_signature = LOGKSI_createSignature;
 
 	res = process_magic_number(err, &blocks, files);
@@ -1694,6 +2221,8 @@ void logksi_internal_filenames_free(INTERNAL_FILE_NAMES *internal) {
 		logksi_filename_free(&internal->log);
 		logksi_filename_free(&internal->inSig);
 		logksi_filename_free(&internal->outSig);
+		logksi_filename_free(&internal->outProof);
+		logksi_filename_free(&internal->outLog);
 		logksi_filename_free(&internal->tempSig);
 		logksi_filename_free(&internal->backupSig);
 		logksi_filename_free(&internal->partsBlk);
@@ -1715,6 +2244,8 @@ void logksi_files_close(INTERNAL_FILE_HANDLES *files) {
 		logksi_file_close(&files->inSig);
 		if (files->outSig == stdout) files->outSig = NULL;
 		logksi_file_close(&files->outSig);
+		logksi_file_close(&files->outProof);
+		logksi_file_close(&files->outLog);
 		logksi_file_close(&files->partsBlk);
 		logksi_file_close(&files->partsSig);
 	}
