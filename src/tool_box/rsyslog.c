@@ -303,14 +303,14 @@ int update_extract_info(BLOCK_INFO *blocks, int isMetaRecordHash, KSI_DataHash *
 			if (res != KT_OK) goto cleanup;
 		}
 		blocks->nofExtractPositionsFound++;
-	}
 
-	if (blocks->nofExtractPositionsInBlock && extractInfo->extractOffset == blocks->nofRecordHashes) {
 		if (isMetaRecordHash) {
-			add_hash_to_record_chain(extractInfo, LEFT_LINK, blocks->extractMask, 0);
+			res = add_hash_to_record_chain(extractInfo, LEFT_LINK, blocks->extractMask, 0);
 		} else {
-			add_hash_to_record_chain(extractInfo, RIGHT_LINK, blocks->extractMask, 0);
+			res = add_hash_to_record_chain(extractInfo, RIGHT_LINK, blocks->extractMask, 0);
 		}
+		if (res != KT_OK) goto cleanup;
+
 	}
 
 	res = KT_OK;
