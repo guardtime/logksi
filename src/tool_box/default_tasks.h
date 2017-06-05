@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2016 Guardtime, Inc.
+ * Copyright 2013-2017 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -39,6 +39,10 @@ int extend_run(int argc, char** argv, char **envp);
 int integrate_run(int argc, char** argv, char **envp);
 char *integrate_help_toString(char*buf, size_t len);
 const char *integrate_get_desc(void);
+
+int extract_run(int argc, char** argv, char **envp);
+char *extract_help_toString(char*buf, size_t len);
+const char *extract_get_desc(void);
 
 int conf_run(int argc, char** argv, char **envp);
 char *conf_help_toString(char *buf, size_t len);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2016 Guardtime, Inc.
+ * Copyright 2013-2017 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -164,16 +164,6 @@ static int conf_fromFile(PARAM_SET *set, const char *fname, const char *source, 
 
 	if (fname == NULL || set == NULL) {
 		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
-
-	if (!SMART_FILE_doFileExist(fname)) {
-		res = KT_IO_ERROR;
-		goto cleanup;
-	}
-
-	if (!SMART_FILE_isReadAccess(fname)) {
-		res = KT_NO_PRIVILEGES;
 		goto cleanup;
 	}
 

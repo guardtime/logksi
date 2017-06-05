@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2016 Guardtime, Inc.
+ * Copyright 2013-2017 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -27,6 +27,7 @@ typedef struct {
 	VERIFYING_FUNCTION verify_signature;
 	EXTENDING_FUNCTION extend_signature;
 	SIGNING_FUNCTION create_signature;
+	int extract_signature;
 } SIGNATURE_PROCESSORS;
 
 typedef enum {
@@ -43,6 +44,8 @@ typedef struct {
 	char *log;
 	char *inSig;
 	char *outSig;
+	char *outProof;
+	char *outLog;
 	char *tempSig;
 	char *backupSig;
 	char *partsBlk;
@@ -54,6 +57,8 @@ typedef struct {
 	FILE *log;
 	FILE *inSig;
 	FILE *outSig;
+	FILE *outProof;
+	FILE *outLog;
 	FILE *partsBlk;
 	FILE *partsSig;
 } INTERNAL_FILE_HANDLES;
@@ -68,7 +73,29 @@ typedef struct {
 } IO_FILES;
 
 #define MAX_TREE_HEIGHT 31
+#define NOF_EXTRACTS 10
 #define SOF_FTLV_BUFFER (0xffff + 4)
+
+typedef enum {
+	LEFT_LINK = 0,
+	RIGHT_LINK = 1
+} LINK_DIRECTION;
+
+typedef struct {
+	LINK_DIRECTION dir;
+	KSI_DataHash *sibling;
+	size_t corr;
+} REC_CHAIN;
+
+typedef struct {
+	size_t extractPos;
+	size_t extractOffset;
+	size_t extractLevel;
+	char *logLine;
+	KSI_TlvElement *metaRecord;
+	KSI_DataHash *extractRecord;
+	REC_CHAIN extractChain[MAX_TREE_HEIGHT];
+} EXTRACT_INFO;
 
 typedef struct {
 	KSI_FTLV ftlv;
@@ -82,6 +109,7 @@ typedef struct {
 	size_t noSigNo;
 	size_t recordCount;
 	size_t nofRecordHashes;
+	size_t nofTotalRecordHashes;
 	size_t nofIntermediateHashes;
 	KSI_HashAlgorithm hashAlgo;
 	KSI_OctetString *randomSeed;
@@ -90,6 +118,14 @@ typedef struct {
 	KSI_DataHash *notVerified[MAX_TREE_HEIGHT];
 	KSI_DataHash *rootHash;
 	KSI_DataHash *metarecordHash;
+	KSI_DataHash *extractMask;
+	char *logLine;
+	unsigned char *metaRecord;
+	size_t nofExtractPositions;
+	size_t *extractPositions;
+	size_t nofExtractPositionsInBlock;
+	size_t nofExtractPositionsFound;
+	EXTRACT_INFO *extractInfo;
 	unsigned char treeHeight;
 	unsigned char balanced;
 	LOGSIG_VERSION version;
@@ -97,6 +133,7 @@ typedef struct {
 
 int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_FUNCTION extend_signature, IO_FILES *files);
 int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, VERIFYING_FUNCTION verify_signature, IO_FILES *files);
+int logsignature_extract(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files);
 int logsignature_integrate(ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files);
 int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files);
 int get_file_read_lock(FILE *in);

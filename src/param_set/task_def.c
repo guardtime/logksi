@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2016 Guardtime, Inc.
+ * Copyright 2013-2017 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -293,9 +293,11 @@ int TASK_DEFINITION_analyzeConsistency(TASK_DEFINITION *def, PARAM_SET *set, dou
 	def->isAnalyzed = 1;
 	*cons = def->consistency;
 
+	res = PST_OK;
+
 cleanup:
 
-	return res = PST_OK;
+	return res;
 }
 
 int TASK_DEFINITION_getMoreConsistent(TASK_DEFINITION *A, TASK_DEFINITION *B, PARAM_SET *set, double sensitivity, TASK_DEFINITION **result) {

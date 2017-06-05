@@ -6,4 +6,5 @@ Version 1.0.157
 * FEATURE: Sign recovery: missing KSI signatures can be added to a log signature file.
 * FEATURE: Verification: log signature files can be verified against log files.
 * FEATURE: Extending: KSI signatures in a log signature file can be extended.
+* FEATURE: Extraction: hash chains of log records can be extracted.
 * FEATURE: Support of LOGSIG12 format, including meta-records.

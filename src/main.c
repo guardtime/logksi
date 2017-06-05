@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2016 Guardtime, Inc.
+ * Copyright 2013-2017 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -293,7 +293,7 @@ static int logksi_compo_get(TASK_SET *tasks, PARAM_SET **set, TOOL_COMPONENT_LIS
 	/**
 	 * Create parameter list that contains all known tasks.
 	 */
-	res = PARAM_SET_new("{sign}{extend}{verify}{integrate}{conf}", &tmp_set);
+	res = PARAM_SET_new("{sign}{extend}{verify}{integrate}{extract}{conf}", &tmp_set);
 	if (res != PST_OK) goto cleanup;
 
 	res = TOOL_COMPONENT_LIST_new(32, &tmp_compo);
@@ -306,6 +306,7 @@ static int logksi_compo_get(TASK_SET *tasks, PARAM_SET **set, TOOL_COMPONENT_LIS
 	TASK_SET_add(tasks, TASK_ID_VERIFY, "Verify", "verify", NULL, NULL, NULL);
 	TASK_SET_add(tasks, TASK_ID_EXTEND, "Extend", "extend", NULL, NULL, NULL);
 	TASK_SET_add(tasks, TASK_ID_INTEGRATE, "Integrate", "integrate", NULL, NULL, NULL);
+	TASK_SET_add(tasks, TASK_ID_EXTRACT, "Extract", "extract", NULL, NULL, NULL);
 	TASK_SET_add(tasks, TASK_ID_CONF, "conf", "conf", NULL, NULL, NULL);
 
 	/**
@@ -315,6 +316,7 @@ static int logksi_compo_get(TASK_SET *tasks, PARAM_SET **set, TOOL_COMPONENT_LIS
 	TOOL_COMPONENT_LIST_add(tmp_compo, "verify", verify_run, verify_help_toString, verify_get_desc, TASK_ID_VERIFY);
 	TOOL_COMPONENT_LIST_add(tmp_compo, "extend", extend_run, extend_help_toString, extend_get_desc, TASK_ID_EXTEND);
 	TOOL_COMPONENT_LIST_add(tmp_compo, "integrate", integrate_run, integrate_help_toString, integrate_get_desc, TASK_ID_INTEGRATE);
+	TOOL_COMPONENT_LIST_add(tmp_compo, "extract", extract_run, extract_help_toString, extract_get_desc, TASK_ID_EXTRACT);
 	TOOL_COMPONENT_LIST_add(tmp_compo, "conf", conf_run, conf_help_toString, conf_get_desc, TASK_ID_CONF);
 
 	*set = tmp_set;
@@ -340,6 +342,8 @@ static int min_arg_cnt(TASK_ID id) {
 		case TASK_ID_INTEGRATE:
 		case TASK_ID_CONF:
 			return 1;
+		case TASK_ID_EXTRACT:
+			return 2;
 		default:
 			return 0xff;
 	}
