@@ -32,7 +32,9 @@ typedef struct {
 
 typedef enum {
 	LOGSIG11 = 0,
-	LOGSIG12 = 1
+	LOGSIG12 = 1,
+	RECSIG11 = 2,
+	RECSIG12 = 3
 } LOGSIG_VERSION;
 
 typedef struct {

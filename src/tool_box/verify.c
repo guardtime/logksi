@@ -200,6 +200,7 @@ char *verify_help_toString(char *buf, size_t len) {
 	KSI_snprintf(buf, len,
 		"Usage:\n"
 		" %s verify <logfile> [<logfile.logsig>] [more_options]\n"
+		" %s verify <logfile.part> [<logfile.part.logsig>] [more_options]\n"
 		" %s verify --ver-int <logfile> [<logfile.logsig>] [more_options]\n"
 		" %s verify --ver-cal <logfile> [<logfile.logsig>] -X <URL>\n"
 		"     [--ext-user <user> --ext-key <key>] [more_options]\n"
@@ -220,6 +221,12 @@ char *verify_help_toString(char *buf, size_t len) {
 		"             Log signature file to be verified. If omitted, the log signature file name is\n"
 		"             derived by adding .logsig to <logfile>. It is expected to be found in the\n"
 		"             same folder as the <logfile>.\n"
+		" <logfile.part>\n"
+		"           - Excerpt file to be verified.\n"
+		" <logfile.part.logsig>\n"
+		"             Record integrity proof file to be verified. If omitted, the file name is\n"
+		"             derived by adding .logsig to <logfile.part>. It is expected to be found in the\n"
+		"             same folder as the <logfile.part>.\n"
 		" -x        - Permit to use extender for publication-based verification.\n"
 		" -X <URL>  - Extending service (KSI Extender) URL.\n"
 		" --ext-user <user>\n"
@@ -242,6 +249,7 @@ char *verify_help_toString(char *buf, size_t len) {
 		"             override the ones in the configuration file.\n"
 		" --log <file>\n"
 		"           - Write libksi log to the given file. Use '-' as file name to redirect the log to stdout.\n",
+		TOOL_getName(),
 		TOOL_getName(),
 		TOOL_getName(),
 		TOOL_getName(),

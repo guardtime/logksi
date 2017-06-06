@@ -678,7 +678,7 @@ static size_t find_header_in_file(FILE *in, char **headers, size_t len) {
 static int process_magic_number(ERR_TRCKR *err, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	size_t count = 0;
-	char *logSignatureHeaders[] = {"LOGSIG11", "LOGSIG12"};
+	char *logSignatureHeaders[] = {"LOGSIG11", "LOGSIG12", "RECSIG11", "RECSIG12"};
 	char *blocksFileHeaders[] = {"LOG12BLK"};
 	char *signaturesFileHeaders[] = {"LOG12SIG"};
 	char *proofFileHeaders[] = {"RECSIG11", "RECSIG12"};
@@ -1261,6 +1261,206 @@ cleanup:
 	return res;
 }
 
+static int process_ksi_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PROCESSORS *processors, BLOCK_INFO *blocks, IO_FILES *files) {
+	int res;
+	KSI_Signature *sig = NULL;
+	KSI_PolicyVerificationResult *verificationResult = NULL;
+	KSI_DataHash *hash = NULL;
+	KSI_TlvElement *tlvSig = NULL;
+
+	if (set == NULL || err == NULL || ksi == NULL || processors == NULL || files == NULL || blocks == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	blocks->blockNo++;
+	blocks->sigNo++;
+	print_progressDesc(0, "Block no. %3zu: processing KSI signature ... ", blocks->blockNo);
+
+	res = KSI_TlvElement_parse(blocks->ftlv_raw, blocks->ftlv_len, &tlvSig);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse KSI signature as TLV element.", blocks->blockNo);
+
+	print_progressResult(res);
+	print_progressDesc(1, "Block no. %3zu: verifying KSI signature... ", blocks->blockNo);
+
+	if (processors->verify_signature) {
+		res = KSI_Signature_parseWithPolicy(ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_EMPTY, NULL, &sig);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse KSI signature.", blocks->blockNo);
+
+		res = processors->verify_signature(set, err, ksi, sig, NULL, &verificationResult);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: KSI signature verification failed.", blocks->blockNo);
+		/* TODO: add dumping of verification results. */
+		KSI_PolicyVerificationResult_free(verificationResult);
+		verificationResult = NULL;
+
+		res = KSI_Signature_getDocumentHash(sig, &hash);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to get root hash from KSI signature.", blocks->blockNo);
+
+		res = KSI_DataHash_getHashAlg(hash, &blocks->hashAlgo);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to get algorithm ID from root hash.", blocks->blockNo);
+
+		KSI_DataHash_free(blocks->rootHash);
+		blocks->rootHash = KSI_DataHash_ref(hash);
+	}
+	res = KT_OK;
+
+cleanup:
+
+	print_progressResult(res);
+	KSI_Signature_free(sig);
+	KSI_PolicyVerificationResult_free(verificationResult);
+	KSI_TlvElement_free(tlvSig);
+	return res;
+}
+
+static int process_hash_step(KSI_CTX *ksi, KSI_TlvElement *tlv, BLOCK_INFO *blocks, KSI_DataHash *inputHash, KSI_DataHash **outputHash) {
+	int res;
+	size_t correction = 0;
+	KSI_DataHash *siblingHash = NULL;
+	KSI_DataHash *tmp = NULL;
+
+	if (tlv == NULL || blocks == NULL || inputHash == NULL || outputHash == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	res = tlv_element_get_uint(tlv, ksi, 0x01, &correction);
+	if (res == KT_INVALID_INPUT_FORMAT) {
+		correction = 0;
+		res = KT_OK;
+	}
+	if (res != KT_OK) goto cleanup;
+	res = tlv_element_get_hash(tlv, ksi, 0x02, &siblingHash);
+	if (res != KT_OK) goto cleanup;
+
+	blocks->treeHeight += correction + 1;
+	if (tlv->ftlv.tag == 0x02) {
+		res = calculate_new_intermediate_hash(ksi, blocks, inputHash, siblingHash, blocks->treeHeight, &tmp);
+	} else if (tlv->ftlv.tag == 0x03){
+		res = calculate_new_intermediate_hash(ksi, blocks, siblingHash, inputHash, blocks->treeHeight, &tmp);
+	} else {
+		res = KT_INVALID_INPUT_FORMAT;
+	}
+	if (res != KT_OK) goto cleanup;
+
+	*outputHash = tmp;
+	tmp = NULL;
+	res = KT_OK;
+
+cleanup:
+
+	KSI_DataHash_free(siblingHash);
+	KSI_DataHash_free(tmp);
+	return res;
+}
+
+static int process_record_chain(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
+	int res;
+	KSI_DataHash *recordHash = NULL;
+	KSI_DataHash *hash = NULL;
+	KSI_TlvElement *tlv = NULL;
+	KSI_TlvElement *tlvMetaRecord = NULL;
+	KSI_DataHash *tmpHash = NULL;
+	KSI_DataHash *root = NULL;
+
+	if (err == NULL || files == NULL || blocks == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	print_progressDesc(0, "Block no. %3zu: processing record hash... ", blocks->blockNo);
+
+	blocks->nofRecordHashes++;
+
+	res = KSI_TlvElement_parse(blocks->ftlv_raw, blocks->ftlv_len, &tlv);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse record chain as TLV element.", blocks->blockNo);
+
+	res = KSI_TlvElement_getElement(tlv, 0x911, &tlvMetaRecord);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to extract metarecord in record chain.", blocks->blockNo);
+
+	KSI_DataHash_free(blocks->metarecordHash);
+	blocks->metarecordHash = NULL;
+	if (tlvMetaRecord != NULL) {
+		res = get_hash_of_metarecord(ksi, blocks, tlvMetaRecord, &hash);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate metarecord hash.", blocks->blockNo);
+
+		blocks->metarecordHash = KSI_DataHash_ref(hash);
+	}
+
+	res = tlv_element_get_hash(tlv, ksi, 0x01, &recordHash);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse hash of record no. %3zu.", blocks->blockNo, blocks->nofRecordHashes);
+
+	if (blocks->metarecordHash != NULL) {
+		/* This is a metarecord hash. */
+		if (!KSI_DataHash_equals(blocks->metarecordHash, recordHash)) {
+			OBJPRINT_Hash(blocks->metarecordHash, "Expected metarecord hash: ", print_debug);
+			OBJPRINT_Hash(recordHash            , "Received metarecord hash: ", print_debug);
+			res = KT_VERIFICATION_FAILURE;
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: metarecord hashes not equal.", blocks->blockNo);
+		}
+
+	} else {
+		/* This is a logline record hash. */
+		if (files->files.log) {
+			res = get_hash_of_logline(ksi, blocks, files, &hash);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate hash of logline no. %3zu.", blocks->blockNo, blocks->nofRecordHashes);
+
+			if (!KSI_DataHash_equals(hash, recordHash)) {
+				OBJPRINT_Hash(hash,       "Expected record hash: ", print_debug);
+				OBJPRINT_Hash(recordHash, "Received record hash: ", print_debug);
+				res = KT_VERIFICATION_FAILURE;
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: record hashes not equal.", blocks->blockNo);
+			}
+		}
+	}
+
+	if (tlv->subList) {
+		int i;
+		blocks->treeHeight = 0;
+		root = KSI_DataHash_ref(recordHash);
+
+		print_progressResult(res);
+		print_progressDesc(0, "Block no. %3zu: processing hash chain... ", blocks->blockNo);
+		for (i = 0; i < KSI_TlvElementList_length(tlv->subList); i++) {
+			KSI_TlvElement *tmpTlv = NULL;
+
+			res = KSI_TlvElementList_elementAt(tlv->subList, i, &tmpTlv);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to get element %d from TLV.", blocks->blockNo, i);
+			if (tmpTlv->ftlv.tag == 0x02 || tmpTlv->ftlv.tag == 0x03) {
+				res = process_hash_step(ksi, tmpTlv, blocks, root, &tmpHash);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to process hash step.", blocks->blockNo);
+
+				KSI_DataHash_free(root);
+				root = tmpHash;
+				tmpHash = NULL;
+			}
+		}
+
+		if (!KSI_DataHash_equals(blocks->rootHash, root)) {
+			OBJPRINT_Hash(blocks->rootHash, "Expected KSI signature root hash: ", print_debug);
+			OBJPRINT_Hash(root,             "            Calculated root hash: ", print_debug);
+			res = KT_VERIFICATION_FAILURE;
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: root hashes not equal.", blocks->blockNo);
+		}
+
+	} else {
+		res = KT_INVALID_INPUT_FORMAT;
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to get sub TLVs from record chain.", blocks->blockNo);
+	}
+	res = KT_OK;
+
+cleanup:
+
+	print_progressResult(res);
+	KSI_DataHash_free(recordHash);
+	KSI_DataHash_free(hash);
+	KSI_DataHash_free(root);
+	KSI_DataHash_free(tmpHash);
+	KSI_TlvElement_free(tlv);
+	KSI_TlvElement_free(tlvMetaRecord);
+	return res;
+}
+
 static int process_partial_block(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	KSI_DataHash *hash = NULL;
@@ -1737,6 +1937,20 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, VERIFYING_
 				case 0x904:
 				{
 					res = process_block_signature(set, err, ksi, &processors, &blocks, files);
+					if (res != KT_OK) goto cleanup;
+				}
+				break;
+
+				case 0x905:
+				{
+					res = process_ksi_signature(set, err, ksi, &processors, &blocks, files);
+					if (res != KT_OK) goto cleanup;
+				}
+				break;
+
+				case 0x907:
+				{
+					res = process_record_chain(err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				}
 				break;
