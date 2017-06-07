@@ -1426,7 +1426,7 @@ static int process_record_chain(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks
 
 			res = KSI_TlvElementList_elementAt(tlv->subList, i, &tmpTlv);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to get element %d from TLV.", blocks->blockNo, i);
-			if (tmpTlv->ftlv.tag == 0x02 || tmpTlv->ftlv.tag == 0x03) {
+			if (tmpTlv && (tmpTlv->ftlv.tag == 0x02 || tmpTlv->ftlv.tag == 0x03)) {
 				res = process_hash_step(ksi, tmpTlv, blocks, root, &tmpHash);
 				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to process hash step.", blocks->blockNo);
 
