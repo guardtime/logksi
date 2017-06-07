@@ -1,10 +1,16 @@
-Version 1.0.157
+Version 1.1.178
 
-2017-04-28 1.0.157
+2017-06-06
+
+* FEATURE: Extraction: hash chains of log records can be extracted into record integrity proof files.
+* FEATURE: Verifying: record integrity proof files can be verified against excerpt files.
+
+Version 1.0.178
+
+2017-05-04 1.0.178
 
 * FEATURE: Integration: blocks and signatures files from asynchronous signing can be integrated into a single log signature file.
 * FEATURE: Sign recovery: missing KSI signatures can be added to a log signature file.
 * FEATURE: Verification: log signature files can be verified against log files.
 * FEATURE: Extending: KSI signatures in a log signature file can be extended.
-* FEATURE: Extraction: hash chains of log records can be extracted.
 * FEATURE: Support of LOGSIG12 format, including meta-records.
