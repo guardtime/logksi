@@ -65,6 +65,7 @@ enum contentStatus {
 	FUNCTION_INVALID_ARG_COUNT,
 	FUNCTION_INVALID_ARG_1,
 	FUNCTION_INVALID_ARG_2,
+	INVALID_VERSION,
 	PARAM_UNKNOWN_ERROR
 };
 
@@ -114,6 +115,8 @@ int isContentOk_uint(const char* integer);
 int isContentOk_uint_not_zero(const char* integer);
 int isContentOk_int(const char* integer);
 int extract_int(void *extra, const char* str,  void** obj);
+
+int isContentOk_pduVersion(const char* version);
 
 int isFormatOk_url(const char *url);
 int convertRepair_url(const char* arg, char* buf, unsigned len);
