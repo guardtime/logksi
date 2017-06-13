@@ -1113,7 +1113,7 @@ static int process_tree_hash(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, I
 cleanup:
 
 	print_progressResult(res);
-	if (blocks->finalTreeHashes) {
+	if (blocks && blocks->finalTreeHashes) {
 		print_debug("Block no. %3zu: Tree hash no. %3zu interpreted as a final hash.\n", blocks->blockNo, blocks->nofTreeHashes);
 	}
 	KSI_DataHash_free(treeHash);
@@ -1432,7 +1432,7 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 cleanup:
 
 	print_progressResult(res);
-	if (blocks->missingTreeHashes == 1) {
+	if (blocks && blocks->missingTreeHashes) {
 		print_debug("Warning: Block no. %3zu: final tree hashes are missing.\n", blocks->blockNo);
 		blocks->warningTreeHashes = 1;
 	}
@@ -1837,7 +1837,7 @@ static int process_partial_signature(ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PRO
 cleanup:
 
 	print_progressResult(res);
-	if (blocks->missingTreeHashes == 1) {
+	if (blocks && blocks->missingTreeHashes) {
 		print_debug("Warning: Block no. %3zu: final tree hashes are missing.\n", blocks->blockNo);
 		blocks->warningTreeHashes = 1;
 	}
@@ -1895,7 +1895,7 @@ cleanup:
 
 	print_progressResult(res);
 
-	if (blocks->warningTreeHashes) {
+	if (blocks && blocks->warningTreeHashes) {
 		print_warnings("Warning: Some tree hashes are missing from the log signature file.\n");
 	}
 
