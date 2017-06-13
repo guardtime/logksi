@@ -94,6 +94,11 @@ const char *getParameterErrorString(int res);
 int isFormatOk_string(const char *str);
 int isFormatOk_hex(const char *hexin);
 
+int isFormatOk_hashAlg(const char *hashAlg);
+int isContentOk_hashAlg(const char *alg);
+/** extra is not used.*/
+int extract_hashAlg(void *extra, const char* str, void** obj);
+
 int isFormatOk_inputFile(const char *path);
 int isContentOk_inputFile(const char* path);
 int isContentOk_inputFileWithPipe(const char* path);
