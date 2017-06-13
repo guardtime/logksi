@@ -151,8 +151,8 @@ int main(int argc, char** argv, char **envp) {
 	 * or an error.
 	 */
 	print_init();
-	print_disable(PRINT_WARNINGS | PRINT_INFO | PRINT_DEBUG);
-	print_enable(PRINT_RESULT | PRINT_ERRORS);
+	print_disable(PRINT_INFO | PRINT_DEBUG);
+	print_enable(PRINT_RESULT | PRINT_WARNINGS | PRINT_ERRORS);
 
 
 	/**

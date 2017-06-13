@@ -112,7 +112,7 @@ typedef struct {
 	size_t recordCount;
 	size_t nofRecordHashes;
 	size_t nofTotalRecordHashes;
-	size_t nofIntermediateHashes;
+	size_t nofTreeHashes;
 	KSI_HashAlgorithm hashAlgo;
 	KSI_OctetString *randomSeed;
 	KSI_DataHash *prevLeaf;
@@ -131,6 +131,11 @@ typedef struct {
 	unsigned char treeHeight;
 	unsigned char balanced;
 	LOGSIG_VERSION version;
+	char keepRecordHashes;
+	char keepTreeHashes;
+	char finalTreeHashes;
+	char missingTreeHashes;
+	char warningTreeHashes;
 } BLOCK_INFO;
 
 int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_FUNCTION extend_signature, IO_FILES *files);
