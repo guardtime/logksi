@@ -310,6 +310,18 @@ int extract_int(void *extra, const char* str,  void** obj){
 	return PST_OK;
 }
 
+int isContentOk_pduVersion(const char* version) {
+	if (version == NULL) return FORMAT_NULLPTR;
+
+	if (strcmp(version, "v1") == 0) {
+		return PARAM_OK;
+	} else if (strcmp(version, "v2") == 0) {
+		return PARAM_OK;
+	}
+
+	return INVALID_VERSION;
+}
+
 int isFormatOk_inputFile(const char *path){
 	if (path == NULL) return FORMAT_NULLPTR;
 	if (strlen(path) == 0) return FORMAT_NOCONTENT;
@@ -600,6 +612,7 @@ const char *getParameterErrorString(int res) {
 		case FUNCTION_INVALID_ARG_COUNT: return "Invalid function argument count";
 		case FUNCTION_INVALID_ARG_1: return "Argument 1 is invalid";
 		case FUNCTION_INVALID_ARG_2: return "Argument 2 is invalid";
+		case INVALID_VERSION: return "Invalid version";
 		default: return "Unknown error";
 	}
 }
