@@ -4,6 +4,8 @@ Version 1.1.178
 
 * FEATURE: Extraction: hash chains of log records can be extracted into record integrity proof files.
 * FEATURE: Verifying: record integrity proof files can be verified against excerpt files.
+* FEATURE: HMAC algorithm for KSI aggregator/extender can be specified with --[aggr|ext]-hmac-alg switch.
+* IMPROVEMENT: Presence of record and tree hashes is checked.
 
 Version 1.0.178
 

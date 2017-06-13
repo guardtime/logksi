@@ -314,6 +314,39 @@ cleanup:
 	return res;
 }
 
+static int tool_init_hmac_alg(KSI_CTX *ksi, ERR_TRCKR *err, PARAM_SET *set) {
+	int res;
+	KSI_HashAlgorithm aggr_alg = KSI_HASHALG_INVALID;
+	KSI_HashAlgorithm ext_alg  = KSI_HASHALG_INVALID;
+
+	if (ksi == NULL || err == NULL || set == NULL) {
+		ERR_TRCKR_ADD(err, res = KT_INVALID_ARGUMENT, NULL);
+		goto cleanup;
+	}
+
+	res = PARAM_SET_getObjExtended(set, "aggr-hmac-alg", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, NULL, (void**)&aggr_alg);
+	if (res != PST_OK && res != PST_PARAMETER_EMPTY && res != PST_PARAMETER_NOT_FOUND) goto cleanup;
+
+	res = PARAM_SET_getObjExtended(set, "ext-hmac-alg", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, NULL, (void**)&ext_alg);
+	if (res != PST_OK && res != PST_PARAMETER_EMPTY && res != PST_PARAMETER_NOT_FOUND) goto cleanup;
+
+	if (aggr_alg != KSI_HASHALG_INVALID) {
+		res = KSI_CTX_setOption(ksi, KSI_OPT_AGGR_HMAC_ALGORITHM, (void*)aggr_alg);
+		if (res != KSI_OK) goto cleanup;
+	}
+
+	if (ext_alg != KSI_HASHALG_INVALID) {
+		res = KSI_CTX_setOption(ksi, KSI_OPT_EXT_HMAC_ALGORITHM, (void*)ext_alg);
+		if (res != KSI_OK) goto cleanup;
+	}
+
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
+
 int TOOL_init_ksi(PARAM_SET *set, KSI_CTX **ksi, ERR_TRCKR **error, SMART_FILE **ksi_log) {
 	int res;
 	ERR_TRCKR *err = NULL;
@@ -355,6 +388,12 @@ int TOOL_init_ksi(PARAM_SET *set, KSI_CTX **ksi, ERR_TRCKR **error, SMART_FILE *
 	res = tool_init_ksi_logger(tmp, err, set, &tmp_log);
 	if (res != KT_OK) {
 		ERR_TRCKR_ADD(err, res, "Error: Unable to configure KSI logger.");
+		goto cleanup;
+	}
+
+	res = tool_init_hmac_alg(tmp, err, set);
+	if (res != KT_OK) {
+		ERR_TRCKR_ADD(err, res, "Error: Unable to configure HMAC algorithm.");
 		goto cleanup;
 	}
 

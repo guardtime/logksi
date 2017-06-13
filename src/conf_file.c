@@ -54,11 +54,11 @@ char* CONF_generate_param_set_desc(char *description, const char *flags, char *b
 
 	if (is_S) {
 		count += KSI_snprintf(buf + count, buf_len - count,
-				"{S}{aggr-user}{aggr-key}");
+				"{S}{aggr-user}{aggr-key}{aggr-hmac-alg}");
 	}
 
 	if (is_X) {
-		count += KSI_snprintf(buf + count, buf_len - count, "{X}{ext-user}{ext-key}");
+		count += KSI_snprintf(buf + count, buf_len - count, "{X}{ext-user}{ext-key}{ext-hmac-alg}");
 	}
 
 	if (is_P) {
@@ -133,6 +133,9 @@ int CONF_initialize_set_functions(PARAM_SET *conf, const char *flags) {
 	}
 
 	if (is_S) {
+		res = PARAM_SET_addControl(conf, "{aggr-hmac-alg}", isFormatOk_hashAlg, isContentOk_hashAlg, NULL, extract_hashAlg);
+		if (res != PST_OK) goto cleanup;
+
 		res = PARAM_SET_addControl(conf, "{S}", isFormatOk_url, NULL, convertRepair_url, NULL);
 		if (res != PST_OK) goto cleanup;
 
@@ -141,6 +144,9 @@ int CONF_initialize_set_functions(PARAM_SET *conf, const char *flags) {
 	}
 
 	if (is_X) {
+		res = PARAM_SET_addControl(conf, "{ext-hmac-alg}", isFormatOk_hashAlg, isContentOk_hashAlg, NULL, extract_hashAlg);
+		if (res != PST_OK) goto cleanup;
+
 		res = PARAM_SET_addControl(conf, "{X}", isFormatOk_url, NULL, convertRepair_url, NULL);
 		if (res != PST_OK) goto cleanup;
 

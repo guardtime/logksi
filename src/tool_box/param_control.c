@@ -366,6 +366,30 @@ int isFormatOk_path(const char *path) {
 	return FORMAT_OK;
 }
 
+int isFormatOk_hashAlg(const char *hashAlg){
+	if (hashAlg == NULL) return FORMAT_NULLPTR;
+	if (strlen(hashAlg) == 0) return FORMAT_NOCONTENT;
+	return FORMAT_OK;
+}
+
+int isContentOk_hashAlg(const char *alg){
+	if (KSI_getHashAlgorithmByName(alg) != KSI_HASHALG_INVALID) return PARAM_OK;
+	else return HASH_ALG_INVALID_NAME;
+}
+
+int extract_hashAlg(void *extra, const char* str, void** obj) {
+	const char *hash_alg_name = NULL;
+	KSI_HashAlgorithm *hash_id = (KSI_HashAlgorithm*)obj;
+
+	if (extra);
+	hash_alg_name = str != NULL ? (str) : ("default");
+	*hash_id = KSI_getHashAlgorithmByName(hash_alg_name);
+
+	if (*hash_id == KSI_HASHALG_INVALID) return KT_UNKNOWN_HASH_ALG;
+
+	return PST_OK;
+}
+
 int isFormatOk_pubString(const char *str) {
 	int C;
 	int i = 0;
