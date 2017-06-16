@@ -218,22 +218,22 @@ static int get_aggregation_level(BLOCK_INFO *blocks) {
 	int level = 0;
 	if (blocks != NULL) {
 		if (blocks->version == LOGSIG11) {
-			/* Accommodate the fixed level bug in LOGSIG11 format. */
+			/* To be backward compatible with a bug in LOGSIG11 implementation of rsyslog-ksi,
+			 * we must sign tree hashes with level 0 regardless of the tree height. */
 			level = 0;
 		} else {
-			/* Record hashes are concatenated with level = 1 */
+			/* LOGSIG12 implementation:
+			 * Calculate the aggregation level from the number of records in the block (tree).
+			 * Level is log2 dependent on the number of records,
+			 * and is the same for all perfect and smaller trees.
+			 * E.g. level = 4 for 5.. 8 records
+			 *      level = 5 for 9..16 records etc.
+			 * Level for the single node tree that uses blinding masks is 1. */
 			level = 1;
-			/* Add the height of the Merkle tree to get the aggregation level. */
-			if (blocks->treeHeight != 0) {
-				level += blocks->treeHeight;
-			} else {
-				/* If the Merkle tree was not built, calculate the tree height from the record count. */
-				/* height = floor(log2(record_count)) + 1 */
-				size_t c = blocks->recordCount;
-				while (c) {
-					level++;
-					c = c / 2;
-				}
+			size_t c = blocks->recordCount - 1;
+			while (c) {
+				level++;
+				c = c / 2;
 			}
 		}
 	}
