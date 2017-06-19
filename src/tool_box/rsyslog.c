@@ -221,7 +221,7 @@ static int get_aggregation_level(BLOCK_INFO *blocks) {
 			/* To be backward compatible with a bug in LOGSIG11 implementation of rsyslog-ksi,
 			 * we must sign tree hashes with level 0 regardless of the tree height. */
 			level = 0;
-		} else {
+		} else if (blocks->recordCount){
 			/* LOGSIG12 implementation:
 			 * Calculate the aggregation level from the number of records in the block (tree).
 			 * Level is log2 dependent on the number of records,
@@ -236,6 +236,8 @@ static int get_aggregation_level(BLOCK_INFO *blocks) {
 				c = c / 2;
 			}
 		}
+		/* If there are no records in the block, the aggregation level is 0,
+		 * as if we are signing a record hash directly. */
 	}
 	return level;
 }
