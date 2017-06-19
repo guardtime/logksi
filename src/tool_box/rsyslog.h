@@ -133,8 +133,9 @@ typedef struct {
 	LOGSIG_VERSION version;
 	char keepRecordHashes;
 	char keepTreeHashes;
-	char finalTreeHashes;
-	char missingTreeHashes;
+	char finalTreeHashesSome;
+	char finalTreeHashesNone;
+	char finalTreeHashesAll;
 	char warningTreeHashes;
 } BLOCK_INFO;
 
