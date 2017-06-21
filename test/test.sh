@@ -11,7 +11,8 @@ test/test_suites/verify_after_sign.bats \
 test/test_suites/verify.bats \
 test/test_suites/extend.bats \
 test/test_suites/verify_after_extend.bats \
-test/test_suites/hash_check.bats
+test/test_suites/hash_check.bats \
+test/test_suites/extract.bats
 
 exit_code=$?
 
