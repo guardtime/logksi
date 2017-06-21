@@ -1,0 +1,1 @@
+Apr 26 14:42:31 CentOS sudo:  vagrant : TTY=pts/0 ; PWD=/home/vagrant/work/logksi ; USER=root ; COMMAND=/bin/cp -r /var/log/secure-20170426-144212 /var/log/secure-20170426-144212.logsig.parts .

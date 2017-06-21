@@ -1671,9 +1671,10 @@ static int process_record_chain(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks
 		}
 
 		if (!KSI_DataHash_equals(blocks->rootHash, root)) {
+			res = KT_VERIFICATION_FAILURE;
+			print_progressResult(res);
 			OBJPRINT_Hash(blocks->rootHash, "Expected KSI signature root hash: ", print_debug);
 			OBJPRINT_Hash(root,             "            Calculated root hash: ", print_debug);
-			res = KT_VERIFICATION_FAILURE;
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: root hashes not equal.", blocks->blockNo);
 		}
 
