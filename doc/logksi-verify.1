@@ -7,6 +7,8 @@
 .HP 4
 \fBlogksi verify \fIlogfile \fR[\fIlogfile.logsig\fR] [\fImore_options\fR]
 .HP 4
+\fBlogksi verify \fIlogfile.part \fR[\fIlogfile.part.logsig\fR] [\fImore_options\fR]
+.HP 4
 \fBlogksi verify --ver-int \fIlogfile \fR[\fIlogfile.logsig\fR] [\fImore_options\fR]
 .HP 4
 \fBlogksi verify --ver-cal \fIlogfile \fR[\fIlogfile.logsig\fR] \fB-X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR] [\fImore_options\fR]
@@ -19,6 +21,8 @@
 .\"
 .SH DESCRIPTION
 Verifies the log file \fIlogfile\fR. The name of the log signature file is expected to be \fIlogfile.logsig\fR by default. If this is not the case, the name of the log signature file must be given explicitly after the \fIlogfile\fR.
+.LP
+Alternatively the extraced log records present in the \fIlogfile.part\fR file can be verified. If not defined otherwise, then the log signature file acting as record integrity proof is expected to be \fIlogfile.part.logsig\fR. See \fBlogksi-extract\fR(1) for details regarding log records' extraction.
 .LP
 For each signed log block the root hash of the block is recomputed and then verified using the KSI signature of that block.
 .LP
@@ -70,7 +74,10 @@ Specify the HMAC key for extending service.
 .\"
 .TP
 \fB--ext-hmac-alg \fIalg\fR
-Hash algorithm to be used for computing HMAC on outgoing messages towards KSI extender. If not set, default algorithm is used. Use \fBksi -h \fRto get the list of supported hash algorithms.
+Hash algorithm to be used for computing HMAC on outgoing messages towards KSI extender. If not set, default algorithm is used. Use \fBlogksi -h \fRto get the list of supported hash algorithms.
+.TP
+\fB--ext-pdu-v \fIstr\fR
+Specify the KSIEP (KSI Extension Protocol) PDU version. Valid values are \fIv1\fR and \fIv2\fR. Note that \fIv1\fR is \fBlegacy\fR implementation and will be fully replaced with \fIv2\fR in the future.
 .\"
 .TP
 \fB-P \fIURL\fR
@@ -159,6 +166,14 @@ To verify \fI/var/log/secure\fR using any policy possible, depending on the curr
 \fBlogksi verify \fI/var/log/secure\fR
 .RE
 .\"
+.TP 2
+\fB6
+To verify log records extracted from \fI/var/log/secure\fR using any policy possible, depending on the current state of the signatures:
+.LP
+.RS 4
+\fBlogksi verify \fI/var/log/secure.part\fR
+.RE
+.\"
 .SH ENVIRONMENT
 Use the environment variable \fBKSI_CONF\fR to define the default configuration file. See \fBlogksi-conf\fR(5) for more information.
 .LP
@@ -168,4 +183,4 @@ Guardtime AS, http://www.guardtime.com/
 .LP
 .\"
 .SH SEE ALSO
-\fBlogksi\fR(1), \fBlogksi-extend\fR(1), \fBlogksi-integrate\fR(1), \fBlogksi-sign\fR(1), \fBlogksi-conf\fR(5)
+\fBlogksi\fR(1), \fBlogksi-extend\fR(1), \fBlogksi-extract\fR(1), \fBlogksi-integrate\fR(1), \fBlogksi-sign\fR(1), \fBlogksi-conf\fR(5)
