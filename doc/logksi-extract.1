@@ -8,7 +8,7 @@
 \fBlogksi extract \fIlogfile \fB-r \fIrecords\fR... [\fImore_options\fR]
 .\"
 .SH DESCRIPTION
-Extracts the record(s) number \fIrecords\fR from the given \fIlogfile\fR and their KSI signature from the respective log signature file. Both, \fIlogfile\fR and \fIrecords\fR, are mandatory inputs. Numbering of records starts with 1.
+Extracts the specified record(s) from the given \fIlogfile\fR and their KSI signature from the respective log signature file. Both, \fIlogfile\fR and \fIrecords\fR, are mandatory inputs. Numbering of records starts with 1.
 .LP
 \fBlogksi extract\fR outputs the requested log record(s) to the file \fIlogfile.part\fR and creates the log signature file \fIlogfile.part.logsig\fR to act as integrity proof for these records. If the files already exist, they will be overwritten.
 .LP
