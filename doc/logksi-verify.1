@@ -22,7 +22,7 @@
 .SH DESCRIPTION
 Verifies the log file \fIlogfile\fR. The name of the log signature file is expected to be \fIlogfile.logsig\fR by default. If this is not the case, the name of the log signature file must be given explicitly after the \fIlogfile\fR.
 .LP
-Alternatively the extraced log records present in the \fIlogfile.part\fR file can be verified. If not defined otherwise, then the log signature file acting as record integrity proof is expected to be \fIlogfile.part.logsig\fR. See \fBlogksi-extract\fR(1) for details regarding log records' extraction.
+Alternatively the extracted log records present in the \fIlogfile.part\fR file can be verified. If not defined otherwise, then the log signature file acting as record integrity proof is expected to be \fIlogfile.part.logsig\fR. See \fBlogksi-extract\fR(1) for details regarding log records' extraction.
 .LP
 For each signed log block the root hash of the block is recomputed and then verified using the KSI signature of that block.
 .LP
