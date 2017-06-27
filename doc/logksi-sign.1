@@ -33,7 +33,11 @@ Specify the HMAC key for signing service.
 .\"
 .TP
 \fB--aggr-hmac-alg \fIalg\fR
-Hash algorithm to be used for computing HMAC on outgoing messages towards KSI aggregator. If not set, default algorithm is used. Use \fBksi -h \fRto get the list of supported hash algorithms.
+Hash algorithm to be used for computing HMAC on outgoing messages towards KSI aggregator. If not set, default algorithm is used. Use \fBlogksi -h \fRto get the list of supported hash algorithms.
+.\"
+.TP
+\fB--aggr-pdu-v \fIstr\fR
+Specify the KSIAP (KSI Aggregation Protocol) PDU version. Valid values are \fIv1\fR and \fIv2\fR. Note that \fIv1\fR is \fBlegacy\fR implementation and will be fully replaced with \fIv2\fR in the future.
 .\"
 .TP
 \fB-d\fR
@@ -81,4 +85,4 @@ Use the environment variable \fBKSI_CONF\fR to define the default configuration 
 Guardtime AS, http://www.guardtime.com/
 .LP
 .SH SEE ALSO
-\fBlogksi\fR(1), \fBlogksi-extend\fR(1), \fBlogksi-integrate\fR(1), \fBlogksi-verify\fR(1), \fBlogksi-conf\fR(5)
+\fBlogksi\fR(1), \fBlogksi-extend\fR(1), \fBlogksi-extract\fR(1), \fBlogksi-integrate\fR(1), \fBlogksi-verify\fR(1), \fBlogksi-conf\fR(5)

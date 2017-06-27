@@ -1,0 +1,64 @@
+.TH LOGKSI-EXTRACT 1
+.\"
+.SH NAME
+\fBlogksi extract \fR- Extracts log records and corresponding hash chains from the log files protected by KSI signatures.
+.\"
+.SH SYNOPSIS
+.HP 4
+\fBlogksi extract \fIlogfile \fB-r \fIrecords\fR... [\fImore_options\fR]
+.\"
+.SH DESCRIPTION
+Extracts the specified record(s) from the given \fIlogfile\fR and their KSI signature from the respective log signature file. Both, \fIlogfile\fR and \fIrecords\fR, are mandatory inputs. Numbering of records starts with 1.
+.LP
+\fBlogksi extract\fR outputs the requested log record(s) to the file \fIlogfile.part\fR and creates the log signature file \fIlogfile.part.logsig\fR to act as integrity proof for these records. If the files already exist, they will be overwritten.
+.LP
+The extracted log records' KSI signatures can be verified independently, thus individual log records can be presented and their integrity proven regardless the state or content of other log records saved in the same \fIlogfile\fR. See \fBlogksi-verify\fR(1) for verification details.
+.\"
+.SH OPTIONS
+.TP
+\fB-r \fIrecords\fR
+Specify the number of record(s) to be extracted. First record is numbered 1. Records to be extracted can be defined either:
+.RS
+.IP \(bu 4
+One by one: 1,2,3,4,8,9,10 or "1 2 3 4 8 9 10" or "1, 2, 3, 4, 8, 9, 10"
+.IP \(bu 4
+As a sequence: 1-4,8-10 or "1-4 8-10"
+.IP \(bu 4
+Mixed: 1-4,8,9,10 or "1-4 8 9 10" or "1-4, 8, 9, 10"
+.RE
+.\"
+.TP
+\fB-d\fR
+Print detailed information about processes and errors to \fIstderr\fR.
+.\"
+.TP
+\fB--log \fIfile\fR
+Write \fIlibksi\fR log to the given file. Use '-' as file name to redirect the log to \fIstdout\fR.
+.br
+.\"
+.SH EXIT STATUS
+See \fBlogksi\fR(1) for more information.
+.\"
+.SH EXAMPLES
+.TP 2
+\fB1
+\fRTo extract the records 1 to 200 and 250 to 260 from the log file \fI/var/log/secure\fR. The extracted records will be written to \fI/var/log/secure.part\fR, their KSI signatures to the log signature file \fI/var/log/secure.part.logsig\fR:
+.LP
+.RS 4
+\fBlogksi extract \fI/var/log/secure \fB-r \fI1-200,250-260
+.RE
+.\"
+.TP 2
+\fB2
+\fRTo extract the records 4, 25 and 121 from the log file \fI/var/log/secure\fR.  The extracted records will be written to \fI/var/log/secure.part\fR, their KSI signatures to the log signature file \fI/var/log/secure.part.logsig\fR:
+.LP
+.RS 4
+\fBlogksi extract \fI/var/log/secure \fB-r \fI4,25,121
+.RE
+.\"
+.SH AUTHOR
+Guardtime AS, http://www.guardtime.com/
+.LP
+.\"
+.SH SEE ALSO
+\fBlogksi\fR(1), \fBlogksi-extend\fR(1), \fBlogksi-integrate\fR(1), \fBlogksi-sign\fR(1), \fBlogksi-verify\fR(1), \fBlogksi-conf\fR(5)
