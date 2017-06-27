@@ -1,3 +1,9 @@
+Version 1.0.187
+
+2017-06-27 1.0.187
+
+* BUGFIX: Aggregation level of a perfectly balanced tree is now calculated correctly.
+
 Version 1.0.157
 
 2017-04-28 1.0.157
