@@ -65,8 +65,8 @@ void print_disable(unsigned print) {
 }
 
 void print_init(void) {
-	print_setStream(PRINT_RESULT | PRINT_INFO | PRINT_WARNINGS, stdout);
-	print_setStream(PRINT_DEBUG | PRINT_ERRORS, stderr);
+	print_setStream(PRINT_RESULT | PRINT_INFO, stdout);
+	print_setStream(PRINT_DEBUG | PRINT_ERRORS | PRINT_WARNINGS, stderr);
 	print_enable(PRINT_RESULT | PRINT_INFO | PRINT_WARNINGS | PRINT_ERRORS);
 }
 
