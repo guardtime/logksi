@@ -25,6 +25,8 @@ Verifying of log signatures (\fBlogksi-verify\fR(1)).
 Recovery signing of unsigned blocks in a log signature file (\fBlogksi-sign\fR(1)).
 .IP \(bu 4
 Integrating of temporary files containing log signature blocks and KSI signatures into one final log signature file (\fBlogksi-integrate\fR(1)).
+.IP \(bu 4
+Extracting log records to be individually verified (\fBlogksi-extract\fR(1)).
 .\"
 .SH LOGKSI COMMANDS
 .LP
@@ -44,6 +46,9 @@ Signs any unsigned block in a given log signature file. Used for recovery signin
 \fBintegrate\fR
 Integrates temporary blocks file and signatures file (created as a result of asynchronous signing) into a standard log signature file. See \fBlogksi-integrate\fR(1) for more information.
 .\"
+.TP
+\fBextract\fR
+Extracts log records and corresponding hash chains from the log files protected by KSI signatures. See \fBlogksi-extract\fR(1) for more information.
 .TP
 \fBconf\fR
 Prints the KSI service parameters. See \fBlogksi-conf\fR(5) for more information.
@@ -130,4 +135,4 @@ Guardtime AS, http://www.guardtime.com/
 .LP
 .\"
 .SH SEE ALSO
-\fBlogksi-extend\fR(1), \fBlogksi-integrate\fR(1), \fBlogksi-sign\fR(1), \fBlogksi-verify\fR(1), \fBlogksi-conf\fR(5)
+\fBlogksi-extend\fR(1), \fBlogksi-extract\fR(1), \fBlogksi-integrate\fR(1), \fBlogksi-sign\fR(1), \fBlogksi-verify\fR(1), \fBlogksi-conf\fR(5)
