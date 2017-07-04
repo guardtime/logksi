@@ -2731,6 +2731,7 @@ void logksi_file_close(FILE **ptr) {
 
 void logksi_files_close(INTERNAL_FILE_HANDLES *files) {
 	if (files != NULL) {
+		if (files->log == stdin) files->log = NULL;
 		logksi_file_close(&files->log);
 		if (files->inSig == stdin) files->inSig = NULL;
 		logksi_file_close(&files->inSig);
