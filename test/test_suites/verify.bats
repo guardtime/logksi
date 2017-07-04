@@ -32,3 +32,9 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ "Log signature verification failed." ]]
 }
 
+@test "verify compressed log from stdin" {
+	run bash -c "zcat test/resource/logfiles/secure.gz | ./src/logksi verify test/resource/logsignatures/secure.logsig --stdin -d"
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
+}
+

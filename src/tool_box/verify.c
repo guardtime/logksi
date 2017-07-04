@@ -85,6 +85,7 @@ int verify_run(int argc, char **argv, char **envp) {
 	IO_FILES files;
 	VERIFYING_FUNCTION verify_signature = NULL;
 	int count = 0;
+	int log_from_stdin = 0;
 
 	memset(&files, 0, sizeof(files));
 
@@ -92,7 +93,7 @@ int verify_run(int argc, char **argv, char **envp) {
 	 * Extract command line parameters and also add configuration specific parameters.
 	 */
 	res = PARAM_SET_new(
-			CONF_generate_param_set_desc("{input}{pos}{x}{d}{pub-str}{ver-int}{ver-cal}{ver-key}{ver-pub}{conf}{log}{h|help}", "XP", buf, sizeof(buf)),
+			CONF_generate_param_set_desc("{input}{pos}{stdin}{x}{d}{pub-str}{ver-int}{ver-cal}{ver-key}{ver-pub}{conf}{log}{h|help}", "XP", buf, sizeof(buf)),
 			&set);
 	if (res != KT_OK) goto cleanup;
 
@@ -113,14 +114,18 @@ int verify_run(int argc, char **argv, char **envp) {
 
 	d = PARAM_SET_isSetByName(set, "d");
 
+	log_from_stdin = PARAM_SET_isSetByName(set, "stdin");
+
 	res = PARAM_SET_getValueCount(set, "input", NULL, PST_PRIORITY_NONE, &count);
 	if (res != KT_OK) goto cleanup;
 
-	res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, 0, &files.user.log);
-	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
+	if (!log_from_stdin) {
+		res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, 0, &files.user.log);
+		if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
+	}
 
-	if (count > 1) {
-		res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, 1, &files.user.sig);
+	if (count > (1 - log_from_stdin)) {
+		res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, (1 - log_from_stdin), &files.user.sig);
 		if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
 	}
 
@@ -200,6 +205,7 @@ char *verify_help_toString(char *buf, size_t len) {
 	KSI_snprintf(buf, len,
 		"Usage:\n"
 		" %s verify <logfile> [<logfile.logsig>] [more_options]\n"
+		" %s verify <logfile.logsig> --stdin [more_options]\n"
 		" %s verify <logfile.part> [<logfile.part.logsig>] [more_options]\n"
 		" %s verify --ver-int <logfile> [<logfile.logsig>] [more_options]\n"
 		" %s verify --ver-cal <logfile> [<logfile.logsig>] -X <URL>\n"
@@ -227,6 +233,8 @@ char *verify_help_toString(char *buf, size_t len) {
 		"             Record integrity proof file to be verified. If omitted, the file name is\n"
 		"             derived by adding .logsig to <logfile.part>. It is expected to be found in the\n"
 		"             same folder as the <logfile.part>.\n"
+		" --stdin   - The log file is read from stdin.\n"
+		"             If --stdin is used, the log signature file name must be specified explicitly.\n"
 		" -x        - Permit to use extender for publication-based verification.\n"
 		" -X <URL>  - Extending service (KSI Extender) URL.\n"
 		" --ext-user <user>\n"
@@ -252,6 +260,7 @@ char *verify_help_toString(char *buf, size_t len) {
 		"             override the ones in the configuration file.\n"
 		" --log <file>\n"
 		"           - Write libksi log to the given file. Use '-' as file name to redirect the log to stdout.\n",
+		TOOL_getName(),
 		TOOL_getName(),
 		TOOL_getName(),
 		TOOL_getName(),
@@ -285,12 +294,12 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	PARAM_SET_addControl(set, "{conf}", isFormatOk_inputFile, isContentOk_inputFileRestrictPipe, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{log}", isFormatOk_path, NULL, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{input}", isFormatOk_inputFile, isContentOk_inputFile, convertRepair_path, NULL);
-	PARAM_SET_addControl(set, "{d}{x}{ver-int}{ver-cal}{ver-key}{ver-pub}", isFormatOk_flag, NULL, NULL, NULL);
+	PARAM_SET_addControl(set, "{stdin}{d}{x}{ver-int}{ver-cal}{ver-key}{ver-pub}", isFormatOk_flag, NULL, NULL, NULL);
 	PARAM_SET_addControl(set, "{pub-str}", isFormatOk_pubString, NULL, NULL, extract_pubString);
 	PARAM_SET_addControl(set, "{pos}", isFormatOk_int, NULL, NULL, extract_int);
 
 	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
-	PARAM_SET_setParseOptions(set, "d,x", PST_PRSCMD_HAS_NO_VALUE | PST_PRSCMD_NO_TYPOS);
+	PARAM_SET_setParseOptions(set, "stdin,d,x", PST_PRSCMD_HAS_NO_VALUE | PST_PRSCMD_NO_TYPOS);
 	PARAM_SET_setParseOptions(set, "ver-int,ver-cal,ver-key,ver-pub", PST_PRSCMD_HAS_NO_VALUE);
 
 	/*						ID						DESC								MAN							ATL		FORBIDDEN											IGN	*/
@@ -545,10 +554,12 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 		goto cleanup;
 	}
 
-	tmp.internal.log = strdup(files->user.log);
-	if (tmp.internal.log == NULL) {
-		res = KT_OUT_OF_MEMORY;
-		ERR_CATCH_MSG(err, res, "Error: could not duplicate input log file name.");
+	if (files->user.log) {
+		tmp.internal.log = strdup(files->user.log);
+		if (tmp.internal.log == NULL) {
+			res = KT_OUT_OF_MEMORY;
+			ERR_CATCH_MSG(err, res, "Error: could not duplicate input log file name.");
+		}
 	}
 
 	/* If input log signature file name is not specified, it is generared from the input log file name. */
@@ -596,10 +607,14 @@ static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files) {
 		goto cleanup;
 	}
 
-	tmp.files.log = fopen(files->internal.log, "rb");
-	if (tmp.files.log == NULL) {
-		res = KT_IO_ERROR;
-		ERR_CATCH_MSG(err, res, "Error: could not open input log file %s.", files->internal.log);
+	if (files->internal.log) {
+		tmp.files.log = fopen(files->internal.log, "rb");
+		if (tmp.files.log == NULL) {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: could not open input log file %s.", files->internal.log);
+		}
+	} else {
+		tmp.files.log = stdin;
 	}
 
 	tmp.files.inSig = fopen(files->internal.inSig, "rb");
