@@ -133,7 +133,6 @@ static void print_general_help(PARAM_SET *set, const char *KSI_CONF){
 }
 
 static int logksi_compo_get(TASK_SET *tasks, PARAM_SET **set, TOOL_COMPONENT_LIST **compo);
-static int min_arg_cnt(TASK_ID id);
 
 int main(int argc, char** argv, char **envp) {
 	int res;
@@ -204,7 +203,7 @@ int main(int argc, char** argv, char **envp) {
 	/**
 	 * Simple tool help handler.
 	 */
-	if (PARAM_SET_isSetByName(set, "h") || (argc < 2 && task == NULL) || (task != NULL && argc < min_arg_cnt(TASK_getID(task)) + 2)) {
+	if (PARAM_SET_isSetByName(set, "h") || (argc < 2 && task == NULL) || (task != NULL && argc < 3)) {
 		print_result("%s %s (C) Guardtime\n", TOOL_getName(), TOOL_getVersion());
 		print_result("%s (C) Guardtime\n\n", KSI_getVersion());
 
@@ -331,20 +330,4 @@ cleanup:
 	TOOL_COMPONENT_LIST_free(tmp_compo);
 
 	return res;
-}
-
-static int min_arg_cnt(TASK_ID id) {
-	switch(id) {
-		case TASK_ID_SIGN:
-		case TASK_ID_EXTEND:
-			return 0;
-		case TASK_ID_VERIFY:
-		case TASK_ID_INTEGRATE:
-		case TASK_ID_CONF:
-			return 1;
-		case TASK_ID_EXTRACT:
-			return 2;
-		default:
-			return 0xff;
-	}
 }

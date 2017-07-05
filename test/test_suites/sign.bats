@@ -22,6 +22,14 @@ export KSI_CONF=test/test.cfg
 	[ "$status" -ne 0 ]
 }
 
+@test "sign from standard input" {
+	run bash -c "cat test/out/unsigned.logsig | ./src/logksi sign --stdin -o test/out/signed_from_stdin.logsig -d"
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
+	run test -f test/out/signed_from_stdin.logsig
+	[ "$status" -eq 0 ]
+}
+
 @test "sign unsigned.logsig" {
 	run ./src/logksi sign test/out/unsigned -d
 	[ "$status" -eq 0 ]
