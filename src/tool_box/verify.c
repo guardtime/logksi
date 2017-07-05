@@ -42,6 +42,7 @@
 enum {
 	/* Trust anchor based verification. */
 	ANC_BASED_DEFAULT,
+	ANC_BASED_DEFAULT_STDIN,
 	ANC_BASED_PUB_FILE,
 	ANC_BASED_PUB_FILE_X,
 	ANC_BASED_PUB_SRT,
@@ -131,6 +132,7 @@ int verify_run(int argc, char **argv, char **envp) {
 
 	switch(TASK_getID(task)) {
 		case ANC_BASED_DEFAULT:
+		case ANC_BASED_DEFAULT_STDIN:
 		case ANC_BASED_PUB_FILE:
 		case ANC_BASED_PUB_FILE_X:
 		case ANC_BASED_PUB_SRT:
@@ -205,8 +207,9 @@ char *verify_help_toString(char *buf, size_t len) {
 	KSI_snprintf(buf, len,
 		"Usage:\n"
 		" %s verify <logfile> [<logfile.logsig>] [more_options]\n"
-		" %s verify <logfile.logsig> --stdin [more_options]\n"
+		" %s verify --stdin <logfile.logsig> [more_options]\n"
 		" %s verify <logfile.part> [<logfile.part.logsig>] [more_options]\n"
+		" %s verify --stdin <logfile.part.logsig> [more_options]\n"
 		" %s verify --ver-int <logfile> [<logfile.logsig>] [more_options]\n"
 		" %s verify --ver-cal <logfile> [<logfile.logsig>] -X <URL>\n"
 		"     [--ext-user <user> --ext-key <key>] [more_options]\n"
@@ -233,8 +236,8 @@ char *verify_help_toString(char *buf, size_t len) {
 		"             Record integrity proof file to be verified. If omitted, the file name is\n"
 		"             derived by adding .logsig to <logfile.part>. It is expected to be found in the\n"
 		"             same folder as the <logfile.part>.\n"
-		" --stdin   - The log file is read from stdin.\n"
-		"             If --stdin is used, the log signature file name must be specified explicitly.\n"
+		" --stdin   - The log or excerpt file is read from stdin.\n"
+		"             If --stdin is used, the log signature or integrity proof file name must be specified explicitly.\n"
 		" -x        - Permit to use extender for publication-based verification.\n"
 		" -X <URL>  - Extending service (KSI Extender) URL.\n"
 		" --ext-user <user>\n"
@@ -293,17 +296,18 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 
 	PARAM_SET_addControl(set, "{conf}", isFormatOk_inputFile, isContentOk_inputFileRestrictPipe, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{log}", isFormatOk_path, NULL, convertRepair_path, NULL);
-	PARAM_SET_addControl(set, "{input}", isFormatOk_inputFile, isContentOk_inputFile, convertRepair_path, NULL);
+	PARAM_SET_addControl(set, "{input}", isFormatOk_path, NULL, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{stdin}{d}{x}{ver-int}{ver-cal}{ver-key}{ver-pub}", isFormatOk_flag, NULL, NULL, NULL);
 	PARAM_SET_addControl(set, "{pub-str}", isFormatOk_pubString, NULL, NULL, extract_pubString);
 	PARAM_SET_addControl(set, "{pos}", isFormatOk_int, NULL, NULL, extract_int);
 
 	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
-	PARAM_SET_setParseOptions(set, "stdin,d,x", PST_PRSCMD_HAS_NO_VALUE | PST_PRSCMD_NO_TYPOS);
-	PARAM_SET_setParseOptions(set, "ver-int,ver-cal,ver-key,ver-pub", PST_PRSCMD_HAS_NO_VALUE);
+	PARAM_SET_setParseOptions(set, "d,x", PST_PRSCMD_HAS_NO_VALUE | PST_PRSCMD_NO_TYPOS);
+	PARAM_SET_setParseOptions(set, "stdin,ver-int,ver-cal,ver-key,ver-pub", PST_PRSCMD_HAS_NO_VALUE);
 
 	/*						ID						DESC								MAN							ATL		FORBIDDEN											IGN	*/
-	TASK_SET_add(task_set,	ANC_BASED_DEFAULT,		"Verify.",							"input",						NULL,	"ver-int,ver-cal,ver-key,ver-pub,P,cnstr,pub-str",	NULL);
+	TASK_SET_add(task_set,	ANC_BASED_DEFAULT,		"Verify, from file.",				"input",						NULL,	"stdin,ver-int,ver-cal,ver-key,ver-pub,P,cnstr,pub-str",	NULL);
+	TASK_SET_add(task_set,	ANC_BASED_DEFAULT_STDIN,"Verify, from standard input",		"input,stdin",					NULL,	"ver-int,ver-cal,ver-key,ver-pub,P,cnstr,pub-str",	NULL);
 	TASK_SET_add(task_set,	ANC_BASED_PUB_FILE,		"Verify, "
 													"use publications file, "
 													"extending is restricted.",			"input,P,cnstr",				NULL,	"ver-int,ver-cal,ver-key,ver-pub,x,T,pub-str",		NULL);
