@@ -8,6 +8,7 @@ Version 1.1.187
 * FEATURE: PDU version for KSI aggregator/extender can be specified with --[aggr|ext]-pdu-v switch.
 * IMPROVEMENT: Presence of record and tree hashes is checked.
 * IMPROVEMENT: Verifying: log file can b read from stdin with --stdin switch.
+* IMPROVEMENT: Signing and extending: log signature can now be read from standard input with --stdin switch.
 
 Version 1.0.187
 
