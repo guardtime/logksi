@@ -7,6 +7,8 @@
 .HP 4
 \fBlogksi verify \fIlogfile \fR[\fIlogfile.logsig\fR] [\fImore_options\fR]
 .HP 4
+\fBlogksi verify --stdin \fIlogfile.logsig\fR [\fImore_options\fR]
+.HP 4
 \fBlogksi verify \fIlogfile.part \fR[\fIlogfile.part.logsig\fR] [\fImore_options\fR]
 .HP 4
 \fBlogksi verify --ver-int \fIlogfile \fR[\fIlogfile.logsig\fR] [\fImore_options\fR]
@@ -23,6 +25,8 @@
 Verifies the log file \fIlogfile\fR. The name of the log signature file is expected to be \fIlogfile.logsig\fR by default. If this is not the case, the name of the log signature file must be given explicitly after the \fIlogfile\fR.
 .LP
 Alternatively the extracted log records present in the \fIlogfile.part\fR file can be verified. If not defined otherwise, then the log signature file acting as record integrity proof is expected to be \fIlogfile.part.logsig\fR. See \fBlogksi-extract\fR(1) for details regarding log records' extraction.
+.LP
+The log file to be verified can also be read from \fIstdin\fR using the \fB--stdin\fR option. In such case there is no default log signature file, thus its name should be explicitly defined.
 .LP
 For each signed log block the root hash of the block is recomputed and then verified using the KSI signature of that block.
 .LP
@@ -55,6 +59,14 @@ Perform key-based verification.
 .TP
 \fB--ver-pub\fR
 Perform publication-based verification (use with \fB-x\fR to permit extending).
+.\"
+.TP
+\fIlogfile\fR
+Log file to be verified. If \fIlogfile\fR is specified, \fB--stdin\fR cannot be used.
+.\"
+.TP
+\fB--stdin\fR
+Use to read the log file to be verified from the \fIstdin\fR. The corresponding log signature file must be explicitly specified.
 .\"
 .TP
 \fB-x\fR
