@@ -530,7 +530,7 @@ static size_t max_tree_hashes(size_t nof_records) {
 	return max;
 }
 
-int tlv_element_get_uint(KSI_TlvElement *tlv, KSI_CTX *ksi, unsigned tag, KSI_uint64_t *out) {
+int tlv_element_get_uint(KSI_TlvElement *tlv, KSI_CTX *ksi, unsigned tag, size_t *out) {
 	int res;
 	KSI_Integer *tmp = NULL;
 
@@ -541,7 +541,7 @@ int tlv_element_get_uint(KSI_TlvElement *tlv, KSI_CTX *ksi, unsigned tag, KSI_ui
 		goto cleanup;
 	}
 
-	*out = KSI_Integer_getUInt64(tmp);
+	*out = (size_t)KSI_Integer_getUInt64(tmp);
 	res = KT_OK;
 
 cleanup:
@@ -744,7 +744,7 @@ static int process_block_header(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks
 	KSI_DataHash *hash = NULL;
 	unsigned char i = 0;
 	KSI_TlvElement *tlv = NULL;
-	KSI_uint64_t algo;
+	size_t algo;
 	size_t j;
 
 	if (err == NULL || ksi == NULL || files == NULL || blocks == NULL) {
@@ -1155,7 +1155,7 @@ static int process_metarecord(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, 
 	int res;
 	KSI_DataHash *hash = NULL;
 	KSI_TlvElement *tlv = NULL;
-	KSI_uint64_t metarecord_index = 0;
+	size_t metarecord_index = 0;
 
 	if (err == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -1184,7 +1184,7 @@ static int process_metarecord(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, 
 		while (blocks->nofRecordHashes < metarecord_index) {
 			blocks->nofRecordHashes++;
 			res = get_hash_of_logline(ksi, blocks, files, &hash);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing logline no. %3zu up to metarecord index %3" PRIu64 "u.", blocks->blockNo, blocks->nofRecordHashes, metarecord_index);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing logline no. %3zu up to metarecord index %3zu.", blocks->blockNo, blocks->nofRecordHashes, metarecord_index);
 			res = add_record_hash_to_merkle_tree(ksi, blocks, 0, hash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
 			KSI_DataHash_free(hash);
@@ -1193,7 +1193,7 @@ static int process_metarecord(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, 
 	}
 
 	res = get_hash_of_metarecord(ksi, blocks, tlv, &hash);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate metarecord hash with index %3" PRIu64 "u.", blocks->blockNo, metarecord_index);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate metarecord hash with index %3zu.", blocks->blockNo, metarecord_index);
 
 	if (files->files.outSig) {
 		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->files.outSig) != blocks->ftlv_len) {
@@ -1307,7 +1307,7 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 	res = KSI_TlvElement_parse(blocks->ftlv_raw, blocks->ftlv_len, &tlv);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse block signature as TLV element.", blocks->blockNo);
 
-	res = tlv_element_get_uint(tlv, ksi, 0x01, (uint64_t*)&blocks->recordCount);
+	res = tlv_element_get_uint(tlv, ksi, 0x01, &blocks->recordCount);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing record count in block signature.", blocks->blockNo);
 
 	res = KSI_TlvElement_getElement(tlv, 0x905, &tlvSig);
@@ -1719,7 +1719,7 @@ static int process_partial_block(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *block
 	res = KSI_TlvElement_parse(blocks->ftlv_raw, blocks->ftlv_len, &tlv);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse block signature as TLV element.", blocks->blockNo);
 
-	res = tlv_element_get_uint(tlv, ksi, 0x01, (uint64_t*)&blocks->recordCount);
+	res = tlv_element_get_uint(tlv, ksi, 0x01, &blocks->recordCount);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing record count in blocks file.", blocks->blockNo);
 
 	res = KSI_TlvElement_getElement(tlv, 0x02, &tlvNoSig);
@@ -1784,7 +1784,7 @@ static int process_partial_signature(ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PRO
 	res = KSI_TlvElement_parse(blocks->ftlv_raw, blocks->ftlv_len, &tlv);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse block signature as TLV element.", blocks->blockNo);
 
-	res = tlv_element_get_uint(tlv, ksi, 0x01, (uint64_t*)&blocks->recordCount);
+	res = tlv_element_get_uint(tlv, ksi, 0x01, &blocks->recordCount);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing record count in signatures file.", blocks->blockNo);
 
 	res = is_block_signature_expected(err, blocks);
