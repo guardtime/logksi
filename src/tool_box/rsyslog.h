@@ -148,6 +148,7 @@ int get_file_read_lock(FILE *in);
 int concat_names(char *org, const char *extension, char **derived);
 int duplicate_name(char *in, char **out);
 int temp_name(char *org, char **derived);
+int check_and_open_file(ERR_TRCKR *err, char *name, FILE **out);
 void logksi_filename_free(char **ptr);
 void logksi_internal_filenames_free(INTERNAL_FILE_NAMES *internal);
 void logksi_file_close(FILE **ptr);

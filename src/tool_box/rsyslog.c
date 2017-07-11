@@ -2683,11 +2683,10 @@ int duplicate_name(char *in, char **out) {
 	}
 
 	*out = tmp;
-	tmp = NULL;
 	res = KT_OK;
 
 cleanup:
-	free(tmp);
+
 	return res;
 }
 
@@ -2722,6 +2721,33 @@ cleanup:
 
 	close(fd);
 	KSI_free(tmp);
+	return res;
+}
+
+int check_and_open_file(ERR_TRCKR *err, char *name, FILE **out) {
+	int res;
+	FILE *tmp = NULL;
+
+	if (name == NULL || out == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	tmp = fopen(name, "rb");
+	if (tmp == NULL) {
+		if (errno == ENOENT) {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: could not find file %s.", name);
+		} else {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: could not open file %s.", name);
+		}
+	}
+
+	*out = tmp;
+	res = KT_OK;
+
+cleanup:
 	return res;
 }
 

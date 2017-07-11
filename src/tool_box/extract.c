@@ -222,23 +222,11 @@ static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files) {
 		goto cleanup;
 	}
 
-	tmp.files.log = fopen(files->internal.log, "rb");
-	if (tmp.files.log == NULL) {
-		res = KT_IO_ERROR;
-		ERR_CATCH_MSG(err, res, "Error: could not open input log file %s.", files->internal.log);
-	}
+	res = check_and_open_file(err, files->internal.log, &tmp.files.log);
+	if (res != KT_OK) goto cleanup;
 
-	/* Make sure that the input log signature exists. */
-	tmp.files.inSig = fopen(files->internal.inSig, "rb");
-	if (tmp.files.inSig == NULL) {
-		if (errno == ENOENT) {
-			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: no matching log signature file found for log file %s.", files->user.log);
-		} else {
-			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: could not open input log signature file %s.", files->internal.inSig);
-		}
-	}
+	res = check_and_open_file(err, files->internal.inSig, &tmp.files.inSig);
+	if (res != KT_OK) goto cleanup;
 
 	tmp.files.outProof = fopen(files->internal.outProof, "wb");
 	if (tmp.files.outProof == NULL) {
