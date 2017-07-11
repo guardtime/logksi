@@ -188,13 +188,9 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 		goto cleanup;
 	}
 
-	tmp.internal.log = strdup(files->user.log);
-	if (tmp.internal.log == NULL) {
-		res = KT_OUT_OF_MEMORY;
-		ERR_CATCH_MSG(err, res, "Error: could not duplicate input log file name.");
-	}
+	res = duplicate_name(files->user.log, &tmp.internal.log);
+	ERR_CATCH_MSG(err, res, "Error: could not duplicate input log file name.");
 
-	/* Generate input log signature file name. */
 	res = concat_names(files->user.log, ".logsig", &tmp.internal.inSig);
 	ERR_CATCH_MSG(err, res, "Error: could not generate input log signature file name.");
 

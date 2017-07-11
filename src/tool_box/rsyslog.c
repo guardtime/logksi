@@ -2667,6 +2667,30 @@ cleanup:
 	return res;
 }
 
+int duplicate_name(char *in, char **out) {
+	int res;
+	char *tmp = NULL;
+
+	if (in == NULL || out == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	tmp = strdup(in);
+	if (tmp == NULL) {
+		res = KT_OUT_OF_MEMORY;
+		goto cleanup;
+	}
+
+	*out = tmp;
+	tmp = NULL;
+	res = KT_OK;
+
+cleanup:
+	free(tmp);
+	return res;
+}
+
 int temp_name(char *org, char **derived) {
 	int res;
 	int fd = -1;

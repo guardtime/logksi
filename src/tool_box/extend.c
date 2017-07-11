@@ -453,11 +453,8 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 			/* Output must go to a named temporary file that is renamed appropriately on success. */
 			res = temp_name(files->user.sig, &tmp.internal.tempSig);
 			ERR_CATCH_MSG(err, res, "Error: could not generate temporary output log signature file name.");
-			tmp.internal.outSig = strdup(files->user.sig);
-			if (tmp.internal.outSig == NULL) {
-				res = KT_OUT_OF_MEMORY;
-				ERR_CATCH_MSG(err, res, "Error: could not duplicate output log signature file name.");
-			}
+			res = duplicate_name(files->user.sig, &tmp.internal.outSig);
+			ERR_CATCH_MSG(err, res, "Error: could not duplicate output log signature file name.");
 		}
 	} else {
 		/* Generate input log signature file name. */
@@ -479,11 +476,8 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 			/* Output must go to a named temporary file that is renamed appropriately on success. */
 			res = temp_name(files->user.sig, &tmp.internal.tempSig);
 			ERR_CATCH_MSG(err, res, "Error: could not generate temporary output log signature file name.");
-			tmp.internal.outSig = strdup(files->user.sig);
-			if (tmp.internal.outSig == NULL) {
-				res = KT_OUT_OF_MEMORY;
-				ERR_CATCH_MSG(err, res, "Error: could not duplicate output log signature file name.");
-			}
+			res = duplicate_name(files->user.sig, &tmp.internal.outSig);
+			ERR_CATCH_MSG(err, res, "Error: could not duplicate output log signature file name.");
 		}
 	}
 	files->internal = tmp.internal;

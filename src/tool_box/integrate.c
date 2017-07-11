@@ -213,11 +213,8 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 		res = concat_names(files->user.log, ".logsig", &tmp.internal.outSig);
 		ERR_CATCH_MSG(err, res, "Error: could not generate output log signature file name.");
 	} else {
-		tmp.internal.outSig = strdup(files->user.sig);
-		if (tmp.internal.outSig == NULL) {
-			res = KT_OUT_OF_MEMORY;
-			ERR_CATCH_MSG(err, res, "Error: could not duplicate output log signature file name.");
-		}
+		res = duplicate_name(files->user.sig, &tmp.internal.outSig);
+		ERR_CATCH_MSG(err, res, "Error: could not duplicate output log signature file name.");
 	}
 
 	files->internal = tmp.internal;
