@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <ksi/ksi.h>
 #include <ksi/compatibility.h>
 #include <ksi/policy.h>
@@ -568,19 +569,9 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 
 	/* If input log signature file name is not specified, it is generared from the input log file name. */
 	if (files->user.sig == NULL) {
-		int i = 0;
-		char *extensions[] = {".logsig", ".ksisig", NULL};
-		while (extensions[i]) {
-			res = concat_names(files->user.log, extensions[i], &tmp.internal.inSig);
-			ERR_CATCH_MSG(err, res, "Error: could not generate input log signature file name.");
-			if (SMART_FILE_doFileExist(tmp.internal.inSig)) break;
-			logksi_filename_free(&tmp.internal.inSig);
-			i++;
-		}
-		if (tmp.internal.inSig == NULL) {
-			res = KT_KSI_SIG_VER_IMPOSSIBLE;
-			ERR_CATCH_MSG(err, res, "Error: no matching input log signature file found for input log file %s.", files->user.log);
-		}
+		/* Generate input log signature file name. */
+		res = concat_names(files->user.log, ".logsig", &tmp.internal.inSig);
+		ERR_CATCH_MSG(err, res, "Error: could not generate input log signature file name.");
 	} else {
 		tmp.internal.inSig = strdup(files->user.sig);
 		if (tmp.internal.inSig == NULL) {
@@ -621,10 +612,16 @@ static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files) {
 		tmp.files.log = stdin;
 	}
 
+	/* Make sure that the input log signature exists. */
 	tmp.files.inSig = fopen(files->internal.inSig, "rb");
 	if (tmp.files.inSig == NULL) {
-		res = KT_IO_ERROR;
-		ERR_CATCH_MSG(err, res, "Error: could not open input log signature file %s.", files->internal.inSig);
+		if (errno == ENOENT) {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: no matching log signature file found for log file %s.", files->user.log);
+		} else {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: could not open input log signature file %s.", files->internal.inSig);
+		}
 	}
 
 	files->files = tmp.files;
