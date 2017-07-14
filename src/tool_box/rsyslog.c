@@ -2751,6 +2751,33 @@ cleanup:
 	return res;
 }
 
+int create_temporary_output_file(char *name, FILE **out, char bStdout) {
+	int res;
+	FILE *tmp = NULL;
+
+	if ((name == NULL && bStdout == 0) || out == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	/* Output goes either to a named or nameless temporary file. */
+	if (bStdout) {
+		tmp = tmpfile();
+	} else {
+		tmp = fopen(name, "wb");
+	}
+	if (tmp == NULL) {
+		res = KT_IO_ERROR;
+		goto cleanup;
+	}
+	*out = tmp;
+	res = KT_OK;
+
+cleanup:
+	return res;
+}
+
+
 void logksi_filename_free(char **ptr) {
 	if (ptr != NULL && *ptr != NULL) {
 		KSI_free(*ptr);

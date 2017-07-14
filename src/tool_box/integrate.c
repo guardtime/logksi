@@ -269,16 +269,8 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 			res = KT_IO_ERROR;
 			ERR_CATCH_MSG(err, res, "Error: overwriting of existing output log signature file %s not supported.", files->internal.outSig);
 		}
-		/* Output goes either to a named or nameless temporary file. */
-		if (files->internal.bStdout) {
-			tmp.files.outSig = tmpfile();
-		} else {
-			tmp.files.outSig = fopen(files->internal.tempSig, "wb");
-		}
-		if (tmp.files.outSig == NULL) {
-			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: could not create temporary output log signature file.");
-		}
+		res = create_temporary_output_file(files->internal.tempSig, &tmp.files.outSig, files->internal.bStdout);
+		ERR_CATCH_MSG(err, res, "Error: could not create temporary output log signature file.");
 	} else if (partsBlkErr == ENOENT && partsSigErr == ENOENT) {
 		/* If none of the input files exist, but the output log signature file exists,
 		 * the output log signature file is the result of the synchronous signing process

@@ -30,6 +30,16 @@ export KSI_CONF=test/test.cfg
 	[ "$status" -eq 0 ]
 }
 
+@test "sign signed2.logsig to stdout" {
+	run bash -c "./src/logksi sign test/out/signed2 -d -o - > test/out/signed_stdout.logsig"
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
+	run test -f test/out/signed_stdout.logsig
+	[ "$status" -eq 0 ]
+	run diff test/out/signed3.logsig test/out/signed_stdout.logsig
+	[ "$status" -eq 0 ]
+}
+
 @test "sign unsigned.logsig" {
 	run ./src/logksi sign test/out/unsigned -d
 	[ "$status" -eq 0 ]
