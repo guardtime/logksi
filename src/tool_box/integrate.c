@@ -40,6 +40,7 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
 static int generate_filenames(ERR_TRCKR *err, IO_FILES *files);
 static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files);
 static int acquire_file_locks(ERR_TRCKR *err, IO_FILES *files);
+static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files);
 static void close_input_and_output_files(ERR_TRCKR *err, int res, IO_FILES *files);
 
 int integrate_run(int argc, char **argv, char **envp) {
@@ -102,6 +103,9 @@ int integrate_run(int argc, char **argv, char **envp) {
 	res = logsignature_integrate(err, ksi, &files);
 	if (res != KT_OK) goto cleanup;
 
+	res = rename_temporary_and_backup_files(err, &files);
+	if (res != KT_OK) goto cleanup;
+
 	res = KT_OK;
 
 cleanup:
@@ -144,6 +148,7 @@ char *integrate_help_toString(char *buf, size_t len) {
 		"           - Name of the integrated output log signature file. If not specified,\n"
 		"             the log signature file is saved as <logfile.logsig> in the same folder where\n"
 		"             the <logfile> is located. An attempt to overwrite an existing log signature file will result in an error.\n"
+		"             Use '-' to redirect the integrated log signature binary stream to stdout.\n"
 		" -d        - Print detailed information about processes and errors to stderr.\n"
 		" --log <file>\n"
 		"           - Write libksi log to the given file. Use '-' as file name to redirect the log to stdout.\n",
@@ -212,7 +217,15 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 	if (files->user.sig == NULL) {
 		res = concat_names(files->user.log, ".logsig", &tmp.internal.outSig);
 		ERR_CATCH_MSG(err, res, "Error: could not generate output log signature file name.");
+		res = temp_name(tmp.internal.outSig, &tmp.internal.tempSig);
+		ERR_CATCH_MSG(err, res, "Error: could not generate temporary output log signature file name.");
+	} else if (!strcmp(files->user.sig, "-")) {
+		/* Output must go to a nameless temporary file before redirecting it to stdout. */
+		tmp.internal.bStdout = 1;
 	} else {
+		/* Output must go to a named temporary file that is renamed appropriately on success. */
+		res = temp_name(files->user.sig, &tmp.internal.tempSig);
+		ERR_CATCH_MSG(err, res, "Error: could not generate temporary output log signature file name.");
 		res = duplicate_name(files->user.sig, &tmp.internal.outSig);
 		ERR_CATCH_MSG(err, res, "Error: could not duplicate output log signature file name.");
 	}
@@ -256,10 +269,15 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 			res = KT_IO_ERROR;
 			ERR_CATCH_MSG(err, res, "Error: overwriting of existing output log signature file %s not supported.", files->internal.outSig);
 		}
-		tmp.files.outSig = fopen(files->internal.outSig, "wb");
+		/* Output goes either to a named or nameless temporary file. */
+		if (files->internal.bStdout) {
+			tmp.files.outSig = tmpfile();
+		} else {
+			tmp.files.outSig = fopen(files->internal.tempSig, "wb");
+		}
 		if (tmp.files.outSig == NULL) {
 			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: could not open output log signature file %s.", files->internal.outSig);
+			ERR_CATCH_MSG(err, res, "Error: could not create temporary output log signature file.");
 		}
 	} else if (partsBlkErr == ENOENT && partsSigErr == ENOENT) {
 		/* If none of the input files exist, but the output log signature file exists,
@@ -327,16 +345,57 @@ cleanup:
 
 }
 
-void close_input_and_output_files(ERR_TRCKR *err, int res, IO_FILES *files) {
-	if (files) {
-		/* If something failed, remove the incomplete output log signature file. */
-		if (files->files.outSig && res != KT_OK) {
-			logksi_file_close(&files->files.outSig);
-			if (remove(files->internal.outSig) != 0) {
-				if (err) ERR_TRCKR_ADD(err, KT_IO_ERROR, "Error: could not remove output log signature %s.", files->internal.outSig);
+static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files) {
+	int res;
+	char buf[1024];
+	size_t count = 0;
+
+	if (err == NULL || files == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	if (files->internal.tempSig) {
+		/* Output must be saved in output log signature file, so the temporary file is renamed. */
+		logksi_file_close(&files->files.outSig);
+		if (rename(files->internal.tempSig, files->internal.outSig) != 0) {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: could not rename temporary file %s to output log signature file %s.", files->internal.tempSig, files->internal.outSig);
+		}
+	} else if (files->internal.bStdout) {
+		/* Copy the contents of the (nameless) temporary output log signature file to stdout. */
+		if (files->files.outSig == NULL) {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: could not access temporary output log signature file in read mode.");
+		}
+		if (fseek(files->files.outSig, 0, SEEK_SET) != 0) {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: could not seek temporary output log signature file.");
+		}
+		while(!feof(files->files.outSig)) {
+			count = fread(buf, 1, sizeof(buf), files->files.outSig);
+			if (fwrite(buf, 1, count, stdout) != count) {
+				res = KT_IO_ERROR;
+				ERR_CATCH_MSG(err, res, "Error: could not write temporary output log signature file to stdout.");
 			}
 		}
+	}
+
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
+
+void close_input_and_output_files(ERR_TRCKR *err, int res, IO_FILES *files) {
+	if (files) {
 		logksi_files_close(&files->files);
+		if (files->internal.tempSig && res != KT_OK) {
+			if (remove(files->internal.tempSig) != 0) {
+				if (err) ERR_TRCKR_ADD(err, KT_IO_ERROR, "Error: could not remove temporary output log signature %s.", files->internal.tempSig);
+			}
+		}
 		logksi_internal_filenames_free(&files->internal);
 	}
 }
