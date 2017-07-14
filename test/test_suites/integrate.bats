@@ -32,6 +32,16 @@ cp -r test/resource/logsignatures/signed.logsig.parts test/out
 	run chmod 0777 test/out/signed.logsig
 }
 
+@test "integrate signed.parts (again) to stdout" {
+	run bash -c "./src/logksi integrate test/out/signed -d -o - > test/out/signed2_stdout.logsig"
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
+	run test -f test/out/signed2_stdout.logsig
+	[ "$status" -eq 0 ]
+	run diff test/out/signed2.logsig test/out/signed2_stdout.logsig
+	[ "$status" -eq 0 ]
+}
+
 cp -r test/resource/logsignatures/unsigned.logsig.parts test/out
 
 @test "integrate unsigned.parts" {

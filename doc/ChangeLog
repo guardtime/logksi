@@ -9,6 +9,7 @@ Version 1.1.187
 * IMPROVEMENT: Presence of record and tree hashes is checked.
 * IMPROVEMENT: Verifying: log file can b read from stdin with --stdin switch.
 * IMPROVEMENT: Signing and extending: log signature can now be read from standard input with --stdin switch.
+* IMPROVEMENT: Integrating: output can be directed to stdout by specifying - as the output file.
 
 Version 1.0.187
 
