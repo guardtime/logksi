@@ -2777,6 +2777,34 @@ cleanup:
 	return res;
 }
 
+int redirect_file_to_stdout(FILE *in) {
+	int res;
+	char buf[1024];
+	size_t count = 0;
+
+	if (in == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	if (fseek(in, 0, SEEK_SET) != 0) {
+		res = KT_IO_ERROR;
+		goto cleanup;
+	}
+
+	while(!feof(in)) {
+		count = fread(buf, 1, sizeof(buf), in);
+		if (fwrite(buf, 1, count, stdout) != count) {
+			res = KT_IO_ERROR;
+			goto cleanup;
+		}
+	}
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
 
 void logksi_filename_free(char **ptr) {
 	if (ptr != NULL && *ptr != NULL) {

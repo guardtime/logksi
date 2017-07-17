@@ -323,8 +323,6 @@ cleanup:
 
 static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files) {
 	int res;
-	char buf[1024];
-	size_t count = 0;
 
 	if (err == NULL || files == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -358,22 +356,8 @@ static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files) {
 			ERR_CATCH_MSG(err, res, "Error: could not rename temporary file %s to output log signature file %s.", files->internal.tempSig, files->internal.outSig);
 		}
 	} else if (files->internal.bStdout) {
-		/* Copy the contents of the (nameless) temporary output log signature file to stdout. */
-		if (files->files.outSig == NULL) {
-			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: could not access temporary output log signature file in read mode.");
-		}
-		if (fseek(files->files.outSig, 0, SEEK_SET) != 0) {
-			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: could not seek temporary output log signature file.");
-		}
-		while(!feof(files->files.outSig)) {
-			count = fread(buf, 1, sizeof(buf), files->files.outSig);
-			if (fwrite(buf, 1, count, stdout) != count) {
-				res = KT_IO_ERROR;
-				ERR_CATCH_MSG(err, res, "Error: could not write temporary output log signature file to stdout.");
-			}
-		}
+		res = redirect_file_to_stdout(files->files.outSig);
+		ERR_CATCH_MSG(err, res, "Error: could not write temporary output log signature file to stdout.");
 	}
 
 	logksi_filename_free(&files->internal.backupSig);

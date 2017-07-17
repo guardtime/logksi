@@ -150,6 +150,7 @@ int duplicate_name(char *in, char **out);
 int temp_name(char *org, char **derived);
 int check_and_open_file(ERR_TRCKR *err, char *name, FILE **out);
 int create_temporary_output_file(char *name, FILE **out, char bStdout);
+int redirect_file_to_stdout(FILE *in);
 void logksi_filename_free(char **ptr);
 void logksi_internal_filenames_free(INTERNAL_FILE_NAMES *internal);
 void logksi_file_close(FILE **ptr);
