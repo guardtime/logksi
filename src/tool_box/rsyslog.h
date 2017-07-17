@@ -155,4 +155,5 @@ void logksi_filename_free(char **ptr);
 void logksi_internal_filenames_free(INTERNAL_FILE_NAMES *internal);
 void logksi_file_close(FILE **ptr);
 void logksi_files_close(INTERNAL_FILE_HANDLES *files);
-int logksi_remove_file(char *name);
+int logksi_file_remove(char *name);
+int logksi_file_rename(char *from, char *to);

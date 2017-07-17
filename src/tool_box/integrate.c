@@ -348,10 +348,8 @@ static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files) {
 	if (files->internal.tempSig) {
 		/* Output must be saved in output log signature file, so the temporary file is renamed. */
 		logksi_file_close(&files->files.outSig);
-		if (rename(files->internal.tempSig, files->internal.outSig) != 0) {
-			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: could not rename temporary file %s to output log signature file %s.", files->internal.tempSig, files->internal.outSig);
-		}
+		res = logksi_file_rename(files->internal.tempSig, files->internal.outSig);
+		ERR_CATCH_MSG(err, res, "Error: could not rename temporary file %s to output log signature file %s.", files->internal.tempSig, files->internal.outSig);
 	} else if (files->internal.bStdout) {
 		res = redirect_file_to_stdout(files->files.outSig);
 		ERR_CATCH_MSG(err, res, "Error: could not write temporary output log signature file to stdout.");

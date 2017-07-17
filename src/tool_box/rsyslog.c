@@ -2849,7 +2849,7 @@ void logksi_files_close(INTERNAL_FILE_HANDLES *files) {
 	}
 }
 
-int logksi_remove_file(char *name) {
+int logksi_file_remove(char *name) {
 	int res;
 	if (name == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -2863,6 +2863,25 @@ int logksi_remove_file(char *name) {
 		}
 	}
 
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
+
+int logksi_file_rename(char *from, char *to) {
+	int res;
+
+	if (from == NULL || to == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	if (rename(from, to) != 0) {
+		res = KT_IO_ERROR;
+		goto cleanup;
+	}
 	res = KT_OK;
 
 cleanup:
