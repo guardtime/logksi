@@ -597,13 +597,13 @@ static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files) {
 	}
 
 	if (files->internal.log) {
-		res = check_and_open_file(err, files->internal.log, &tmp.files.log);
+		res = logksi_file_check_and_open(err, files->internal.log, &tmp.files.log);
 		if (res != KT_OK) goto cleanup;
 	} else {
 		tmp.files.log = stdin;
 	}
 
-	res = check_and_open_file(err, files->internal.inSig, &tmp.files.inSig);
+	res = logksi_file_check_and_open(err, files->internal.inSig, &tmp.files.inSig);
 	if (res != KT_OK) goto cleanup;
 
 	files->files = tmp.files;

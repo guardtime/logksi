@@ -269,7 +269,7 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 			res = KT_IO_ERROR;
 			ERR_CATCH_MSG(err, res, "Error: overwriting of existing output log signature file %s not supported.", files->internal.outSig);
 		}
-		res = create_temporary_output_file(files->internal.tempSig, &tmp.files.outSig, files->internal.bStdout);
+		res = logksi_file_create_temporary(files->internal.tempSig, &tmp.files.outSig, files->internal.bStdout);
 		ERR_CATCH_MSG(err, res, "Error: could not create temporary output log signature file.");
 	} else if (partsBlkErr == ENOENT && partsSigErr == ENOENT) {
 		/* If none of the input files exist, but the output log signature file exists,
@@ -351,7 +351,7 @@ static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files) {
 		res = logksi_file_rename(files->internal.tempSig, files->internal.outSig);
 		ERR_CATCH_MSG(err, res, "Error: could not rename temporary file %s to output log signature file %s.", files->internal.tempSig, files->internal.outSig);
 	} else if (files->internal.bStdout) {
-		res = redirect_file_to_stdout(files->files.outSig);
+		res = logksi_file_redirect_to_stdout(files->files.outSig);
 		ERR_CATCH_MSG(err, res, "Error: could not write temporary output log signature file to stdout.");
 	}
 

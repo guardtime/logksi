@@ -2724,7 +2724,7 @@ cleanup:
 	return res;
 }
 
-int check_and_open_file(ERR_TRCKR *err, char *name, FILE **out) {
+int logksi_file_check_and_open(ERR_TRCKR *err, char *name, FILE **out) {
 	int res;
 	FILE *tmp = NULL;
 
@@ -2751,7 +2751,28 @@ cleanup:
 	return res;
 }
 
-int create_temporary_output_file(char *name, FILE **out, char bStdout) {
+int logksi_file_create(char *name, FILE **out) {
+	int res;
+	FILE *tmp = NULL;
+
+	if (name == NULL  || out == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	tmp = fopen(name, "wb");
+	if (tmp == NULL) {
+		res = KT_IO_ERROR;
+		goto cleanup;
+	}
+	*out = tmp;
+	res = KT_OK;
+
+cleanup:
+	return res;
+}
+
+int logksi_file_create_temporary(char *name, FILE **out, char bStdout) {
 	int res;
 	FILE *tmp = NULL;
 
@@ -2777,7 +2798,7 @@ cleanup:
 	return res;
 }
 
-int redirect_file_to_stdout(FILE *in) {
+int logksi_file_redirect_to_stdout(FILE *in) {
 	int res;
 	char buf[1024];
 	size_t count = 0;

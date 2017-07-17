@@ -300,14 +300,14 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 	}
 
 	if (files->internal.inSig) {
-		res = check_and_open_file(err, files->internal.inSig, &tmp.files.inSig);
+		res = logksi_file_check_and_open(err, files->internal.inSig, &tmp.files.inSig);
 		if (res != KT_OK) goto cleanup;
 	} else {
 		/* If not specified, the input is taken from stdin. */
 		tmp.files.inSig = stdin;
 	}
 
-	res = create_temporary_output_file(files->internal.tempSig, &tmp.files.outSig, files->internal.bStdout);
+	res = logksi_file_create_temporary(files->internal.tempSig, &tmp.files.outSig, files->internal.bStdout);
 	ERR_CATCH_MSG(err, res, "Error: could not create temporary output log signature file.");
 
 	files->files = tmp.files;
@@ -350,7 +350,7 @@ static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files) {
 		res = logksi_file_rename(files->internal.tempSig, files->internal.outSig);
 		ERR_CATCH_MSG(err, res, "Error: could not rename temporary file %s to output log signature file %s.", files->internal.tempSig, files->internal.outSig);
 	} else if (files->internal.bStdout) {
-		res = redirect_file_to_stdout(files->files.outSig);
+		res = logksi_file_redirect_to_stdout(files->files.outSig);
 		ERR_CATCH_MSG(err, res, "Error: could not write temporary output log signature file to stdout.");
 	}
 

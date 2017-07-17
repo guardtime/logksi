@@ -222,23 +222,17 @@ static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files) {
 		goto cleanup;
 	}
 
-	res = check_and_open_file(err, files->internal.log, &tmp.files.log);
+	res = logksi_file_check_and_open(err, files->internal.log, &tmp.files.log);
 	if (res != KT_OK) goto cleanup;
 
-	res = check_and_open_file(err, files->internal.inSig, &tmp.files.inSig);
+	res = logksi_file_check_and_open(err, files->internal.inSig, &tmp.files.inSig);
 	if (res != KT_OK) goto cleanup;
 
-	tmp.files.outProof = fopen(files->internal.outProof, "wb");
-	if (tmp.files.outProof == NULL) {
-		res = KT_IO_ERROR;
-		ERR_CATCH_MSG(err, res, "Error: could not open output integrity proof file %s.", files->internal.outProof);
-	}
+	res = logksi_file_create(files->internal.outProof, &tmp.files.outProof);
+	ERR_CATCH_MSG(err, res, "Error: could not open output integrity proof file %s.", files->internal.outProof);
 
-	tmp.files.outLog = fopen(files->internal.outLog, "wb");
-	if (tmp.files.outLog == NULL) {
-		res = KT_IO_ERROR;
-		ERR_CATCH_MSG(err, res, "Error: could not open output log records file %s.", files->internal.outLog);
-	}
+	res = logksi_file_create(files->internal.outLog, &tmp.files.outLog);
+	ERR_CATCH_MSG(err, res, "Error: could not open output log records file %s.", files->internal.outLog);
 
 	files->files = tmp.files;
 	memset(&tmp.files, 0, sizeof(tmp.files));
