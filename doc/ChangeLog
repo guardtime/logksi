@@ -1,13 +1,13 @@
-Version 1.1.187
+Version 1.1.231
 
-2017-07-04
+2017-07-18
 
 * FEATURE: Extraction: hash chains of log records can be extracted into record integrity proof files.
 * FEATURE: Verifying: record integrity proof files can be verified against excerpt files.
 * FEATURE: HMAC algorithm for KSI aggregator/extender can be specified with --[aggr|ext]-hmac-alg switch.
 * FEATURE: PDU version for KSI aggregator/extender can be specified with --[aggr|ext]-pdu-v switch.
 * IMPROVEMENT: Presence of record and tree hashes is checked.
-* IMPROVEMENT: Verifying: log file can b read from stdin with --stdin switch.
+* IMPROVEMENT: Verifying: log file can be read from stdin with --stdin switch.
 * IMPROVEMENT: Signing and extending: log signature can now be read from standard input with --stdin switch.
 * IMPROVEMENT: Integrating: output can be directed to stdout by specifying - as the output file.
 
