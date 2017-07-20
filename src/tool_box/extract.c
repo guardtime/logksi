@@ -44,7 +44,8 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
 
 static int generate_filenames(ERR_TRCKR *err, IO_FILES *files);
 static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files);
-static void close_log_and_signature_files(IO_FILES *files);
+static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files);
+static void close_log_and_signature_files(ERR_TRCKR *err, int res, IO_FILES *files);
 
 int extract_run(int argc, char **argv, char **envp) {
 	int res;
@@ -98,9 +99,12 @@ int extract_run(int argc, char **argv, char **envp) {
 	res = logsignature_extract(set, err, ksi, &files);
 	if (res != KT_OK) goto cleanup;
 
+	res = rename_temporary_and_backup_files(err, &files);
+	if (res != KT_OK) goto cleanup;
+
 cleanup:
 
-	close_log_and_signature_files(&files);
+	close_log_and_signature_files(err, res, &files);
 
 	print_progressResult(res);
 	LOGKSI_KSI_ERRTrace_save(ksi);
@@ -197,8 +201,14 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 	res = concat_names(files->user.log, ".part.logsig", &tmp.internal.outProof);
 	ERR_CATCH_MSG(err, res, "Error: could not generate output integrity proof file name.");
 
+	res = temp_name(tmp.internal.outProof, &tmp.internal.tempProof);
+	ERR_CATCH_MSG(err, res, "Error: could not generate output integrity proof file name.");
+
 	res = concat_names(files->user.log, ".part", &tmp.internal.outLog);
 	ERR_CATCH_MSG(err, res, "Error: could not generate output log records file name.");
+
+	res = temp_name(tmp.internal.outLog, &tmp.internal.tempLog);
+	ERR_CATCH_MSG(err, res, "Error: could not generate output integrity proof file name.");
 
 	files->internal = tmp.internal;
 	memset(&tmp.internal, 0, sizeof(tmp.internal));
@@ -228,11 +238,11 @@ static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files) {
 	res = logksi_file_check_and_open(err, files->internal.inSig, &tmp.files.inSig);
 	if (res != KT_OK) goto cleanup;
 
-	res = logksi_file_create(files->internal.outProof, &tmp.files.outProof);
-	ERR_CATCH_MSG(err, res, "Error: could not open output integrity proof file %s.", files->internal.outProof);
+	res = logksi_file_create_temporary(files->internal.tempProof, &tmp.files.outProof, files->internal.bStdout);
+	ERR_CATCH_MSG(err, res, "Error: could not create temporary output integrity proof file.");
 
-	res = logksi_file_create(files->internal.outLog, &tmp.files.outLog);
-	ERR_CATCH_MSG(err, res, "Error: could not open output log records file %s.", files->internal.outLog);
+	res = logksi_file_create_temporary(files->internal.tempLog, &tmp.files.outLog, files->internal.bStdout);
+	ERR_CATCH_MSG(err, res, "Error: could not create temporary output log records file.");
 
 	files->files = tmp.files;
 	memset(&tmp.files, 0, sizeof(tmp.files));
@@ -245,9 +255,48 @@ cleanup:
 	return res;
 }
 
-static void close_log_and_signature_files(IO_FILES *files) {
+static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files) {
+	int res;
+
+	if (err == NULL || files == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	if (files->internal.tempProof) {
+		/* Output must be saved in integrity proof file, so the temporary file is renamed. */
+		logksi_file_close(&files->files.outProof);
+		res = logksi_file_rename(files->internal.tempProof, files->internal.outProof);
+		ERR_CATCH_MSG(err, res, "Error: could not rename temporary file %s to output integrity proof file %s.", files->internal.tempProof, files->internal.outProof);
+	}
+
+	if (files->internal.tempLog) {
+		/* Output must be saved in log records file, so the temporary file is renamed. */
+		logksi_file_close(&files->files.outLog);
+		res = logksi_file_rename(files->internal.tempLog, files->internal.outLog);
+		ERR_CATCH_MSG(err, res, "Error: could not rename temporary file %s to output log records file %s.", files->internal.tempLog, files->internal.outLog);
+	}
+
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
+
+static void close_log_and_signature_files(ERR_TRCKR *err, int res, IO_FILES *files) {
 	if (files) {
 		logksi_files_close(&files->files);
+		if (files->internal.tempProof && res != KT_OK) {
+			if (remove(files->internal.tempProof) != 0) {
+				if (err) ERR_TRCKR_ADD(err, KT_IO_ERROR, "Error: could not remove temporary integrity proof file %s.", files->internal.tempProof);
+			}
+		}
+		if (files->internal.tempLog && res != KT_OK) {
+			if (remove(files->internal.tempLog) != 0) {
+				if (err) ERR_TRCKR_ADD(err, KT_IO_ERROR, "Error: could not remove temporary log records file %s.", files->internal.tempLog);
+			}
+		}
 		logksi_internal_filenames_free(&files->internal);
 	}
 }

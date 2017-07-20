@@ -49,6 +49,8 @@ typedef struct {
 	char *outProof;
 	char *outLog;
 	char *tempSig;
+	char *tempProof;
+	char *tempLog;
 	char *backupSig;
 	char *partsBlk;
 	char *partsSig;
