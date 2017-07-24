@@ -267,3 +267,21 @@ cp -r test/out/extract.base test/out/extract.base.10
 	run diff test/out/extract.base.part test/resource/logfiles/r3-7.part 
 	[ "$status" -eq 0 ]
 }
+
+@test "attempt to extract a range given in descending order" {
+	run ./src/logksi extract test/out/extract.base -r 7-3 -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: list of positions must be given in strictly ascending order." ]]
+}
+
+@test "attempt to extract a list that contains duplicates" {
+	run ./src/logksi extract test/out/extract.base -r 3,4,5-7,7 -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: list of positions must be given in strictly ascending order." ]]
+}
+
+@test "attempt to extract a list of ranges given in descending order" {
+	run ./src/logksi extract test/out/extract.base -r 6-7,3-5 -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: list of positions must be given in strictly ascending order." ]]
+}

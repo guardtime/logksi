@@ -2263,13 +2263,20 @@ cleanup:
 	return res;
 }
 
-int add_position(long int n, BLOCK_INFO *blocks) {
+int add_position(ERR_TRCKR *err, long int n, BLOCK_INFO *blocks) {
 	int res;
 	size_t *tmp = NULL;
 
 	if (n == 0 || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
+	}
+
+	if (blocks->nofExtractPositions) {
+		if (n <= blocks->extractPositions[blocks->nofExtractPositions - 1]) {
+			res = KT_INVALID_CMD_PARAM;
+			ERR_CATCH_MSG(err, res, "Error: list of positions must be given in strictly ascending order.");
+		}
 	}
 
 	if (blocks->extractPositions == NULL) {
@@ -2295,7 +2302,7 @@ cleanup:
 	return res;
 }
 
-int extract_positions(char *records, BLOCK_INFO *blocks) {
+int extract_positions(ERR_TRCKR *err, char *records, BLOCK_INFO *blocks) {
 	int res;
 	long int n = 0;
 	long int from = 0;
@@ -2322,12 +2329,17 @@ int extract_positions(char *records, BLOCK_INFO *blocks) {
 		if (endp == records) {
 			res = KT_INVALID_INPUT_FORMAT;
 			goto cleanup;
+		} else if (n <= from) {
+			res = KT_INVALID_CMD_PARAM;
+			ERR_CATCH_MSG(err, res, "Error: list of positions must be given in strictly ascending order.");
 		} else {
 			if (from == 0) {
-				add_position(n, blocks);
+				res = add_position(err, n, blocks);
+				if (res != KT_OK) goto cleanup;
 			} else {
 				while (from++ < n) {
-					add_position(from, blocks);
+					res = add_position(err, from, blocks);
+					if (res != KT_OK) goto cleanup;
 				}
 			}
 			from = 0;
@@ -2361,7 +2373,7 @@ int logsignature_extract(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES 
 	res = PARAM_SET_getStr(set, "r", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &records);
 	if (res != KT_OK) goto cleanup;
 
-	res = extract_positions(records, &blocks);
+	res = extract_positions(err, records, &blocks);
 	if (res != KT_OK) goto cleanup;
 
 	res = process_magic_number(err, &blocks, files);
