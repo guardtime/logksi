@@ -82,10 +82,10 @@ int integrate_run(int argc, char **argv, char **envp) {
 
 	d = PARAM_SET_isSetByName(set, "d");
 
-	res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.user.log);
+	res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.user.inLog);
 	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
 
-	res = PARAM_SET_getStr(set, "o", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.user.sig);
+	res = PARAM_SET_getStr(set, "o", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.user.inSig);
 	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
 
 	res = generate_filenames(err, &files);
@@ -207,26 +207,26 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 	}
 
 	/* Input consists of two parts - blocks and signatures. Names of these files are generated from the log file name. */
-	res = concat_names(files->user.log, ".logsig.parts/blocks.dat", &tmp.internal.partsBlk);
+	res = concat_names(files->user.inLog, ".logsig.parts/blocks.dat", &tmp.internal.partsBlk);
 	ERR_CATCH_MSG(err, res, "Error: could not generate input blocks file name.");
 
-	res = concat_names(files->user.log, ".logsig.parts/block-signatures.dat", &tmp.internal.partsSig);
+	res = concat_names(files->user.inLog, ".logsig.parts/block-signatures.dat", &tmp.internal.partsSig);
 	ERR_CATCH_MSG(err, res, "Error: could not generate input signatures file name.");
 
 	/* Output log signature file name, if not specified, is generated from the log file name. */
-	if (files->user.sig == NULL) {
-		res = concat_names(files->user.log, ".logsig", &tmp.internal.outSig);
+	if (files->user.inSig == NULL) {
+		res = concat_names(files->user.inLog, ".logsig", &tmp.internal.outSig);
 		ERR_CATCH_MSG(err, res, "Error: could not generate output log signature file name.");
 		res = temp_name(tmp.internal.outSig, &tmp.internal.tempSig);
 		ERR_CATCH_MSG(err, res, "Error: could not generate temporary output log signature file name.");
-	} else if (!strcmp(files->user.sig, "-")) {
+	} else if (!strcmp(files->user.inSig, "-")) {
 		/* Output must go to a nameless temporary file before redirecting it to stdout. */
 		tmp.internal.bStdout = 1;
 	} else {
 		/* Output must go to a named temporary file that is renamed appropriately on success. */
-		res = temp_name(files->user.sig, &tmp.internal.tempSig);
+		res = temp_name(files->user.inSig, &tmp.internal.tempSig);
 		ERR_CATCH_MSG(err, res, "Error: could not generate temporary output log signature file name.");
-		res = duplicate_name(files->user.sig, &tmp.internal.outSig);
+		res = duplicate_name(files->user.inSig, &tmp.internal.outSig);
 		ERR_CATCH_MSG(err, res, "Error: could not duplicate output log signature file name.");
 	}
 
