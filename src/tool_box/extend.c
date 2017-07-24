@@ -95,10 +95,10 @@ int extend_run(int argc, char** argv, char **envp) {
 	res = check_pipe_errors(set, err);
 	if (res != KT_OK) goto cleanup;
 
-	res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.user.log);
+	res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.user.inLog);
 	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
 
-	res = PARAM_SET_getStr(set, "o", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.user.sig);
+	res = PARAM_SET_getStr(set, "o", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.user.inSig);
 	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
 
 	switch(TASK_getID(task)) {
@@ -445,38 +445,38 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 	}
 
 	/* If not specified, the input signature is read from stdin. */
-	if (files->user.log == NULL) {
-		if (files->user.sig == NULL || !strcmp(files->user.sig, "-")) {
+	if (files->user.inLog == NULL) {
+		if (files->user.inSig == NULL || !strcmp(files->user.inSig, "-")) {
 			/* Output must go to a nameless temporary file before redirecting it to stdout. */
 			tmp.internal.bStdout = 1;
 		} else {
 			/* Output must go to a named temporary file that is renamed appropriately on success. */
-			res = temp_name(files->user.sig, &tmp.internal.tempSig);
+			res = temp_name(files->user.inSig, &tmp.internal.tempSig);
 			ERR_CATCH_MSG(err, res, "Error: could not generate temporary output log signature file name.");
-			res = duplicate_name(files->user.sig, &tmp.internal.outSig);
+			res = duplicate_name(files->user.inSig, &tmp.internal.outSig);
 			ERR_CATCH_MSG(err, res, "Error: could not duplicate output log signature file name.");
 		}
 	} else {
 		/* Generate input log signature file name. */
-		res = concat_names(files->user.log, ".logsig", &tmp.internal.inSig);
+		res = concat_names(files->user.inLog, ".logsig", &tmp.internal.inSig);
 		ERR_CATCH_MSG(err, res, "Error: could not generate input log signature file name.");
 
 		/* Check if output would overwrite the input log signature file. */
-		if (files->user.sig == NULL || !strcmp(files->user.sig, tmp.internal.inSig)) {
+		if (files->user.inSig == NULL || !strcmp(files->user.inSig, tmp.internal.inSig)) {
 			/* Output must to go to a temporary file before overwriting the input log signature file. */
 			res = temp_name(tmp.internal.inSig, &tmp.internal.tempSig);
 			ERR_CATCH_MSG(err, res, "Error: could not generate temporary output log signature file name.");
 			/* Input must kept in a backup file when overwritten by the output log signature file. */
 			res = concat_names(tmp.internal.inSig, ".bak", &tmp.internal.backupSig);
 			ERR_CATCH_MSG(err, res, "Error: could not generate backup input log signature file name.");
-		} else if (!strcmp(files->user.sig, "-")) {
+		} else if (!strcmp(files->user.inSig, "-")) {
 			/* Output must go to a nameless temporary file before redirecting it to stdout. */
 			tmp.internal.bStdout = 1;
 		} else {
 			/* Output must go to a named temporary file that is renamed appropriately on success. */
-			res = temp_name(files->user.sig, &tmp.internal.tempSig);
+			res = temp_name(files->user.inSig, &tmp.internal.tempSig);
 			ERR_CATCH_MSG(err, res, "Error: could not generate temporary output log signature file name.");
-			res = duplicate_name(files->user.sig, &tmp.internal.outSig);
+			res = duplicate_name(files->user.inSig, &tmp.internal.outSig);
 			ERR_CATCH_MSG(err, res, "Error: could not duplicate output log signature file name.");
 		}
 	}

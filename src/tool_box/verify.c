@@ -95,7 +95,7 @@ int verify_run(int argc, char **argv, char **envp) {
 	 * Extract command line parameters and also add configuration specific parameters.
 	 */
 	res = PARAM_SET_new(
-			CONF_generate_param_set_desc("{input}{pos}{stdin}{x}{d}{pub-str}{ver-int}{ver-cal}{ver-key}{ver-pub}{conf}{log}{h|help}", "XP", buf, sizeof(buf)),
+			CONF_generate_param_set_desc("{input}{stdin}{x}{d}{pub-str}{ver-int}{ver-cal}{ver-key}{ver-pub}{conf}{log}{h|help}", "XP", buf, sizeof(buf)),
 			&set);
 	if (res != KT_OK) goto cleanup;
 
@@ -122,12 +122,12 @@ int verify_run(int argc, char **argv, char **envp) {
 	if (res != KT_OK) goto cleanup;
 
 	if (!log_from_stdin) {
-		res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, 0, &files.user.log);
+		res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, 0, &files.user.inLog);
 		if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
 	}
 
 	if (count > (1 - log_from_stdin)) {
-		res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, (1 - log_from_stdin), &files.user.sig);
+		res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, (1 - log_from_stdin), &files.user.inSig);
 		if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
 	}
 
@@ -300,7 +300,6 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	PARAM_SET_addControl(set, "{input}", isFormatOk_path, NULL, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{stdin}{d}{x}{ver-int}{ver-cal}{ver-key}{ver-pub}", isFormatOk_flag, NULL, NULL, NULL);
 	PARAM_SET_addControl(set, "{pub-str}", isFormatOk_pubString, NULL, NULL, extract_pubString);
-	PARAM_SET_addControl(set, "{pos}", isFormatOk_int, NULL, NULL, extract_int);
 
 	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
 	PARAM_SET_setParseOptions(set, "d,x", PST_PRSCMD_HAS_NO_VALUE | PST_PRSCMD_NO_TYPOS);
@@ -559,18 +558,18 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 		goto cleanup;
 	}
 
-	if (files->user.log) {
-		res = duplicate_name(files->user.log, &tmp.internal.log);
+	if (files->user.inLog) {
+		res = duplicate_name(files->user.inLog, &tmp.internal.inLog);
 		ERR_CATCH_MSG(err, res, "Error: could not duplicate input log file name.");
 	}
 
 	/* If input log signature file name is not specified, it is generared from the input log file name. */
-	if (files->user.sig == NULL) {
+	if (files->user.inSig == NULL) {
 		/* Generate input log signature file name. */
-		res = concat_names(files->user.log, ".logsig", &tmp.internal.inSig);
+		res = concat_names(files->user.inLog, ".logsig", &tmp.internal.inSig);
 		ERR_CATCH_MSG(err, res, "Error: could not generate input log signature file name.");
 	} else {
-		res = duplicate_name(files->user.sig, &tmp.internal.inSig);
+		res = duplicate_name(files->user.inSig, &tmp.internal.inSig);
 		ERR_CATCH_MSG(err, res, "Error: could not duplicate input log signature file name.");
 	}
 
@@ -596,11 +595,11 @@ static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files) {
 		goto cleanup;
 	}
 
-	if (files->internal.log) {
-		res = logksi_file_check_and_open(err, files->internal.log, &tmp.files.log);
+	if (files->internal.inLog) {
+		res = logksi_file_check_and_open(err, files->internal.inLog, &tmp.files.inLog);
 		if (res != KT_OK) goto cleanup;
 	} else {
-		tmp.files.log = stdin;
+		tmp.files.inLog = stdin;
 	}
 
 	res = logksi_file_check_and_open(err, files->internal.inSig, &tmp.files.inSig);

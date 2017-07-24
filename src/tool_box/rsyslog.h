@@ -38,12 +38,17 @@ typedef enum {
 } LOGSIG_VERSION;
 
 typedef struct {
-	char *log;
-	char *sig;
+	char *inLog;
+	char *inSig;
+	char *outLog;
+	char *outProof;
+	char *outBase;
+	char bStdinLog;
+	char bStdinSig;
 } USER_FILE_NAMES;
 
 typedef struct {
-	char *log;
+	char *inLog;
 	char *inSig;
 	char *outSig;
 	char *outProof;
@@ -55,10 +60,12 @@ typedef struct {
 	char *partsBlk;
 	char *partsSig;
 	char bStdout;
+	char bStdoutLog;
+	char bStdoutProof;
 } INTERNAL_FILE_NAMES;
 
 typedef struct {
-	FILE *log;
+	FILE *inLog;
 	FILE *inSig;
 	FILE *outSig;
 	FILE *outProof;

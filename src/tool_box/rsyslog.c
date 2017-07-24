@@ -437,8 +437,8 @@ int get_hash_of_logline(KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_D
 		goto cleanup;
 	}
 
-	if (files->files.log) {
-		if (fgets(buf, sizeof(buf), files->files.log) == NULL) {
+	if (files->files.inLog) {
+		if (fgets(buf, sizeof(buf), files->files.inLog) == NULL) {
 			res = KT_IO_ERROR;
 			goto cleanup;
 		}
@@ -921,7 +921,7 @@ static int process_record_hash(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks,
 		blocks->metarecordHash = NULL;
 	} else {
 		/* This is a logline record hash. */
-		if (files->files.log) {
+		if (files->files.inLog) {
 			res = get_hash_of_logline(ksi, blocks, files, &hash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate hash of logline no. %3zu.", blocks->blockNo, blocks->nofRecordHashes);
 
@@ -1056,7 +1056,7 @@ static int process_tree_hash(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, I
 	 * build the Merkle tree according to the number of tree hashes encountered. */
 	if (blocks->keepRecordHashes == 0 && blocks->nofTreeHashes > max_tree_hashes(blocks->nofRecordHashes)) {
 		blocks->nofRecordHashes++;
-		if (files->files.log) {
+		if (files->files.inLog) {
 			if (blocks->metarecordHash) {
 				res = add_record_hash_to_merkle_tree(ksi, blocks, 1, blocks->metarecordHash);
 				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
@@ -1170,7 +1170,7 @@ static int process_metarecord(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, 
 	res = tlv_element_get_uint(tlv, ksi, 0x01, &metarecord_index);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing metarecord index.", blocks->blockNo);
 
-	if (files->files.log) {
+	if (files->files.inLog) {
 		/* If the block contains metarecords but not the corresponding record hashes:
 		 * Calculate missing metarecord hash from the last metarecord and
 		 * build the Merkle tree according to the record count in the signature data. */
@@ -1321,7 +1321,7 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 	res = is_block_signature_expected(err, blocks);
 	if (res != KT_OK) goto cleanup;
 
-	if (files->files.log) {
+	if (files->files.inLog) {
 		/* If the block contains metarecords but not the corresponding record hashes:
 		 * Calculate missing metarecord hash from the last metarecord and
 		 * build the Merkle tree with the metarecord hash. */
@@ -1634,7 +1634,7 @@ static int process_record_chain(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks
 
 	} else {
 		/* This is a logline record hash. */
-		if (files->files.log) {
+		if (files->files.inLog) {
 			res = get_hash_of_logline(ksi, blocks, files, &hash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate hash of logline no. %3zu.", blocks->blockNo, blocks->nofRecordHashes);
 
@@ -1928,8 +1928,8 @@ static int finalize_log_signature(ERR_TRCKR *err, BLOCK_INFO *blocks, IO_FILES *
 	}
 
 	/* Log file must not contain more records than log signature file. */
-	if (files->files.log) {
-		if (fread(buf, 1, 1, files->files.log) > 0) {
+	if (files->files.inLog) {
+		if (fread(buf, 1, 1, files->files.inLog) > 0) {
 			res = KT_VERIFICATION_FAILURE;
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: end of log file contains unexpected records.", blocks->blockNo);
 		}
@@ -2836,12 +2836,14 @@ void logksi_filename_free(char **ptr) {
 
 void logksi_internal_filenames_free(INTERNAL_FILE_NAMES *internal) {
 	if (internal != NULL) {
-		logksi_filename_free(&internal->log);
+		logksi_filename_free(&internal->inLog);
 		logksi_filename_free(&internal->inSig);
 		logksi_filename_free(&internal->outSig);
 		logksi_filename_free(&internal->outProof);
 		logksi_filename_free(&internal->outLog);
 		logksi_filename_free(&internal->tempSig);
+		logksi_filename_free(&internal->tempProof);
+		logksi_filename_free(&internal->tempLog);
 		logksi_filename_free(&internal->backupSig);
 		logksi_filename_free(&internal->partsBlk);
 		logksi_filename_free(&internal->partsSig);
@@ -2857,8 +2859,8 @@ void logksi_file_close(FILE **ptr) {
 
 void logksi_files_close(INTERNAL_FILE_HANDLES *files) {
 	if (files != NULL) {
-		if (files->log == stdin) files->log = NULL;
-		logksi_file_close(&files->log);
+		if (files->inLog == stdin) files->inLog = NULL;
+		logksi_file_close(&files->inLog);
 		if (files->inSig == stdin) files->inSig = NULL;
 		logksi_file_close(&files->inSig);
 		if (files->outSig == stdout) files->outSig = NULL;
