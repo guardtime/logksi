@@ -191,7 +191,7 @@ char *extract_help_toString(char *buf, size_t len) {
 		" -r <records>\n"
 		"             Positions of log records to be extraced, given as a list of ranges.\n"
 		"             Example: -r 12-18,21,88-192\n"
-		"             List of positions must be given in a strictly ascending order.\n"
+		"             List of positions must be given in a strictly ascending order using positive decimal numbers.\n"
 		"             Note: the list must be enclosed in double quotes if spaces are used as separators.\n"
 		" -d        - Print detailed information about processes and errors to stderr.\n"
 		" --log <file>\n"
@@ -226,7 +226,9 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 
 	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
 	PARAM_SET_setParseOptions(set, "d", PST_PRSCMD_HAS_NO_VALUE | PST_PRSCMD_NO_TYPOS);
+	PARAM_SET_setParseOptions(set, "r", PST_PRSCMD_HAS_VALUE | PST_PRSCMD_NO_TYPOS);
 	PARAM_SET_setParseOptions(set, "log-from-stdin,sig-from-stdin", PST_PRSCMD_HAS_NO_VALUE);
+
 
 	/*						ID		DESC									MAN							ATL		FORBIDDEN							IGN	*/
 	TASK_SET_add(task_set,	0,		"Extract records and hash chains, "

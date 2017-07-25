@@ -2275,7 +2275,7 @@ int add_position(ERR_TRCKR *err, long int n, BLOCK_INFO *blocks) {
 	if (blocks->nofExtractPositions) {
 		if (n <= blocks->extractPositions[blocks->nofExtractPositions - 1]) {
 			res = KT_INVALID_CMD_PARAM;
-			ERR_CATCH_MSG(err, res, "Error: list of positions must be given in strictly ascending order.");
+			ERR_CATCH_MSG(err, res, "Error: List of positions must be given in strictly ascending order.");
 		}
 	}
 
@@ -2307,6 +2307,8 @@ int extract_positions(ERR_TRCKR *err, char *records, BLOCK_INFO *blocks) {
 	long int n = 0;
 	long int from = 0;
 	char *endp = NULL;
+	char digit_expected = 1;
+	char dash_allowed = 1;
 
 	if (records == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -2314,37 +2316,56 @@ int extract_positions(ERR_TRCKR *err, char *records, BLOCK_INFO *blocks) {
 	}
 
 	while (*records) {
-		if (*records == ',') {
-			records++;
-			from = 0;
-			continue;
-		}
-		if (*records == '-') {
-			records++;
-			from = n;
-			continue;
-		}
-
-		n = strtol(records, &endp, 0);
-		if (endp == records) {
-			res = KT_INVALID_INPUT_FORMAT;
-			goto cleanup;
-		} else if (n <= from) {
-			res = KT_INVALID_CMD_PARAM;
-			ERR_CATCH_MSG(err, res, "Error: list of positions must be given in strictly ascending order.");
-		} else {
-			if (from == 0) {
-				res = add_position(err, n, blocks);
-				if (res != KT_OK) goto cleanup;
-			} else {
-				while (from++ < n) {
-					res = add_position(err, from, blocks);
-					if (res != KT_OK) goto cleanup;
+		if(!digit_expected) {
+			digit_expected = 1;
+			if (*records == ',') {
+				dash_allowed = 1;
+				records++;
+				from = 0;
+				continue;
+			}
+			if (*records == '-') {
+				if (dash_allowed) {
+					dash_allowed = 0;
+					records++;
+					from = n;
+					continue;
+				} else {
+					res = KT_INVALID_CMD_PARAM;
+					ERR_CATCH_MSG(err, res, "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges.");
 				}
 			}
-			from = 0;
-			records = endp;
+		} else {
+			digit_expected = 0;
+			n = strtol(records, &endp, 10);
+			if (endp == records) {
+				res = KT_INVALID_CMD_PARAM;
+				ERR_CATCH_MSG(err, res, "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges.");
+			} else {
+				if (n <= 0) {
+					res = KT_INVALID_CMD_PARAM;
+					ERR_CATCH_MSG(err, res, "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges.");
+				} else if (from == 0) {
+					res = add_position(err, n, blocks);
+					if (res != KT_OK) goto cleanup;
+				} else if (n <= from) {
+					res = KT_INVALID_CMD_PARAM;
+					ERR_CATCH_MSG(err, res, "Error: List of positions must be given in strictly ascending order.");
+				} else {
+					while (from++ < n) {
+						res = add_position(err, from, blocks);
+						if (res != KT_OK) goto cleanup;
+					}
+				}
+				from = 0;
+				records = endp;
+			}
 		}
+	}
+
+	if(digit_expected) {
+		res = KT_INVALID_CMD_PARAM;
+		ERR_CATCH_MSG(err, res, "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges.");
 	}
 	res = KT_OK;
 

@@ -242,7 +242,7 @@ cp -r test/out/extract.base test/out/extract.base.10
 	run ./src/logksi verify test/out/extract.base.part -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run diff test/out/extract.base.part test/resource/logfiles/r1430.part 
+	run diff test/out/extract.base.part test/resource/logfiles/r1430.part
 	[ "$status" -eq 0 ]
 }
 
@@ -253,7 +253,7 @@ cp -r test/out/extract.base test/out/extract.base.10
 	run ./src/logksi verify test/out/extract.base.part -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run diff test/out/extract.base.part test/resource/logfiles/r1429.part 
+	run diff test/out/extract.base.part test/resource/logfiles/r1429.part
 	[ "$status" -eq 0 ]
 }
 
@@ -264,24 +264,103 @@ cp -r test/out/extract.base test/out/extract.base.10
 	run ./src/logksi verify test/out/extract.base.part -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run diff test/out/extract.base.part test/resource/logfiles/r3-7.part 
+	run diff test/out/extract.base.part test/resource/logfiles/r3-7.part
+	[ "$status" -eq 0 ]
+}
+
+@test "extract range over three blocks, alternative range definition 1" {
+	run ./src/logksi extract test/out/extract.base -r 3-5,6,7 -d
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
+	run ./src/logksi verify test/out/extract.base.part -d
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
+	run diff test/out/extract.base.part test/resource/logfiles/r3-7.part
+	[ "$status" -eq 0 ]
+}
+
+@test "extract range over three blocks, alternative range definition 2" {
+	run ./src/logksi extract test/out/extract.base -r 3,4,5-7 -d
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
+	run ./src/logksi verify test/out/extract.base.part -d
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
+	run diff test/out/extract.base.part test/resource/logfiles/r3-7.part
 	[ "$status" -eq 0 ]
 }
 
 @test "attempt to extract a range given in descending order" {
 	run ./src/logksi extract test/out/extract.base -r 7-3 -d
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: list of positions must be given in strictly ascending order." ]]
+	[[ "$output" =~ "Error: List of positions must be given in strictly ascending order." ]]
 }
 
 @test "attempt to extract a list that contains duplicates" {
 	run ./src/logksi extract test/out/extract.base -r 3,4,5-7,7 -d
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: list of positions must be given in strictly ascending order." ]]
+	[[ "$output" =~ "Error: List of positions must be given in strictly ascending order." ]]
 }
 
 @test "attempt to extract a list of ranges given in descending order" {
 	run ./src/logksi extract test/out/extract.base -r 6-7,3-5 -d
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: list of positions must be given in strictly ascending order." ]]
+	[[ "$output" =~ "Error: List of positions must be given in strictly ascending order." ]]
+}
+
+@test "attempt to extract a list that contains non-positive numbers" {
+	run ./src/logksi extract test/out/extract.base -r 6,-7 -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	run ./src/logksi extract test/out/extract.base -r 6,7-8,-9 -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	run ./src/logksi extract test/out/extract.base -r 6,7--8,9 -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	run ./src/logksi extract test/out/extract.base -r 0,3 -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	run ./src/logksi extract test/out/extract.base -r 0-3 -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	run ./src/logksi extract test/out/extract.base -r -3-3 -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+}
+
+@test "attempt to extract a list that contains syntax errors" {
+	run ./src/logksi extract test/out/extract.base -r , -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	run ./src/logksi extract test/out/extract.base -r 5, -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	run ./src/logksi extract test/out/extract.base -r - -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	run ./src/logksi extract test/out/extract.base -r 6- -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	run ./src/logksi extract test/out/extract.base -r 5,,6 -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	run ./src/logksi extract test/out/extract.base -r 5-6-7 -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+}
+
+@test "attempt to extract a list that contains non-decimal integers" {
+	run ./src/logksi extract test/out/extract.base -r 0x5 -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	run ./src/logksi extract test/out/extract.base -r 0X5 -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	run ./src/logksi extract test/out/extract.base -r 5,0x6 -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	run ./src/logksi extract test/out/extract.base -r 5-0X6 -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
 }
