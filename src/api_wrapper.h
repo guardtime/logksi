@@ -50,6 +50,7 @@ int LOGKSI_Signature_isCalendarAuthRecPresent(const KSI_Signature *sig);
 int LOGKSI_Signature_isPublicationRecordPresent(const KSI_Signature *sig);
 int LOGKSI_receivePublicationsFile(ERR_TRCKR *err ,KSI_CTX *ctx, KSI_PublicationsFile **pubFile);
 int LOGKSI_verifyPublicationsFile(ERR_TRCKR *err, KSI_CTX *ctx, KSI_PublicationsFile *pubfile);
+int LOGKSI_DataHash_fromImprint(ERR_TRCKR *err, KSI_CTX *ctx, const unsigned char *imprint, size_t length, KSI_DataHash **hash);
 void LOGKSI_KSI_ERRTrace_save(KSI_CTX *ctx);
 const char *LOGKSI_KSI_ERRTrace_get(void);
 void LOGKSI_KSI_ERRTrace_LOG(KSI_CTX *ksi);

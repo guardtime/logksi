@@ -444,6 +444,22 @@ int LOGKSI_verifyPublicationsFile(ERR_TRCKR *err, KSI_CTX *ctx, KSI_Publications
 	return res;
 }
 
+int LOGKSI_DataHash_fromImprint(ERR_TRCKR *err, KSI_CTX *ctx, const unsigned char *imprint,
+									size_t length, KSI_DataHash **hash) {
+	int res;
+
+	if (err == NULL || ctx == NULL || imprint == NULL || hash == NULL) {
+		ERR_TRCKR_ADD(err, res = KT_INVALID_ARGUMENT, NULL);
+		return res;
+	}
+
+	res = KSI_DataHash_fromImprint(ctx, imprint, length, hash);
+	if (res != KSI_OK) LOGKSI_KSI_ERRTrace_save(ctx);
+	appendBaseErrorIfPresent(err, res, ctx, __LINE__);
+
+	return res;
+}
+
 int LOGKSI_Signature_isPublicationRecordPresent(const KSI_Signature *sig) {
 	KSI_PublicationRecord *pubRec = NULL;
 

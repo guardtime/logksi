@@ -571,7 +571,7 @@ cleanup:
 	return res;
 }
 
-int tlv_element_get_hash(KSI_TlvElement *tlv, KSI_CTX *ksi, unsigned tag, KSI_DataHash **out) {
+int tlv_element_get_hash(ERR_TRCKR *err, KSI_TlvElement *tlv, KSI_CTX *ksi, unsigned tag, KSI_DataHash **out) {
 	int res;
 	KSI_TlvElement *el = NULL;
 	KSI_DataHash *hash = NULL;
@@ -583,7 +583,7 @@ int tlv_element_get_hash(KSI_TlvElement *tlv, KSI_CTX *ksi, unsigned tag, KSI_Da
 		goto cleanup;
 	}
 
-	res = KSI_DataHash_fromImprint(ksi, el->ptr + el->ftlv.hdr_len, el->ftlv.dat_len, &hash);
+	res = LOGKSI_DataHash_fromImprint(err, ksi, el->ptr + el->ftlv.hdr_len, el->ftlv.dat_len, &hash);
 	if (res != KSI_OK) goto cleanup;
 
 	*out = hash;
@@ -775,16 +775,16 @@ static int process_block_header(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks
 	res = tlv_get_octet_string(tlv, ksi, 0x02, &seed);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing random seed in block header.", blocks->blockNo);
 
-	res = tlv_element_get_hash(tlv, ksi, 0x03, &hash);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing hash of previous leaf in block header.", blocks->blockNo);
+	res = tlv_element_get_hash(err, tlv, ksi, 0x03, &hash);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse last hash of previous block.", blocks->blockNo);
 
 	if (blocks->prevLeaf != NULL) {
 		if (!KSI_DataHash_equals(blocks->prevLeaf, hash)) {
 			res = KT_VERIFICATION_FAILURE;
 			print_progressResult(res);
-			OBJPRINT_Hash(blocks->prevLeaf, "Expected hash of previous leaf: ", print_debug);
-			OBJPRINT_Hash(hash            , "Received hash of previous leaf: ", print_debug);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: previous leaf hashes not equal.", blocks->blockNo);
+			OBJPRINT_Hash(blocks->prevLeaf, "Expected last hash of previous block: ", print_debug);
+			OBJPRINT_Hash(hash            , "Received last hash of previous block: ", print_debug);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: last hashes of previous blocks not equal.", blocks->blockNo);
 		}
 	}
 
@@ -901,8 +901,8 @@ static int process_record_hash(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks,
 	blocks->keepRecordHashes = 1;
 	blocks->nofRecordHashes++;
 
-	res = KSI_DataHash_fromImprint(ksi, blocks->ftlv_raw + blocks->ftlv.hdr_len, blocks->ftlv.dat_len, &recordHash);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to create hash of record no. %3zu.", blocks->blockNo, blocks->nofRecordHashes);
+	res = LOGKSI_DataHash_fromImprint(err, ksi, blocks->ftlv_raw + blocks->ftlv.hdr_len, blocks->ftlv.dat_len, &recordHash);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse hash of record no. %3zu.", blocks->blockNo, blocks->nofRecordHashes);
 
 	if (blocks->metarecordHash != NULL) {
 		/* This is a metarecord hash. */
@@ -1041,8 +1041,8 @@ static int process_tree_hash(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, I
 	blocks->keepTreeHashes = 1;
 	blocks->nofTreeHashes++;
 
-	res = KSI_DataHash_fromImprint(ksi, blocks->ftlv_raw + blocks->ftlv.hdr_len, blocks->ftlv.dat_len, &treeHash);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to create tree hash.", blocks->blockNo);
+	res = LOGKSI_DataHash_fromImprint(err, ksi, blocks->ftlv_raw + blocks->ftlv.hdr_len, blocks->ftlv.dat_len, &treeHash);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse tree hash.", blocks->blockNo);
 
 	if (files->files.outSig) {
 		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->files.outSig) != blocks->ftlv_len) {
@@ -1545,7 +1545,7 @@ cleanup:
 	return res;
 }
 
-static int process_hash_step(KSI_CTX *ksi, KSI_TlvElement *tlv, BLOCK_INFO *blocks, KSI_DataHash *inputHash, KSI_DataHash **outputHash) {
+static int process_hash_step(ERR_TRCKR *err, KSI_CTX *ksi, KSI_TlvElement *tlv, BLOCK_INFO *blocks, KSI_DataHash *inputHash, KSI_DataHash **outputHash) {
 	int res;
 	size_t correction = 0;
 	KSI_DataHash *siblingHash = NULL;
@@ -1562,7 +1562,7 @@ static int process_hash_step(KSI_CTX *ksi, KSI_TlvElement *tlv, BLOCK_INFO *bloc
 		res = KT_OK;
 	}
 	if (res != KT_OK) goto cleanup;
-	res = tlv_element_get_hash(tlv, ksi, 0x02, &siblingHash);
+	res = tlv_element_get_hash(err, tlv, ksi, 0x02, &siblingHash);
 	if (res != KT_OK) goto cleanup;
 
 	blocks->treeHeight += correction + 1;
@@ -1619,7 +1619,7 @@ static int process_record_chain(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks
 		blocks->metarecordHash = KSI_DataHash_ref(hash);
 	}
 
-	res = tlv_element_get_hash(tlv, ksi, 0x01, &recordHash);
+	res = tlv_element_get_hash(err, tlv, ksi, 0x01, &recordHash);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse hash of record no. %3zu.", blocks->blockNo, blocks->nofRecordHashes);
 
 	if (blocks->metarecordHash != NULL) {
@@ -1661,7 +1661,7 @@ static int process_record_chain(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks
 			res = KSI_TlvElementList_elementAt(tlv->subList, i, &tmpTlv);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to get element %d from TLV.", blocks->blockNo, i);
 			if (tmpTlv && (tmpTlv->ftlv.tag == 0x02 || tmpTlv->ftlv.tag == 0x03)) {
-				res = process_hash_step(ksi, tmpTlv, blocks, root, &tmpHash);
+				res = process_hash_step(err, ksi, tmpTlv, blocks, root, &tmpHash);
 				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to process hash step.", blocks->blockNo);
 
 				KSI_DataHash_free(root);
@@ -1725,8 +1725,8 @@ static int process_partial_block(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *block
 	res = KSI_TlvElement_getElement(tlv, 0x02, &tlvNoSig);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to extract 'no-sig' element in blocks file.", blocks->blockNo);
 
-	res = tlv_element_get_hash(tlvNoSig, ksi, 0x01, &hash);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing root hash in blocks file.", blocks->blockNo);
+	res = tlv_element_get_hash(err, tlvNoSig, ksi, 0x01, &hash);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse root hash.", blocks->blockNo);
 
 	if (blocks->nofRecordHashes && blocks->nofRecordHashes != blocks->recordCount) {
 		res = KT_INVALID_INPUT_FORMAT;
@@ -1828,7 +1828,7 @@ static int process_partial_signature(ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PRO
 		}
 	} else if (tlvNoSig != NULL) {
 		blocks->noSigNo++;
-		res = tlv_element_get_hash(tlvNoSig, ksi, 0x01, &hash);
+		res = tlv_element_get_hash(err, tlvNoSig, ksi, 0x01, &hash);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse root hash.", blocks->blockNo);
 
 		if (blocks->rootHash == NULL) {
