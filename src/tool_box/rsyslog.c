@@ -703,16 +703,16 @@ static int process_magic_number(ERR_TRCKR *err, BLOCK_INFO *blocks, IO_FILES *fi
 
 	if (files->files.partsBlk) {
 		if (find_header_in_file(files->files.partsBlk, blocksFileHeaders, SOF_ARRAY(blocksFileHeaders)) == SOF_ARRAY(blocksFileHeaders)) {
-			ERR_CATCH_MSG(err, res, "Error: Magic number not found at the beginning of blocks file %s.", files->internal.partsBlk);
+			ERR_CATCH_MSG(err, res, "Error: Unable to parse blocks file %s, magic number not found.", files->internal.partsBlk);
 		}
 		if (find_header_in_file(files->files.partsSig, signaturesFileHeaders, SOF_ARRAY(signaturesFileHeaders)) == SOF_ARRAY(signaturesFileHeaders)) {
-			ERR_CATCH_MSG(err, res, "Error: Magic number not found at the beginning of signatures file %s.", files->internal.partsSig);
+			ERR_CATCH_MSG(err, res, "Error: Unable to parse signature file %s, magic number not found.", files->internal.partsSig);
 		}
 		blocks->version = LOGSIG12;
 	} else {
 		blocks->version = find_header_in_file(files->files.inSig, logSignatureHeaders, SOF_ARRAY(logSignatureHeaders));
 		if (blocks->version == SOF_ARRAY(logSignatureHeaders)) {
-			ERR_CATCH_MSG(err, res, "Error: Magic number not found at the beginning of signature file %s.", files->internal.inSig);
+			ERR_CATCH_MSG(err, res, "Error: Unable to parse signature file %s, magic number not found.", files->internal.inSig);
 		}
 	}
 
@@ -2084,6 +2084,7 @@ int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_
 	processors.extend_signature = extend_signature;
 
 	res = process_magic_number(err, &blocks, files);
+
 	if (res != KT_OK) goto cleanup;
 
 	while (!feof(files->files.inSig)) {
