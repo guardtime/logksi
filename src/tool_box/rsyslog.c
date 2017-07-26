@@ -384,6 +384,11 @@ int add_record_hash_to_merkle_tree(KSI_CTX *ksi, BLOCK_INFO *blocks, int isMetaR
 		goto cleanup;
 	}
 
+	/* Do not allow meta records to be extracted. */
+	if (isMetaRecordHash) {
+		blocks->nofTotalRecordHashes--;
+	}
+
 	res = calculate_new_leaf_hash(ksi, blocks, hash, isMetaRecordHash, &lastHash);
 	if (res != KT_OK) goto cleanup;
 

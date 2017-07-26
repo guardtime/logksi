@@ -235,25 +235,14 @@ cp -r test/out/extract.base test/out/extract.base.10
 	[[ "$output" =~ "Log signature verification failed." ]]
 }
 
-@test "extract last (meta)record" {
-	run ./src/logksi extract test/out/extract.base -r 1430 -d
-	[ "$status" -eq 0 ]
-	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run ./src/logksi verify test/out/extract.base.part -d
-	[ "$status" -eq 0 ]
-	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run diff test/out/extract.base.part test/resource/logfiles/r1430.part
-	[ "$status" -eq 0 ]
-}
-
 @test "extract last (log)record" {
-	run ./src/logksi extract test/out/extract.base -r 1429 -d
+	run ./src/logksi extract test/out/extract.base -r 1414 -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	run ./src/logksi verify test/out/extract.base.part -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run diff test/out/extract.base.part test/resource/logfiles/r1429.part
+	run diff test/out/extract.base.part test/resource/logfiles/r1414.part
 	[ "$status" -eq 0 ]
 }
 
