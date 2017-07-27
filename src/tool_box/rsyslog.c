@@ -242,6 +242,14 @@ static int get_aggregation_level(BLOCK_INFO *blocks) {
 	return level;
 }
 
+static size_t get_nof_lines(BLOCK_INFO *blocks) {
+	if (blocks) {
+		return blocks->nofRecordHashes + blocks->nofTotalRecordHashes;
+	} else {
+		return 0;
+	}
+}
+
 int expand_extract_info(BLOCK_INFO *blocks) {
 	int res;
 	EXTRACT_INFO *tmp = NULL;
@@ -893,12 +901,12 @@ static int is_record_hash_expected(ERR_TRCKR *err, BLOCK_INFO *blocks) {
 	/* Check if record hashes are present for previous records. */
 	if (blocks->nofRecordHashes > 0 && blocks->keepRecordHashes == 0) {
 		res = KT_VERIFICATION_FAILURE;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing record hash for record no. %3zu.", blocks->blockNo, blocks->nofRecordHashes);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing record hash for logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
 	}
 	/* Check if all tree hashes are present for previous records. */
 	if (blocks->keepTreeHashes && blocks->nofTreeHashes != max_tree_hashes(blocks->nofRecordHashes)) {
 		res = KT_VERIFICATION_FAILURE;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing tree hash(es) for record no. %3zu.", blocks->blockNo, blocks->nofRecordHashes);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing tree hash(es) for logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
 	}
 	/* Check if record hashes are present in previous blocks. */
 	if (blocks->blockNo > 1 && blocks->keepRecordHashes == 0) {
@@ -932,7 +940,7 @@ static int process_record_hash(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks,
 	blocks->nofRecordHashes++;
 
 	res = LOGKSI_DataHash_fromImprint(err, ksi, blocks->ftlv_raw + blocks->ftlv.hdr_len, blocks->ftlv.dat_len, &recordHash);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse hash of record no. %3zu.", blocks->blockNo, blocks->nofRecordHashes);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse hash of logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
 
 	if (blocks->metarecordHash != NULL) {
 		/* This is a metarecord hash. */
@@ -948,10 +956,13 @@ static int process_record_hash(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks,
 		/* This is a logline record hash. */
 		if (files->files.inLog) {
 			res = get_hash_of_logline(ksi, blocks, files, &hash);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate hash of logline no. %3zu.", blocks->blockNo, blocks->nofRecordHashes);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate hash of logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
 
 			res = logksi_datahash_compare(err, hash, recordHash);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: record hashes not equal for record no. %3zu.", blocks->blockNo, blocks->nofRecordHashes);
+			if (res != KT_OK) {
+				print_debug("Received logline: %s", blocks->logLine);
+			}
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: record hashes not equal for logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
 		}
 
 		res = add_record_hash_to_merkle_tree(ksi, blocks, 0, recordHash);
@@ -1006,14 +1017,14 @@ static int is_tree_hash_expected(ERR_TRCKR *err, BLOCK_INFO *blocks) {
 	/* Check if tree hashes are present for previous records. */
 	if (blocks->nofRecordHashes > 1 && blocks->keepTreeHashes == 0) {
 		res = KT_VERIFICATION_FAILURE;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing tree hash for record no. %3zu.", blocks->blockNo, blocks->nofRecordHashes - 1);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing tree hash for logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks) - 1);
 	}
 	/* Check if all record hashes are present for previous records. */
 	if (blocks->keepRecordHashes && blocks->nofTreeHashes == max_tree_hashes(blocks->nofRecordHashes)) {
 		/* Either a record hash is missing or the tree hash is used in finalizing the unbalanced tree. */
 		if (blocks->balanced) {
 			res = KT_VERIFICATION_FAILURE;
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing record hash for record no. %3zu.", blocks->blockNo, blocks->nofRecordHashes + 1);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing record hash for logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks) + 1);
 		} else {
 			blocks->finalTreeHashesSome = 1;
 			/* Prepare tree hashes for verification of finalizing. */
@@ -1085,7 +1096,7 @@ static int process_tree_hash(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, I
 				blocks->metarecordHash = NULL;
 			} else {
 				res = get_hash_of_logline(ksi, blocks, files, &recordHash);
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate hash of logline no. %3zu.", blocks->blockNo, blocks->nofRecordHashes);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate hash of logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
 				res = add_record_hash_to_merkle_tree(ksi, blocks, 0, recordHash);
 				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to add record hash to Merkle tree.", blocks->blockNo);
 				KSI_DataHash_free(recordHash);
@@ -1106,11 +1117,11 @@ static int process_tree_hash(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, I
 			}
 			if (i == blocks->treeHeight) {
 				res = KT_VERIFICATION_FAILURE;
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unexpected tree hash for record no. %3zu.", blocks->blockNo, blocks->nofRecordHashes);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unexpected tree hash for logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
 			}
 
 			res = logksi_datahash_compare(err, blocks->notVerified[i], treeHash);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: tree hashes not equal for record no. %3zu.", blocks->blockNo, blocks->nofRecordHashes);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: tree hashes not equal for logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
 
 			KSI_DataHash_free(blocks->notVerified[i]);
 			blocks->notVerified[i] = NULL;
@@ -1143,11 +1154,11 @@ static int process_tree_hash(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, I
 			}
 			if (i == blocks->treeHeight) {
 				res = KT_VERIFICATION_FAILURE;
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unexpected tree hash for record no. %3zu.", blocks->blockNo, blocks->nofRecordHashes);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unexpected tree hash for logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
 			}
 
 			res = logksi_datahash_compare(err, blocks->notVerified[i], treeHash);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: tree hashes not equal for record no. %3zu.", blocks->blockNo, blocks->nofRecordHashes);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: tree hashes not equal for logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
 		}
 	}
 	res = KT_OK;
@@ -1195,7 +1206,7 @@ static int process_metarecord(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, 
 		while (blocks->nofRecordHashes < metarecord_index) {
 			blocks->nofRecordHashes++;
 			res = get_hash_of_logline(ksi, blocks, files, &hash);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing logline no. %3zu up to metarecord index %3zu.", blocks->blockNo, blocks->nofRecordHashes, metarecord_index);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing logline no. %4zu up to metarecord index %3zu.", blocks->blockNo, get_nof_lines(blocks), metarecord_index);
 			res = add_record_hash_to_merkle_tree(ksi, blocks, 0, hash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
 			KSI_DataHash_free(hash);
@@ -1249,7 +1260,7 @@ int is_block_signature_expected(ERR_TRCKR *err, BLOCK_INFO *blocks) {
 		/* Check if all record hashes are present in the current block. */
 		if (blocks->nofRecordHashes < blocks->recordCount) {
 			res = KT_VERIFICATION_FAILURE;
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing record hash for record no. %3zu.", blocks->blockNo, blocks->nofRecordHashes + 1);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing record hash for logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks) + 1);
 		}
 	}
 
@@ -1257,7 +1268,7 @@ int is_block_signature_expected(ERR_TRCKR *err, BLOCK_INFO *blocks) {
 		/* Check if all mandatory tree hashes are present in the current block. */
 		if (blocks->nofTreeHashes < maxTreeHashes) {
 			res = KT_VERIFICATION_FAILURE;
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing tree hash(es) for record no. %3zu.", blocks->blockNo, blocks->recordCount);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing tree hash(es) for logline no. %4zu.", blocks->blockNo, blocks->recordCount + blocks->nofTotalRecordHashes);
 		}
 		/* Check if the block contains too few optional tree hashes. */
 		if (blocks->nofTreeHashes < maxTreeHashes + maxFinalHashes) {
@@ -1631,7 +1642,7 @@ static int process_record_chain(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks
 	}
 
 	res = tlv_element_get_hash(err, tlv, ksi, 0x01, &recordHash);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse hash of record no. %3zu.", blocks->blockNo, blocks->nofRecordHashes);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse hash of logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
 
 	if (blocks->metarecordHash != NULL) {
 		/* This is a metarecord hash. */
@@ -1641,7 +1652,7 @@ static int process_record_chain(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks
 		/* This is a logline record hash. */
 		if (files->files.inLog) {
 			res = get_hash_of_logline(ksi, blocks, files, &hash);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate hash of logline no. %3zu.", blocks->blockNo, blocks->nofRecordHashes);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate hash of logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
 
 			res = logksi_datahash_compare(err, hash, recordHash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: record hashes not equal.", blocks->blockNo);
