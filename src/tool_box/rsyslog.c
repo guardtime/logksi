@@ -699,6 +699,31 @@ cleanup:
 	return res;
 }
 
+int tlv_element_parse_and_check_sub_elements(ERR_TRCKR *err, KSI_CTX *ksi, unsigned char *dat, size_t dat_len, size_t hdr_len, KSI_TlvElement **out) {
+	int res;
+	KSI_TlvElement *tmp = NULL;
+
+	if (dat == NULL || out == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	res = LOGKSI_FTLV_memReadN(err, ksi, dat + hdr_len, dat_len - hdr_len, NULL, 0, NULL);
+	if (res != KSI_OK) goto cleanup;
+
+	res = LOGKSI_TlvElement_parse(err, ksi, dat, dat_len, &tmp);
+	if (res != KSI_OK) goto cleanup;
+
+	*out = tmp;
+	tmp = NULL;
+	res = KT_OK;
+
+cleanup:
+
+	KSI_TlvElement_free(tmp);
+	return res;
+}
+
 static size_t find_header_in_file(FILE *in, char **headers, size_t len) {
 	size_t res = len;
 	size_t i;
@@ -809,7 +834,7 @@ static int process_block_header(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks
 	blocks->finalTreeHashesNone = 0;
 	blocks->finalTreeHashesAll = 0;
 
-	res = KSI_TlvElement_parse(blocks->ftlv_raw, blocks->ftlv_len, &tlv);
+	res = tlv_element_parse_and_check_sub_elements(err, ksi, blocks->ftlv_raw, blocks->ftlv_len, blocks->ftlv.hdr_len, &tlv);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse block header as TLV element.", blocks->blockNo);
 
 	res = tlv_element_get_uint(tlv, ksi, 0x01, &algo);
@@ -1186,7 +1211,7 @@ static int process_metarecord(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, 
 
 	print_progressDesc(0, "Block no. %3zu: processing metarecord... ", blocks->blockNo);
 
-	res = KSI_TlvElement_parse(blocks->ftlv_raw, blocks->ftlv_len, &tlv);
+	res = tlv_element_parse_and_check_sub_elements(err, ksi, blocks->ftlv_raw, blocks->ftlv_len, blocks->ftlv.hdr_len, &tlv);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse metarecord as TLV element.", blocks->blockNo);
 
 	res = tlv_element_get_uint(tlv, ksi, 0x01, &metarecord_index);
@@ -1326,7 +1351,7 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 
 	print_progressDesc(0, "Block no. %3zu: processing block signature data... ", blocks->blockNo);
 
-	res = KSI_TlvElement_parse(blocks->ftlv_raw, blocks->ftlv_len, &tlv);
+	res = tlv_element_parse_and_check_sub_elements(err, ksi, blocks->ftlv_raw, blocks->ftlv_len, blocks->ftlv.hdr_len, &tlv);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse block signature as TLV element.", blocks->blockNo);
 
 	res = tlv_element_get_uint(tlv, ksi, 0x01, &blocks->recordCount);
@@ -1531,7 +1556,7 @@ static int process_ksi_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, S
 	blocks->sigNo++;
 	print_progressDesc(0, "Block no. %3zu: processing KSI signature ... ", blocks->blockNo);
 
-	res = KSI_TlvElement_parse(blocks->ftlv_raw, blocks->ftlv_len, &tlvSig);
+	res = tlv_element_parse_and_check_sub_elements(err, ksi, blocks->ftlv_raw, blocks->ftlv_len, blocks->ftlv.hdr_len, &tlvSig);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse KSI signature as TLV element.", blocks->blockNo);
 
 	print_progressResult(res);
@@ -1626,7 +1651,7 @@ static int process_record_chain(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks
 
 	blocks->nofRecordHashes++;
 
-	res = KSI_TlvElement_parse(blocks->ftlv_raw, blocks->ftlv_len, &tlv);
+	res = tlv_element_parse_and_check_sub_elements(err, ksi, blocks->ftlv_raw, blocks->ftlv_len, blocks->ftlv.hdr_len, &tlv);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse record chain as TLV element.", blocks->blockNo);
 
 	res = KSI_TlvElement_getElement(tlv, 0x911, &tlvMetaRecord);
@@ -1721,7 +1746,7 @@ static int process_partial_block(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *block
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: partial block data without preceding block header found.", blocks->sigNo);
 	}
 
-	res = KSI_TlvElement_parse(blocks->ftlv_raw, blocks->ftlv_len, &tlv);
+	res = tlv_element_parse_and_check_sub_elements(err, ksi, blocks->ftlv_raw, blocks->ftlv_len, blocks->ftlv.hdr_len, &tlv);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse block signature as TLV element.", blocks->blockNo);
 
 	res = tlv_element_get_uint(tlv, ksi, 0x01, &blocks->recordCount);
@@ -1783,7 +1808,7 @@ static int process_partial_signature(ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PRO
 		res = KT_INVALID_INPUT_FORMAT;
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: block signature data without preceding block header found.", blocks->sigNo);
 	}
-	res = KSI_TlvElement_parse(blocks->ftlv_raw, blocks->ftlv_len, &tlv);
+	res = tlv_element_parse_and_check_sub_elements(err, ksi, blocks->ftlv_raw, blocks->ftlv_len, blocks->ftlv.hdr_len, &tlv);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse block signature as TLV element.", blocks->blockNo);
 
 	res = tlv_element_get_uint(tlv, ksi, 0x01, &blocks->recordCount);
@@ -1978,7 +2003,7 @@ static void free_blocks(BLOCK_INFO *blocks) {
 	}
 }
 
-static int count_blocks(ERR_TRCKR *err, BLOCK_INFO *blocks, FILE *in) {
+static int count_blocks(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, FILE *in) {
 	int res;
 	long int pos = -1;
 	KSI_TlvElement *tlv = NULL;
@@ -2013,7 +2038,7 @@ static int count_blocks(ERR_TRCKR *err, BLOCK_INFO *blocks, FILE *in) {
 				break;
 
 				case 0x904:
-					res = KSI_TlvElement_parse(blocks->ftlv_raw, blocks->ftlv_len, &tlv);
+					res = tlv_element_parse_and_check_sub_elements(err, ksi, blocks->ftlv_raw, blocks->ftlv_len, blocks->ftlv.hdr_len, &tlv);
 					ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse block signature as TLV element.", blocks->blockNo);
 					res = KSI_TlvElement_getElement(tlv, 0x02, &tlvNoSig);
 					ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to extract 'no-sig' element in signatures file.", blocks->blockNo);
@@ -2579,7 +2604,7 @@ int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *fi
 	}
 
 	if (progress) {
-		res = count_blocks(err, &blocks, files->files.inSig);
+		res = count_blocks(err, ksi, &blocks, files->files.inSig);
 		if (res != KT_OK) goto cleanup;
 		print_debug("Progress: %3zu of %3zu blocks need signing. Estimated signing time: %3zu seconds.\n", blocks.noSigCount, blocks.blockCount, blocks.noSigCount);
 	}

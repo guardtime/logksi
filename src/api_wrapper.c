@@ -460,6 +460,38 @@ int LOGKSI_DataHash_fromImprint(ERR_TRCKR *err, KSI_CTX *ctx, const unsigned cha
 	return res;
 }
 
+int LOGKSI_FTLV_memReadN(ERR_TRCKR *err, KSI_CTX *ctx, const unsigned char *buf,
+						 size_t buf_len, KSI_FTLV *arr, size_t arr_len, size_t *rd) {
+	int res;
+
+	if (err == NULL || ctx == NULL || buf == NULL) {
+		ERR_TRCKR_ADD(err, res = KT_INVALID_ARGUMENT, NULL);
+		return res;
+	}
+
+	res = KSI_FTLV_memReadN(buf, buf_len, arr, arr_len, rd);
+	if (res != KSI_OK) LOGKSI_KSI_ERRTrace_save(ctx);
+	appendBaseErrorIfPresent(err, res, ctx, __LINE__);
+
+	return res;
+}
+
+int LOGKSI_TlvElement_parse(ERR_TRCKR *err, KSI_CTX *ctx, unsigned char *dat, size_t dat_len, KSI_TlvElement **out) {
+	int res;
+
+	if (err == NULL || ctx == NULL || dat == NULL || out == NULL) {
+		ERR_TRCKR_ADD(err, res = KT_INVALID_ARGUMENT, NULL);
+		return res;
+	}
+
+	res = KSI_TlvElement_parse(dat, dat_len, out);
+	if (res != KSI_OK) LOGKSI_KSI_ERRTrace_save(ctx);
+	appendBaseErrorIfPresent(err, res, ctx, __LINE__);
+
+	return res;
+}
+
+
 int LOGKSI_Signature_isPublicationRecordPresent(const KSI_Signature *sig) {
 	KSI_PublicationRecord *pubRec = NULL;
 
