@@ -26,7 +26,7 @@ export KSI_CONF=test/test.cfg
 }
 
 @test "extend from standard input" {
-	run bash -c "cat test/out/signed3.logsig | ./src/logksi extend --stdin -o test/out/extended_from_stdin.logsig \
+	run bash -c "cat test/out/signed3.logsig | ./src/logksi extend --sig-from-stdin -o test/out/extended_from_stdin.logsig \
 	--pub-str AAAAAA-CZAIED-AAPVYU-HILW2M-KXRX6Z-M5QQQC-WUJVMM-B5USWC-7VHLO2-UQ4DME-WKKRKB-NBYMUF \
 	-P file://test/resource/publication/dummy-publications.bin \
 	-V test/resource/certificates/dummy-cert.pem \

@@ -11,10 +11,10 @@
 .HP 4
 \fBlogksi extend \fIlogfile\fR [\fB-o \fIout.logsig\fR] \fB--conf \fIlogksi.conf\fR [\fImore_options\fR]
 .HP 4
-\fBlogksi extend \fB--stdin\fR [\fB-o \fIout.logsig\fR] \fB--conf \fIlogksi.conf\fR [\fImore_options\fR]
+\fBlogksi extend \fB--sig-from-stdin\fR [\fB-o \fIout.logsig\fR] \fB--conf \fIlogksi.conf\fR [\fImore_options\fR]
 .\"
 .SH DESCRIPTION
-Finds the log signature file (\fIlogfile.logsig\fR) based on the specified log file \fIlogfile\fR and extends KSI signatures in it to the desired publication. The log signature file is expected to be located in the same directory as the log file. Alternatively, if no \fIlogfile\fR is specified, the log signature file may be read from \fIstdin\fR. To do that the \fB--stdin\fR option should be used. If neither the \fIlogfile\fR nor \fB--stdin\fR option is given, help text is returned.
+Finds the log signature file (\fIlogfile.logsig\fR) based on the specified log file \fIlogfile\fR and extends KSI signatures in it to the desired publication. The log signature file is expected to be located in the same directory as the log file. Alternatively, if no \fIlogfile\fR is specified, the log signature file may be read from \fIstdin\fR. To do that the \fB--sig-from-stdin\fR option should be used. If neither the \fIlogfile\fR nor \fB--sig-from-stdin\fR option is given, help text is returned.
 .LP
 After the signatures are extended and the corresponding publication records are attached, the log signatures can be verified using publication-based verification where only trusted publications file or a publication string in printed media is needed to perform the verification. See \fBlogksi-verify\fR(1) for details.
 .LP
@@ -25,10 +25,10 @@ Note that all KSI signatures present in the log signature file will be attempted
 .SH OPTIONS
 .TP
 \fIlogfile\fR
-Name of the log file whose log signature file is to be extended. If \fIlogfile\fR is specified, the \fB--stdin\fR option cannot be used.
+Name of the log file whose log signature file is to be extended. If \fIlogfile\fR is specified, the \fB--sig-from-stdin\fR option cannot be used.
 .\"
 .TP
-\fB--stdin\fR
+\fB--sig-from-stdin\fR
 Use to read the log signature file from \fIstdin\fR. If no output file is specified with \fB-o\fR, the result will be returned to \fIstdout\fR.
 .\"
 .TP

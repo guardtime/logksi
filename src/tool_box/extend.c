@@ -71,7 +71,7 @@ int extend_run(int argc, char** argv, char **envp) {
 	 * Extract command line parameters.
 	 */
 	res = PARAM_SET_new(
-			CONF_generate_param_set_desc("{input}{o}{stdin}{d}{x}{T}{pub-str}{conf}{log}{h|help}", "XP", buf, sizeof(buf)),
+			CONF_generate_param_set_desc("{input}{o}{sig-from-stdin}{d}{x}{T}{pub-str}{conf}{log}{h|help}", "XP", buf, sizeof(buf)),
 			&set);
 	if (res != KT_OK) goto cleanup;
 
@@ -168,12 +168,13 @@ char *extend_help_toString(char*buf, size_t len) {
 		" %s extend <logfile> [-o <out.logsig>] -X <URL>\n"
 		"    [--ext-user <user> --ext-key <key>] -P <URL> [--cnstr <oid=value>]... [--pub-str <str>] [more_options]\n"
 		" %s extend <logfile> [-o <out.logsig>] --conf <logksi.conf> [more_options]\n"
-		" %s extend --stdin [-o <out.logsig>] --conf <logksi.conf> [more_options]\n"
+		" %s extend --sig-from-stdin [-o <out.logsig>] --conf <logksi.conf> [more_options]\n"
 		"\n"
 		" <logfile>\n"
 		"           - Name of the log file whose log signature file is to be extended.\n"
-		"             If specified, the --stdin switch cannot be used.\n"
-		" --stdin     The log signature file is read from stdin.\n"
+		"             If specified, the --sig-from-stdin switch cannot be used.\n"
+		" --sig-from-stdin\n"
+		"             The log signature file is read from stdin.\n"
 		" -o <out.logsig>\n"
 		"           - Name of the extended output log signature file. An existing log signature file is always overwritten.\n"
 		"             If not specified, the log signature is saved to <logfile.logsig> while a backup of <logfile.logsig>\n"
@@ -385,12 +386,12 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	PARAM_SET_addControl(set, "{log}{o}", isFormatOk_path, NULL, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{input}", isFormatOk_inputFile, NULL, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{T}", isFormatOk_utcTime, isContentOk_utcTime, NULL, extract_utcTime);
-	PARAM_SET_addControl(set, "{stdin}{d}", isFormatOk_flag, NULL, NULL, NULL);
+	PARAM_SET_addControl(set, "{sig-from-stdin}{d}", isFormatOk_flag, NULL, NULL, NULL);
 	PARAM_SET_addControl(set, "{pub-str}", isFormatOk_pubString, NULL, NULL, extract_pubString);
 
 	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
 	PARAM_SET_setParseOptions(set, "d", PST_PRSCMD_HAS_NO_VALUE | PST_PRSCMD_NO_TYPOS);
-	PARAM_SET_setParseOptions(set, "stdin", PST_PRSCMD_HAS_NO_VALUE);
+	PARAM_SET_setParseOptions(set, "sig-from-stdin", PST_PRSCMD_HAS_NO_VALUE);
 
 	/**
 	 * Define possible tasks.
@@ -398,22 +399,22 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	/*					  ID	DESC												MAN						ATL		FORBIDDEN			IGN	*/
 	TASK_SET_add(task_set, 0,	"Extend, "
 								"from file, "
-								"to the earliest available publication.",			"input,X,P",			NULL,	"stdin,T,pub-str",	NULL);
+								"to the earliest available publication.",			"input,X,P",					NULL,	"sig-from-stdin,T,pub-str",	NULL);
 	TASK_SET_add(task_set, 1,	"Extend, "
 								"from standard input, "
-								"to the earliest available publication.",			"stdin,X,P",			NULL,	"input,T,pub-str",	NULL);
+								"to the earliest available publication.",			"sig-from-stdin,X,P",			NULL,	"input,T,pub-str",			NULL);
 	TASK_SET_add(task_set, 2,	"Extend, "
 								"from file, "
-								"to the specified time.",							"input,X,T",			NULL,	"stdin,pub-str",	NULL);
+								"to the specified time.",							"input,X,T",					NULL,	"sig-from-stdin,pub-str",	NULL);
 	TASK_SET_add(task_set, 3,	"Extend, "
 								"from standard input, "
-								"to the specified time.",							"stdin,X,T",			NULL,	"input,pub-str",	NULL);
+								"to the specified time.",							"sig-from-stdin,X,T",			NULL,	"input,pub-str",			NULL);
 	TASK_SET_add(task_set, 4,	"Extend, "
 								"from file, "
-								"to time specified in publications string.",		"input,X,P,pub-str",	NULL,	"stdin,T",			NULL);
+								"to time specified in publications string.",		"input,X,P,pub-str",			NULL,	"sig-from-stdin,T",			NULL);
 	TASK_SET_add(task_set, 5,	"Extend, "
 								"from standard input, "
-								"to time specified in publications string.",		"stdin,X,P,pub-str",	NULL,	"input,T",			NULL);
+								"to time specified in publications string.",		"sig-from-stdin,X,P,pub-str",	NULL,	"input,T",					NULL);
 
 cleanup:
 
