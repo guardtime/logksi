@@ -192,7 +192,6 @@ char *extract_help_toString(char *buf, size_t len) {
 		"             Positions of log records to be extraced, given as a list of ranges.\n"
 		"             Example: -r 12-18,21,88-192\n"
 		"             List of positions must be given in a strictly ascending order using positive decimal numbers.\n"
-		"             Note: the list must be enclosed in double quotes if spaces are used as separators.\n"
 		" -d        - Print detailed information about processes and errors to stderr.\n"
 		" --log <file>\n"
 		"           - Write libksi log to the given file. Use '-' as file name to redirect the log to stdout.\n",
