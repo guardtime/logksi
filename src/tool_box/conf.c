@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2016 Guardtime, Inc.
+ * Copyright 2013-2017 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -128,11 +128,17 @@ char *conf_help_toString(char *buf, size_t len) {
 		"           - Username for signing service.\n"
 		" --aggr-key <key>\n"
 		"           - HMAC key for signing service.\n"
+		" --aggr-hmac-alg <alg>\n"
+		"           - Hash algorithm to be used for computing HMAC on outgoing messages towards\n"
+		"             KSI aggregator. If not set, default algorithm is used.\n"
 		" -X <URL>  - Extending service (KSI Extender) URL.\n"
 		" --ext-user <user>\n"
 		"           - Username for extending service.\n"
 		" --ext-key <key>\n"
 		"           - HMAC key for extending service.\n"
+		" --ext-hmac-alg <alg>\n"
+		"           - Hash algorithm to be used for computing HMAC on outgoing messages towards\n"
+		"             KSI extender. If not set, default algorithm is used.\n"
 		" -P <URL>  - Publications file URL (or file with URI scheme 'file://').\n"
 		" --cnstr <oid=value>\n"
 		"           - OID of the PKI certificate field (e.g. e-mail address) and the expected\n"

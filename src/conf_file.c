@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2016 Guardtime, Inc.
+ * Copyright 2013-2017 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -54,11 +54,11 @@ char* CONF_generate_param_set_desc(char *description, const char *flags, char *b
 
 	if (is_S) {
 		count += KSI_snprintf(buf + count, buf_len - count,
-				"{S}{aggr-user}{aggr-key}");
+				"{S}{aggr-user}{aggr-key}{aggr-hmac-alg}{aggr-pdu-v}");
 	}
 
 	if (is_X) {
-		count += KSI_snprintf(buf + count, buf_len - count, "{X}{ext-user}{ext-key}");
+		count += KSI_snprintf(buf + count, buf_len - count, "{X}{ext-user}{ext-key}{ext-hmac-alg}{ext-pdu-v}");
 	}
 
 	if (is_P) {
@@ -133,18 +133,30 @@ int CONF_initialize_set_functions(PARAM_SET *conf, const char *flags) {
 	}
 
 	if (is_S) {
+		res = PARAM_SET_addControl(conf, "{aggr-hmac-alg}", isFormatOk_hashAlg, isContentOk_hashAlg, NULL, extract_hashAlg);
+		if (res != PST_OK) goto cleanup;
+
 		res = PARAM_SET_addControl(conf, "{S}", isFormatOk_url, NULL, convertRepair_url, NULL);
 		if (res != PST_OK) goto cleanup;
 
 		res = PARAM_SET_addControl(conf, "{aggr-user}{aggr-key}", isFormatOk_userPass, NULL, NULL, NULL);
 		if (res != PST_OK) goto cleanup;
+
+		res = PARAM_SET_addControl(conf, "{aggr-pdu-v}", isFormatOk_string, isContentOk_pduVersion, NULL, NULL);
+		if (res != PST_OK) goto cleanup;
 	}
 
 	if (is_X) {
+		res = PARAM_SET_addControl(conf, "{ext-hmac-alg}", isFormatOk_hashAlg, isContentOk_hashAlg, NULL, extract_hashAlg);
+		if (res != PST_OK) goto cleanup;
+
 		res = PARAM_SET_addControl(conf, "{X}", isFormatOk_url, NULL, convertRepair_url, NULL);
 		if (res != PST_OK) goto cleanup;
 
 		res = PARAM_SET_addControl(conf, "{ext-key}{ext-user}", isFormatOk_userPass, NULL, NULL, NULL);
+		if (res != PST_OK) goto cleanup;
+
+		res = PARAM_SET_addControl(conf, "{ext-pdu-v}", isFormatOk_string, isContentOk_pduVersion, NULL, NULL);
 		if (res != PST_OK) goto cleanup;
 	}
 
@@ -164,16 +176,6 @@ static int conf_fromFile(PARAM_SET *set, const char *fname, const char *source, 
 
 	if (fname == NULL || set == NULL) {
 		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
-
-	if (!SMART_FILE_doFileExist(fname)) {
-		res = KT_IO_ERROR;
-		goto cleanup;
-	}
-
-	if (!SMART_FILE_isReadAccess(fname)) {
-		res = KT_NO_PRIVILEGES;
 		goto cleanup;
 	}
 

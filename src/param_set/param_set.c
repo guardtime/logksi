@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2016 Guardtime, Inc.
+ * Copyright 2013-2017 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -27,6 +27,8 @@
 #include "parameter.h"
 #include "param_set.h"
 #include "strn.h"
+#include <errno.h>
+#include "logksi_err.h"
 
 #define TYPO_SENSITIVITY 10
 #define TYPO_MAX_COUNT 5
@@ -41,7 +43,7 @@ static int isValidNameChar(int c) {
 const char* extract_next_name(const char* name_string, int (*isValidNameChar)(int), char *buf, short len, int *flags) {
 	int cat_i = 0;
 	int buf_i = 0;
-	int tmp_flags = 0;
+//	int tmp_flags = 0;
 	int isNameOpen = 0;
 	int isFlagsOpen = 0;
 
@@ -92,9 +94,10 @@ const char* extract_next_name(const char* name_string, int (*isValidNameChar)(in
 	}
 
 	buf[buf_i] = 0;
-	if (flags != NULL) {
-		*flags = tmp_flags;
-	}
+	/* TODO: assign extracted flags */
+//	if (flags != NULL) {
+//		*flags = tmp_flags;
+//	}
 
 	return buf_i == 0 ? NULL : &name_string[cat_i];
 }
@@ -634,8 +637,6 @@ static int param_set_addRawParameter(const char *param, const char *arg, const c
 			if (res != PST_OK && res != PST_PARAMETER_IS_UNKNOWN && res != PST_PARAMETER_IS_TYPO) {
 				goto cleanup;
 			}
-
-			res = PST_OK;
 		} else {
 			char str_flg[2] = {255,0};
 			int itr = 0;
@@ -659,8 +660,6 @@ static int param_set_addRawParameter(const char *param, const char *arg, const c
 					if (res != PST_OK && res != PST_PARAMETER_IS_UNKNOWN && res != PST_PARAMETER_IS_TYPO) {
 						goto cleanup;
 					}
-
-					res = PST_OK;
 				}
 			} else {
 				res = param_set_add_typo_or_unknown(set, typo_list, source, flag, NULL);
@@ -718,17 +717,17 @@ int param_set_getParameterByConstraints(PARAM_SET *set, const char *names, const
 	 */
 	pName = names;
 	while ((pName = extract_next_name(pName, isValidNameChar, buf, sizeof(buf), NULL)) != NULL) {
-		PARAM *param = NULL;
+		PARAM *parameter = NULL;
 		int count = 0;
 
-		res = param_set_getParameterByName(set, buf, &param);
+		res = param_set_getParameterByName(set, buf, &parameter);
 		if (res != PST_OK) goto cleanup;;
 
-		res = PARAM_getValueCount(param, source, priority, &count);
+		res = PARAM_getValueCount(parameter, source, priority, &count);
 		if (res != PST_OK) goto cleanup;
 
 		if (count != 0) {
-			has_value = param;
+			has_value = parameter;
 		}
 
 		if (at == PST_INDEX_FIRST && has_value != NULL) {
@@ -736,7 +735,7 @@ int param_set_getParameterByConstraints(PARAM_SET *set, const char *names, const
 			*index = PST_INDEX_FIRST;
 			break;
 		} else if (at != PST_INDEX_FIRST && at != PST_INDEX_LAST && count_sum + count > at) {
-			tmp = param;
+			tmp = parameter;
 			*index = at - count_sum;
 			break;
 		}
@@ -1399,8 +1398,16 @@ int PARAM_SET_readFromFile(PARAM_SET *set, const char *fname, const char* source
 
 	file = fopen(fname, "r");
 	if (file == NULL) {
-		res = PST_IO_ERROR;
-		goto cleanup;
+		if (errno == ENOENT) {
+			res = KT_IO_ERROR;
+			goto cleanup;
+		} else if (errno == EACCES) {
+			res = KT_NO_PRIVILEGES;
+			goto cleanup;
+		} else {
+			res = PST_IO_ERROR;
+			goto cleanup;
+		}
 	}
 
 	do {
@@ -1416,12 +1423,10 @@ int PARAM_SET_readFromFile(PARAM_SET *set, const char *fname, const char* source
 			PST_snprintf(buf, sizeof(buf), "Syntax error at line %4zu. Unknown character. '%.60s'.\n", line_nr, line);
 			PARAM_addValue(set->syntax, buf, source, priority);
 			error_count++;
-			res = PST_OK;
 		} else if (flag[0] != '-' && flag[0] != '\0') {
 			PST_snprintf(buf, sizeof(buf) , "Syntax error at line %4zu. Missing character '-'. '%.60s'.\n", line_nr, line);
 			PARAM_addValue(set->syntax, buf, source, priority);
 			error_count++;
-			res = PST_OK;
 		} else if (res != PST_OK) {
 			goto cleanup;
 		}
@@ -1807,6 +1812,7 @@ int PARAM_SET_parseCMD(PARAM_SET *set, int argc, char **argv, const char *source
 					dpgprint("----------------------------------\n");
 					if (value_counter == 0) {
 						res = PARAM_SET_add(set, opend_parameter->flagName, NULL, source, priority);
+						if (res != PST_OK) goto cleanup;
 						dpgprint("P:CLOSE (%s = NULL)%s\n", opend_parameter->flagName, break_type_to_string(token_match_break + token_pot_param_break + token_no_param_break + value_saturation_break, buf, sizeof(buf)));
 					} else {
 						dpgprint("P:CLOSE (%s ---)%s\n", opend_parameter->flagName, break_type_to_string(token_match_break + token_pot_param_break + token_no_param_break + value_saturation_break, buf, sizeof(buf)));
@@ -1839,6 +1845,7 @@ int PARAM_SET_parseCMD(PARAM_SET *set, int argc, char **argv, const char *source
 
 				if (last_token_brake && value_counter == 0) {
 					res = PARAM_SET_add(set, opend_parameter->flagName, NULL, source, priority);
+					if (res != PST_OK) goto cleanup;
 				}
 
 				continue;
@@ -2052,7 +2059,8 @@ char* PARAM_SET_invalidParametersToString(const PARAM_SET *set, const char *pref
 		if (PARAM_isParsOptionSet(parameter, PST_PRSCMD_FORMAT_CONTROL_ONLY_FOR_LAST_HIGHST_PRIORITY_VALUE)) {
 			res = PARAM_getValue(parameter, NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &invalid);
 
-			if (res != PST_OK && res != PST_PARAMETER_EMPTY && res != PST_PARAMETER_VALUE_NOT_FOUND) return NULL;
+			if (res == PST_PARAMETER_EMPTY || res == PST_PARAMETER_VALUE_NOT_FOUND) continue;
+			if (res != PST_OK) return NULL;
 			count += param_value_add_errorstring_to_buf(parameter, invalid, prefix, getErrString, buf + count, buf_len - count);
 		} else {
 			while (PARAM_getInvalid(parameter, NULL, PST_PRIORITY_NONE, n++, &invalid) == PST_OK) {
@@ -2152,14 +2160,10 @@ char* PARAM_SET_typosToString(PARAM_SET *set, int flags, const char *prefix, cha
 	int n = 0;
 	const char *similar = NULL;
 	size_t count = 0;
-	char *hyphen = "";
-	char *d_hyphen = "";
+	char *hyphen = "-";
+	char *d_hyphen = "-";
 
-	if (flags & PST_TOSTR_HYPHEN) {
-		hyphen = "-";
-		d_hyphen = "-";
-	} else if (flags & PST_TOSTR_DOUBLE_HYPHEN) {
-		hyphen = "-";
+	if (flags & PST_TOSTR_DOUBLE_HYPHEN) {
 		d_hyphen = "--";
 	}
 

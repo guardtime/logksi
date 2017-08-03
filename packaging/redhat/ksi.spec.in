@@ -71,6 +71,7 @@ make install DESTDIR=%{buildroot}
 %{_mandir}/man1/logksi-extend.1*
 %{_mandir}/man1/logksi-verify.1*
 %{_mandir}/man1/logksi-integrate.1*
+%{_mandir}/man1/logksi-extract.1*
 %{_mandir}/man5/logksi-conf.5*
 %{_docdir}/%{name_package}/LICENSE
 %{_docdir}/%{name_package}/ChangeLog

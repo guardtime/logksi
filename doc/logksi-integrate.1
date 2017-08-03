@@ -20,7 +20,7 @@ If the output file name is not specified, it is derived from the name of the log
 The integration of the files can be performed once both files are complete. \fBlogksi integrate \fR waits to acquire a read lock on the files before integrating them. The read lock is advisory and relies on the same implementation in the signing application.
 .LP
 If the temporary files do not exist, but a matching log signature exists, it is assumed that the log signature is the output of a synchronous signing process. \fBlogksi integrate \fR waits to acquire a read lock on the log signature file and then skips the actual integration. The read lock is advisory and relies on the same implementation in the signing application.
-.LP 
+.LP
 During integration the following is checked:
 .LP
 .IP \(bu 4
@@ -33,7 +33,7 @@ If some KSI signatures are missing from the log signature file \fIblock-signatur
 .SH OPTIONS
 .TP
 \fB-o \fIout.logsig\fR
-Specify the name of the integrated output log signature file. If not specified, the log signature file is saved as \fIlogfile.logsig\fR in the same folder where the \fIlogfile\fR is located. An attempt to overwrite an existing log signature file will result in an error.
+Specify the name of the integrated output log signature file. If not specified, the log signature file is saved as \fIlogfile.logsig\fR in the same folder where the \fIlogfile\fR is located. An attempt to overwrite an existing log signature file will result in an error. Use '-' as file name to redirect the output as a binary stream to \fIstdout\fR.
 .\"
 .TP
 \fB-d\fR
@@ -61,4 +61,4 @@ Guardtime AS, http://www.guardtime.com/
 .LP
 .\"
 .SH SEE ALSO
-\fBlogksi\fR(1), \fBlogksi-extend\fR(1), \fBlogksi-sign\fR(1), \fBlogksi-verify\fR(1), \fBlogksi-conf\fR(5)
+\fBlogksi\fR(1), \fBlogksi-extend\fR(1), \fBlogksi-extract\fR(1), \fBlogksi-sign\fR(1), \fBlogksi-verify\fR(1), \fBlogksi-conf\fR(5)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2016 Guardtime, Inc.
+ * Copyright 2013-2017 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -138,6 +138,52 @@ static int tool_init_ksi_network_provider(KSI_CTX *ksi, ERR_TRCKR *err, PARAM_SE
 		res = KSI_CTX_setTransferTimeoutSeconds(ksi, networkTransferTimeout);
 		ERR_CATCH_MSG(err, res, "Error: Unable set transfer timeout.");
 	}
+
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
+
+#ifndef KSI_PDU_VERSION_1
+#define KSI_PDU_VERSION_1 1
+#endif
+
+#ifndef KSI_PDU_VERSION_2
+#define KSI_PDU_VERSION_2 2
+#endif
+
+static int tool_init_pdu(KSI_CTX *ksi, ERR_TRCKR *err, PARAM_SET *set) {
+	int res;
+	char *aggr_pdu_version = NULL;
+	char *ext_pdu_version = NULL;
+
+	if (ksi == NULL || err == NULL || set == NULL) {
+		ERR_TRCKR_ADD(err, res = KT_INVALID_ARGUMENT, NULL);
+		goto cleanup;
+	}
+
+	/* Check if PDU version type is specified. */
+	res = PARAM_SET_getStr(set, "aggr-pdu-v", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &aggr_pdu_version);
+	if (res != PST_OK && res != PST_PARAMETER_EMPTY && res !=PST_PARAMETER_NOT_FOUND) goto cleanup;
+
+	res = PARAM_SET_getStr(set, "ext-pdu-v", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &ext_pdu_version);
+	if (res != PST_OK && res != PST_PARAMETER_EMPTY && res !=PST_PARAMETER_NOT_FOUND) goto cleanup;
+
+
+	if (aggr_pdu_version != NULL) {
+		size_t aggr_pdu = strcmp(aggr_pdu_version, "v1") == 0 ? KSI_PDU_VERSION_1 : KSI_PDU_VERSION_2;
+		res = KSI_CTX_setFlag(ksi, KSI_CTX_FLAG_AGGR_PDU_VER, (void*)aggr_pdu);
+		if (res != KSI_OK) goto cleanup;
+	}
+
+	if (ext_pdu_version != NULL) {
+		size_t ext_pdu = strcmp(ext_pdu_version, "v1") == 0 ? KSI_PDU_VERSION_1 : KSI_PDU_VERSION_2;
+		res = KSI_CTX_setFlag(ksi, KSI_CTX_FLAG_EXT_PDU_VER, (void*)ext_pdu);
+		if (res != KSI_OK) goto cleanup;
+	}
+
 
 	res = KT_OK;
 
@@ -314,6 +360,39 @@ cleanup:
 	return res;
 }
 
+static int tool_init_hmac_alg(KSI_CTX *ksi, ERR_TRCKR *err, PARAM_SET *set) {
+	int res;
+	KSI_HashAlgorithm aggr_alg = KSI_HASHALG_INVALID;
+	KSI_HashAlgorithm ext_alg  = KSI_HASHALG_INVALID;
+
+	if (ksi == NULL || err == NULL || set == NULL) {
+		ERR_TRCKR_ADD(err, res = KT_INVALID_ARGUMENT, NULL);
+		goto cleanup;
+	}
+
+	res = PARAM_SET_getObjExtended(set, "aggr-hmac-alg", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, NULL, (void**)&aggr_alg);
+	if (res != PST_OK && res != PST_PARAMETER_EMPTY && res != PST_PARAMETER_NOT_FOUND) goto cleanup;
+
+	res = PARAM_SET_getObjExtended(set, "ext-hmac-alg", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, NULL, (void**)&ext_alg);
+	if (res != PST_OK && res != PST_PARAMETER_EMPTY && res != PST_PARAMETER_NOT_FOUND) goto cleanup;
+
+	if (aggr_alg != KSI_HASHALG_INVALID) {
+		res = KSI_CTX_setOption(ksi, KSI_OPT_AGGR_HMAC_ALGORITHM, (void*)aggr_alg);
+		if (res != KSI_OK) goto cleanup;
+	}
+
+	if (ext_alg != KSI_HASHALG_INVALID) {
+		res = KSI_CTX_setOption(ksi, KSI_OPT_EXT_HMAC_ALGORITHM, (void*)ext_alg);
+		if (res != KSI_OK) goto cleanup;
+	}
+
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
+
 int TOOL_init_ksi(PARAM_SET *set, KSI_CTX **ksi, ERR_TRCKR **error, SMART_FILE **ksi_log) {
 	int res;
 	ERR_TRCKR *err = NULL;
@@ -358,9 +437,21 @@ int TOOL_init_ksi(PARAM_SET *set, KSI_CTX **ksi, ERR_TRCKR **error, SMART_FILE *
 		goto cleanup;
 	}
 
+	res = tool_init_hmac_alg(tmp, err, set);
+	if (res != KT_OK) {
+		ERR_TRCKR_ADD(err, res, "Error: Unable to configure HMAC algorithm.");
+		goto cleanup;
+	}
+
 	res = tool_init_ksi_network_provider(tmp, err, set);
 	if (res != KT_OK) {
 		ERR_TRCKR_ADD(err, res, "Error: Unable to configure network provider.");
+		goto cleanup;
+	}
+
+	res = tool_init_pdu(tmp, err, set);
+	if (res != KT_OK) {
+		ERR_TRCKR_ADD(err, res, "Error: Unable to configure KSI PDU version.");
 		goto cleanup;
 	}
 

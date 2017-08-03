@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2016 Guardtime, Inc.
+ * Copyright 2013-2017 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -24,6 +24,7 @@
 #include <ksi/ksi.h>
 #include <ksi/policy.h>
 #include "err_trckr.h"
+#include <ksi/tlv_element.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -50,6 +51,9 @@ int LOGKSI_Signature_isCalendarAuthRecPresent(const KSI_Signature *sig);
 int LOGKSI_Signature_isPublicationRecordPresent(const KSI_Signature *sig);
 int LOGKSI_receivePublicationsFile(ERR_TRCKR *err ,KSI_CTX *ctx, KSI_PublicationsFile **pubFile);
 int LOGKSI_verifyPublicationsFile(ERR_TRCKR *err, KSI_CTX *ctx, KSI_PublicationsFile *pubfile);
+int LOGKSI_DataHash_fromImprint(ERR_TRCKR *err, KSI_CTX *ctx, const unsigned char *imprint, size_t length, KSI_DataHash **hash);
+int LOGKSI_FTLV_memReadN(ERR_TRCKR *err, KSI_CTX *ctx, const unsigned char *buf, size_t buf_len, KSI_FTLV *arr, size_t arr_len, size_t *rd);
+int LOGKSI_TlvElement_parse(ERR_TRCKR *err, KSI_CTX *ctx, unsigned char *dat, size_t dat_len, KSI_TlvElement **out);
 void LOGKSI_KSI_ERRTrace_save(KSI_CTX *ctx);
 const char *LOGKSI_KSI_ERRTrace_get(void);
 void LOGKSI_KSI_ERRTrace_LOG(KSI_CTX *ksi);

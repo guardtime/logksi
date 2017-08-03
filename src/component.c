@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2016 Guardtime, Inc.
+ * Copyright 2013-2017 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -237,7 +237,7 @@ char *TOOL_COMPONENT_LIST_helpToString(TOOL_COMPONENT_LIST *list, int id, char *
 		if (list->component[i]->id == id) {
 			if (list->component[i]->help_toString == NULL) {
 				count += PST_snprintf(buf + count, buf_len - count, "%s %s help.\n", TOOL_getName(), list->component[i]->name);
-				count += PST_snprintf(buf + count, buf_len - count, "Unavailable.\n");
+				PST_snprintf(buf + count, buf_len - count, "Unavailable.\n");
 			}
 			return list->component[i]->help_toString(buf, buf_len);
 		}

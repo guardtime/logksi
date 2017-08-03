@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2016 Guardtime, Inc.
+ * Copyright 2013-2017 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <ksi/ksi.h>
 #include <ksi/compatibility.h>
 #include <ksi/policy.h>
@@ -42,6 +43,7 @@
 enum {
 	/* Trust anchor based verification. */
 	ANC_BASED_DEFAULT,
+	ANC_BASED_DEFAULT_STDIN,
 	ANC_BASED_PUB_FILE,
 	ANC_BASED_PUB_FILE_X,
 	ANC_BASED_PUB_SRT,
@@ -85,6 +87,7 @@ int verify_run(int argc, char **argv, char **envp) {
 	IO_FILES files;
 	VERIFYING_FUNCTION verify_signature = NULL;
 	int count = 0;
+	int log_from_stdin = 0;
 
 	memset(&files, 0, sizeof(files));
 
@@ -92,7 +95,7 @@ int verify_run(int argc, char **argv, char **envp) {
 	 * Extract command line parameters and also add configuration specific parameters.
 	 */
 	res = PARAM_SET_new(
-			CONF_generate_param_set_desc("{input}{x}{d}{pub-str}{ver-int}{ver-cal}{ver-key}{ver-pub}{conf}{log}{h|help}", "XP", buf, sizeof(buf)),
+			CONF_generate_param_set_desc("{input}{log-from-stdin}{x}{d}{pub-str}{ver-int}{ver-cal}{ver-key}{ver-pub}{conf}{log}{h|help}", "XP", buf, sizeof(buf)),
 			&set);
 	if (res != KT_OK) goto cleanup;
 
@@ -113,19 +116,24 @@ int verify_run(int argc, char **argv, char **envp) {
 
 	d = PARAM_SET_isSetByName(set, "d");
 
+	log_from_stdin = PARAM_SET_isSetByName(set, "log-from-stdin");
+
 	res = PARAM_SET_getValueCount(set, "input", NULL, PST_PRIORITY_NONE, &count);
 	if (res != KT_OK) goto cleanup;
 
-	res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, 0, &files.user.log);
-	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
+	if (!log_from_stdin) {
+		res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, 0, &files.user.inLog);
+		if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
+	}
 
-	if (count > 1) {
-		res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, 1, &files.user.sig);
+	if (count > (1 - log_from_stdin)) {
+		res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, (1 - log_from_stdin), &files.user.inSig);
 		if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
 	}
 
 	switch(TASK_getID(task)) {
 		case ANC_BASED_DEFAULT:
+		case ANC_BASED_DEFAULT_STDIN:
 		case ANC_BASED_PUB_FILE:
 		case ANC_BASED_PUB_FILE_X:
 		case ANC_BASED_PUB_SRT:
@@ -200,6 +208,9 @@ char *verify_help_toString(char *buf, size_t len) {
 	KSI_snprintf(buf, len,
 		"Usage:\n"
 		" %s verify <logfile> [<logfile.logsig>] [more_options]\n"
+		" %s verify --log-from-stdin <logfile.logsig> [more_options]\n"
+		" %s verify <logfile.part> [<logfile.part.logsig>] [more_options]\n"
+		" %s verify --log-from-stdin <logfile.part.logsig> [more_options]\n"
 		" %s verify --ver-int <logfile> [<logfile.logsig>] [more_options]\n"
 		" %s verify --ver-cal <logfile> [<logfile.logsig>] -X <URL>\n"
 		"     [--ext-user <user> --ext-key <key>] [more_options]\n"
@@ -220,12 +231,24 @@ char *verify_help_toString(char *buf, size_t len) {
 		"             Log signature file to be verified. If omitted, the log signature file name is\n"
 		"             derived by adding .logsig to <logfile>. It is expected to be found in the\n"
 		"             same folder as the <logfile>.\n"
+		" <logfile.part>\n"
+		"           - Excerpt file to be verified.\n"
+		" <logfile.part.logsig>\n"
+		"             Record integrity proof file to be verified. If omitted, the file name is\n"
+		"             derived by adding .logsig to <logfile.part>. It is expected to be found in the\n"
+		"             same folder as the <logfile.part>.\n"
+		" --log-from-stdin\n"
+		"           - The log or excerpt file is read from stdin.\n"
+		"             If --log-from-stdin is used, the log signature or integrity proof file name must be specified explicitly.\n"
 		" -x        - Permit to use extender for publication-based verification.\n"
 		" -X <URL>  - Extending service (KSI Extender) URL.\n"
 		" --ext-user <user>\n"
 		"           - Username for extending service.\n"
 		" --ext-key <key>\n"
 		"           - HMAC key for extending service.\n"
+		" --ext-hmac-alg <alg>\n"
+		"           - Hash algorithm to be used for computing HMAC on outgoing messages\n"
+		"             towards KSI extender. If not set, default algorithm is used.\n"
 		" -P <URL>  - Publications file URL (or file with URI scheme 'file://').\n"
 		" --cnstr <oid=value>\n"
 		"           - OID of the PKI certificate field (e.g. e-mail address) and the expected\n"
@@ -242,6 +265,8 @@ char *verify_help_toString(char *buf, size_t len) {
 		"             override the ones in the configuration file.\n"
 		" --log <file>\n"
 		"           - Write libksi log to the given file. Use '-' as file name to redirect the log to stdout.\n",
+		TOOL_getName(),
+		TOOL_getName(),
 		TOOL_getName(),
 		TOOL_getName(),
 		TOOL_getName(),
@@ -273,16 +298,17 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 
 	PARAM_SET_addControl(set, "{conf}", isFormatOk_inputFile, isContentOk_inputFileRestrictPipe, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{log}", isFormatOk_path, NULL, convertRepair_path, NULL);
-	PARAM_SET_addControl(set, "{input}", isFormatOk_inputFile, isContentOk_inputFile, convertRepair_path, NULL);
-	PARAM_SET_addControl(set, "{d}{x}{ver-int}{ver-cal}{ver-key}{ver-pub}", isFormatOk_flag, NULL, NULL, NULL);
+	PARAM_SET_addControl(set, "{input}", isFormatOk_path, NULL, convertRepair_path, NULL);
+	PARAM_SET_addControl(set, "{log-from-stdin}{d}{x}{ver-int}{ver-cal}{ver-key}{ver-pub}", isFormatOk_flag, NULL, NULL, NULL);
 	PARAM_SET_addControl(set, "{pub-str}", isFormatOk_pubString, NULL, NULL, extract_pubString);
 
 	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
 	PARAM_SET_setParseOptions(set, "d,x", PST_PRSCMD_HAS_NO_VALUE | PST_PRSCMD_NO_TYPOS);
-	PARAM_SET_setParseOptions(set, "ver-int,ver-cal,ver-key,ver-pub", PST_PRSCMD_HAS_NO_VALUE);
+	PARAM_SET_setParseOptions(set, "log-from-stdin,ver-int,ver-cal,ver-key,ver-pub", PST_PRSCMD_HAS_NO_VALUE);
 
 	/*						ID						DESC								MAN							ATL		FORBIDDEN											IGN	*/
-	TASK_SET_add(task_set,	ANC_BASED_DEFAULT,		"Verify.",							"input",						NULL,	"ver-int,ver-cal,ver-key,ver-pub,P,cnstr,pub-str",	NULL);
+	TASK_SET_add(task_set,	ANC_BASED_DEFAULT,		"Verify, from file.",				"input",						NULL,	"log-from-stdin,ver-int,ver-cal,ver-key,ver-pub,P,cnstr,pub-str",	NULL);
+	TASK_SET_add(task_set,	ANC_BASED_DEFAULT_STDIN,"Verify, from standard input",		"input,log-from-stdin",			NULL,	"ver-int,ver-cal,ver-key,ver-pub,P,cnstr,pub-str",	NULL);
 	TASK_SET_add(task_set,	ANC_BASED_PUB_FILE,		"Verify, "
 													"use publications file, "
 													"extending is restricted.",			"input,P,cnstr",				NULL,	"ver-int,ver-cal,ver-key,ver-pub,x,T,pub-str",		NULL);
@@ -533,33 +559,19 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 		goto cleanup;
 	}
 
-	tmp.internal.log = strdup(files->user.log);
-	if (tmp.internal.log == NULL) {
-		res = KT_OUT_OF_MEMORY;
+	if (files->user.inLog) {
+		res = duplicate_name(files->user.inLog, &tmp.internal.inLog);
 		ERR_CATCH_MSG(err, res, "Error: could not duplicate input log file name.");
 	}
 
 	/* If input log signature file name is not specified, it is generared from the input log file name. */
-	if (files->user.sig == NULL) {
-		int i = 0;
-		char *extensions[] = {".logsig", ".ksisig", NULL};
-		while (extensions[i]) {
-			res = concat_names(files->user.log, extensions[i], &tmp.internal.inSig);
-			ERR_CATCH_MSG(err, res, "Error: could not generate input log signature file name.");
-			if (SMART_FILE_doFileExist(tmp.internal.inSig)) break;
-			logksi_filename_free(&tmp.internal.inSig);
-			i++;
-		}
-		if (tmp.internal.inSig == NULL) {
-			res = KT_KSI_SIG_VER_IMPOSSIBLE;
-			ERR_CATCH_MSG(err, res, "Error: no matching input log signature file found for input log file %s.", files->user.log);
-		}
+	if (files->user.inSig == NULL) {
+		/* Generate input log signature file name. */
+		res = concat_names(files->user.inLog, ".logsig", &tmp.internal.inSig);
+		ERR_CATCH_MSG(err, res, "Error: could not generate input log signature file name.");
 	} else {
-		tmp.internal.inSig = strdup(files->user.sig);
-		if (tmp.internal.inSig == NULL) {
-			res = KT_OUT_OF_MEMORY;
-			ERR_CATCH_MSG(err, res, "Error: could not duplicate input log signature file name.");
-		}
+		res = duplicate_name(files->user.inSig, &tmp.internal.inSig);
+		ERR_CATCH_MSG(err, res, "Error: could not duplicate input log signature file name.");
 	}
 
 	files->internal = tmp.internal;
@@ -584,17 +596,15 @@ static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files) {
 		goto cleanup;
 	}
 
-	tmp.files.log = fopen(files->internal.log, "rb");
-	if (tmp.files.log == NULL) {
-		res = KT_IO_ERROR;
-		ERR_CATCH_MSG(err, res, "Error: could not open input log file %s.", files->internal.log);
+	if (files->internal.inLog) {
+		res = logksi_file_check_and_open(err, files->internal.inLog, &tmp.files.inLog);
+		if (res != KT_OK) goto cleanup;
+	} else {
+		tmp.files.inLog = stdin;
 	}
 
-	tmp.files.inSig = fopen(files->internal.inSig, "rb");
-	if (tmp.files.inSig == NULL) {
-		res = KT_IO_ERROR;
-		ERR_CATCH_MSG(err, res, "Error: could not open input log signature file %s.", files->internal.inSig);
-	}
+	res = logksi_file_check_and_open(err, files->internal.inSig, &tmp.files.inSig);
+	if (res != KT_OK) goto cleanup;
 
 	files->files = tmp.files;
 	memset(&tmp.files, 0, sizeof(tmp.files));

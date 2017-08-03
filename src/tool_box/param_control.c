@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2016 Guardtime, Inc.
+ * Copyright 2013-2017 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -310,6 +310,18 @@ int extract_int(void *extra, const char* str,  void** obj){
 	return PST_OK;
 }
 
+int isContentOk_pduVersion(const char* version) {
+	if (version == NULL) return FORMAT_NULLPTR;
+
+	if (strcmp(version, "v1") == 0) {
+		return PARAM_OK;
+	} else if (strcmp(version, "v2") == 0) {
+		return PARAM_OK;
+	}
+
+	return INVALID_VERSION;
+}
+
 int isFormatOk_inputFile(const char *path){
 	if (path == NULL) return FORMAT_NULLPTR;
 	if (strlen(path) == 0) return FORMAT_NOCONTENT;
@@ -364,6 +376,30 @@ int isFormatOk_path(const char *path) {
 	if (path == NULL) return FORMAT_NULLPTR;
 	if (path[0] == '\0') return FORMAT_NOCONTENT;
 	return FORMAT_OK;
+}
+
+int isFormatOk_hashAlg(const char *hashAlg){
+	if (hashAlg == NULL) return FORMAT_NULLPTR;
+	if (strlen(hashAlg) == 0) return FORMAT_NOCONTENT;
+	return FORMAT_OK;
+}
+
+int isContentOk_hashAlg(const char *alg){
+	if (KSI_getHashAlgorithmByName(alg) != KSI_HASHALG_INVALID) return PARAM_OK;
+	else return HASH_ALG_INVALID_NAME;
+}
+
+int extract_hashAlg(void *extra, const char* str, void** obj) {
+	const char *hash_alg_name = NULL;
+	KSI_HashAlgorithm *hash_id = (KSI_HashAlgorithm*)obj;
+
+	if (extra);
+	hash_alg_name = str != NULL ? (str) : ("default");
+	*hash_id = KSI_getHashAlgorithmByName(hash_alg_name);
+
+	if (*hash_id == KSI_HASHALG_INVALID) return KT_UNKNOWN_HASH_ALG;
+
+	return PST_OK;
 }
 
 int isFormatOk_pubString(const char *str) {
@@ -576,6 +612,7 @@ const char *getParameterErrorString(int res) {
 		case FUNCTION_INVALID_ARG_COUNT: return "Invalid function argument count";
 		case FUNCTION_INVALID_ARG_1: return "Argument 1 is invalid";
 		case FUNCTION_INVALID_ARG_2: return "Argument 2 is invalid";
+		case INVALID_VERSION: return "Invalid version";
 		default: return "Unknown error";
 	}
 }

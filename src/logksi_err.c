@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2016 Guardtime, Inc.
+ * Copyright 2013-2017 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -40,6 +40,8 @@ static int logksi_ErrToExitcode(int error_code) {
 			return EXIT_IO_ERROR;
 		case KT_INVALID_INPUT_FORMAT:
 			return EXIT_INVALID_FORMAT;
+		case KT_UNKNOWN_HASH_ALG:
+			return EXIT_CRYPTO_ERROR;
 		case KT_INVALID_CMD_PARAM:
 			return EXIT_INVALID_CL_PARAMETERS;
 		case KT_NO_PRIVILEGES:
@@ -108,6 +110,8 @@ static const char* logksiErrToString(int error_code) {
 			return "Index is too large.";
 		case KT_INVALID_INPUT_FORMAT:
 			return "Invalid input data format";
+		case KT_UNKNOWN_HASH_ALG:
+			return "The hash algorithm is unknown or unimplemented.";
 		case KT_INVALID_CMD_PARAM:
 			return "The command-line parameters is invalid or missing.";
 		case KT_NO_PRIVILEGES:

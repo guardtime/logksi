@@ -5,24 +5,32 @@
 .\"
 .SH SYNOPSIS
 .HP 4
-\fBlogksi extend \fR[\fIlogfile\fR] [\fB-o \fIout.logsig\fR] \fB-X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... [\fImore_options\fR]
+\fBlogksi extend \fIlogfile\fR [\fB-o \fIout.logsig\fR] \fB-X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... [\fImore_options\fR]
 .HP 4
-\fBlogksi extend \fR[\fIlogfile\fR] [\fB-o \fIout.logsig\fR] \fB-X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... \fB--pub-str \fIstr \fR[\fImore_options\fR]
+\fBlogksi extend \fIlogfile\fR [\fB-o \fIout.logsig\fR] \fB-X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... \fB--pub-str \fIstr \fR[\fImore_options\fR]
 .HP 4
-\fBlogksi extend \fR[\fIlogfile\fR] [\fB-o \fIout.logsig\fR] \fB--conf \fIlogksi.conf\fR [\fImore_options\fR]
+\fBlogksi extend \fIlogfile\fR [\fB-o \fIout.logsig\fR] \fB--conf \fIlogksi.conf\fR [\fImore_options\fR]
+.HP 4
+\fBlogksi extend \fB--sig-from-stdin\fR [\fB-o \fIout.logsig\fR] \fB--conf \fIlogksi.conf\fR [\fImore_options\fR]
 .\"
 .SH DESCRIPTION
-Finds the log signature file (\fIlogfile.logsig\fR) based on the specified log file \fIlogfile\fR and extends KSI signatures in it to the desired publication. If no \fIlogfile\fR is specified, input is read from \fIstdin\fR and should correspond to a log signature file.
+Finds the log signature file (\fIlogfile.logsig\fR) based on the specified log file \fIlogfile\fR and extends KSI signatures in it to the desired publication. The log signature file is expected to be located in the same directory as the log file. Alternatively, if no \fIlogfile\fR is specified, the log signature file may be read from \fIstdin\fR. To do that the \fB--sig-from-stdin\fR option should be used. If neither the \fIlogfile\fR nor \fB--sig-from-stdin\fR option is given, help text is returned.
 .LP
 After the signatures are extended and the corresponding publication records are attached, the log signatures can be verified using publication-based verification where only trusted publications file or a publication string in printed media is needed to perform the verification. See \fBlogksi-verify\fR(1) for details.
 .LP
 User must have access to KSI extending service and a trusted KSI publications file. By default the KSI signatures are extended to the earliest available publication. Use the option \fB--pub-str\fR to extend signatures to the publication denoted by the given publication string.
 .LP
 Note that all KSI signatures present in the log signature file will be attempted to extend to the same publication. If for some reason the extending of at least one signature fails, none of the signatures are extended.
-.LP
-If both, input and output files are left unspecified, the \fIstdin\fR and \fIstdout\fR are used, respectively.
 .\"
 .SH OPTIONS
+.TP
+\fIlogfile\fR
+Name of the log file whose log signature file is to be extended. If \fIlogfile\fR is specified, the \fB--sig-from-stdin\fR option cannot be used.
+.\"
+.TP
+\fB--sig-from-stdin\fR
+Use to read the log signature file from \fIstdin\fR. If no output file is specified with \fB-o\fR, the result will be returned to \fIstdout\fR.
+.\"
 .TP
 \fB-o \fIout.logsig\fR
 Specify the name of the extended output log signature file. If not specified, the input file \fIlogfile.logsig\fR is modified. The backup of the original log signature file will be saved to \fIlogfile.logsig.bak\fR. If extending fails, the newly created \fIlogfile.logsig\fR will be deleted and the original \fIlogfile.logsig\fR will be restored from the backup file. If the output file name is explicitly specified, the existing file will always be overwritten and no backup file will be created. Use '-' as file name to redirect the output as a binary stream to \fIstdout\fR.
@@ -38,6 +46,14 @@ Specify the username for extending service.
 .TP
 \fB--ext-key \fIkey\fR
 Specify the HMAC key for extending service.
+.\"
+.TP
+\fB--ext-hmac-alg \fIalg\fR
+Hash algorithm to be used for computing HMAC on outgoing messages towards KSI extender. If not set, default algorithm is used. Use \fBlogksi -h \fRto get the list of supported hash algorithms.
+.\"
+.TP
+\fB--ext-pdu-v \fIstr\fR
+Specify the KSIEP (KSI Extension Protocol) PDU version. Valid values are \fIv1\fR and \fIv2\fR. Note that use of \fIv1\fR is \fBdeprecated\fR and use of \fIv2\fR is recommended.
 .\"
 .TP
 \fB-P \fIURL\fR
@@ -111,4 +127,4 @@ Guardtime AS, http://www.guardtime.com/
 .LP
 .\"
 .SH SEE ALSO
-\fBlogksi\fR(1), \fBlogksi-integrate\fR(1), \fBlogksi-sign\fR(1), \fBlogksi-verify\fR(1), \fBlogksi-conf\fR(5)
+\fBlogksi\fR(1), \fBlogksi-extract\fR(1), \fBlogksi-integrate\fR(1), \fBlogksi-sign\fR(1), \fBlogksi-verify\fR(1), \fBlogksi-conf\fR(5)

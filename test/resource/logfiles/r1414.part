@@ -1,0 +1,1 @@
+May 24 08:34:43 CentOS sudo:  vagrant : TTY=pts/0 ; PWD=/home/vagrant/work/logksi ; USER=root ; COMMAND=/usr/sbin/logrotate /etc/logrotate.d/secure-rotate

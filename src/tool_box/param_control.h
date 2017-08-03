@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2016 Guardtime, Inc.
+ * Copyright 2013-2017 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -65,6 +65,7 @@ enum contentStatus {
 	FUNCTION_INVALID_ARG_COUNT,
 	FUNCTION_INVALID_ARG_1,
 	FUNCTION_INVALID_ARG_2,
+	INVALID_VERSION,
 	PARAM_UNKNOWN_ERROR
 };
 
@@ -94,6 +95,11 @@ const char *getParameterErrorString(int res);
 int isFormatOk_string(const char *str);
 int isFormatOk_hex(const char *hexin);
 
+int isFormatOk_hashAlg(const char *hashAlg);
+int isContentOk_hashAlg(const char *alg);
+/** extra is not used.*/
+int extract_hashAlg(void *extra, const char* str, void** obj);
+
 int isFormatOk_inputFile(const char *path);
 int isContentOk_inputFile(const char* path);
 int isContentOk_inputFileWithPipe(const char* path);
@@ -109,6 +115,8 @@ int isContentOk_uint(const char* integer);
 int isContentOk_uint_not_zero(const char* integer);
 int isContentOk_int(const char* integer);
 int extract_int(void *extra, const char* str,  void** obj);
+
+int isContentOk_pduVersion(const char* version);
 
 int isFormatOk_url(const char *url);
 int convertRepair_url(const char* arg, char* buf, unsigned len);

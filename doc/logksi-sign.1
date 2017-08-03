@@ -5,16 +5,26 @@
 .\"
 .SH SYNOPSIS
 .HP 4
-\fBlogksi sign \fR[\fIlogfile\fR] [\fB-o \fIout.logsig\fR] \fB-S \fIURL \fR[\fB--aggr-user \fIuser \fB--aggr-key \fIkey\fR] [\fImore options\fR]
+\fBlogksi sign \fIlogfile\fR [\fB-o \fIout.logsig\fR] \fB-S \fIURL \fR[\fB--aggr-user \fIuser \fB--aggr-key \fIkey\fR] [\fImore options\fR]
+.HP 4
+\fBlogksi sign --sig-from-stdin [\fB-o \fIout.logsig\fR] \fB-S \fIURL \fR[\fB--aggr-user \fIuser \fB--aggr-key \fIkey\fR] [\fImore options\fR]
 .\"
 .SH DESCRIPTION
-Signs the unsigned log blocks in a log signature file of a given \fIlogfile\fR. The name of the log signature file is expected to be \fIlogfile.logsig\fR. If no \fIlogfile\fR is given, input is read from \fIstdin\fR and should correspond to a log signature file.
+Signs the unsigned log blocks in a log signature file of a given \fIlogfile\fR. The name of the log signature file located in the same directory as the \fIlogfile\fR is expected to be \fIlogfile.logsig\fR. Alternatively, if no \fIlogfile\fR is specified, the \fB--sig-from-stdin\fR option should be used to read the log signature file from the \fIstdin\fR. If neither the \fIlogfile\fR nor \fB--sig-from-stdin\fR option is given, help text is returned.
 .LP
 \fBlogksi sign\fR provides the recovery signing functionality for cases when some log blocks have been left unsigned during routine signing/logging. For instance, when the KSI service was not reachable.
 .LP
 User must have access to KSI signing service (KSI Aggregator) for signing.
 .\"
 .SH OPTIONS
+.TP
+\fIlogfile\fR
+Name of the log file whose unsigned log blocks should be signed. If \fIlogfile\fR is specified, the \fB--sig-from-stdin\fR option cannot be used.
+.\"
+.TP
+\fB--sig-from-stdin\fR
+Use to read the log signature file from \fIstdin\fR. If no output file is specified with \fB-o\fR, the result will be returned to \fIstdout\fR.
+.\"
 .TP
 \fB-o \fIout.logsig\fR
 Specify the name of the output log signature file. If not specified, the input file \fIlogfile.logsig\fR is modified. The backup of the original log signature file will be saved to \fIlogfile.logsig.bak\fR. If the output file name is explicitly specified, an existing file will always be overwritten and no backup file will be created. Use '-' as file name to redirect the output as a binary stream to \fIstdout\fR.
@@ -30,6 +40,14 @@ Specify the username for signing service.
 .TP
 \fB--aggr-key \fIkey\fR
 Specify the HMAC key for signing service.
+.\"
+.TP
+\fB--aggr-hmac-alg \fIalg\fR
+Hash algorithm to be used for computing HMAC on outgoing messages towards KSI aggregator. If not set, default algorithm is used. Use \fBlogksi -h \fRto get the list of supported hash algorithms.
+.\"
+.TP
+\fB--aggr-pdu-v \fIstr\fR
+Specify the KSIAP (KSI Aggregation Protocol) PDU version. Valid values are \fIv1\fR and \fIv2\fR. Note that use of \fIv1\fR is \fBdeprecated\fR and use of \fIv2\fR is recommended.
 .\"
 .TP
 \fB-d\fR
@@ -77,4 +95,4 @@ Use the environment variable \fBKSI_CONF\fR to define the default configuration 
 Guardtime AS, http://www.guardtime.com/
 .LP
 .SH SEE ALSO
-\fBlogksi\fR(1), \fBlogksi-extend\fR(1), \fBlogksi-integrate\fR(1), \fBlogksi-verify\fR(1), \fBlogksi-conf\fR(5)
+\fBlogksi\fR(1), \fBlogksi-extend\fR(1), \fBlogksi-extract\fR(1), \fBlogksi-integrate\fR(1), \fBlogksi-verify\fR(1), \fBlogksi-conf\fR(5)

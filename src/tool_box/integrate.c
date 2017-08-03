@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2016 Guardtime, Inc.
+ * Copyright 2013-2017 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -40,6 +40,7 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
 static int generate_filenames(ERR_TRCKR *err, IO_FILES *files);
 static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files);
 static int acquire_file_locks(ERR_TRCKR *err, IO_FILES *files);
+static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files);
 static void close_input_and_output_files(ERR_TRCKR *err, int res, IO_FILES *files);
 
 int integrate_run(int argc, char **argv, char **envp) {
@@ -81,10 +82,10 @@ int integrate_run(int argc, char **argv, char **envp) {
 
 	d = PARAM_SET_isSetByName(set, "d");
 
-	res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.user.log);
+	res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.user.inLog);
 	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
 
-	res = PARAM_SET_getStr(set, "o", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.user.sig);
+	res = PARAM_SET_getStr(set, "o", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.user.inSig);
 	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
 
 	res = generate_filenames(err, &files);
@@ -100,6 +101,9 @@ int integrate_run(int argc, char **argv, char **envp) {
 	} else if (res != KT_OK) goto cleanup;
 
 	res = logsignature_integrate(err, ksi, &files);
+	if (res != KT_OK) goto cleanup;
+
+	res = rename_temporary_and_backup_files(err, &files);
 	if (res != KT_OK) goto cleanup;
 
 	res = KT_OK;
@@ -144,6 +148,7 @@ char *integrate_help_toString(char *buf, size_t len) {
 		"           - Name of the integrated output log signature file. If not specified,\n"
 		"             the log signature file is saved as <logfile.logsig> in the same folder where\n"
 		"             the <logfile> is located. An attempt to overwrite an existing log signature file will result in an error.\n"
+		"             Use '-' to redirect the integrated log signature binary stream to stdout.\n"
 		" -d        - Print detailed information about processes and errors to stderr.\n"
 		" --log <file>\n"
 		"           - Write libksi log to the given file. Use '-' as file name to redirect the log to stdout.\n",
@@ -202,22 +207,27 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 	}
 
 	/* Input consists of two parts - blocks and signatures. Names of these files are generated from the log file name. */
-	res = concat_names(files->user.log, ".logsig.parts/blocks.dat", &tmp.internal.partsBlk);
+	res = concat_names(files->user.inLog, ".logsig.parts/blocks.dat", &tmp.internal.partsBlk);
 	ERR_CATCH_MSG(err, res, "Error: could not generate input blocks file name.");
 
-	res = concat_names(files->user.log, ".logsig.parts/block-signatures.dat", &tmp.internal.partsSig);
+	res = concat_names(files->user.inLog, ".logsig.parts/block-signatures.dat", &tmp.internal.partsSig);
 	ERR_CATCH_MSG(err, res, "Error: could not generate input signatures file name.");
 
 	/* Output log signature file name, if not specified, is generated from the log file name. */
-	if (files->user.sig == NULL) {
-		res = concat_names(files->user.log, ".logsig", &tmp.internal.outSig);
+	if (files->user.inSig == NULL) {
+		res = concat_names(files->user.inLog, ".logsig", &tmp.internal.outSig);
 		ERR_CATCH_MSG(err, res, "Error: could not generate output log signature file name.");
+		res = temp_name(tmp.internal.outSig, &tmp.internal.tempSig);
+		ERR_CATCH_MSG(err, res, "Error: could not generate temporary output log signature file name.");
+	} else if (!strcmp(files->user.inSig, "-")) {
+		/* Output must go to a nameless temporary file before redirecting it to stdout. */
+		tmp.internal.bStdout = 1;
 	} else {
-		tmp.internal.outSig = strdup(files->user.sig);
-		if (tmp.internal.outSig == NULL) {
-			res = KT_OUT_OF_MEMORY;
-			ERR_CATCH_MSG(err, res, "Error: could not duplicate output log signature file name.");
-		}
+		/* Output must go to a named temporary file that is renamed appropriately on success. */
+		res = temp_name(files->user.inSig, &tmp.internal.tempSig);
+		ERR_CATCH_MSG(err, res, "Error: could not generate temporary output log signature file name.");
+		res = duplicate_name(files->user.inSig, &tmp.internal.outSig);
+		ERR_CATCH_MSG(err, res, "Error: could not duplicate output log signature file name.");
 	}
 
 	files->internal = tmp.internal;
@@ -259,11 +269,8 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 			res = KT_IO_ERROR;
 			ERR_CATCH_MSG(err, res, "Error: overwriting of existing output log signature file %s not supported.", files->internal.outSig);
 		}
-		tmp.files.outSig = fopen(files->internal.outSig, "wb");
-		if (tmp.files.outSig == NULL) {
-			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: could not open output log signature file %s.", files->internal.outSig);
-		}
+		res = logksi_file_create_temporary(files->internal.tempSig, &tmp.files.outSig, files->internal.bStdout);
+		ERR_CATCH_MSG(err, res, "Error: could not create temporary output log signature file.");
 	} else if (partsBlkErr == ENOENT && partsSigErr == ENOENT) {
 		/* If none of the input files exist, but the output log signature file exists,
 		 * the output log signature file is the result of the synchronous signing process
@@ -330,16 +337,39 @@ cleanup:
 
 }
 
+static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files) {
+	int res;
+
+	if (err == NULL || files == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	if (files->internal.tempSig) {
+		/* Output must be saved in output log signature file, so the temporary file is renamed. */
+		logksi_file_close(&files->files.outSig);
+		res = logksi_file_rename(files->internal.tempSig, files->internal.outSig);
+		ERR_CATCH_MSG(err, res, "Error: could not rename temporary file %s to output log signature file %s.", files->internal.tempSig, files->internal.outSig);
+	} else if (files->internal.bStdout) {
+		res = logksi_file_redirect_to_stdout(files->files.outSig);
+		ERR_CATCH_MSG(err, res, "Error: could not write temporary output log signature file to stdout.");
+	}
+
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
+
 void close_input_and_output_files(ERR_TRCKR *err, int res, IO_FILES *files) {
 	if (files) {
-		/* If something failed, remove the incomplete output log signature file. */
-		if (files->files.outSig && res != KT_OK) {
-			logksi_file_close(&files->files.outSig);
-			if (remove(files->internal.outSig) != 0) {
-				if (err) ERR_TRCKR_ADD(err, KT_IO_ERROR, "Error: could not remove output log signature %s.", files->internal.outSig);
+		logksi_files_close(&files->files);
+		if (files->internal.tempSig && res != KT_OK) {
+			if (remove(files->internal.tempSig) != 0) {
+				if (err) ERR_TRCKR_ADD(err, KT_IO_ERROR, "Error: could not remove temporary output log signature %s.", files->internal.tempSig);
 			}
 		}
-		logksi_files_close(&files->files);
 		logksi_internal_filenames_free(&files->internal);
 	}
 }

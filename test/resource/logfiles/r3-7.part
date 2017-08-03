@@ -1,0 +1,5 @@
+Apr 27 11:00:30 CentOS sshd[2782]: pam_unix(sshd:session): session closed for user vagrant
+Apr 27 11:00:36 CentOS sshd[4384]: Accepted password for vagrant from 192.168.10.1 port 52725 ssh2
+Apr 27 11:00:37 CentOS sshd[4384]: pam_unix(sshd:session): session opened for user vagrant by (uid=0)
+Apr 28 08:15:52 CentOS sudo:  vagrant : TTY=pts/0 ; PWD=/home/vagrant/work/logksi ; USER=root ; COMMAND=/bin/kill -9 15487
+Apr 28 12:32:44 CentOS sudo:  vagrant : TTY=pts/0 ; PWD=/home/vagrant/work/libksi ; USER=root ; COMMAND=/usr/bin/yum install libksi-devel-3.13.2043-1.el6.x86_64.rpm

@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2016 Guardtime, Inc.
+ * Copyright 2013-2017 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -56,6 +56,7 @@ enum Logksi_errors {
 	KT_IO_ERROR,
 	KT_INDEX_OVF,
 	KT_INVALID_INPUT_FORMAT,
+	KT_UNKNOWN_HASH_ALG,
 	KT_INVALID_CMD_PARAM,
 	KT_NO_PRIVILEGES,
 	KT_KSI_SIG_VER_IMPOSSIBLE,

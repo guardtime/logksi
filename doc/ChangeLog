@@ -1,12 +1,25 @@
+Version 1.1.249
+
+2017-08-03
+
+* FEATURE: Extraction: hash chains of log records can be extracted into record integrity proof files.
+* FEATURE: Verifying: record integrity proof files can be verified against excerpt files.
+* FEATURE: HMAC algorithm for KSI aggregator/extender can be specified with --[aggr|ext]-hmac-alg switch.
+* FEATURE: PDU version for KSI aggregator/extender can be specified with --[aggr|ext]-pdu-v switch.
+* IMPROVEMENT: Presence of record and tree hashes is checked.
+* IMPROVEMENT: Verifying: log file can be read from stdin with --log-from-stdin switch.
+* IMPROVEMENT: Signing and extending: log signature can now be read from standard input with --log-from-stdin switch.
+* IMPROVEMENT: Integrating: output can be directed to stdout by specifying - as the output file.
+
 Version 1.0.187
 
-2017-06-27 1.0.187
+2017-06-28
 
-* BUGFIX: Aggregation level of a perfectly balanced tree is now calculated correctly.
+* BUGFIX: Tree height is now calculated correctly for perfectly balanced trees.
 
-Version 1.0.157
+Version 1.0.178
 
-2017-04-28 1.0.157
+2017-05-04 1.0.178
 
 * FEATURE: Integration: blocks and signatures files from asynchronous signing can be integrated into a single log signature file.
 * FEATURE: Sign recovery: missing KSI signatures can be added to a log signature file.

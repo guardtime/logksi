@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2016 Guardtime, Inc.
+ * Copyright 2013-2017 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -158,7 +158,7 @@ void PARAM_VAL_free(PARAM_VAL *rootValue) {
 
 	do {
 		to_be_freed = next;
-		next = next->next;
+		next = to_be_freed->next;
 		free(to_be_freed->cstr_value);
 		free(to_be_freed->source);
 		free(to_be_freed);
