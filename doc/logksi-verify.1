@@ -190,7 +190,7 @@ To verify log records extracted from \fI/var/log/secure\fR using any policy poss
 .\"
 .TP 2
 \fB7
-To verify the compressed log file (note that the file has to be compressed during the logging) \fI/var/log/secure.gz\fR using any policy possible, depending on the current state of the signatures:
+To verify the compressed log file \fI/var/log/secure.gz\fR using any policy possible, depending on the current state of the signatures:
 .LP
 .RS 4
 \fBzcat \fI/var/log/secure.gz\fR | \fBlogksi verify \fI/var/log/secure.logsig \fB--log-from-stdin
