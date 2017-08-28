@@ -188,6 +188,14 @@ To verify log records extracted from \fI/var/log/secure\fR using any policy poss
 \fBlogksi verify \fI/var/log/secure.part\fR
 .RE
 .\"
+.TP 2
+\fB7
+To verify the compressed log file \fI/var/log/secure.gz\fR using any policy possible, depending on the current state of the signatures:
+.LP
+.RS 4
+\fBzcat \fI/var/log/secure.gz\fR | \fBlogksi verify \fI/var/log/secure.logsig \fB--log-from-stdin
+.RE
+.\"
 .SH ENVIRONMENT
 Use the environment variable \fBKSI_CONF\fR to define the default configuration file. See \fBlogksi-conf\fR(5) for more information.
 .LP
