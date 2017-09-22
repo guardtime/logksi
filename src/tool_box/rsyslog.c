@@ -1395,6 +1395,12 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 		}
 	}
 
+	/* If no record hashes were computed or encountered, previous leaf hashes must not be compared. */
+	if (blocks->nofRecordHashes == 0) {
+		KSI_DataHash_free(blocks->prevLeaf);
+		blocks->prevLeaf = NULL;
+	}
+
 	/* If we have any record hashes directly from log signature file or indirectly from log file,
 	 * their count must match the record count in block signature. */
 	if (blocks->nofRecordHashes && blocks->nofRecordHashes != blocks->recordCount) {
