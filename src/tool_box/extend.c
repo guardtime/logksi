@@ -233,7 +233,7 @@ static int extend_to_nearest_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX
 
 	print_progressDesc(d, "%s", getPublicationsFileRetrieveDescriptionString(set));
 	res = LOGKSI_receivePublicationsFile(err, ksi, &pubFile);
-	ERR_CATCH_MSG(err, res, "Error: Unable receive publications file.");
+	ERR_CATCH_MSG(err, res, "Error: Unable to receive publications file.");
 	print_progressResult(res);
 
 	if (!PARAM_SET_isSetByName(set, "publications-file-no-verify")) {
@@ -327,7 +327,7 @@ static int extend_to_specified_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_C
 
 	print_progressDesc(d, "%s", getPublicationsFileRetrieveDescriptionString(set));
 	res = LOGKSI_receivePublicationsFile(err, ksi, &pubFile);
-	ERR_CATCH_MSG(err, res, "Error: Unable receive publications file.");
+	ERR_CATCH_MSG(err, res, "Error: Unable to receive publications file.");
 	print_progressResult(res);
 
 	print_progressDesc(d, "Searching for a publication record from publications file... ");
