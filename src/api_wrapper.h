@@ -54,6 +54,7 @@ int LOGKSI_verifyPublicationsFile(ERR_TRCKR *err, KSI_CTX *ctx, KSI_Publications
 int LOGKSI_DataHash_fromImprint(ERR_TRCKR *err, KSI_CTX *ctx, const unsigned char *imprint, size_t length, KSI_DataHash **hash);
 int LOGKSI_FTLV_memReadN(ERR_TRCKR *err, KSI_CTX *ctx, const unsigned char *buf, size_t buf_len, KSI_FTLV *arr, size_t arr_len, size_t *rd);
 int LOGKSI_TlvElement_parse(ERR_TRCKR *err, KSI_CTX *ctx, unsigned char *dat, size_t dat_len, KSI_TlvElement **out);
+int LOGKSI_Signature_parseWithPolicy(ERR_TRCKR *err, KSI_CTX *ctx, const unsigned char *raw, size_t raw_len, const KSI_Policy *policy, KSI_VerificationContext *context, KSI_Signature **sig);
 void LOGKSI_KSI_ERRTrace_save(KSI_CTX *ctx);
 const char *LOGKSI_KSI_ERRTrace_get(void);
 void LOGKSI_KSI_ERRTrace_LOG(KSI_CTX *ksi);

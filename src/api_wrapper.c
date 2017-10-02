@@ -491,6 +491,20 @@ int LOGKSI_TlvElement_parse(ERR_TRCKR *err, KSI_CTX *ctx, unsigned char *dat, si
 	return res;
 }
 
+int LOGKSI_Signature_parseWithPolicy(ERR_TRCKR *err, KSI_CTX *ctx, const unsigned char *raw, size_t raw_len, const KSI_Policy *policy, KSI_VerificationContext *context, KSI_Signature **sig) {
+	int res;
+
+	if (err == NULL || ctx == NULL || raw == NULL || sig == NULL) {
+		ERR_TRCKR_ADD(err, res = KT_INVALID_ARGUMENT, NULL);
+		return res;
+	}
+
+	res = KSI_Signature_parseWithPolicy(ctx, raw, raw_len, policy, context, sig);
+	if (res != KSI_OK) LOGKSI_KSI_ERRTrace_save(ctx);
+	appendBaseErrorIfPresent(err, res, ctx, __LINE__);
+
+	return res;
+}
 
 int LOGKSI_Signature_isPublicationRecordPresent(const KSI_Signature *sig) {
 	KSI_PublicationRecord *pubRec = NULL;

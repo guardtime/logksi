@@ -1415,7 +1415,7 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to get root hash for verification.", blocks->blockNo);
 
 	if (processors->verify_signature) {
-		res = KSI_Signature_parseWithPolicy(ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_EMPTY, NULL, &sig);
+		res = LOGKSI_Signature_parseWithPolicy(err, ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_EMPTY, NULL, &sig);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse KSI signature.", blocks->blockNo);
 
 		res = processors->verify_signature(set, err, ksi, sig, (KSI_DataHash*)context.documentHash, &verificationResult);
@@ -1425,7 +1425,7 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 		verificationResult = NULL;
 
 	} else if (processors->extend_signature) {
-		res = KSI_Signature_parseWithPolicy(ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_INTERNAL, &context, &sig);
+		res = LOGKSI_Signature_parseWithPolicy(err, ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_INTERNAL, &context, &sig);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse KSI signature.", blocks->blockNo);
 
 		print_progressResult(res);
@@ -1449,7 +1449,7 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 		context.documentHash = NULL;
 		KSI_VerificationContext_clean(&context);
 	} else if (processors->extract_signature) {
-		res = KSI_Signature_parseWithPolicy(ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_INTERNAL, &context, &sig);
+		res = LOGKSI_Signature_parseWithPolicy(err, ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_INTERNAL, &context, &sig);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse KSI signature.", blocks->blockNo);
 
 		if (blocks->nofExtractPositionsInBlock) {
@@ -1569,7 +1569,7 @@ static int process_ksi_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, S
 	print_progressDesc(1, "Block no. %3zu: verifying KSI signature... ", blocks->blockNo);
 
 	if (processors->verify_signature) {
-		res = KSI_Signature_parseWithPolicy(ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_EMPTY, NULL, &sig);
+		res = LOGKSI_Signature_parseWithPolicy(err, ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_EMPTY, NULL, &sig);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse KSI signature.", blocks->blockNo);
 
 		res = processors->verify_signature(set, err, ksi, sig, NULL, &verificationResult);
@@ -1835,7 +1835,7 @@ static int process_partial_signature(ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PRO
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to extract 'no-sig' element in signatures file.", blocks->blockNo);
 
 	if (tlvSig != NULL) {
-		res = KSI_Signature_parseWithPolicy(ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_EMPTY, NULL, &sig);
+		res = LOGKSI_Signature_parseWithPolicy(err, ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_EMPTY, NULL, &sig);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse KSI signature in signatures file.", blocks->blockNo);
 
 		res = KSI_Signature_getDocumentHash(sig, &docHash);
