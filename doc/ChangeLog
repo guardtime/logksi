@@ -1,6 +1,6 @@
-Version 1.1.249
+Version 1.1
 
-2017-08-03
+2017-08-03 1.1.249
 
 * FEATURE: Extraction: hash chains of log records can be extracted into record integrity proof files.
 * FEATURE: Verifying: record integrity proof files can be verified against excerpt files.
@@ -11,13 +11,11 @@ Version 1.1.249
 * IMPROVEMENT: Signing and extending: log signature can now be read from standard input with --log-from-stdin switch.
 * IMPROVEMENT: Integrating: output can be directed to stdout by specifying - as the output file.
 
-Version 1.0.187
+Version 1.0
 
-2017-06-28
+2017-06-28 1.0.187
 
 * BUGFIX: Tree height is now calculated correctly for perfectly balanced trees.
-
-Version 1.0.178
 
 2017-05-04 1.0.178
 
