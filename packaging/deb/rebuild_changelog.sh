@@ -149,7 +149,7 @@ while read line; do
   elif [[ $line == \** ]] ; then
     array+=("${line:2}")
   fi
-done <<< $(tac -r $rela_changelog_path)
+done <<< "$(tac -r $rela_changelog_path)"
 
 cd ..
 cp $tmpdir/debian/changelog $outputpath

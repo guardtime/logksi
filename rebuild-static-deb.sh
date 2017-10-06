@@ -67,8 +67,6 @@ debuild -us -uc
 cd ..
 
 suffix=${VER}-${PKG_VERSION}.${RELEASE_VERSION}_${ARCH}
-mv logksi_${VER}_${ARCH}.build logksi_$suffix.build
-mv logksi_${VER}_${ARCH}.buildinfo logksi_$suffix.buildinfo
 mv logksi_${VER}_${ARCH}.changes logksi_$suffix.changes
 mv logksi_${VER}_${ARCH}.deb logksi_$suffix.deb
 
