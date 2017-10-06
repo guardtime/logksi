@@ -1,0 +1,12 @@
+Source: @PACKAGE@
+Section: utils
+Priority: optional
+Maintainer: Guardtime <support@guardtime.com>
+Build-Depends: libksi(>=3.14)
+Standards-Version: 3.9.8
+
+Package: @PACKAGE@
+Architecture: any
+Section: utils
+Priority: optional
+Description: Log signature command-line tool for Keyless Signature Infrastructure

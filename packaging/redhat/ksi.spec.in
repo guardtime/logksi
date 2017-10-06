@@ -54,7 +54,7 @@ For detailed usage instructions see `man %{name_tool}`.
 %setup -q -n %{name_package}-%{version}
 
 %build
-%configure @KSI_RPM_BUILD_FLAGS@
+%configure @KSI_PACKAGING_BUILD_FLAGS@
 make
 
 %install

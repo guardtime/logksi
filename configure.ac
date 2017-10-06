@@ -98,5 +98,5 @@ AC_CHECK_FUNCS([strchr])
 # Add more warnings
 CFLAGS+=" -Wall"
 
-AC_CONFIG_FILES([GNUmakefile src/GNUmakefile packaging/redhat/ksi.spec])
+AC_CONFIG_FILES([GNUmakefile src/GNUmakefile packaging/redhat/ksi.spec packaging/deb/control packaging/deb/rules])
 AC_OUTPUT
