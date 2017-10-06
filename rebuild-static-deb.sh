@@ -72,18 +72,3 @@ mv logksi_${VER}_${ARCH}.deb logksi_$suffix.deb
 
 rm -rf logksi-$VER
 
-# debuild ->
-	# dpkg-buildpackage
-	# lintian
-	# debsign
-
-
-# make install DESTDIR=`pwd`/tmp
-# https://wiki.debian.org/Packaging
-# (Alumise alla kirjeldab any / all architecture vahet)
-# https://wiki.debian.org/Packaging/Intro?action=show&redirect=IntroDebianPackaging
-###### https://wiki.debian.org/Courses2005/BuildingWithoutHelper
-# A copy of the file which will be installed in /usr/share/doc/package/copyright should be in debian/copyright in the source package.
-# https://www.debian.org/doc/manuals/maint-guide/dreq.en.html#copyright
-# https://people.canonical.com/~cjwatson/ubuntu-policy/policy.html/ch-controlfields.html
-# https://www.debian.org/doc/debian-policy/index.html#s-copyrightfile
