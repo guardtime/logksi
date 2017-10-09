@@ -32,40 +32,40 @@ cp -r test/out/extract.base test/out/extract.base.10
 	run ./src/logksi verify test/out/extract.base -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run diff test/out/extract.base.part test/resource/logfiles/r1.part 
+	run diff test/out/extract.base.excerpt test/resource/logfiles/r1.excerpt
 	[ "$status" -eq 0 ]
 }
 
 @test "extract record 1, specify log records file" {
-	run ./src/logksi extract test/out/extract.base.1 --out-log test/out/extract.user.1.part -r 1 -d
+	run ./src/logksi extract test/out/extract.base.1 --out-log test/out/extract.user.1.excerpt -r 1 -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run ./src/logksi verify test/out/extract.user.1.part test/out/extract.base.1.part.logsig -d
+	run ./src/logksi verify test/out/extract.user.1.excerpt test/out/extract.base.1.excerpt.logsig -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run diff test/out/extract.user.1.part test/resource/logfiles/r1.part 
+	run diff test/out/extract.user.1.excerpt test/resource/logfiles/r1.excerpt
 	[ "$status" -eq 0 ]
 }
 
 @test "extract record 1, specify integrity proof file" {
-	run ./src/logksi extract test/out/extract.base.2 --out-proof test/out/extract.user.2.part.logsig -r 1 -d
+	run ./src/logksi extract test/out/extract.base.2 --out-proof test/out/extract.user.2.excerpt.logsig -r 1 -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run ./src/logksi verify test/out/extract.base.2.part test/out/extract.user.2.part.logsig -d
+	run ./src/logksi verify test/out/extract.base.2.excerpt test/out/extract.user.2.excerpt.logsig -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run diff test/out/extract.base.2.part test/resource/logfiles/r1.part 
+	run diff test/out/extract.base.2.excerpt test/resource/logfiles/r1.excerpt
 	[ "$status" -eq 0 ]
 }
 
 @test "extract record 1, specify both output files" {
-	run ./src/logksi extract test/out/extract.base.3 --out-log test/out/extract.user.3.part --out-proof test/out/extract.user.3.part.logsig -r 1 -d
+	run ./src/logksi extract test/out/extract.base.3 --out-log test/out/extract.user.3.excerpt --out-proof test/out/extract.user.3.excerpt.logsig -r 1 -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run ./src/logksi verify test/out/extract.user.3.part -d
+	run ./src/logksi verify test/out/extract.user.3.excerpt -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run diff test/out/extract.user.3.part test/resource/logfiles/r1.part 
+	run diff test/out/extract.user.3.excerpt test/resource/logfiles/r1.excerpt
 	[ "$status" -eq 0 ]
 }
 
@@ -73,10 +73,10 @@ cp -r test/out/extract.base test/out/extract.base.10
 	run ./src/logksi extract test/out/extract.base.4 -o test/out/extract.user.4 -r 1 -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run ./src/logksi verify test/out/extract.user.4.part -d
+	run ./src/logksi verify test/out/extract.user.4.excerpt -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run diff test/out/extract.user.4.part test/resource/logfiles/r1.part 
+	run diff test/out/extract.user.4.excerpt test/resource/logfiles/r1.excerpt
 	[ "$status" -eq 0 ]
 }
 
@@ -84,10 +84,10 @@ cp -r test/out/extract.base test/out/extract.base.10
 	run ./src/logksi extract test/out/extract.base.5 -o test/out/extract.user.5 --out-log test/out/extract.user.5.1 -r 1 -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run ./src/logksi verify test/out/extract.user.5.1 test/out/extract.user.5.part.logsig -d
+	run ./src/logksi verify test/out/extract.user.5.1 test/out/extract.user.5.excerpt.logsig -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run diff test/out/extract.user.5.1 test/resource/logfiles/r1.part 
+	run diff test/out/extract.user.5.1 test/resource/logfiles/r1.excerpt
 	[ "$status" -eq 0 ]
 }
 
@@ -95,10 +95,10 @@ cp -r test/out/extract.base test/out/extract.base.10
 	run ./src/logksi extract test/out/extract.base.6 -o test/out/extract.user.6 --out-proof test/out/extract.user.6.1 -r 1 -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run ./src/logksi verify test/out/extract.user.6.part test/out/extract.user.6.1 -d
+	run ./src/logksi verify test/out/extract.user.6.excerpt test/out/extract.user.6.1 -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run diff test/out/extract.user.6.part test/resource/logfiles/r1.part 
+	run diff test/out/extract.user.6.excerpt test/resource/logfiles/r1.excerpt
 	[ "$status" -eq 0 ]
 }
 
@@ -106,10 +106,10 @@ cp -r test/out/extract.base test/out/extract.base.10
 	run bash -c "./src/logksi extract test/out/extract.base.7 --out-log - -r 1 -d > test/out/extract.user.7.stdout"
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run ./src/logksi verify test/out/extract.user.7.stdout test/out/extract.base.7.part.logsig -d
+	run ./src/logksi verify test/out/extract.user.7.stdout test/out/extract.base.7.excerpt.logsig -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run diff test/out/extract.user.7.stdout test/resource/logfiles/r1.part 
+	run diff test/out/extract.user.7.stdout test/resource/logfiles/r1.excerpt
 	[ "$status" -eq 0 ]
 }
 
@@ -117,10 +117,10 @@ cp -r test/out/extract.base test/out/extract.base.10
 	run bash -c "./src/logksi extract test/out/extract.base.8 --out-proof - -r 1 -d > test/out/extract.user.8.stdout"
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run ./src/logksi verify test/out/extract.base.8.part test/out/extract.user.8.stdout -d
+	run ./src/logksi verify test/out/extract.base.8.excerpt test/out/extract.user.8.stdout -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run diff test/out/extract.base.8.part test/resource/logfiles/r1.part 
+	run diff test/out/extract.base.8.excerpt test/resource/logfiles/r1.excerpt
 	[ "$status" -eq 0 ]
 }
 
@@ -137,10 +137,10 @@ cp -r test/out/extract.base test/out/extract.base.10
 	run bash -c "cat test/out/extract.base.9 | ./src/logksi extract --log-from-stdin test/out/extract.base.9.logsig -o test/out/extract.user.9 -r 1 -d"
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run ./src/logksi verify test/out/extract.user.9.part -d
+	run ./src/logksi verify test/out/extract.user.9.excerpt -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run diff test/out/extract.user.9.part test/resource/logfiles/r1.part 
+	run diff test/out/extract.user.9.excerpt test/resource/logfiles/r1.excerpt
 	[ "$status" -eq 0 ]
 }
 
@@ -148,10 +148,10 @@ cp -r test/out/extract.base test/out/extract.base.10
 	run bash -c "cat test/out/extract.base.10.logsig | ./src/logksi extract test/out/extract.base.10 --sig-from-stdin -r 1 -d"
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run ./src/logksi verify test/out/extract.base.10.part -d
+	run ./src/logksi verify test/out/extract.base.10.excerpt -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run diff test/out/extract.base.10.part test/resource/logfiles/r1.part 
+	run diff test/out/extract.base.10.excerpt test/resource/logfiles/r1.excerpt
 	[ "$status" -eq 0 ]
 }
 
@@ -174,62 +174,62 @@ cp -r test/out/extract.base test/out/extract.base.10
 	run ./src/logksi extract --log-from-stdin test/out/extract.base.10.logsig -r 1 -d
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: output log records file name must be specified if log file is read from stdin." ]]
-	run ./src/logksi extract --log-from-stdin test/out/extract.base.10.logsig --out-log test/out/extract.user.10.part -r 1 -d
+	run ./src/logksi extract --log-from-stdin test/out/extract.base.10.logsig --out-log test/out/extract.user.10.excerpt -r 1 -d
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: output integrity proof file name must be specified if log file is read from stdin." ]]
 }
 
 @test "verify record 1 modified" {
-	run ./src/logksi verify test/resource/logfiles/r1_modified.part test/out/extract.base.part.logsig -d
+	run ./src/logksi verify test/resource/logfiles/r1_modified.excerpt test/out/extract.base.excerpt.logsig -d
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: Block no.   1: record hashes not equal." ]]
 	[[ "$output" =~ "Log signature verification failed." ]]
 }
 
 @test "verify record 1 too long" {
-	run ./src/logksi verify test/resource/logfiles/r1_too_long.part test/out/extract.base.part.logsig -d
+	run ./src/logksi verify test/resource/logfiles/r1_too_long.excerpt test/out/extract.base.excerpt.logsig -d
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: Block no.   1: end of log file contains unexpected records." ]]
 	[[ "$output" =~ "Log signature verification failed." ]]
 }
 
 @test "verify proof wrong record hash" {
-	run ./src/logksi verify test/out/extract.base.part test/resource/logsignatures/proof_wrong_record_hash.part.logsig -d
+	run ./src/logksi verify test/out/extract.base.excerpt test/resource/logsignatures/proof_wrong_record_hash.excerpt.logsig -d
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: Block no.   1: record hashes not equal." ]]
 	[[ "$output" =~ "Log signature verification failed." ]]
 }
 
 @test "verify proof wrong sibling hash 1" {
-	run ./src/logksi verify test/out/extract.base.part test/resource/logsignatures/proof_wrong_sibling_hash_1.part.logsig -d
+	run ./src/logksi verify test/out/extract.base.excerpt test/resource/logsignatures/proof_wrong_sibling_hash_1.excerpt.logsig -d
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: Block no.   1: root hashes not equal." ]]
 	[[ "$output" =~ "Log signature verification failed." ]]
 }
 
 @test "verify proof wrong sibling hash 3" {
-	run ./src/logksi verify test/out/extract.base.part test/resource/logsignatures/proof_wrong_sibling_hash_3.part.logsig -d
+	run ./src/logksi verify test/out/extract.base.excerpt test/resource/logsignatures/proof_wrong_sibling_hash_3.excerpt.logsig -d
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: Block no.   1: root hashes not equal." ]]
 	[[ "$output" =~ "Log signature verification failed." ]]
 }
 
 @test "verify proof wrong level correction 1" {
-	run ./src/logksi verify test/out/extract.base.part test/resource/logsignatures/proof_wrong_level_correction_1.part.logsig -d
+	run ./src/logksi verify test/out/extract.base.excerpt test/resource/logsignatures/proof_wrong_level_correction_1.excerpt.logsig -d
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: Block no.   1: root hashes not equal." ]]
 	[[ "$output" =~ "Log signature verification failed." ]]
 }
 
 @test "verify proof wrong level correction 2" {
-	run ./src/logksi verify test/out/extract.base.part test/resource/logsignatures/proof_wrong_level_correction_2.part.logsig -d
+	run ./src/logksi verify test/out/extract.base.excerpt test/resource/logsignatures/proof_wrong_level_correction_2.excerpt.logsig -d
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: Block no.   1: root hashes not equal." ]]
 	[[ "$output" =~ "Log signature verification failed." ]]
 }
 
 @test "verify proof wrong link direction" {
-	run ./src/logksi verify test/out/extract.base.part test/resource/logsignatures/proof_wrong_link_direction.part.logsig -d
+	run ./src/logksi verify test/out/extract.base.excerpt test/resource/logsignatures/proof_wrong_link_direction.excerpt.logsig -d
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: Block no.   1: root hashes not equal." ]]
 	[[ "$output" =~ "Log signature verification failed." ]]
@@ -239,10 +239,10 @@ cp -r test/out/extract.base test/out/extract.base.10
 	run ./src/logksi extract test/out/extract.base -r 1414 -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run ./src/logksi verify test/out/extract.base.part -d
+	run ./src/logksi verify test/out/extract.base.excerpt -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run diff test/out/extract.base.part test/resource/logfiles/r1414.part
+	run diff test/out/extract.base.excerpt test/resource/logfiles/r1414.excerpt
 	[ "$status" -eq 0 ]
 }
 
@@ -250,10 +250,10 @@ cp -r test/out/extract.base test/out/extract.base.10
 	run ./src/logksi extract test/out/extract.base -r 3-7 -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run ./src/logksi verify test/out/extract.base.part -d
+	run ./src/logksi verify test/out/extract.base.excerpt -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run diff test/out/extract.base.part test/resource/logfiles/r3-7.part
+	run diff test/out/extract.base.excerpt test/resource/logfiles/r3-7.excerpt
 	[ "$status" -eq 0 ]
 }
 
@@ -261,10 +261,10 @@ cp -r test/out/extract.base test/out/extract.base.10
 	run ./src/logksi extract test/out/extract.base -r 3-5,6,7 -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run ./src/logksi verify test/out/extract.base.part -d
+	run ./src/logksi verify test/out/extract.base.excerpt -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run diff test/out/extract.base.part test/resource/logfiles/r3-7.part
+	run diff test/out/extract.base.excerpt test/resource/logfiles/r3-7.excerpt
 	[ "$status" -eq 0 ]
 }
 
@@ -272,10 +272,10 @@ cp -r test/out/extract.base test/out/extract.base.10
 	run ./src/logksi extract test/out/extract.base -r 3,4,5-7 -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run ./src/logksi verify test/out/extract.base.part -d
+	run ./src/logksi verify test/out/extract.base.excerpt -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run diff test/out/extract.base.part test/resource/logfiles/r3-7.part
+	run diff test/out/extract.base.excerpt test/resource/logfiles/r3-7.excerpt
 	[ "$status" -eq 0 ]
 }
 
