@@ -14,7 +14,7 @@
 .SH DESCRIPTION
 Extracts the specified record(s) from the given \fIlogfile\fR and their KSI signature(s) from the respective log signature file \fIlogfile.logsig\fR. If the log signature file \fIlogfile.logsig\fR is not specified, its name is derived from \fIlogfile\fR by adding the \fI.logsig\fR suffix.
 .LP
-\fBlogksi extract\fR outputs the requested log record(s) to the file \fIlogfile.part\fR and creates the record integrity proof file \fIlogfile.part.logsig\fR for these records. If the files already exist, they will be overwritten.
+\fBlogksi extract\fR outputs the requested log record(s) to the file \fIlogfile.excerpt\fR and creates the record integrity proof file \fIlogfile.excerpt.logsig\fR for these records. If the files already exist, they will be overwritten.
 .LP
 The extracted log records' KSI signatures can be verified independently, thus individual log records can be presented and their integrity proven regardless the state or content of other log records saved in the same \fIlogfile\fR. See \fBlogksi-verify\fR(1) for verification details.
 .\"
@@ -27,13 +27,13 @@ Read the log file from \fIstdin\fR. If \fB--log-from-stdin\fR is used, the log s
 Read the log signature file from \fIstdin\fR. If \fB--sig-from-stdin\fR is specified, the log file \fIlogfile\fR must be specified and \fB--log-from-stdin\fR cannot be used.
 .TP
 \fB-o \fIoutfile\fR
-Names of output files will be derived from \fIoutfile\fR by adding the appropriate suffixes. Name of the log records file will be \fIoutfile.part\fR. Name of the integrity proof file will be \fIoutfile.part.logsig\fR. If \fIoutfile\fR is not specified, names of output files will be derived from \fIlogfile\fR by adding the same suffixes. If \fB--log-from-stdin\fR is specified, \fIoutfile\fR must also be specified.
+Names of output files will be derived from \fIoutfile\fR by adding the appropriate suffixes. Name of the log records file will be \fIoutfile.excerpt\fR. Name of the integrity proof file will be \fIoutfile.excerpt.logsig\fR. If \fIoutfile\fR is not specified, names of output files will be derived from \fIlogfile\fR by adding the same suffixes. If \fB--log-from-stdin\fR is specified, \fIoutfile\fR must also be specified.
 .TP
 \fB--out-log \fIlog.records\fR
-Specify the name of the log records file. The log records file can be redirected to \fIstdout\fR by using '-' as the file name. If the log records file name is not specified with \fB--out-log\fR, its name will be derived from either \fIoutfile\fR or \fIlogfile\fR by adding the \fI.part\fR suffix.
+Specify the name of the log records file. The log records file can be redirected to \fIstdout\fR by using '-' as the file name. If the log records file name is not specified with \fB--out-log\fR, its name will be derived from either \fIoutfile\fR or \fIlogfile\fR by adding the \fI.excerpt\fR suffix.
 .TP
 \fB--out-proof \fIintegrity.proof\fR
-Specify the name of the integrity proof file. The integrity proof file can be redirected to \fIstdout\fR (unless the log records file is also redirected to \fIstdout\fR) by using '-' as the file name. If the integrity proof file name is not specified with \fB--out-proof\fR, its name will be derived from either \fIoutfile\fR or \fIlogfile\fR by adding the \fI.part.logsig\fR suffix.
+Specify the name of the integrity proof file. The integrity proof file can be redirected to \fIstdout\fR (unless the log records file is also redirected to \fIstdout\fR) by using '-' as the file name. If the integrity proof file name is not specified with \fB--out-proof\fR, its name will be derived from either \fIoutfile\fR or \fIlogfile\fR by adding the \fI.excerpt.logsig\fR suffix.
 .TP
 \fB-r \fIrecords\fR
 Specify the position(s) of record(s) to be extracted. Position of the first record is 1 and all positions must be defined in a strictly ascending order, using positive decimal numbers. Positions to be extracted can be defined either:
@@ -61,7 +61,7 @@ See \fBlogksi\fR(1) for more information.
 .SH EXAMPLES
 .TP 2
 \fB1
-\fRTo extract the records 1 to 200 and 250 to 260 from the log file \fI/var/log/secure\fR. The extracted records will be written to \fI/var/log/secure.part\fR, the corresponding integrity proof file will be \fI/var/log/secure.part.logsig\fR:
+\fRTo extract the records 1 to 200 and 250 to 260 from the log file \fI/var/log/secure\fR. The extracted records will be written to \fI/var/log/secure.excerpt\fR, the corresponding integrity proof file will be \fI/var/log/secure.excerpt.logsig\fR:
 .LP
 .RS 4
 \fBlogksi extract \fI/var/log/secure \fB-r \fI1-200,250-260
@@ -69,7 +69,7 @@ See \fBlogksi\fR(1) for more information.
 .\"
 .TP 2
 \fB2
-\fRTo extract the records 4, 25 and 121 from the log file \fI/var/log/secure\fR.  The extracted records will be written to \fI/var/log/proof.part\fR, the corresponding integrity proof file will be \fI/var/log/proof.part.logsig\fR:
+\fRTo extract the records 4, 25 and 121 from the log file \fI/var/log/secure\fR.  The extracted records will be written to \fI/var/log/proof.excerpt\fR, the corresponding integrity proof file will be \fI/var/log/proof.excerpt.logsig\fR:
 .LP
 .RS 4
 \fBlogksi extract \fI/var/log/secure \fB-o \fI/var/log/proof \fB-r \fI4,25,121
