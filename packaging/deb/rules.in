@@ -33,7 +33,7 @@ define is-in-build-dir
 endef
 
 define is-root
-	@test $$(id -u) = 0 || (echo need root priviledges; exit 1)
+	@test $$(id -u) = 0 || (echo need root privileges; exit 1)
 endef
 
 

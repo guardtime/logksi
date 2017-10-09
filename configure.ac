@@ -73,19 +73,19 @@ if test "$enable_static_build" = "yes" ; then
 	KSI_PACKAGING_BUILD_FLAGS="--enable-static-build"
 	
 	if test "$enable_use_installed_libksi" = "yes" ; then
-		KSI_RPM_BUILD_DEPENDECY="BuildRequires: libksi-devel >= $libksi_ver"
-		KSI_DEB_BUILD_DEPENDECY="Build-Depends: libksi-dev(>=$libksi_ver)"
+		KSI_RPM_BUILD_DEPENDENCY="BuildRequires: libksi-devel >= $libksi_ver"
+		KSI_DEB_BUILD_DEPENDENCY="Build-Depends: libksi-dev(>=$libksi_ver)"
 	fi
 else
 	AC_MSG_NOTICE([KSI library will be linked dynamically.])
 	AC_CHECK_LIB([ksi], [KSI_CTX_new], [], [AC_MSG_FAILURE([Could not find libksi (KSI C SDK). Install libksi or specify the library path manually.])])
-	KSI_RPM_BUILD_DEPENDECY="BuildRequires: libksi-devel >= $libksi_ver"
-	KSI_DEB_BUILD_DEPENDECY="Build-Depends: libksi-dev(>=$libksi_ver)"
+	KSI_RPM_BUILD_DEPENDENCY="BuildRequires: libksi-devel >= $libksi_ver"
+	KSI_DEB_BUILD_DEPENDENCY="Build-Depends: libksi-dev(>=$libksi_ver)"
 fi
 
-AC_SUBST(KSI_RPM_DEPENDECY)
-AC_SUBST(KSI_RPM_BUILD_DEPENDECY)
-AC_SUBST(KSI_DEB_BUILD_DEPENDECY)
+AC_SUBST(KSI_RPM_DEPENDENCY)
+AC_SUBST(KSI_RPM_BUILD_DEPENDENCY)
+AC_SUBST(KSI_DEB_BUILD_DEPENDENCY)
 AC_SUBST(KSI_PACKAGING_BUILD_FLAGS)
 
 AC_CHECK_HEADER([ksi/ksi.h], [], [AC_MSG_FAILURE([Could not find include files (libksi-devel) of libksi (KSI C SDK). Install libksi-devel or specify the headers manually.])])

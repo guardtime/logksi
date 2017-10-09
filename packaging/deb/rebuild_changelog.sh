@@ -27,7 +27,7 @@ set -e
     controlpath="$2"
     packagename="$3"
     outputpath="$4"
-    distribution_quide=($5)
+    distribution_guide=($5)
  else
     echo "Usage:"
     echo "  $0 <changelog path> <control file path> <package name> <output path> [<distribution guide>]"
@@ -51,23 +51,23 @@ set -e
     echo "       - Output path for debian changelog. Will overwrite existing file!"
     echo ""
     echo "  distribution guide"
-    echo "        - Array of distribution guides. As debian changelog needs a field for."
+    echo "        - Array of distribution guides. As debian changelog needs a field for"
     echo "          distribution (e.g. stable, unstable). To change the default values"
     echo "          a list of release versions and distribution value pairs must be specified."
-    echo "          When distribution value changes after a version X, it must only specified at"
-    echo "          once as next releases uses the previous distribution value. Note that distribution"
-    echo "          UNREALESED will never be included to the debian changelog."
+    echo "          When distribution value changes after version X, it must only be specified"
+    echo "          once as next releases use the previous distribution value. Note that distribution"
+    echo "          UNREALESED will never be included in the debian changelog."
     echo ""
     echo "          For example '0.1.0:UNRELEASED 1.2.1:unstable 1.2.11:stable' will create a"
     echo "          changelog where first releases were actually never released until 1.2.1 where"
-    echo "          the package was distributed for unstable until version 1.2.11."
+    echo "          the package was distributed as unstable until version 1.2.11."
     echo ""
     echo ""
     echo "Example:"
     echo "  Rebuild changelog so that every release is marked as default distribution (unstable):"
     echo "    rebuild_changelog.sh changelog packaging/deb/control packaging/deb/changelog"
     echo ""
-    echo "  Rebuild changelog so that some of the first releases are not included (as the release" 
+    echo "  Rebuild changelog so that some of the first releases are not included (as the releases"
     echo "  were never made under debian):"
     echo "    rebuild_changelog.sh changelog packaging/deb/control packaging/deb/changelog"
     echo "    '0.0.32:UNRELEASED 1.0.0:unstable'"
@@ -96,7 +96,7 @@ is_unreleased=false
 extra_release_commands=""
 array=()
 
-# Reverse the changelog file and begin with the oldest release (unreleased change are not included).
+# Reverse the changelog file and begin with the oldest release (unreleased changes are not included).
 while read line; do
   # Look for the line that contains The Release.
   # If it's not release, it must be release content.
@@ -105,7 +105,7 @@ while read line; do
     version_str="${BASH_REMATCH[2]}"
 
     # Check if distribution name has to be changed.
-    for key in "${distribution_quide[@]}"; do
+    for key in "${distribution_guide[@]}"; do
       if [[ $key == "$version_str:"* ]]; then
         dist=$(echo $key| cut -d':' -f 2)
         extra_release_commands="--force-distribution -D $dist"
@@ -121,7 +121,7 @@ while read line; do
 
     # If distribution is UNRELEASED, just give a warning and do nothing as the records will be ignored anyway.
     if $is_unreleased ; then
-        echo "Warning: distribution is 'UNREALESED'. Version $version_str is not included to changelog."
+        echo "Warning: distribution is 'UNREALESED'. Version $version_str is not included in changelog."
     else
         echo "Appending new release: v$version_str $time_string"
 

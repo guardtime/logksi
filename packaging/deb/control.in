@@ -2,7 +2,7 @@ Source: @PACKAGE@
 Section: utils
 Priority: optional
 Maintainer: Guardtime <support@guardtime.com>
-@KSI_DEB_BUILD_DEPENDECY@
+@KSI_DEB_BUILD_DEPENDENCY@
 Standards-Version: 3.9.8
 
 Package: @PACKAGE@
