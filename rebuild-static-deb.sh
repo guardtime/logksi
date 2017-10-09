@@ -37,13 +37,11 @@ VER=$(tr -d [:space:] < VERSION)
 ARCH=$(dpkg --print-architecture)
 RELEASE_VERSION="$(lsb_release -is)$(lsb_release -rs | grep -Po "[0-9]{1,3}" | head -1)"
 PKG_VERSION=1
-
-
 DEB_DIR=packaging/deb
 
-autoreconf -if && \
-./configure $conf_args && \
-make clean && \
+autoreconf -if
+./configure $conf_args
+make clean
 make dist
 
 
