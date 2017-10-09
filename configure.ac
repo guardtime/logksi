@@ -50,6 +50,10 @@ AM_PROG_CC_C_O
 
 AC_PROG_LN_S
 # Checks for libraries.
+
+AC_CHECK_LIB([crypto], [SHA256_Init], [], [AC_MSG_FAILURE([Could not find OpenSSL 0.9.8+ libraries.])])
+AC_CHECK_LIB([curl], [curl_easy_init], [], [AC_MSG_FAILURE([Could not find Curl libraries.])])
+
 libksi_ver="3.10"
 AC_ARG_ENABLE(static-build,         
 [  --enable-static-build              enable static linking of ksi library)],:,:)
@@ -66,24 +70,26 @@ if test "$enable_static_build" = "yes" ; then
 
 	AC_MSG_NOTICE([KSI library will be linked statically.])
 	AC_CHECK_LIB([ksi], [KSI_CTX_new], [LIBS="-Wl,-static -lksi -Wl,$dy_link_flag $LIBS"], [AC_MSG_FAILURE([Could not find libksi (KSI C SDK). Install libksi or specify the library path manually.])])
-	KSI_RPM_BUILD_FLAGS="--enable-static-build"
+	KSI_PACKAGING_BUILD_FLAGS="--enable-static-build"
 	
 	if test "$enable_use_installed_libksi" = "yes" ; then
-		KSI_BUILD_DEPENDECY="BuildRequires: libksi-devel >= $libksi_ver"
+		KSI_RPM_BUILD_DEPENDENCY="BuildRequires: libksi-devel >= $libksi_ver"
+		KSI_DEB_BUILD_DEPENDENCY="Build-Depends: libksi-dev(>=$libksi_ver)"
 	fi
 else
 	AC_MSG_NOTICE([KSI library will be linked dynamically.])
 	AC_CHECK_LIB([ksi], [KSI_CTX_new], [], [AC_MSG_FAILURE([Could not find libksi (KSI C SDK). Install libksi or specify the library path manually.])])
-	KSI_BUILD_DEPENDECY="BuildRequires: libksi-devel >= $libksi_ver"
+	KSI_RPM_BUILD_DEPENDENCY="BuildRequires: libksi-devel >= $libksi_ver"
+	KSI_DEB_BUILD_DEPENDENCY="Build-Depends: libksi-dev(>=$libksi_ver)"
 fi
 
-AC_SUBST(KSI_RPM_DEPENDECY)
-AC_SUBST(KSI_BUILD_DEPENDECY)
-AC_SUBST(KSI_RPM_BUILD_FLAGS)
+AC_SUBST(KSI_RPM_DEPENDENCY)
+AC_SUBST(KSI_RPM_BUILD_DEPENDENCY)
+AC_SUBST(KSI_DEB_BUILD_DEPENDENCY)
+AC_SUBST(KSI_PACKAGING_BUILD_FLAGS)
 
 AC_CHECK_HEADER([ksi/ksi.h], [], [AC_MSG_FAILURE([Could not find include files (libksi-devel) of libksi (KSI C SDK). Install libksi-devel or specify the headers manually.])])
-AC_CHECK_LIB([crypto], [SHA256_Init], [], [AC_MSG_FAILURE([Could not find OpenSSL 0.9.8+ libraries.])])
-AC_CHECK_LIB([curl], [curl_easy_init], [], [AC_MSG_FAILURE([Could not find Curl libraries.])])
+
 
 # Checks for header files.
 AC_CHECK_HEADERS([stdlib.h string.h])
@@ -98,5 +104,5 @@ AC_CHECK_FUNCS([strchr])
 # Add more warnings
 CFLAGS+=" -Wall"
 
-AC_CONFIG_FILES([GNUmakefile src/GNUmakefile packaging/redhat/ksi.spec])
+AC_CONFIG_FILES([GNUmakefile src/GNUmakefile packaging/redhat/logksi.spec packaging/deb/control packaging/deb/rules])
 AC_OUTPUT
