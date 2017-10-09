@@ -2,6 +2,10 @@
 
 Version 1.1
 
+2017-10-05 1.1.258
+
+* BUGFIX: Extending: previous leaf hashes are not verified if record/tree hashes are not available for computing leaf hashes.
+
 2017-08-03 1.1.249
 
 * FEATURE: Extraction: hash chains of log records can be extracted into record integrity proof files.
