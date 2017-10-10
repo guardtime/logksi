@@ -669,26 +669,60 @@ cleanup:
 	return res;
 }
 
-int logksi_datahash_compare(ERR_TRCKR *err, KSI_DataHash *expected, KSI_DataHash *received) {
+static int format_hash_help(const char *helpLeft, const char *helpRight, char *bufLeft, char *bufRight, size_t bufLen) {
 	int res;
-	KSI_HashAlgorithm expected_id;
-	KSI_HashAlgorithm received_id;
+	int len = 0;
 
-	if (expected == NULL || received == NULL) {
+	if (bufLeft == NULL || bufRight == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
 
-	if (!KSI_DataHash_equals(expected, received)) {
+	if (helpLeft == NULL) helpLeft = "Computed hash: ";
+	if (helpRight == NULL) helpRight = "Stored hash: ";
+
+	len = strlen(helpLeft) > strlen(helpRight) ? strlen(helpLeft) : strlen(helpRight);
+
+	if (len > bufLen - 1) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	sprintf(bufLeft, "%*s", len, helpLeft);
+	sprintf(bufRight, "%*s", len, helpRight);
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
+
+int logksi_datahash_compare(ERR_TRCKR *err, KSI_DataHash *left, KSI_DataHash *right, const char *helpLeft, const char *helpRight) {
+	int res;
+	KSI_HashAlgorithm leftId;
+	KSI_HashAlgorithm rightId;
+	char bufLeft[256];
+	char bufRight[256];
+
+	if (left == NULL || right == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	if (!KSI_DataHash_equals(left, right)) {
 		res = KT_VERIFICATION_FAILURE;
 		print_progressResult(res);
-		if (KSI_DataHash_getHashAlg(expected, &expected_id) == KSI_OK &&
-			KSI_DataHash_getHashAlg(received, &received_id) == KSI_OK &&
-			expected_id != received_id) {
+		if (KSI_DataHash_getHashAlg(left, &leftId) == KSI_OK &&
+			KSI_DataHash_getHashAlg(right, &rightId) == KSI_OK &&
+			leftId != rightId) {
 			ERR_TRCKR_ADD(err, res, "Error: Hash algorithm in block header does not match the hash algorithm in received hash.");
 		}
-		OBJPRINT_Hash(expected, "Expected hash: ", print_debug);
-		OBJPRINT_Hash(received, "Received hash: ", print_debug);
+
+		res = format_hash_help(helpLeft, helpRight, bufLeft, bufRight, 256);
+		if (res != KT_OK) goto cleanup;
+
+		OBJPRINT_Hash(left, bufLeft, print_debug);
+		OBJPRINT_Hash(right, bufRight, print_debug);
 		goto cleanup;
 	}
 
@@ -847,8 +881,8 @@ static int process_block_header(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse last hash of previous block.", blocks->blockNo);
 
 	if (blocks->prevLeaf != NULL) {
-		res = logksi_datahash_compare(err, blocks->prevLeaf, hash);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: last hashes of previous blocks not equal.", blocks->blockNo);
+		res = logksi_datahash_compare(err, blocks->prevLeaf, hash, "Last hash computed from previous block data: ", "Last hash stored in current block header: ");
+		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: last hashes of previous block not equal.", blocks->blockNo);
 	}
 
 	if (files->files.outSig) {
@@ -969,7 +1003,7 @@ static int process_record_hash(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks,
 
 	if (blocks->metarecordHash != NULL) {
 		/* This is a metarecord hash. */
-		res = logksi_datahash_compare(err, blocks->metarecordHash, recordHash);
+		res = logksi_datahash_compare(err, blocks->metarecordHash, recordHash, "Metarecord hash computed from metarecord: ", "Metarecord hash stored in log signature file: ");
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: metarecord hashes not equal.", blocks->blockNo);
 
 		res = add_record_hash_to_merkle_tree(ksi, blocks, 1, blocks->metarecordHash);
@@ -983,7 +1017,7 @@ static int process_record_hash(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks,
 			res = get_hash_of_logline(ksi, blocks, files, &hash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate hash of logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
 
-			res = logksi_datahash_compare(err, hash, recordHash);
+			res = logksi_datahash_compare(err, hash, recordHash, "Record hash computed from logline: ", "Record hash stored in log signature file: ");
 			if (res != KT_OK) {
 				print_debug("Received logline: %s", blocks->logLine);
 			}
@@ -1145,7 +1179,7 @@ static int process_tree_hash(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, I
 				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unexpected tree hash for logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
 			}
 
-			res = logksi_datahash_compare(err, blocks->notVerified[i], treeHash);
+			res = logksi_datahash_compare(err, blocks->notVerified[i], treeHash, "Tree hash computed from record hashes: ", "Tree hash stored in log signature file: ");
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: tree hashes not equal for logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
 
 			KSI_DataHash_free(blocks->notVerified[i]);
@@ -1182,7 +1216,7 @@ static int process_tree_hash(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, I
 				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unexpected tree hash for logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
 			}
 
-			res = logksi_datahash_compare(err, blocks->notVerified[i], treeHash);
+			res = logksi_datahash_compare(err, blocks->notVerified[i], treeHash, "Tree hash computed from record hashes: ", "Tree hash stored in log signature file: ");
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: tree hashes not equal for logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
 		}
 	}
@@ -1677,7 +1711,7 @@ static int process_record_chain(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks
 
 	if (blocks->metarecordHash != NULL) {
 		/* This is a metarecord hash. */
-		res = logksi_datahash_compare(err, blocks->metarecordHash, recordHash);
+		res = logksi_datahash_compare(err, blocks->metarecordHash, recordHash, "Metarecord hash computed from metarecord: ", "Metarecord hash stored in integrity proof file: ");
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: metarecord hashes not equal.", blocks->blockNo);
 	} else {
 		/* This is a logline record hash. */
@@ -1685,7 +1719,7 @@ static int process_record_chain(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks
 			res = get_hash_of_logline(ksi, blocks, files, &hash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate hash of logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
 
-			res = logksi_datahash_compare(err, hash, recordHash);
+			res = logksi_datahash_compare(err, hash, recordHash, "Record hash computed from logline: ", "Record hash stored in integrity proof file: ");
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: record hashes not equal.", blocks->blockNo);
 		}
 	}
@@ -1712,7 +1746,7 @@ static int process_record_chain(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks
 			}
 		}
 
-		res = logksi_datahash_compare(err, blocks->rootHash, root);
+		res = logksi_datahash_compare(err, root, blocks->rootHash, "Root hash computed from hash chain: ", "Root hash stored in KSI signature: ");
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: root hashes not equal.", blocks->blockNo);
 	} else {
 		res = KT_INVALID_INPUT_FORMAT;
@@ -1774,7 +1808,7 @@ static int process_partial_block(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *block
 		res = calculate_root_hash(ksi, blocks, &rootHash);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate root hash.", blocks->blockNo);
 
-		res = logksi_datahash_compare(err, rootHash, hash);
+		res = logksi_datahash_compare(err, rootHash, hash, "Root hash computed from record hashes: ", "Unsigned root hash stored in block data file: ");
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: root hashes not equal.", blocks->blockNo);
 	}
 
@@ -1852,14 +1886,14 @@ static int process_partial_signature(ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PRO
 
 		/* Compare signed root hash with unsigned root hash. */
 		if (blocks->rootHash) {
-			res = logksi_datahash_compare(err, blocks->rootHash, docHash);
+			res = logksi_datahash_compare(err, blocks->rootHash, docHash, "Unsigned root hash stored in block data file: ", "Signed root hash stored in KSI signature: ");
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: root hashes not equal.", blocks->blockNo);
 		} else if (blocks->nofRecordHashes) {
 			/* Compute the root hash and compare with signed root hash. */
 			res = calculate_root_hash(ksi, blocks, &rootHash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate root hash.", blocks->blockNo);
 
-			res = logksi_datahash_compare(err, rootHash, docHash);
+			res = logksi_datahash_compare(err, rootHash, docHash, "Root hash computed from record hashes: ", "Signed root hash stored in KSI signature: ");
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: root hashes not equal.", blocks->blockNo);
 		}
 	} else if (tlvNoSig != NULL) {
@@ -1869,14 +1903,14 @@ static int process_partial_signature(ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PRO
 
 		/* Compare unsigned root hashes. */
 		if (blocks->rootHash) {
-			res = logksi_datahash_compare(err, blocks->rootHash, hash);
+			res = logksi_datahash_compare(err, blocks->rootHash, hash, "Unsigned root hash stored in block data file: ", "Unsigned root hash stored in block signature file: ");
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: root hashes not equal.", blocks->blockNo);
 		} else if (blocks->nofRecordHashes) {
 			/* Compute the root hash and compare with unsigned root hash. */
 			res = calculate_root_hash(ksi, blocks, &rootHash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate root hash.", blocks->blockNo);
 
-			res = logksi_datahash_compare(err, rootHash, hash);
+			res = logksi_datahash_compare(err, rootHash, hash, "Root hash computed from record hashes: ", "Unsigned root hash stored in block signature file: ");
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: root hashes not equal.", blocks->blockNo);
 		}
 
