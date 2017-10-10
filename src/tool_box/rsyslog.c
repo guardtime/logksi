@@ -1776,10 +1776,11 @@ static int process_partial_block(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *block
 
 		res = logksi_datahash_compare(err, rootHash, hash);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: root hashes not equal.", blocks->blockNo);
-
-		blocks->rootHash = hash;
-		hash = NULL;
 	}
+
+	blocks->rootHash = hash;
+	hash = NULL;
+
 
 	res = KT_OK;
 
@@ -1797,7 +1798,7 @@ static int process_partial_signature(ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PRO
 	int res;
 	KSI_Signature *sig = NULL;
 	KSI_DataHash *hash = NULL;
-	KSI_DataHash *docHash = NULL;
+	KSI_DataHash *rootHash = NULL;
 	KSI_TlvElement *tlv = NULL;
 	KSI_TlvElement *tlvSig = NULL;
 	KSI_TlvElement *tlvNoSig = NULL;
@@ -1823,6 +1824,12 @@ static int process_partial_signature(ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PRO
 	res = is_block_signature_expected(err, blocks);
 	if (res != KT_OK) goto cleanup;
 
+	/* If no record hashes were computed or encountered, previous leaf hashes must not be compared. */
+	if (blocks->nofRecordHashes == 0) {
+		KSI_DataHash_free(blocks->prevLeaf);
+		blocks->prevLeaf = NULL;
+	}
+
 	if (blocks->nofRecordHashes && blocks->nofRecordHashes != blocks->recordCount) {
 		res = KT_INVALID_INPUT_FORMAT;
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: expected %zu records in signatures file, but found %zu records in blocks file.", blocks->blockNo, blocks->recordCount, blocks->nofRecordHashes);
@@ -1835,36 +1842,43 @@ static int process_partial_signature(ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PRO
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to extract 'no-sig' element in signatures file.", blocks->blockNo);
 
 	if (tlvSig != NULL) {
+		KSI_DataHash *docHash = NULL;
+
 		res = LOGKSI_Signature_parseWithPolicy(err, ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_EMPTY, NULL, &sig);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse KSI signature in signatures file.", blocks->blockNo);
 
 		res = KSI_Signature_getDocumentHash(sig, &docHash);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to get root hash from KSI signature.", blocks->blockNo);
 
-		/* If the blocks file contains hashes, re-compute and compare the root hash against the provided root hash. */
-		if (blocks->nofRecordHashes) {
-			if (blocks->rootHash == NULL) {
-				res = calculate_root_hash(ksi, blocks, &blocks->rootHash);
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate root hash.", blocks->blockNo);
-			}
-
+		/* Compare signed root hash with unsigned root hash. */
+		if (blocks->rootHash) {
 			res = logksi_datahash_compare(err, blocks->rootHash, docHash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: root hashes not equal.", blocks->blockNo);
-		} else {
-			KSI_DataHash_free(blocks->prevLeaf);
-			blocks->prevLeaf = NULL;
+		} else if (blocks->nofRecordHashes) {
+			/* Compute the root hash and compare with signed root hash. */
+			res = calculate_root_hash(ksi, blocks, &rootHash);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate root hash.", blocks->blockNo);
+
+			res = logksi_datahash_compare(err, rootHash, docHash);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: root hashes not equal.", blocks->blockNo);
 		}
 	} else if (tlvNoSig != NULL) {
 		blocks->noSigNo++;
 		res = tlv_element_get_hash(err, tlvNoSig, ksi, 0x01, &hash);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse root hash.", blocks->blockNo);
 
-		if (blocks->rootHash == NULL) {
-			res = calculate_root_hash(ksi, blocks, &blocks->rootHash);
+		/* Compare unsigned root hashes. */
+		if (blocks->rootHash) {
+			res = logksi_datahash_compare(err, blocks->rootHash, hash);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: root hashes not equal.", blocks->blockNo);
+		} else if (blocks->nofRecordHashes) {
+			/* Compute the root hash and compare with unsigned root hash. */
+			res = calculate_root_hash(ksi, blocks, &rootHash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate root hash.", blocks->blockNo);
+
+			res = logksi_datahash_compare(err, rootHash, hash);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: root hashes not equal.", blocks->blockNo);
 		}
-		res = logksi_datahash_compare(err, blocks->rootHash, hash);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: root hashes not equal.", blocks->blockNo);
 
 		if (processors->create_signature) {
 			print_progressResult(res);
@@ -1920,6 +1934,7 @@ cleanup:
 	}
 	KSI_Signature_free(sig);
 	KSI_DataHash_free(hash);
+	KSI_DataHash_free(rootHash);
 	KSI_TlvElement_free(tlvSig);
 	KSI_TlvElement_free(tlvNoSig);
 	KSI_TlvElement_free(tlv);
