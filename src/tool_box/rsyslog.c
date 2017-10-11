@@ -718,8 +718,7 @@ int logksi_datahash_compare(ERR_TRCKR *err, KSI_DataHash *left, KSI_DataHash *ri
 			ERR_TRCKR_ADD(err, res, "Error: Hash algorithm in block header does not match the hash algorithm in received hash.");
 		}
 
-		res = format_hash_help(helpLeft, helpRight, bufLeft, bufRight, 256);
-		if (res != KT_OK) goto cleanup;
+		if(format_hash_help(helpLeft, helpRight, bufLeft, bufRight, 256) != KT_OK) goto cleanup;
 
 		OBJPRINT_Hash(left, bufLeft, print_debug);
 		OBJPRINT_Hash(right, bufRight, print_debug);
