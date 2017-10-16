@@ -866,6 +866,7 @@ static int process_block_header(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks
 	blocks->finalTreeHashesSome = 0;
 	blocks->finalTreeHashesNone = 0;
 	blocks->finalTreeHashesAll = 0;
+	blocks->unsignedRootHash = 0;
 
 	res = tlv_element_parse_and_check_sub_elements(err, ksi, blocks->ftlv_raw, blocks->ftlv_len, blocks->ftlv.hdr_len, &tlv);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse block header as TLV element.", blocks->blockNo);
@@ -1936,6 +1937,10 @@ static int process_partial_signature(ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PRO
 
 			res = KSI_TlvElement_serialize(tlvSig, blocks->ftlv_raw, SOF_FTLV_BUFFER, &blocks->ftlv_len, 0);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to serialize KSI signature.", blocks->blockNo);
+		} else {
+			/* Missing signatures found during integration. */
+			blocks->warningSignatures = 1;
+			blocks->unsignedRootHash = 1;
 		}
 	} else {
 		res = KT_INVALID_INPUT_FORMAT;
@@ -1964,6 +1969,9 @@ cleanup:
 		} else if (blocks->finalTreeHashesAll) {
 			print_debug("Block no. %3zu: all final tree hashes are present.\n", blocks->blockNo);
 		}
+		if (blocks->unsignedRootHash) {
+			print_debug("Warning: Block no. %3zu: unsigned root hash found.\n", blocks->blockNo);
+		}
 	}
 	KSI_Signature_free(sig);
 	KSI_DataHash_free(hash);
@@ -1972,6 +1980,15 @@ cleanup:
 	KSI_TlvElement_free(tlvNoSig);
 	KSI_TlvElement_free(tlv);
 	return res;
+}
+
+static int check_warnings(BLOCK_INFO *blocks) {
+	if (blocks) {
+		if (blocks->warningSignatures || blocks->warningTreeHashes) {
+			return 1;
+		}
+	}
+	return 0;
 }
 
 static int finalize_log_signature(ERR_TRCKR *err, BLOCK_INFO *blocks, IO_FILES *files) {
@@ -2020,8 +2037,15 @@ cleanup:
 
 	print_progressResult(res);
 
-	if (blocks && blocks->warningTreeHashes) {
-		print_warnings("Warning: Some tree hashes are missing from the log signature file.\n");
+	if (check_warnings(blocks)) {
+		print_warnings("\n");
+		if (blocks && blocks->warningTreeHashes) {
+			print_warnings("Warning: Some tree hashes are missing from the log signature file.\n");
+		}
+
+		if (blocks && blocks->warningSignatures) {
+			print_warnings("Warning: Unsigned root hashes found. Run 'logksi sign' to perform signing recovery.\n");
+		}
 	}
 
 	return res;
