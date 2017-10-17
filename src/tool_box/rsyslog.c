@@ -169,6 +169,53 @@ cleanup:
 	return res;
 }
 
+int merge_one_level(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash **hash) {
+	int res;
+	unsigned char i = 0;
+	KSI_DataHash *root = NULL;
+	KSI_DataHash *tmp = NULL;
+
+	if (ksi == NULL || blocks == NULL || hash == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	while (i < blocks->treeHeight) {
+		if (blocks->MerkleTree[i]) {
+			if (root == NULL) {
+				/* Initialize root hash only if there is at least one more hash afterwards. */
+				if (i < blocks->treeHeight - 1) {
+					root = KSI_DataHash_ref(blocks->MerkleTree[i]);
+					KSI_DataHash_free(blocks->MerkleTree[i]);
+					blocks->MerkleTree[i] = NULL;
+				}
+			} else {
+				res = calculate_new_tree_hash(ksi, blocks, blocks->MerkleTree[i], root, i + 2, &tmp);
+				if (res != KT_OK) goto cleanup;
+
+				KSI_DataHash_free(root);
+				root = tmp;
+
+				KSI_DataHash_free(blocks->MerkleTree[i]);
+				blocks->MerkleTree[i] = KSI_DataHash_ref(root);
+				break;
+			}
+		}
+		i++;
+	}
+
+	*hash = KSI_DataHash_ref(root);
+	tmp = NULL;
+
+	res = KT_OK;
+
+cleanup:
+
+	KSI_DataHash_free(root);
+	KSI_DataHash_free(tmp);
+	return res;
+}
+
 int calculate_root_hash(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash **hash) {
 	int res;
 	unsigned char i = 0;
@@ -666,6 +713,65 @@ cleanup:
 
 	KSI_OctetString_free(tmp);
 	KSI_free(buf);
+	return res;
+}
+
+int tlv_element_create_hash(KSI_DataHash *hash, unsigned tag, KSI_TlvElement **tlv) {
+	int res;
+	KSI_TlvElement *tmp = NULL;
+	unsigned char *imprint = NULL;
+	size_t length = 0;
+
+	res = KSI_TlvElement_new(&tmp);
+	if (res != KSI_OK) goto cleanup;
+
+	res = KSI_DataHash_getImprint(hash, (const unsigned char **)&imprint, &length);
+	if (res != KSI_OK) goto cleanup;
+
+	tmp->ftlv.tag = tag;
+	tmp->ptr = imprint;
+	tmp->ftlv.dat_len = length;
+
+	*tlv = tmp;
+	tmp = NULL;
+	res = KSI_OK;
+
+cleanup:
+
+	KSI_TlvElement_free(tmp);
+	return res;
+}
+
+int tlv_element_write_hash(KSI_DataHash *hash, unsigned tag, FILE *out) {
+	int res;
+	KSI_TlvElement *tlv = NULL;
+	unsigned char buf[0xffff + 4];
+	size_t len = 0;
+	unsigned char *ptr = NULL;
+
+	if (hash == NULL || out == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	res = tlv_element_create_hash(hash, tag, &tlv);
+	if (res != KT_OK) goto cleanup;
+
+	res = KSI_TlvElement_serialize(tlv, buf, sizeof(buf), &len, KSI_TLV_OPT_NO_MOVE);
+	if (res != KSI_OK) goto cleanup;
+
+	ptr = buf + sizeof(buf) - len;
+
+	if (fwrite(ptr, 1, len, out) != len) {
+		res = KT_IO_ERROR;
+		goto cleanup;
+	}
+
+	res = KT_OK;
+
+cleanup:
+
+	KSI_TlvElement_free(tlv);
 	return res;
 }
 
@@ -1561,7 +1667,7 @@ cleanup:
 	print_progressResult(res);
 	if (blocks) {
 		if (blocks->finalTreeHashesNone) {
-			print_debug("Warning: Block no. %3zu: all final tree hashes are missing.\n", blocks->blockNo);
+			print_debug("Warning: Block no. %3zu: all final tree hashes are missing. Run 'logksi sign' with '--insert-missing-hashes' to repair the log signature.\n", blocks->blockNo);
 			blocks->warningTreeHashes = 1;
 		} else if (blocks->finalTreeHashesAll) {
 			print_debug("Block no. %3zu: all final tree hashes are present.\n", blocks->blockNo);
@@ -1828,14 +1934,16 @@ cleanup:
 	return res;
 }
 
-static int process_partial_signature(ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PROCESSORS *processors, BLOCK_INFO *blocks, IO_FILES *files, int progress) {
+static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PROCESSORS *processors, BLOCK_INFO *blocks, IO_FILES *files, int progress) {
 	int res;
 	KSI_Signature *sig = NULL;
 	KSI_DataHash *hash = NULL;
 	KSI_DataHash *rootHash = NULL;
+	KSI_DataHash *missing = NULL;
 	KSI_TlvElement *tlv = NULL;
 	KSI_TlvElement *tlvSig = NULL;
 	KSI_TlvElement *tlvNoSig = NULL;
+	int insertHashes = 0;
 
 	if (err == NULL || ksi == NULL || processors == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -1869,6 +1977,21 @@ static int process_partial_signature(ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PRO
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: expected %zu records in signatures file, but found %zu records in blocks file.", blocks->blockNo, blocks->recordCount, blocks->nofRecordHashes);
 	}
 
+	insertHashes = PARAM_SET_isSetByName(set, "insert-missing-hashes");
+	if (blocks->finalTreeHashesNone && insertHashes) {
+		do {
+			missing = NULL;
+			res = merge_one_level(ksi, blocks, &missing);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing tree hash could not be computed.", blocks->blockNo);
+			if (missing) {
+				res = tlv_element_write_hash(missing, 0x903, files->files.outSig);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing tree hash could not be written.", blocks->blockNo);
+				KSI_DataHash_free(missing);
+			}
+		} while (missing);
+		blocks->finalTreeHashesNone = 0;
+	}
+
 	res = KSI_TlvElement_getElement(tlv, 0x905, &tlvSig);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to extract KSI signature element in signatures file.", blocks->blockNo);
 
@@ -1893,6 +2016,7 @@ static int process_partial_signature(ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PRO
 			res = calculate_root_hash(ksi, blocks, &rootHash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate root hash.", blocks->blockNo);
 
+			if (rootHash == NULL) printf("root hash = NULL\n");
 			res = logksi_datahash_compare(err, rootHash, docHash, "Root hash computed from record hashes: ", "Signed root hash stored in KSI signature: ");
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: root hashes not equal.", blocks->blockNo);
 		}
@@ -1964,7 +2088,7 @@ cleanup:
 	print_progressResult(res);
 	if (blocks) {
 		if (blocks->finalTreeHashesNone) {
-			print_debug("Warning: Block no. %3zu: all final tree hashes are missing.\n", blocks->blockNo);
+			print_debug("Warning: Block no. %3zu: all final tree hashes are missing. Run 'logksi sign' with '--insert-missing-hashes' to repair the log signature.\n", blocks->blockNo);
 			blocks->warningTreeHashes = 1;
 		} else if (blocks->finalTreeHashesAll) {
 			print_debug("Block no. %3zu: all final tree hashes are present.\n", blocks->blockNo);
@@ -1976,6 +2100,7 @@ cleanup:
 	KSI_Signature_free(sig);
 	KSI_DataHash_free(hash);
 	KSI_DataHash_free(rootHash);
+	KSI_DataHash_free(missing);
 	KSI_TlvElement_free(tlvSig);
 	KSI_TlvElement_free(tlvNoSig);
 	KSI_TlvElement_free(tlv);
@@ -2040,7 +2165,7 @@ cleanup:
 	if (check_warnings(blocks)) {
 		print_warnings("\n");
 		if (blocks && blocks->warningTreeHashes) {
-			print_warnings("Warning: Some tree hashes are missing from the log signature file.\n");
+			print_warnings("Warning: Some tree hashes are missing from the log signature file. Run 'logksi sign' with '--insert-missing-hashes' to repair the log signature.\n");
 		}
 
 		if (blocks && blocks->warningSignatures) {
@@ -2557,7 +2682,7 @@ cleanup:
 	return res;
 }
 
-int logsignature_integrate(ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files) {
+int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files) {
 	int res;
 	BLOCK_INFO blocks;
 	unsigned char ftlv_raw[SOF_FTLV_BUFFER];
@@ -2619,7 +2744,7 @@ int logsignature_integrate(ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files) {
 						ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unexpected TLV %04X read from block-signatures file.", blocks.blockNo, blocks.ftlv.tag);
 					}
 
-					res = process_partial_signature(err, ksi, &processors, &blocks, files, 0);
+					res = process_partial_signature(set, err, ksi, &processors, &blocks, files, 0);
 					if (res != KT_OK) goto cleanup;
 				}
 				break;
@@ -2713,7 +2838,7 @@ int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *fi
 
 				case 0x904:
 				{
-					res = process_partial_signature(err, ksi, &processors, &blocks, files, progress);
+					res = process_partial_signature(set, err, ksi, &processors, &blocks, files, progress);
 					if (res != KT_OK) goto cleanup;
 				}
 				break;

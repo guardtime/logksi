@@ -20,6 +20,14 @@ cp -r test/resource/logsignatures/signed.logsig.parts test/out
 	[ "$status" -eq 0 ]
 }
 
+@test "integrate signed.parts to output signed_all_final_hashes.logsig" {
+	run ./src/logksi integrate test/out/signed -o test/out/signed_all_final_hashes.logsig -d --insert-missing-hashes
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
+	run test -f test/out/signed_all_final_hashes.logsig
+	[ "$status" -eq 0 ]
+}
+
 @test "try integrating signed.parts again" {
 	run chmod 0444 test/out/signed.logsig
 	run ./src/logksi integrate test/out/signed -d
@@ -49,6 +57,14 @@ cp -r test/resource/logsignatures/unsigned.logsig.parts test/out
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	run test -f test/out/unsigned.logsig
+	[ "$status" -eq 0 ]
+}
+
+@test "integrate unsigned.parts to output unsigned_all_final_hashes.logsig" {
+	run ./src/logksi integrate test/out/unsigned -o test/out/unsigned_all_final_hashes.logsig -d --insert-missing-hashes
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
+	run test -f test/out/unsigned_all_final_hashes.logsig
 	[ "$status" -eq 0 ]
 }
 
