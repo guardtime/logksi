@@ -18,6 +18,13 @@ cp -r test/resource/logfiles/signed test/out
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 }
 
+@test "verify integrated overwritten.logsig" {
+	run ./src/logksi verify test/out/signed test/out/overwritten.logsig -d
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
+}
+
 cp -r test/resource/logfiles/unsigned test/out
 
 @test "try verifying integrated unsigned.logsig" {
