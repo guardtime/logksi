@@ -1,7 +1,8 @@
 * IMPROVEMENT: Debian packaging implemented.
 * IMPROVEMENT: New switch '--insert-missing-hashes' can be used to fix log signatures with missing final tree hashes.
+* IMPROVEMENT: New switch '--force-overwrite' can be used to overwrite the existing log signature during integration.
 * IMPROVEMENT: User is warned about unsigned root hashes during integration.
-* IMPROVEMENT: Excerpt file extension renamed from .part to .excerpt.
+* IMPROVEMENT: Extracted excerpt file extension renamed from .part to .excerpt.
 * IMPROVEMENT: Help text improved for hash comparison failures.
 * BUGFIX: Parts that contain neither hashes nor signatures are now properly integrated.
 
