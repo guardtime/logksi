@@ -36,6 +36,20 @@ cp -r test/resource/logsignatures/tree_hashes_final_all_present.logsig test/out
 	[[ "$output" =~ "Warning: Block no.   1: all final tree hashes are missing." ]]
 }
 
+@test "insert missing hashes" {
+	run ./src/logksi sign test/out/all_hashes -o test/out/no_missing_hashes.logsig -d --insert-missing-hashes
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
+}
+
+@test "verify no missing hashes" {
+	run ./src/logksi verify test/out/all_hashes test/out/no_missing_hashes.logsig -d
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Block no.   1: interpreting tree hash no.   5 as a final hash... ok." ]]
+	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
+}
+
 @test "verify record hash out of block" {
 	run ./src/logksi verify test/out/all_hashes test/out/record_hash_out_of_block.logsig -d
 	[ "$status" -ne 0 ]
