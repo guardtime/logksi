@@ -148,6 +148,7 @@ typedef struct {
 	char warningTreeHashes;
 	char unsignedRootHash;
 	char warningSignatures;
+	size_t nofHashFails;
 } BLOCK_INFO;
 
 int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_FUNCTION extend_signature, IO_FILES *files);

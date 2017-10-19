@@ -945,10 +945,40 @@ cleanup:
 	return res;
 }
 
-static int process_block_header(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
+int continue_on_hash_fail(int result, PARAM_SET *set, BLOCK_INFO *blocks, KSI_DataHash *computed, KSI_DataHash *stored, KSI_DataHash **replacement) {
+	int res = result;
+
+	if (set == NULL || blocks == NULL || computed == NULL || stored == NULL || replacement == NULL) {
+		goto cleanup;
+	}
+
+	if (res == KT_OK) {
+		*replacement = KSI_DataHash_ref(computed);
+	} else {
+		blocks->nofHashFails++;
+		if (PARAM_SET_isSetByName(set, "use-computed-hash-on-fail")) {
+			print_debug("Using computed hash to continue.\n");
+			*replacement = KSI_DataHash_ref(computed);
+			res = KT_OK;
+		} else if (PARAM_SET_isSetByName(set, "use-stored-hash-on-fail")) {
+			*replacement = KSI_DataHash_ref(stored);
+			print_debug("Using stored hash to continue.\n");
+			res = KT_OK;
+		} else {
+			*replacement = KSI_DataHash_ref(computed);
+		}
+	}
+
+cleanup:
+
+	return res;
+}
+
+static int process_block_header(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	KSI_OctetString *seed = NULL;
 	KSI_DataHash *hash = NULL;
+	KSI_DataHash *replacement = NULL;
 	unsigned char i = 0;
 	KSI_TlvElement *tlv = NULL;
 	size_t algo;
@@ -988,7 +1018,10 @@ static int process_block_header(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks
 
 	if (blocks->prevLeaf != NULL) {
 		res = logksi_datahash_compare(err, blocks->prevLeaf, hash, "Last hash computed from previous block data: ", "Last hash stored in current block header: ");
+		res = continue_on_hash_fail(res, set, blocks, blocks->prevLeaf, hash, &replacement);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: last hashes of previous block not equal.", blocks->blockNo);
+	} else {
+		replacement = KSI_DataHash_ref(hash);
 	}
 
 	if (files->files.outSig) {
@@ -1003,8 +1036,7 @@ static int process_block_header(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks
 	blocks->randomSeed = seed;
 	seed = NULL;
 	KSI_DataHash_free(blocks->prevLeaf);
-	blocks->prevLeaf = hash;
-	hash = NULL;
+	blocks->prevLeaf = replacement;
 
 	while (i < blocks->treeHeight) {
 		KSI_DataHash_free(blocks->MerkleTree[i]);
@@ -1086,10 +1118,11 @@ cleanup:
 	return res;
 }
 
-static int process_record_hash(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
+static int process_record_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	KSI_DataHash *recordHash = NULL;
 	KSI_DataHash *hash = NULL;
+	KSI_DataHash *replacement = NULL;
 
 	if (err == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -1110,9 +1143,10 @@ static int process_record_hash(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks,
 	if (blocks->metarecordHash != NULL) {
 		/* This is a metarecord hash. */
 		res = logksi_datahash_compare(err, blocks->metarecordHash, recordHash, "Metarecord hash computed from metarecord: ", "Metarecord hash stored in log signature file: ");
+		res = continue_on_hash_fail(res, set, blocks, blocks->metarecordHash, recordHash, &replacement);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: metarecord hashes not equal.", blocks->blockNo);
 
-		res = add_record_hash_to_merkle_tree(ksi, blocks, 1, blocks->metarecordHash);
+		res = add_record_hash_to_merkle_tree(ksi, blocks, 1, replacement);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
 
 		KSI_DataHash_free(blocks->metarecordHash);
@@ -1127,10 +1161,13 @@ static int process_record_hash(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks,
 			if (res != KT_OK) {
 				print_debug("Received logline: %s", blocks->logLine);
 			}
+			res = continue_on_hash_fail(res, set, blocks, hash, recordHash, &replacement);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: record hashes not equal for logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
+		} else {
+			replacement = KSI_DataHash_ref(recordHash);
 		}
 
-		res = add_record_hash_to_merkle_tree(ksi, blocks, 0, recordHash);
+		res = add_record_hash_to_merkle_tree(ksi, blocks, 0, replacement);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to add hash to Merkle tree.", blocks->blockNo);
 	}
 
@@ -1145,6 +1182,7 @@ static int process_record_hash(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks,
 cleanup:
 
 	print_progressResult(res);
+	KSI_DataHash_free(replacement);
 	KSI_DataHash_free(recordHash);
 	KSI_DataHash_free(hash);
 	return res;
@@ -1216,12 +1254,13 @@ cleanup:
 	return res;
 }
 
-static int process_tree_hash(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
+static int process_tree_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	KSI_DataHash *treeHash = NULL;
 	KSI_DataHash *recordHash = NULL;
 	KSI_DataHash *tmpRoot = NULL;
 	KSI_DataHash *root = NULL;
+	KSI_DataHash *replacement = NULL;
 	unsigned char i;
 
 	if (err == NULL || files == NULL || blocks == NULL) {
@@ -1286,6 +1325,7 @@ static int process_tree_hash(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, I
 			}
 
 			res = logksi_datahash_compare(err, blocks->notVerified[i], treeHash, "Tree hash computed from record hashes: ", "Tree hash stored in log signature file: ");
+			res = continue_on_hash_fail(res, set, blocks, blocks->notVerified[i], treeHash, &replacement);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: tree hashes not equal for logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
 
 			KSI_DataHash_free(blocks->notVerified[i]);
@@ -1323,6 +1363,7 @@ static int process_tree_hash(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, I
 			}
 
 			res = logksi_datahash_compare(err, blocks->notVerified[i], treeHash, "Tree hash computed from record hashes: ", "Tree hash stored in log signature file: ");
+			res = continue_on_hash_fail(res, set, blocks, blocks->notVerified[i], treeHash, &replacement);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: tree hashes not equal for logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
 		}
 	}
@@ -1335,6 +1376,7 @@ cleanup:
 	KSI_DataHash_free(recordHash);
 	KSI_DataHash_free(tmpRoot);
 	KSI_DataHash_free(root);
+	KSI_DataHash_free(replacement);
 	return res;
 }
 
@@ -1779,7 +1821,7 @@ cleanup:
 	return res;
 }
 
-static int process_record_chain(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
+static int process_record_chain(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	KSI_DataHash *recordHash = NULL;
 	KSI_DataHash *hash = NULL;
@@ -1787,6 +1829,7 @@ static int process_record_chain(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks
 	KSI_TlvElement *tlvMetaRecord = NULL;
 	KSI_DataHash *tmpHash = NULL;
 	KSI_DataHash *root = NULL;
+	KSI_DataHash *replacement = NULL;
 
 	if (err == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -1818,6 +1861,7 @@ static int process_record_chain(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks
 	if (blocks->metarecordHash != NULL) {
 		/* This is a metarecord hash. */
 		res = logksi_datahash_compare(err, blocks->metarecordHash, recordHash, "Metarecord hash computed from metarecord: ", "Metarecord hash stored in integrity proof file: ");
+		res = continue_on_hash_fail(res, set, blocks, blocks->metarecordHash, recordHash, &replacement);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: metarecord hashes not equal.", blocks->blockNo);
 	} else {
 		/* This is a logline record hash. */
@@ -1826,14 +1870,17 @@ static int process_record_chain(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate hash of logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
 
 			res = logksi_datahash_compare(err, hash, recordHash, "Record hash computed from logline: ", "Record hash stored in integrity proof file: ");
+			res = continue_on_hash_fail(res, set, blocks, hash, recordHash, &replacement);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: record hashes not equal.", blocks->blockNo);
+		} else {
+			replacement = KSI_DataHash_ref(recordHash);
 		}
 	}
 
 	if (tlv->subList) {
 		int i;
 		blocks->treeHeight = 0;
-		root = KSI_DataHash_ref(recordHash);
+		root = KSI_DataHash_ref(replacement);
 
 		print_progressResult(res);
 		print_progressDesc(0, "Block no. %3zu: processing hash chain... ", blocks->blockNo);
@@ -1853,6 +1900,9 @@ static int process_record_chain(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks
 		}
 
 		res = logksi_datahash_compare(err, root, blocks->rootHash, "Root hash computed from hash chain: ", "Root hash stored in KSI signature: ");
+		KSI_DataHash_free(replacement);
+		replacement = NULL;
+		res = continue_on_hash_fail(res, set, blocks, root, blocks->rootHash, &replacement);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: root hashes not equal.", blocks->blockNo);
 	} else {
 		res = KT_INVALID_INPUT_FORMAT;
@@ -1867,15 +1917,17 @@ cleanup:
 	KSI_DataHash_free(hash);
 	KSI_DataHash_free(root);
 	KSI_DataHash_free(tmpHash);
+	KSI_DataHash_free(replacement);
 	KSI_TlvElement_free(tlv);
 	KSI_TlvElement_free(tlvMetaRecord);
 	return res;
 }
 
-static int process_partial_block(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
+static int process_partial_block(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	KSI_DataHash *hash = NULL;
 	KSI_DataHash *rootHash = NULL;
+	KSI_DataHash *replacement = NULL;
 	KSI_TlvElement *tlv = NULL;
 	KSI_TlvElement *tlvNoSig = NULL;
 
@@ -1915,12 +1967,13 @@ static int process_partial_block(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *block
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate root hash.", blocks->blockNo);
 
 		res = logksi_datahash_compare(err, rootHash, hash, "Root hash computed from record hashes: ", "Unsigned root hash stored in block data file: ");
+		res = continue_on_hash_fail(res, set, blocks, rootHash, hash, &replacement);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: root hashes not equal.", blocks->blockNo);
+	} else {
+		replacement = KSI_DataHash_ref(hash);
 	}
 
-	blocks->rootHash = hash;
-	hash = NULL;
-
+	blocks->rootHash = replacement;
 
 	res = KT_OK;
 
@@ -1940,6 +1993,7 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 	KSI_DataHash *hash = NULL;
 	KSI_DataHash *rootHash = NULL;
 	KSI_DataHash *missing = NULL;
+	KSI_DataHash *replacement = NULL;
 	KSI_TlvElement *tlv = NULL;
 	KSI_TlvElement *tlvSig = NULL;
 	KSI_TlvElement *tlvNoSig = NULL;
@@ -2010,6 +2064,7 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 		/* Compare signed root hash with unsigned root hash. */
 		if (blocks->rootHash) {
 			res = logksi_datahash_compare(err, blocks->rootHash, docHash, "Unsigned root hash stored in block data file: ", "Signed root hash stored in KSI signature: ");
+			res = continue_on_hash_fail(res, set, blocks, blocks->rootHash, docHash, &replacement);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: root hashes not equal.", blocks->blockNo);
 		} else if (blocks->nofRecordHashes) {
 			/* Compute the root hash and compare with signed root hash. */
@@ -2018,6 +2073,7 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 
 			if (rootHash == NULL) printf("root hash = NULL\n");
 			res = logksi_datahash_compare(err, rootHash, docHash, "Root hash computed from record hashes: ", "Signed root hash stored in KSI signature: ");
+			res = continue_on_hash_fail(res, set, blocks, rootHash, docHash, &replacement);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: root hashes not equal.", blocks->blockNo);
 		}
 	} else if (tlvNoSig != NULL) {
@@ -2028,6 +2084,7 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 		/* Compare unsigned root hashes. */
 		if (blocks->rootHash) {
 			res = logksi_datahash_compare(err, blocks->rootHash, hash, "Unsigned root hash stored in block data file: ", "Unsigned root hash stored in block signature file: ");
+			res = continue_on_hash_fail(res, set, blocks, blocks->rootHash, hash, &replacement);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: root hashes not equal.", blocks->blockNo);
 		} else if (blocks->nofRecordHashes) {
 			/* Compute the root hash and compare with unsigned root hash. */
@@ -2035,6 +2092,7 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate root hash.", blocks->blockNo);
 
 			res = logksi_datahash_compare(err, rootHash, hash, "Root hash computed from record hashes: ", "Unsigned root hash stored in block signature file: ");
+			res = continue_on_hash_fail(res, set, blocks, rootHash, hash, &replacement);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: root hashes not equal.", blocks->blockNo);
 		}
 
@@ -2101,6 +2159,7 @@ cleanup:
 	KSI_DataHash_free(hash);
 	KSI_DataHash_free(rootHash);
 	KSI_DataHash_free(missing);
+	KSI_DataHash_free(replacement);
 	KSI_TlvElement_free(tlvSig);
 	KSI_TlvElement_free(tlvNoSig);
 	KSI_TlvElement_free(tlv);
@@ -2156,6 +2215,10 @@ static int finalize_log_signature(ERR_TRCKR *err, BLOCK_INFO *blocks, IO_FILES *
 		}
 	}
 
+	if (blocks->nofHashFails) {
+		res = KT_VERIFICATION_FAILURE;
+		ERR_CATCH_MSG(err, res, "Error: %4zu hash comparison failures found.", blocks->nofHashFails);
+	}
 	res = KT_OK;
 
 cleanup:
@@ -2312,17 +2375,17 @@ int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_
 		if (res == KSI_OK) {
 			switch (blocks.ftlv.tag) {
 				case 0x901:
-					res = process_block_header(err, ksi, &blocks, files);
+					res = process_block_header(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
 				case 0x902:
-					res = process_record_hash(err, ksi, &blocks, files);
+					res = process_record_hash(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
 				case 0x903:
-					res = process_tree_hash(err, ksi, &blocks, files);
+					res = process_tree_hash(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
@@ -2395,17 +2458,17 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, VERIFYING_
 				case LOGSIG12:
 					switch (blocks.ftlv.tag) {
 						case 0x901:
-							res = process_block_header(err, ksi, &blocks, files);
+							res = process_block_header(set, err, ksi, &blocks, files);
 							if (res != KT_OK) goto cleanup;
 						break;
 
 						case 0x902:
-							res = process_record_hash(err, ksi, &blocks, files);
+							res = process_record_hash(set, err, ksi, &blocks, files);
 							if (res != KT_OK) goto cleanup;
 						break;
 
 						case 0x903:
-							res = process_tree_hash(err, ksi, &blocks, files);
+							res = process_tree_hash(set, err, ksi, &blocks, files);
 							if (res != KT_OK) goto cleanup;
 						break;
 
@@ -2443,7 +2506,7 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, VERIFYING_
 
 						case 0x907:
 						{
-							res = process_record_chain(err, ksi, &blocks, files);
+							res = process_record_chain(set, err, ksi, &blocks, files);
 							if (res != KT_OK) goto cleanup;
 						}
 						break;
@@ -2626,17 +2689,17 @@ int logsignature_extract(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES 
 		if (res == KSI_OK) {
 			switch (blocks.ftlv.tag) {
 				case 0x901:
-					res = process_block_header(err, ksi, &blocks, files);
+					res = process_block_header(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
 				case 0x902:
-					res = process_record_hash(err, ksi, &blocks, files);
+					res = process_record_hash(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
 				case 0x903:
-					res = process_tree_hash(err, ksi, &blocks, files);
+					res = process_tree_hash(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
@@ -2705,17 +2768,17 @@ int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILE
 		if (res == KSI_OK) {
 			switch (blocks.ftlv.tag) {
 				case 0x901:
-					res = process_block_header(err, ksi, &blocks, files);
+					res = process_block_header(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
 				case 0x902:
-					res = process_record_hash(err, ksi, &blocks, files);
+					res = process_record_hash(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
 				case 0x903:
-					res = process_tree_hash(err, ksi, &blocks, files);
+					res = process_tree_hash(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
@@ -2726,7 +2789,7 @@ int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILE
 
 				case 0x904:
 				{
-					res = process_partial_block(err, ksi, &blocks, files);
+					res = process_partial_block(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 
 					res = KSI_FTLV_fileRead(files->files.partsSig, blocks.ftlv_raw, SOF_FTLV_BUFFER, &blocks.ftlv_len, &blocks.ftlv);
@@ -2817,17 +2880,17 @@ int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *fi
 		if (res == KSI_OK) {
 			switch (blocks.ftlv.tag) {
 				case 0x901:
-					res = process_block_header(err, ksi, &blocks, files);
+					res = process_block_header(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
 				case 0x902:
-					res = process_record_hash(err, ksi, &blocks, files);
+					res = process_record_hash(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
 				case 0x903:
-					res = process_tree_hash(err, ksi, &blocks, files);
+					res = process_tree_hash(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
