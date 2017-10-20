@@ -15,7 +15,7 @@ the log signature blocks file: \fIlogfile.logsig.parts/blocks.dat\fR; and
 .IP \(bu 4
 the log signature file containing the respective KSI signatures: \fIlogfile.logsig.parts/block-signatures.dat\fR.
 .LP
-If the output file name is not specified, it is derived from the name of the log file \fIlogfile\fR by adding the standard suffix \fI.logsig\fR. An attempt to overwrite an existing log signature file will result in an error.
+If the output file name is not specified, it is derived from the name of the log file \fIlogfile\fR by adding the standard suffix \fI.logsig\fR. An attempt to overwrite an existing log signature file will result in an error, unless the \fB--force-overwrite\fR option is specified.
 .LP
 The integration of the files can be performed once both files are complete. \fBlogksi integrate \fR waits to acquire a read lock on the files before integrating them. The read lock is advisory and relies on the same implementation in the signing application.
 .LP
@@ -28,12 +28,20 @@ The order of log blocks in \fIblocks.dat\fR and KSI signatures in \fIblock-signa
 .IP \(bu 4
 The root hash of each block in the log signature blocks file needs to be equal to the one in the KSI signatures file.
 .LP
-If some KSI signatures are missing from the log signature file \fIblock-signatures.dat\fR, a respective \fIno-sig\fR field is recognised and integration is performed anyway. The missing signatures can then be acquired using \fBlogksi sign\fR function.
+If some KSI signatures are missing from the log signature file \fIblock-signatures.dat\fR, a respective \fIno-sig\fR field is recognised and integration is performed anyway. A warning message is printed about the missing KSI signatures with a recommendation to run \fBlogksi sign\fR to acquire the missing signatures.
 .\"
 .SH OPTIONS
 .TP
 \fB-o \fIout.logsig\fR
 Specify the name of the integrated output log signature file. If not specified, the log signature file is saved as \fIlogfile.logsig\fR in the same folder where the \fIlogfile\fR is located. An attempt to overwrite an existing log signature file will result in an error. Use '-' as file name to redirect the output as a binary stream to \fIstdout\fR.
+.\"
+.TP
+\fB--insert-missing-hashes\fR
+Pre-emptively repair the log signature by inserting missing final tree hashes. Final tree hashes might be missing if the Merkle tree is not perfectly balanced. If the option is not used during integration, a warning message is printed about missing hashes with a recommendation to run \fBlogksi sign\fR with the \fB--insert-missing-hashes\fR option. Inserting missing hashes improves verifiablity, but a log signature without final tree hashes is verifiable as well.
+.\"
+.TP
+\fB--force-overwrite\fR
+Force overwriting of an existing log signature. If the existing log signature contains KSI signatures obtained during sign recovery, these signatures are lost and must be obtained again by running \fBlogksi sign\fR.
 .\"
 .TP
 \fB-d\fR
