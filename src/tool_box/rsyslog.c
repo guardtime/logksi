@@ -1262,6 +1262,7 @@ static int process_tree_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK
 	KSI_DataHash *root = NULL;
 	KSI_DataHash *replacement = NULL;
 	unsigned char i;
+	char finalTreeHash = 0;
 
 	if (err == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -1286,34 +1287,39 @@ static int process_tree_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK
 		}
 	}
 
-	/* If the block contains tree hashes, but not record hashes:
-	 * Calculate missing record hashes from the records in the logfile and
-	 * build the Merkle tree according to the number of tree hashes encountered. */
-	if (blocks->keepRecordHashes == 0 && blocks->nofTreeHashes > max_tree_hashes(blocks->nofRecordHashes)) {
-		blocks->nofRecordHashes++;
-		if (files->files.inLog) {
-			if (blocks->metarecordHash) {
-				res = add_record_hash_to_merkle_tree(ksi, blocks, 1, blocks->metarecordHash);
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
-
-				KSI_DataHash_free(blocks->metarecordHash);
-				blocks->metarecordHash = NULL;
-			} else {
-				res = get_hash_of_logline(ksi, blocks, files, &recordHash);
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate hash of logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
-				res = add_record_hash_to_merkle_tree(ksi, blocks, 0, recordHash);
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to add record hash to Merkle tree.", blocks->blockNo);
-				KSI_DataHash_free(recordHash);
-				recordHash = NULL;
-			}
-		} else {
-			/* No log file available so build the Merkle tree from tree hashes alone. */
-			res = add_leaf_hash_to_merkle_tree(ksi, blocks, treeHash, 0);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to add leaf hash to Merkle tree.", blocks->blockNo);
-		}
-	}
 
 	if (!blocks->finalTreeHashesSome) {
+		/* If the block contains tree hashes, but not record hashes:
+		 * Calculate missing record hashes from the records in the logfile and
+		 * build the Merkle tree according to the number of tree hashes encountered. */
+		if (blocks->keepRecordHashes == 0 && blocks->nofTreeHashes > max_tree_hashes(blocks->nofRecordHashes)) {
+			/* If the block is closed prematurely with a metarecord, process the current tree hash as a mandatory tree hash and
+			 * all subsequent tree hashes as optional final tree hashes. */
+			if (blocks->metarecordHash) {
+				finalTreeHash = 1;
+			}
+			blocks->nofRecordHashes++;
+			if (files->files.inLog) {
+				if (blocks->metarecordHash) {
+					res = add_record_hash_to_merkle_tree(ksi, blocks, 1, blocks->metarecordHash);
+					ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
+
+					KSI_DataHash_free(blocks->metarecordHash);
+					blocks->metarecordHash = NULL;
+				} else {
+					res = get_hash_of_logline(ksi, blocks, files, &recordHash);
+					ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate hash of logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
+					res = add_record_hash_to_merkle_tree(ksi, blocks, 0, recordHash);
+					ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to add record hash to Merkle tree.", blocks->blockNo);
+					KSI_DataHash_free(recordHash);
+					recordHash = NULL;
+				}
+			} else {
+				/* No log file available so build the Merkle tree from tree hashes alone. */
+				res = add_leaf_hash_to_merkle_tree(ksi, blocks, treeHash, 0);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to add leaf hash to Merkle tree.", blocks->blockNo);
+			}
+		}
 		if (blocks->nofRecordHashes) {
 			/* Find the corresponding tree hash from the Merkle tree. */
 			for (i = 0; i < blocks->treeHeight; i++) {
@@ -1333,11 +1339,9 @@ static int process_tree_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK
 		}
 	} else {
 		if (blocks->nofRecordHashes) {
+			print_progressResult(res);
+			print_progressDesc(0, "Block no. %3zu: interpreting tree hash no. %3zu as a final hash... ", blocks->blockNo, blocks->nofTreeHashes);
 			/* Find the corresponding tree hash from the Merkle tree. */
-			if (blocks && blocks->finalTreeHashesSome) {
-				print_progressResult(res);
-				print_progressDesc(0, "Block no. %3zu: interpreting tree hash no. %3zu as a final hash... ", blocks->blockNo, blocks->nofTreeHashes);
-			}
 			i = 0;
 			while (i < blocks->treeHeight) {
 				if (root == NULL) {
@@ -1367,6 +1371,16 @@ static int process_tree_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK
 			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: tree hashes not equal for logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
 		}
 	}
+
+	if (finalTreeHash) {
+		/* This was the last mandatory tree hash. From this point forward all tree hashes must be interpreted as optional final tree hashes. */
+		blocks->finalTreeHashesSome = 1;
+		/* Prepare tree hashes for verification of finalizing. */
+		for (i = 0; i < blocks->treeHeight; i++) {
+			blocks->notVerified[i] = KSI_DataHash_ref(blocks->MerkleTree[i]);
+		}
+	}
+
 	res = KT_OK;
 
 cleanup:
