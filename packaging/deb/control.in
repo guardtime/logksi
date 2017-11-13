@@ -2,11 +2,12 @@ Source: @PACKAGE@
 Section: utils
 Priority: optional
 Maintainer: Guardtime <support@guardtime.com>
-@KSI_DEB_BUILD_DEPENDENCY@
 Standards-Version: 3.9.8
+@KSI_DEB_BUILD_DEPENDECY@
 
 Package: @PACKAGE@
 Architecture: any
 Section: utils
 Priority: optional
 Description: Log signature command-line tool for Keyless Signature Infrastructure.
+@KSI_DEB_RUN_DEPENDECY@
