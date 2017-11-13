@@ -66,8 +66,8 @@ debuild -us -uc
 cd ..
 
 suffix=${VER}-${PKG_VERSION}.${RELEASE_VERSION}_${ARCH}
-mv $PACKAGE_NAME_${VER}_${ARCH}.changes $PACKAGE_NAME_$suffix.changes
-mv $PACKAGE_NAME_${VER}_${ARCH}.deb $PACKAGE_NAME_$suffix.deb
+mv ${PACKAGE_NAME}_${VER}_${ARCH}.changes ${PACKAGE_NAME}_$suffix.changes
+mv ${PACKAGE_NAME}_${VER}_${ARCH}.deb ${PACKAGE_NAME}_$suffix.deb
 
 rm -rf $PACKAGE_NAME-$VER
 
