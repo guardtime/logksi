@@ -28,19 +28,21 @@
 
 Summary: Log signature command-line tool for Keyless Signature Infrastructure
 Name: %{name_package}
-Version: %(cat VERSION)
+Version: @VERSION@
 Release: 1%{?dist}
 License: Apache 2.0
 Group: Applications/Security
 Source:  http://download.guardtime.com/%{name_package}-%{version}.tar.gz
-URL: http://www.guardtime.com/
+URL: http://www.guardtime.com
 Vendor: Guardtime AS
 Packager: Guardtime AS <info@guardtime.com>
 Distribution: Guardtime utilities
 BuildRoot: %{_tmppath}/%{name_package}-%{version}-build
 
 # Dependencies are set in config.ac
-@KSI_RPM_BUILD_DEPENDENCY@
+@KSI_RPM_BUILD_DEPENDECY@
+@KSI_RPM_RUN_DEPENDECY@
+
 
 %description
 Log signature command-line tool for KSI blockchain. Provides the
@@ -74,6 +76,7 @@ make install DESTDIR=%{buildroot}
 %{_mandir}/man1/logksi-extract.1*
 %{_mandir}/man5/logksi-conf.5*
 %{_docdir}/%{name_package}/LICENSE
+%{_docdir}/%{name_package}/README.md
 %{_docdir}/%{name_package}/ChangeLog
 
 %changelog
