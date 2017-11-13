@@ -38,6 +38,7 @@ ARCH=$(dpkg --print-architecture)
 RELEASE_VERSION="$(lsb_release -is)$(lsb_release -rs | grep -Po "[0-9]{1,3}" | head -1)"
 PKG_VERSION=1
 DEB_DIR=packaging/deb
+PACKAGE_NAME=logksi
 
 autoreconf -if
 ./configure $conf_args
@@ -48,25 +49,25 @@ make dist
 # Rebuild debian changelog.
 if command  -v dch > /dev/null; then
   echo "Generating debian changelog..."
-  $DEB_DIR/rebuild_changelog.sh doc/ChangeLog $DEB_DIR/control logksi $DEB_DIR/changelog
+  $DEB_DIR/rebuild_changelog.sh doc/ChangeLog $DEB_DIR/control $PACKAGE_NAME $DEB_DIR/changelog
 else
   >&2 echo "Error: Unable to generate Debian changelog file as dch is not installed!"
   >&2 echo "Install devscripts 'apt-get install devscripts'"
   exit 1
 fi
 
-tar xvfz logksi-$VER.tar.gz
-mv logksi-$VER.tar.gz logksi-$VER.orig.tar.gz
-mkdir logksi-$VER/debian
-cp $DEB_DIR/control $DEB_DIR/changelog $DEB_DIR/rules $DEB_DIR/copyright logksi-$VER/debian
-chmod +x logksi-$VER/debian/rules
-cd logksi-$VER
+tar xvfz $PACKAGE_NAME-$VER.tar.gz
+mv $PACKAGE_NAME-$VER.tar.gz $PACKAGE_NAME-$VER.orig.tar.gz
+mkdir $PACKAGE_NAME-$VER/debian
+cp $DEB_DIR/control $DEB_DIR/changelog $DEB_DIR/rules $DEB_DIR/copyright $PACKAGE_NAME-$VER/debian
+chmod +x $PACKAGE_NAME-$VER/debian/rules
+cd $PACKAGE_NAME-$VER
 debuild -us -uc 
 cd ..
 
 suffix=${VER}-${PKG_VERSION}.${RELEASE_VERSION}_${ARCH}
-mv logksi_${VER}_${ARCH}.changes logksi_$suffix.changes
-mv logksi_${VER}_${ARCH}.deb logksi_$suffix.deb
+mv $PACKAGE_NAME_${VER}_${ARCH}.changes $PACKAGE_NAME_$suffix.changes
+mv $PACKAGE_NAME_${VER}_${ARCH}.deb $PACKAGE_NAME_$suffix.deb
 
-rm -rf logksi-$VER
+rm -rf $PACKAGE_NAME-$VER
 

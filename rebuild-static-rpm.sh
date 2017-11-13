@@ -20,6 +20,7 @@
 
 
 BUILD_DIR=~/rpmbuild
+PACKAGE_NAME=logksi
 version=$(tr -d [:space:] < VERSION)
 
 conf_args="--enable-static-build"
@@ -38,9 +39,9 @@ autoreconf -if && \
 make clean && \
 make dist && \
 mkdir -p $BUILD_DIR/{BUILD,RPMS,SOURCES,SPECS,SRPMS,tmp} && \
-cp packaging/redhat/logksi.spec $BUILD_DIR/SPECS/ && \
-cp logksi-*.tar.gz $BUILD_DIR/SOURCES/ && \
-rpmbuild -ba $BUILD_DIR/SPECS/logksi.spec && \
-cp $BUILD_DIR/RPMS/*/logksi-*$version*.rpm . && \
-cp $BUILD_DIR/SRPMS/logksi-*$version*.rpm .
+cp packaging/redhat/$PACKAGE_NAME.spec $BUILD_DIR/SPECS/ && \
+cp $PACKAGE_NAME-*.tar.gz $BUILD_DIR/SOURCES/ && \
+rpmbuild -ba $BUILD_DIR/SPECS/$PACKAGE_NAME.spec && \
+cp $BUILD_DIR/RPMS/*/$PACKAGE_NAME-*$version*.rpm . && \
+cp $BUILD_DIR/SRPMS/$PACKAGE_NAME-*$version*.rpm .
 chmod -v 644 *.rpm
