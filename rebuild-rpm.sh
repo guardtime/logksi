@@ -23,7 +23,7 @@ BUILD_DIR=~/rpmbuild
 version=$(tr -d [:space:] < VERSION)
 
 autoreconf -if && \
-./configure $* && \
+./configure --enable-use-installed-libksi $* && \
 make clean && \
 make dist && \
 mkdir -p $BUILD_DIR/{BUILD,RPMS,SOURCES,SPECS,SRPMS,tmp} && \
@@ -32,3 +32,4 @@ cp logksi-*$version*.tar.gz $BUILD_DIR/SOURCES/ && \
 rpmbuild -ba $BUILD_DIR/SPECS/logksi.spec && \
 cp $BUILD_DIR/RPMS/*/logksi-*$version*.rpm . && \
 cp $BUILD_DIR/SRPMS/logksi-*$version*.rpm .
+chmod -v 644 *.rpm
