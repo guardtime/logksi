@@ -1503,13 +1503,21 @@ int is_block_signature_expected(ERR_TRCKR *err, BLOCK_INFO *blocks) {
 			res = KT_VERIFICATION_FAILURE;
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing tree hash(es) for logline no. %zu.", blocks->blockNo, blocks->recordCount + blocks->nofTotalRecordHashes);
 		}
-		/* Check if the block contains too few optional tree hashes. */
+		/* Check if the block contains too few final tree hashes. */
 		if (blocks->nofTreeHashes < maxTreeHashes + maxFinalHashes) {
+			/* Check if none of the final tree hashes have yet been received. (Final tree hashes must all be present or all missing.) */
 			if (blocks->nofTreeHashes == maxTreeHashes) {
-				/* Special case: if all optional tree hashes are missing, we issue just a warning. */
-				blocks->finalTreeHashesNone = 1;
+				/* Check if there is reason to expect final tree hashes. */
+				if (blocks->finalTreeHashesSome) {
+					/* All final tree hashes are missing, but at least they are being expected -> this is OK and can be repaired. */
+					blocks->finalTreeHashesNone = 1;
+				} else {
+					/* All of the final tree hashes are missing, but they are not being expected either (e.g. missing metarecord). This should never happen. */
+					res = KT_VERIFICATION_FAILURE;
+					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: all final tree hashes are missing and block is closed without a metarecord.", blocks->blockNo);
+				}
 			} else {
-				/* If however some optional tree hashes are present, they must all be present. */
+				/* If some final tree hashes are present, they must all be present. */
 				res = KT_VERIFICATION_FAILURE;
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: found %zu final tree hashes instead of %zu.", blocks->blockNo, blocks->nofTreeHashes - maxTreeHashes, maxFinalHashes);
 			}
@@ -2070,17 +2078,19 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 
 	insertHashes = PARAM_SET_isSetByName(set, "insert-missing-hashes");
 	if (blocks->finalTreeHashesNone && insertHashes) {
-		do {
-			missing = NULL;
-			res = merge_one_level(ksi, blocks, &missing);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing tree hash could not be computed.", blocks->blockNo);
-			if (missing) {
-				res = tlv_element_write_hash(missing, 0x903, files->files.outSig);
-				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing tree hash could not be written.", blocks->blockNo);
-				KSI_DataHash_free(missing);
-			}
-		} while (missing);
-		blocks->finalTreeHashesNone = 0;
+		if (blocks->keepRecordHashes || (!blocks->keepRecordHashes && blocks->finalTreeHashesSome)) {
+			do {
+				missing = NULL;
+				res = merge_one_level(ksi, blocks, &missing);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing tree hash could not be computed.", blocks->blockNo);
+				if (missing) {
+					res = tlv_element_write_hash(missing, 0x903, files->files.outSig);
+					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing tree hash could not be written.", blocks->blockNo);
+					KSI_DataHash_free(missing);
+				}
+			} while (missing);
+			blocks->finalTreeHashesNone = 0;
+		}
 	}
 
 	res = KSI_TlvElement_getElement(tlv, 0x905, &tlvSig);
