@@ -1002,6 +1002,7 @@ static int process_block_header(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BL
 	blocks->finalTreeHashesSome = 0;
 	blocks->finalTreeHashesNone = 0;
 	blocks->finalTreeHashesAll = 0;
+	blocks->finalTreeHashesLeaf = 0;
 	blocks->unsignedRootHash = 0;
 
 	res = tlv_element_parse_and_check_sub_elements(err, ksi, blocks->ftlv_raw, blocks->ftlv_len, blocks->ftlv.hdr_len, &tlv);
@@ -1206,6 +1207,19 @@ static int max_final_hashes(BLOCK_INFO *blocks) {
 	return finalHashes;
 }
 
+static size_t nof_unverified_hashes(BLOCK_INFO *blocks) {
+	size_t count = 0;
+	size_t i;
+
+	for (i = 0; i < blocks->treeHeight; i++) {
+		if (blocks->notVerified[i]) {
+			count++;
+		}
+	}
+
+	return count;
+}
+
 static int is_tree_hash_expected(ERR_TRCKR *err, BLOCK_INFO *blocks) {
 	int res;
 	int i;
@@ -1228,11 +1242,15 @@ static int is_tree_hash_expected(ERR_TRCKR *err, BLOCK_INFO *blocks) {
 	}
 	/* Check if all record hashes are present for previous records. */
 	if (blocks->keepRecordHashes && blocks->nofTreeHashes == max_tree_hashes(blocks->nofRecordHashes)) {
-		/* Either a record hash is missing or the tree hash is used in finalizing the unbalanced tree. */
+		/* All the tree hashes that can be computed from the received record hashes have been received.
+		 * However, another tree hash was just received, so either the preceding record hash is missing or
+		 * the tree hash is used in finalizing the unbalanced tree. */
 		if (blocks->balanced) {
+			/* The tree is balanced, so no finalizing is needed. Thus the tree hash is unexpected, probably due to a missing record hash. */
 			res = KT_VERIFICATION_FAILURE;
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing record hash for logline no. %zu.", blocks->blockNo, get_nof_lines(blocks) + 1);
 		} else {
+			/* Assuming that no record hashes are missing, let's start the finalizing process. */
 			blocks->finalTreeHashesSome = 1;
 			/* Prepare tree hashes for verification of finalizing. */
 			for (i = 0; i < blocks->treeHeight; i++) {
@@ -1240,6 +1258,7 @@ static int is_tree_hash_expected(ERR_TRCKR *err, BLOCK_INFO *blocks) {
 			}
 		}
 	}
+
 	/* Check if all final tree hashes are present. */
 	if (blocks->finalTreeHashesSome && blocks->nofTreeHashes == max_tree_hashes(blocks->nofRecordHashes) + max_final_hashes(blocks)) {
 		res = KT_VERIFICATION_FAILURE;
@@ -1266,7 +1285,6 @@ static int process_tree_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK
 	KSI_DataHash *root = NULL;
 	KSI_DataHash *replacement = NULL;
 	unsigned char i;
-	char finalTreeHash = 0;
 
 	if (err == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -1291,16 +1309,15 @@ static int process_tree_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK
 		}
 	}
 
-
 	if (!blocks->finalTreeHashesSome) {
 		/* If the block contains tree hashes, but not record hashes:
 		 * Calculate missing record hashes from the records in the logfile and
 		 * build the Merkle tree according to the number of tree hashes encountered. */
 		if (blocks->keepRecordHashes == 0 && blocks->nofTreeHashes > max_tree_hashes(blocks->nofRecordHashes)) {
-			/* If the block is closed prematurely with a metarecord, process the current tree hash as a mandatory tree hash and
-			 * all subsequent tree hashes as optional final tree hashes. */
+			/* If the block is closed prematurely with a metarecord, process the current tree hash as a mandatory leaf hash.
+			 * Subsequent tree hashes are either mandatory tree hashes corresponding to the metarecord hash or optional final tree hashes. */
 			if (blocks->metarecordHash) {
-				finalTreeHash = 1;
+				blocks->finalTreeHashesLeaf = 1;
 			}
 			blocks->nofRecordHashes++;
 			if (files->files.inLog) {
@@ -1340,10 +1357,21 @@ static int process_tree_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK
 
 			res = logksi_datahash_compare(err, blocks->notVerified[i], treeHash, "Tree hash computed from record hashes: ", "Tree hash stored in log signature file: ");
 			res = continue_on_hash_fail(res, set, blocks, blocks->notVerified[i], treeHash, &replacement);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: tree hashes not equal for logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
+			if (blocks->keepRecordHashes) {
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: tree hashes not equal for logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
+			} else {
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: tree hashes not equal.", blocks->blockNo);
+			}
 
 			KSI_DataHash_free(blocks->notVerified[i]);
 			blocks->notVerified[i] = NULL;
+		}
+		if (blocks->finalTreeHashesLeaf && !nof_unverified_hashes(blocks)) {
+			/* This was the last mandatory tree hash. From this point forward all tree hashes must be interpreted as optional final tree hashes. */
+			blocks->finalTreeHashesSome = 1;
+			for (i = 0; i < blocks->treeHeight; i++) {
+				blocks->notVerified[i] = KSI_DataHash_ref(blocks->MerkleTree[i]);
+			}
 		}
 	} else {
 		if (blocks->nofRecordHashes) {
@@ -1377,15 +1405,6 @@ static int process_tree_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK
 			res = logksi_datahash_compare(err, blocks->notVerified[i], treeHash, "Tree hash computed from record hashes: ", "Tree hash stored in log signature file: ");
 			res = continue_on_hash_fail(res, set, blocks, blocks->notVerified[i], treeHash, &replacement);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: tree hashes not equal for logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
-		}
-	}
-
-	if (finalTreeHash) {
-		/* This was the last mandatory tree hash. From this point forward all tree hashes must be interpreted as optional final tree hashes. */
-		blocks->finalTreeHashesSome = 1;
-		/* Prepare tree hashes for verification of finalizing. */
-		for (i = 0; i < blocks->treeHeight; i++) {
-			blocks->notVerified[i] = KSI_DataHash_ref(blocks->MerkleTree[i]);
 		}
 	}
 
@@ -1498,6 +1517,10 @@ int is_block_signature_expected(ERR_TRCKR *err, BLOCK_INFO *blocks) {
 	}
 
 	if (blocks->keepTreeHashes) {
+		if (!blocks->keepRecordHashes && !blocks->balanced && !blocks->finalTreeHashesSome) {
+			res = KT_VERIFICATION_FAILURE;
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: incomplete block is closed without a metarecord.", blocks->blockNo);
+		}
 		/* Check if all mandatory tree hashes are present in the current block. */
 		if (blocks->nofTreeHashes < maxTreeHashes) {
 			res = KT_VERIFICATION_FAILURE;
@@ -1508,7 +1531,7 @@ int is_block_signature_expected(ERR_TRCKR *err, BLOCK_INFO *blocks) {
 			/* Check if none of the final tree hashes have yet been received. (Final tree hashes must all be present or all missing.) */
 			if (blocks->nofTreeHashes == maxTreeHashes) {
 				/* Check if there is reason to expect final tree hashes. */
-				if (blocks->finalTreeHashesSome) {
+				if (blocks->finalTreeHashesSome || blocks->keepRecordHashes) {
 					/* All final tree hashes are missing, but at least they are being expected -> this is OK and can be repaired. */
 					blocks->finalTreeHashesNone = 1;
 				} else {
@@ -1995,6 +2018,9 @@ static int process_partial_block(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, B
 	res = tlv_element_get_uint(tlv, ksi, 0x01, &blocks->recordCount);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing record count in blocks file.", blocks->blockNo);
 
+	res = is_block_signature_expected(err, blocks);
+	if (res != KT_OK) goto cleanup;
+
 	res = KSI_TlvElement_getElement(tlv, 0x02, &tlvNoSig);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to extract 'no-sig' element in blocks file.", blocks->blockNo);
 
@@ -2118,7 +2144,6 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 			res = calculate_root_hash(ksi, blocks, &rootHash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate root hash.", blocks->blockNo);
 
-			if (rootHash == NULL) printf("root hash = NULL\n");
 			res = logksi_datahash_compare(err, rootHash, docHash, "Root hash computed from record hashes: ", "Signed root hash stored in KSI signature: ");
 			res = continue_on_hash_fail(res, set, blocks, rootHash, docHash, &replacement);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: root hashes not equal.", blocks->blockNo);
