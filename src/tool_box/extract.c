@@ -178,8 +178,8 @@ char *extract_help_toString(char *buf, size_t len) {
 		"             If --sig-from-stdin is used, the log file name must be specified explicitly.\n"
 		" -o <outfile>\n"
 		"             Names of the output files will be derived from <outfile> by adding the appropriate sufixes.\n"
-		"             Name of the log records file will be <outfile.part>.\n"
-		"             Name of the integrity proof file will be <outfile.part.logsig>.\n"
+		"             Name of the excerpt file will be <outfile.excerpt>.\n"
+		"             Name of the integrity proof file will be <outfile.excerpt.logsig>.\n"
 		"             If <outfile> is not specified, names of the output files will be derived from <logfile>.\n"
 		"             <outfile> must be specified if the log file is read from stdin.\n"
 		" --out-log <log.records>\n"
@@ -192,7 +192,8 @@ char *extract_help_toString(char *buf, size_t len) {
 		"             Positions of log records to be extraced, given as a list of ranges.\n"
 		"             Example: -r 12-18,21,88-192\n"
 		"             List of positions must be given in a strictly ascending order using positive decimal numbers.\n"
-		" -d        - Print detailed information about processes and errors to stderr.\n"
+		" -d\n"
+		"           - Print detailed information about processes and errors to stderr.\n"
 		" --log <file>\n"
 		"           - Write libksi log to the given file. Use '-' as file name to redirect the log to stdout.\n",
 		TOOL_getName(),
@@ -283,12 +284,12 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 			res = KT_INVALID_CMD_PARAM;
 			ERR_CATCH_MSG(err, res, "Error: both output files cannot be redirected to stdout.");
 		} else {
-			res = concat_names(files->user.outBase, ".part", &tmp.internal.outLog);
+			res = concat_names(files->user.outBase, ".excerpt", &tmp.internal.outLog);
 			ERR_CATCH_MSG(err, res, "Error: could not generate output log records file name.");
 		}
 	} else {
 		if (files->user.inLog) {
-			res = concat_names(files->user.inLog, ".part", &tmp.internal.outLog);
+			res = concat_names(files->user.inLog, ".excerpt", &tmp.internal.outLog);
 			ERR_CATCH_MSG(err, res, "Error: could not generate output log records file name.");
 		} else {
 			res = KT_INVALID_CMD_PARAM;
@@ -308,12 +309,12 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 			res = KT_INVALID_CMD_PARAM;
 			ERR_CATCH_MSG(err, res, "Error: both output files cannot be redirected to stdout.");
 		} else {
-			res = concat_names(files->user.outBase, ".part.logsig", &tmp.internal.outProof);
+			res = concat_names(files->user.outBase, ".excerpt.logsig", &tmp.internal.outProof);
 			ERR_CATCH_MSG(err, res, "Error: could not generate output log records file name.");
 		}
 	} else {
 		if (files->user.inLog) {
-			res = concat_names(files->user.inLog, ".part.logsig", &tmp.internal.outProof);
+			res = concat_names(files->user.inLog, ".excerpt.logsig", &tmp.internal.outProof);
 			ERR_CATCH_MSG(err, res, "Error: could not generate output integrity proof file name.");
 		} else {
 			res = KT_INVALID_CMD_PARAM;

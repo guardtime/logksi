@@ -20,16 +20,40 @@ cp -r test/resource/logsignatures/signed.logsig.parts test/out
 	[ "$status" -eq 0 ]
 }
 
+@test "integrate signed.parts to output signed_all_final_hashes.logsig" {
+	run ./src/logksi integrate test/out/signed -o test/out/signed_all_final_hashes.logsig -d --insert-missing-hashes
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
+	run test -f test/out/signed_all_final_hashes.logsig
+	[ "$status" -eq 0 ]
+}
+
 @test "try integrating signed.parts again" {
 	run chmod 0444 test/out/signed.logsig
 	run ./src/logksi integrate test/out/signed -d
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ " Error: overwriting of existing output log signature" ]]
+	[[ "$output" =~ " Error: overwriting of existing log signature" ]]
 	run test -f test/out/signed.logsig
 	[ "$status" -eq 0 ]
 	run test -f test/out/signed.logsig.bak
 	[ "$status" -ne 0 ]
 	run chmod 0777 test/out/signed.logsig
+}
+
+@test "integrate signed.parts to output overwritten.logsig" {
+	run ./src/logksi integrate test/out/signed -o test/out/overwritten.logsig -d
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
+	run test -f test/out/overwritten.logsig
+	[ "$status" -eq 0 ]
+}
+
+@test "integrate signed.parts to output overwritten.logsig, force overwriting and insert missing hashes" {
+	run ./src/logksi integrate test/out/signed -o test/out/overwritten.logsig -d --force-overwrite --insert-missing-hashes
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
+	run test -f test/out/overwritten.logsig
+	[ "$status" -eq 0 ]
 }
 
 @test "integrate signed.parts (again) to stdout" {
@@ -49,6 +73,14 @@ cp -r test/resource/logsignatures/unsigned.logsig.parts test/out
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	run test -f test/out/unsigned.logsig
+	[ "$status" -eq 0 ]
+}
+
+@test "integrate unsigned.parts to output unsigned_all_final_hashes.logsig" {
+	run ./src/logksi integrate test/out/unsigned -o test/out/unsigned_all_final_hashes.logsig -d --insert-missing-hashes
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
+	run test -f test/out/unsigned_all_final_hashes.logsig
 	[ "$status" -eq 0 ]
 }
 

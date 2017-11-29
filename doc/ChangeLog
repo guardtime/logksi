@@ -1,12 +1,23 @@
+Version 1.2
+
+2017-11-29 1.2.323
+
+* IMPROVEMENT: Presence of a closing metarecord is checked for incomplete blocks.
+* IMPROVEMENT: Presence of final tree hashes is now also checked when only tree hashes are stored.
+* IMPROVEMENT: New switch '--insert-missing-hashes' can be used to fix log signatures with missing final tree hashes.
+* IMPROVEMENT: New switch '--force-overwrite' can be used to overwrite the existing log signature during integration.
+* IMPROVEMENT: User is warned about unsigned root hashes during integration.
+* IMPROVEMENT: Extracted excerpt file extension renamed from .part to .excerpt.
+* IMPROVEMENT: Help text improved for hash comparison failures.
+* BUGFIX: Parts that contain neither hashes nor signatures are now properly integrated.
+
 Version 1.1
 
 2017-10-05 1.1.258
 
 * BUGFIX: Extending: previous leaf hashes are not verified if record/tree hashes are not available for computing leaf hashes.
 
-Version 1.1.249
-
-2017-08-03
+2017-08-03 1.1.249
 
 * FEATURE: Extraction: hash chains of log records can be extracted into record integrity proof files.
 * FEATURE: Verifying: record integrity proof files can be verified against excerpt files.
@@ -17,13 +28,11 @@ Version 1.1.249
 * IMPROVEMENT: Signing and extending: log signature can now be read from standard input with --log-from-stdin switch.
 * IMPROVEMENT: Integrating: output can be directed to stdout by specifying - as the output file.
 
-Version 1.0.187
+Version 1.0
 
-2017-06-28
+2017-06-28 1.0.187
 
 * BUGFIX: Tree height is now calculated correctly for perfectly balanced trees.
-
-Version 1.0.178
 
 2017-05-04 1.0.178
 

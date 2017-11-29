@@ -20,15 +20,17 @@
 
 
 BUILD_DIR=~/rpmbuild
+PACKAGE_NAME=logksi
 version=$(tr -d [:space:] < VERSION)
 
 autoreconf -if && \
-./configure $* && \
+./configure --enable-use-installed-libksi $* && \
 make clean && \
 make dist && \
 mkdir -p $BUILD_DIR/{BUILD,RPMS,SOURCES,SPECS,SRPMS,tmp} && \
-cp packaging/redhat/ksi.spec $BUILD_DIR/SPECS/ && \
-cp logksi-*$version*.tar.gz $BUILD_DIR/SOURCES/ && \
-rpmbuild -ba $BUILD_DIR/SPECS/ksi.spec && \
-cp $BUILD_DIR/RPMS/*/logksi-*$version*.rpm . && \
-cp $BUILD_DIR/SRPMS/logksi-*$version*.rpm .
+cp packaging/redhat/$PACKAGE_NAME.spec $BUILD_DIR/SPECS/ && \
+cp $PACKAGE_NAME-*$version*.tar.gz $BUILD_DIR/SOURCES/ && \
+rpmbuild -ba $BUILD_DIR/SPECS/$PACKAGE_NAME.spec && \
+cp $BUILD_DIR/RPMS/*/$PACKAGE_NAME-*$version*.rpm . && \
+cp $BUILD_DIR/SRPMS/$PACKAGE_NAME-*$version*.rpm .
+chmod -v 644 *.rpm

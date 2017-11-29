@@ -181,7 +181,8 @@ char *extend_help_toString(char*buf, size_t len) {
 		"             is saved in <logfile.logsig.bak>.\n"
 		"             Use '-' to redirect the extended log signature binary stream to stdout.\n"
 		"             If input is read from stdin and output is not specified, stdout is used for output.\n"
-		" -X <URL>  - Extending service (KSI Extender) URL.\n"
+		" -X <URL>\n"
+		"           - Extending service (KSI Extender) URL.\n"
 		" --ext-user <user>\n"
 		"           - Username for extending service.\n"
 		" --ext-key <key>\n"
@@ -189,16 +190,19 @@ char *extend_help_toString(char*buf, size_t len) {
 		" --ext-hmac-alg <alg>\n"
 		"           - Hash algorithm to be used for computing HMAC on outgoing messages\n"
 		"             towards KSI extender. If not set, default algorithm is used.\n"
-		" -P <URL>  - Publications file URL (or file with URI scheme 'file://').\n"
+		" -P <URL>\n"
+		"           - Publications file URL (or file with URI scheme 'file://').\n"
 		" --cnstr <oid=value>\n"
 		"           - OID of the PKI certificate field (e.g. e-mail address) and the expected\n"
 		"             value to qualify the certificate for verification of publications file\n"
 		"             PKI signature. At least one constraint must be defined.\n"
 		" --pub-str <str>\n"
 		"           - Publication record as publication string to extend the signature to.\n"
-		" -V        - Certificate file in PEM format for publications file verification.\n"
+		" -V\n"
+		"           - Certificate file in PEM format for publications file verification.\n"
 		"             All values from lower priority sources are ignored.\n"
-		" -d        - Print detailed information about processes and errors to stderr.\n"
+		" -d\n"
+		"           - Print detailed information about processes and errors to stderr.\n"
 		" --conf <file>\n"
 		"             Read configuration options from the given file.\n"
 		"             Configuration options given explicitly on command line will\n"
@@ -233,7 +237,7 @@ static int extend_to_nearest_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX
 
 	print_progressDesc(d, "%s", getPublicationsFileRetrieveDescriptionString(set));
 	res = LOGKSI_receivePublicationsFile(err, ksi, &pubFile);
-	ERR_CATCH_MSG(err, res, "Error: Unable receive publications file.");
+	ERR_CATCH_MSG(err, res, "Error: Unable to receive publications file.");
 	print_progressResult(res);
 
 	if (!PARAM_SET_isSetByName(set, "publications-file-no-verify")) {
@@ -327,7 +331,7 @@ static int extend_to_specified_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_C
 
 	print_progressDesc(d, "%s", getPublicationsFileRetrieveDescriptionString(set));
 	res = LOGKSI_receivePublicationsFile(err, ksi, &pubFile);
-	ERR_CATCH_MSG(err, res, "Error: Unable receive publications file.");
+	ERR_CATCH_MSG(err, res, "Error: Unable to receive publications file.");
 	print_progressResult(res);
 
 	print_progressDesc(d, "Searching for a publication record from publications file... ");

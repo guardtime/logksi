@@ -7,6 +7,21 @@ cp -r test/resource/logfiles/signed test/out
 @test "verify integrated signed.logsig" {
 	run ./src/logksi verify test/out/signed -d
 	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Block no.   1: all final tree hashes are missing." ]]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
+}
+
+@test "verify integrated signed_all_final_hashes.logsig" {
+	run ./src/logksi verify test/out/signed test/out/signed_all_final_hashes.logsig -d
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
+}
+
+@test "verify integrated overwritten.logsig" {
+	run ./src/logksi verify test/out/signed test/out/overwritten.logsig -d
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 }
 
@@ -15,5 +30,13 @@ cp -r test/resource/logfiles/unsigned test/out
 @test "try verifying integrated unsigned.logsig" {
 	run ./src/logksi verify test/out/unsigned -d
 	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Block no.   1: all final tree hashes are missing." ]]
+	[[ "$output" =~ "missing KSI signature in block signature." ]]
+}
+
+@test "try verifying integrated unsigned_all_final_hashes.logsig" {
+	run ./src/logksi verify test/out/unsigned test/out/unsigned_all_final_hashes.logsig -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
 	[[ "$output" =~ "missing KSI signature in block signature." ]]
 }

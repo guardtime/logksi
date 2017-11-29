@@ -26,7 +26,7 @@ man_MANS = \
 	../doc/logksi-extract.1 \
 	../doc/logksi-verify.1
 
-dist_doc_DATA = ../LICENSE ../doc/ChangeLog
+dist_doc_DATA = ../LICENSE ../README.md ../doc/ChangeLog
 
 EXTRA_DIST = ../VERSION $(man_MANS) $(dist_doc_DATA)
 logksi_LDADD = -lm

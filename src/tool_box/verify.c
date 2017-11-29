@@ -95,7 +95,7 @@ int verify_run(int argc, char **argv, char **envp) {
 	 * Extract command line parameters and also add configuration specific parameters.
 	 */
 	res = PARAM_SET_new(
-			CONF_generate_param_set_desc("{input}{log-from-stdin}{x}{d}{pub-str}{ver-int}{ver-cal}{ver-key}{ver-pub}{conf}{log}{h|help}", "XP", buf, sizeof(buf)),
+			CONF_generate_param_set_desc("{input}{log-from-stdin}{x}{d}{pub-str}{ver-int}{ver-cal}{ver-key}{ver-pub}{use-computed-hash-on-fail}{use-stored-hash-on-fail}{conf}{log}{h|help}", "XP", buf, sizeof(buf)),
 			&set);
 	if (res != KT_OK) goto cleanup;
 
@@ -209,8 +209,8 @@ char *verify_help_toString(char *buf, size_t len) {
 		"Usage:\n"
 		" %s verify <logfile> [<logfile.logsig>] [more_options]\n"
 		" %s verify --log-from-stdin <logfile.logsig> [more_options]\n"
-		" %s verify <logfile.part> [<logfile.part.logsig>] [more_options]\n"
-		" %s verify --log-from-stdin <logfile.part.logsig> [more_options]\n"
+		" %s verify <logfile.excerpt> [<logfile.excerpt.logsig>] [more_options]\n"
+		" %s verify --log-from-stdin <logfile.excerpt.logsig> [more_options]\n"
 		" %s verify --ver-int <logfile> [<logfile.logsig>] [more_options]\n"
 		" %s verify --ver-cal <logfile> [<logfile.logsig>] -X <URL>\n"
 		"     [--ext-user <user> --ext-key <key>] [more_options]\n"
@@ -221,27 +221,33 @@ char *verify_help_toString(char *buf, size_t len) {
 		" %s verify --ver-pub <logfile> [<logfile.logsig>] -P <URL> [--cnstr <oid=value>]...\n"
 		"        [-x -X <URL>  [--ext-user <user> --ext-key <key>]] [more_options]\n"
 		"\n"
-		" --ver-int - Perform internal verification.\n"
-		" --ver-cal - Perform calendar-based verification (use extending service).\n"
-		" --ver-key - Perform key-based verification.\n"
-		" --ver-pub - Perform publication-based verification (use with -x to permit extending).\n"
+		" --ver-int\n"
+		"           - Perform internal verification.\n"
+		" --ver-cal\n"
+		"           - Perform calendar-based verification (use extending service).\n"
+		" --ver-key\n"
+		"           - Perform key-based verification.\n"
+		" --ver-pub\n"
+		"           - Perform publication-based verification (use with -x to permit extending).\n"
 		" <logfile>\n"
 		"           - Log file to be verified.\n"
 		" <logfile.logsig>\n"
 		"             Log signature file to be verified. If omitted, the log signature file name is\n"
 		"             derived by adding .logsig to <logfile>. It is expected to be found in the\n"
 		"             same folder as the <logfile>.\n"
-		" <logfile.part>\n"
+		" <logfile.excerpt>\n"
 		"           - Excerpt file to be verified.\n"
-		" <logfile.part.logsig>\n"
+		" <logfile.excerpt.logsig>\n"
 		"             Record integrity proof file to be verified. If omitted, the file name is\n"
-		"             derived by adding .logsig to <logfile.part>. It is expected to be found in the\n"
-		"             same folder as the <logfile.part>.\n"
+		"             derived by adding .logsig to <logfile.excerpt>. It is expected to be found in the\n"
+		"             same folder as the <logfile.excerpt>.\n"
 		" --log-from-stdin\n"
 		"           - The log or excerpt file is read from stdin.\n"
 		"             If --log-from-stdin is used, the log signature or integrity proof file name must be specified explicitly.\n"
-		" -x        - Permit to use extender for publication-based verification.\n"
-		" -X <URL>  - Extending service (KSI Extender) URL.\n"
+		" -x\n"
+		"           - Permit to use extender for publication-based verification.\n"
+		" -X <URL>\n"
+		"           - Extending service (KSI Extender) URL.\n"
 		" --ext-user <user>\n"
 		"           - Username for extending service.\n"
 		" --ext-key <key>\n"
@@ -249,16 +255,19 @@ char *verify_help_toString(char *buf, size_t len) {
 		" --ext-hmac-alg <alg>\n"
 		"           - Hash algorithm to be used for computing HMAC on outgoing messages\n"
 		"             towards KSI extender. If not set, default algorithm is used.\n"
-		" -P <URL>  - Publications file URL (or file with URI scheme 'file://').\n"
+		" -P <URL>\n"
+		"           - Publications file URL (or file with URI scheme 'file://').\n"
 		" --cnstr <oid=value>\n"
 		"           - OID of the PKI certificate field (e.g. e-mail address) and the expected\n"
 		"             value to qualify the certificate for verification of publications file\n"
 		"             PKI signature. At least one constraint must be defined.\n"
 		" --pub-str <str>\n"
 		"           - Publication string to verify with.\n"
-		" -V        - Certificate file in PEM format for publications file verification.\n"
+		" -V\n"
+		"           - Certificate file in PEM format for publications file verification.\n"
 		"             All values from lower priority sources are ignored.\n"
-		" -d        - Print detailed information about processes and errors to stderr.\n"
+		" -d\n"
+		"           - Print detailed information about processes and errors to stderr.\n"
 		" --conf <file>\n"
 		"             Read configuration options from the given file.\n"
 		"             Configuration options given explicitly on command line will\n"
@@ -299,12 +308,12 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	PARAM_SET_addControl(set, "{conf}", isFormatOk_inputFile, isContentOk_inputFileRestrictPipe, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{log}", isFormatOk_path, NULL, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{input}", isFormatOk_path, NULL, convertRepair_path, NULL);
-	PARAM_SET_addControl(set, "{log-from-stdin}{d}{x}{ver-int}{ver-cal}{ver-key}{ver-pub}", isFormatOk_flag, NULL, NULL, NULL);
+	PARAM_SET_addControl(set, "{log-from-stdin}{d}{x}{ver-int}{ver-cal}{ver-key}{ver-pub}{use-computed-hash-on-fail}{use-stored-hash-on-fail}", isFormatOk_flag, NULL, NULL, NULL);
 	PARAM_SET_addControl(set, "{pub-str}", isFormatOk_pubString, NULL, NULL, extract_pubString);
 
 	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
 	PARAM_SET_setParseOptions(set, "d,x", PST_PRSCMD_HAS_NO_VALUE | PST_PRSCMD_NO_TYPOS);
-	PARAM_SET_setParseOptions(set, "log-from-stdin,ver-int,ver-cal,ver-key,ver-pub", PST_PRSCMD_HAS_NO_VALUE);
+	PARAM_SET_setParseOptions(set, "log-from-stdin,ver-int,ver-cal,ver-key,ver-pub,use-computed-hash-on-fail,use-stored-hash-on-fail", PST_PRSCMD_HAS_NO_VALUE);
 
 	/*						ID						DESC								MAN							ATL		FORBIDDEN											IGN	*/
 	TASK_SET_add(task_set,	ANC_BASED_DEFAULT,		"Verify, from file.",				"input",						NULL,	"log-from-stdin,ver-int,ver-cal,ver-key,ver-pub,P,cnstr,pub-str",	NULL);

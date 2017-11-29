@@ -70,7 +70,7 @@ int sign_run(int argc, char** argv, char **envp) {
 	 * Extract command line parameters.
 	 */
 	res = PARAM_SET_new(
-			CONF_generate_param_set_desc("{input}{o}{sig-from-stdin}{d}{show-progress}{log}{conf}{h|help}", "S", buf, sizeof(buf)),
+			CONF_generate_param_set_desc("{input}{o}{sig-from-stdin}{insert-missing-hashes}{d}{show-progress}{log}{conf}{h|help}", "S", buf, sizeof(buf)),
 			&set);
 	if (res != KT_OK) goto cleanup;
 
@@ -157,7 +157,8 @@ char *sign_help_toString(char*buf, size_t len) {
 		"             is saved in <logfile.logsig.bak>.\n"
 		"             Use '-' to redirect the signed log signature binary stream to stdout.\n"
 		"             If input is read from stdin and output is not specified, stdout is used for output.\n"
-		" -S <URL>  - Signing service (KSI Aggregator) URL.\n"
+		" -S <URL>\n"
+		"           - Signing service (KSI Aggregator) URL.\n"
 		" --aggr-user <user>\n"
 		"           - Username for signing service.\n"
 		" --aggr-key <key>\n"
@@ -165,8 +166,11 @@ char *sign_help_toString(char*buf, size_t len) {
 		" --aggr-hmac-alg <alg>\n"
 		"           - Hash algorithm to be used for computing HMAC on outgoing messages\n"
 		"             towards KSI aggregator. If not set, default algorithm is used.\n"
-		" -d        - Print detailed information about processes and errors to stderr.\n"
-		" --show-progress"
+		" --insert-missing-hashes\n"
+		"           - Generate and insert missing tree hashes into the log signature file.\n"
+		" -d\n"
+		"           - Print detailed information about processes and errors to stderr.\n"
+		" --show-progress\n"
 		"           - Print signing progress. Only valid with -d.\n"
 		" --conf <file>\n"
 		"           - Read configuration options from the given file. It must be noted\n"
@@ -202,12 +206,12 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	PARAM_SET_addControl(set, "{conf}", isFormatOk_inputFile, isContentOk_inputFileRestrictPipe, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{o}{log}", isFormatOk_path, NULL, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{input}", isFormatOk_path, NULL, convertRepair_path, NULL);
-	PARAM_SET_addControl(set, "{sig-from-stdin}{d}{show-progress}", isFormatOk_flag, NULL, NULL, NULL);
+	PARAM_SET_addControl(set, "{sig-from-stdin}{insert-missing-hashes}{d}{show-progress}", isFormatOk_flag, NULL, NULL, NULL);
 
 
 	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
 	PARAM_SET_setParseOptions(set, "d", PST_PRSCMD_HAS_NO_VALUE | PST_PRSCMD_NO_TYPOS);
-	PARAM_SET_setParseOptions(set, "sig-from-stdin,show-progress", PST_PRSCMD_HAS_NO_VALUE);
+	PARAM_SET_setParseOptions(set, "sig-from-stdin,insert-missing-hashes,show-progress", PST_PRSCMD_HAS_NO_VALUE);
 
 	/*					  ID	DESC										MAN					ATL		FORBIDDEN		IGN	*/
 	TASK_SET_add(task_set, 0,	"Sign data from file.",						"input,S",			NULL,	"sig-from-stdin",			NULL);

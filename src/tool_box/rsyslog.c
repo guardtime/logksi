@@ -169,6 +169,53 @@ cleanup:
 	return res;
 }
 
+int merge_one_level(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash **hash) {
+	int res;
+	unsigned char i = 0;
+	KSI_DataHash *root = NULL;
+	KSI_DataHash *tmp = NULL;
+
+	if (ksi == NULL || blocks == NULL || hash == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	while (i < blocks->treeHeight) {
+		if (blocks->MerkleTree[i]) {
+			if (root == NULL) {
+				/* Initialize root hash only if there is at least one more hash afterwards. */
+				if (i < blocks->treeHeight - 1) {
+					root = KSI_DataHash_ref(blocks->MerkleTree[i]);
+					KSI_DataHash_free(blocks->MerkleTree[i]);
+					blocks->MerkleTree[i] = NULL;
+				}
+			} else {
+				res = calculate_new_tree_hash(ksi, blocks, blocks->MerkleTree[i], root, i + 2, &tmp);
+				if (res != KT_OK) goto cleanup;
+
+				KSI_DataHash_free(root);
+				root = tmp;
+
+				KSI_DataHash_free(blocks->MerkleTree[i]);
+				blocks->MerkleTree[i] = KSI_DataHash_ref(root);
+				break;
+			}
+		}
+		i++;
+	}
+
+	*hash = KSI_DataHash_ref(root);
+	tmp = NULL;
+
+	res = KT_OK;
+
+cleanup:
+
+	KSI_DataHash_free(root);
+	KSI_DataHash_free(tmp);
+	return res;
+}
+
 int calculate_root_hash(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash **hash) {
 	int res;
 	unsigned char i = 0;
@@ -669,26 +716,118 @@ cleanup:
 	return res;
 }
 
-int logksi_datahash_compare(ERR_TRCKR *err, KSI_DataHash *expected, KSI_DataHash *received) {
+int tlv_element_create_hash(KSI_DataHash *hash, unsigned tag, KSI_TlvElement **tlv) {
 	int res;
-	KSI_HashAlgorithm expected_id;
-	KSI_HashAlgorithm received_id;
+	KSI_TlvElement *tmp = NULL;
+	unsigned char *imprint = NULL;
+	size_t length = 0;
 
-	if (expected == NULL || received == NULL) {
+	res = KSI_TlvElement_new(&tmp);
+	if (res != KSI_OK) goto cleanup;
+
+	res = KSI_DataHash_getImprint(hash, (const unsigned char **)&imprint, &length);
+	if (res != KSI_OK) goto cleanup;
+
+	tmp->ftlv.tag = tag;
+	tmp->ptr = imprint;
+	tmp->ftlv.dat_len = length;
+
+	*tlv = tmp;
+	tmp = NULL;
+	res = KSI_OK;
+
+cleanup:
+
+	KSI_TlvElement_free(tmp);
+	return res;
+}
+
+int tlv_element_write_hash(KSI_DataHash *hash, unsigned tag, FILE *out) {
+	int res;
+	KSI_TlvElement *tlv = NULL;
+	unsigned char buf[0xffff + 4];
+	size_t len = 0;
+	unsigned char *ptr = NULL;
+
+	if (hash == NULL || out == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
 
-	if (!KSI_DataHash_equals(expected, received)) {
+	res = tlv_element_create_hash(hash, tag, &tlv);
+	if (res != KT_OK) goto cleanup;
+
+	res = KSI_TlvElement_serialize(tlv, buf, sizeof(buf), &len, KSI_TLV_OPT_NO_MOVE);
+	if (res != KSI_OK) goto cleanup;
+
+	ptr = buf + sizeof(buf) - len;
+
+	if (fwrite(ptr, 1, len, out) != len) {
+		res = KT_IO_ERROR;
+		goto cleanup;
+	}
+
+	res = KT_OK;
+
+cleanup:
+
+	KSI_TlvElement_free(tlv);
+	return res;
+}
+
+static int format_hash_help(const char *helpLeft, const char *helpRight, char *bufLeft, char *bufRight, size_t bufLen) {
+	int res;
+	int len = 0;
+
+	if (bufLeft == NULL || bufRight == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	if (helpLeft == NULL) helpLeft = "Computed hash: ";
+	if (helpRight == NULL) helpRight = "Stored hash: ";
+
+	len = strlen(helpLeft) > strlen(helpRight) ? strlen(helpLeft) : strlen(helpRight);
+
+	if (len > bufLen - 1) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	sprintf(bufLeft, "%*s", len, helpLeft);
+	sprintf(bufRight, "%*s", len, helpRight);
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
+
+int logksi_datahash_compare(ERR_TRCKR *err, KSI_DataHash *left, KSI_DataHash *right, const char *helpLeft, const char *helpRight) {
+	int res;
+	KSI_HashAlgorithm leftId;
+	KSI_HashAlgorithm rightId;
+	char bufLeft[256];
+	char bufRight[256];
+
+	if (left == NULL || right == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	if (!KSI_DataHash_equals(left, right)) {
 		res = KT_VERIFICATION_FAILURE;
 		print_progressResult(res);
-		if (KSI_DataHash_getHashAlg(expected, &expected_id) == KSI_OK &&
-			KSI_DataHash_getHashAlg(received, &received_id) == KSI_OK &&
-			expected_id != received_id) {
+		if (KSI_DataHash_getHashAlg(left, &leftId) == KSI_OK &&
+			KSI_DataHash_getHashAlg(right, &rightId) == KSI_OK &&
+			leftId != rightId) {
 			ERR_TRCKR_ADD(err, res, "Error: Hash algorithm in block header does not match the hash algorithm in received hash.");
 		}
-		OBJPRINT_Hash(expected, "Expected hash: ", print_debug);
-		OBJPRINT_Hash(received, "Received hash: ", print_debug);
+
+		if(format_hash_help(helpLeft, helpRight, bufLeft, bufRight, 256) != KT_OK) goto cleanup;
+
+		OBJPRINT_Hash(left, bufLeft, print_debug);
+		OBJPRINT_Hash(right, bufRight, print_debug);
 		goto cleanup;
 	}
 
@@ -806,10 +945,40 @@ cleanup:
 	return res;
 }
 
-static int process_block_header(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
+int continue_on_hash_fail(int result, PARAM_SET *set, BLOCK_INFO *blocks, KSI_DataHash *computed, KSI_DataHash *stored, KSI_DataHash **replacement) {
+	int res = result;
+
+	if (set == NULL || blocks == NULL || computed == NULL || stored == NULL || replacement == NULL) {
+		goto cleanup;
+	}
+
+	if (res == KT_OK) {
+		*replacement = KSI_DataHash_ref(computed);
+	} else {
+		blocks->nofHashFails++;
+		if (PARAM_SET_isSetByName(set, "use-computed-hash-on-fail")) {
+			print_debug("Using computed hash to continue.\n");
+			*replacement = KSI_DataHash_ref(computed);
+			res = KT_OK;
+		} else if (PARAM_SET_isSetByName(set, "use-stored-hash-on-fail")) {
+			*replacement = KSI_DataHash_ref(stored);
+			print_debug("Using stored hash to continue.\n");
+			res = KT_OK;
+		} else {
+			*replacement = KSI_DataHash_ref(computed);
+		}
+	}
+
+cleanup:
+
+	return res;
+}
+
+static int process_block_header(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	KSI_OctetString *seed = NULL;
 	KSI_DataHash *hash = NULL;
+	KSI_DataHash *replacement = NULL;
 	unsigned char i = 0;
 	KSI_TlvElement *tlv = NULL;
 	size_t algo;
@@ -824,7 +993,7 @@ static int process_block_header(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks
 
 	if (blocks->blockNo > blocks->sigNo) {
 		res = KT_INVALID_INPUT_FORMAT;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: block signature data missing.", blocks->blockNo);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: block signature data missing.", blocks->blockNo);
 	}
 	blocks->blockNo++;
 	blocks->recordCount = 0;
@@ -833,28 +1002,33 @@ static int process_block_header(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks
 	blocks->finalTreeHashesSome = 0;
 	blocks->finalTreeHashesNone = 0;
 	blocks->finalTreeHashesAll = 0;
+	blocks->finalTreeHashesLeaf = 0;
+	blocks->unsignedRootHash = 0;
 
 	res = tlv_element_parse_and_check_sub_elements(err, ksi, blocks->ftlv_raw, blocks->ftlv_len, blocks->ftlv.hdr_len, &tlv);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse block header as TLV element.", blocks->blockNo);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse block header as TLV element.", blocks->blockNo);
 
 	res = tlv_element_get_uint(tlv, ksi, 0x01, &algo);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing hash algorithm in block header.", blocks->blockNo);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing hash algorithm in block header.", blocks->blockNo);
 
 	res = tlv_get_octet_string(tlv, ksi, 0x02, &seed);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing random seed in block header.", blocks->blockNo);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing random seed in block header.", blocks->blockNo);
 
 	res = tlv_element_get_hash(err, tlv, ksi, 0x03, &hash);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse last hash of previous block.", blocks->blockNo);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse last hash of previous block.", blocks->blockNo);
 
 	if (blocks->prevLeaf != NULL) {
-		res = logksi_datahash_compare(err, blocks->prevLeaf, hash);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: last hashes of previous blocks not equal.", blocks->blockNo);
+		res = logksi_datahash_compare(err, blocks->prevLeaf, hash, "Last hash computed from previous block data: ", "Last hash stored in current block header: ");
+		res = continue_on_hash_fail(res, set, blocks, blocks->prevLeaf, hash, &replacement);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: last hashes of previous block not equal.", blocks->blockNo);
+	} else {
+		replacement = KSI_DataHash_ref(hash);
 	}
 
 	if (files->files.outSig) {
 		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->files.outSig) != blocks->ftlv_len) {
 			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to copy block header.", blocks->blockNo);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to copy block header.", blocks->blockNo);
 		}
 	}
 
@@ -863,8 +1037,7 @@ static int process_block_header(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks
 	blocks->randomSeed = seed;
 	seed = NULL;
 	KSI_DataHash_free(blocks->prevLeaf);
-	blocks->prevLeaf = hash;
-	hash = NULL;
+	blocks->prevLeaf = replacement;
 
 	while (i < blocks->treeHeight) {
 		KSI_DataHash_free(blocks->MerkleTree[i]);
@@ -921,22 +1094,22 @@ static int is_record_hash_expected(ERR_TRCKR *err, BLOCK_INFO *blocks) {
 	/* Check if record hash is received between block header and block signature. */
 	if (blocks->blockNo == blocks->sigNo) {
 		res = KT_VERIFICATION_FAILURE;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: record hash without preceding block header found.", blocks->blockNo + 1);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: record hash without preceding block header found.", blocks->blockNo + 1);
 	}
 	/* Check if record hashes are present for previous records. */
 	if (blocks->nofRecordHashes > 0 && blocks->keepRecordHashes == 0) {
 		res = KT_VERIFICATION_FAILURE;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing record hash for logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing record hash for logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
 	}
 	/* Check if all tree hashes are present for previous records. */
 	if (blocks->keepTreeHashes && blocks->nofTreeHashes != max_tree_hashes(blocks->nofRecordHashes)) {
 		res = KT_VERIFICATION_FAILURE;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing tree hash(es) for logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing tree hash(es) for logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
 	}
 	/* Check if record hashes are present in previous blocks. */
 	if (blocks->blockNo > 1 && blocks->keepRecordHashes == 0) {
 		res = KT_VERIFICATION_FAILURE;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: all record hashes missing.", blocks->blockNo - 1);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: all record hashes missing.", blocks->blockNo - 1);
 	}
 
 	res = KT_OK;
@@ -946,10 +1119,11 @@ cleanup:
 	return res;
 }
 
-static int process_record_hash(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
+static int process_record_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	KSI_DataHash *recordHash = NULL;
 	KSI_DataHash *hash = NULL;
+	KSI_DataHash *replacement = NULL;
 
 	if (err == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -965,15 +1139,16 @@ static int process_record_hash(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks,
 	blocks->nofRecordHashes++;
 
 	res = LOGKSI_DataHash_fromImprint(err, ksi, blocks->ftlv_raw + blocks->ftlv.hdr_len, blocks->ftlv.dat_len, &recordHash);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse hash of logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse hash of logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
 
 	if (blocks->metarecordHash != NULL) {
 		/* This is a metarecord hash. */
-		res = logksi_datahash_compare(err, blocks->metarecordHash, recordHash);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: metarecord hashes not equal.", blocks->blockNo);
+		res = logksi_datahash_compare(err, blocks->metarecordHash, recordHash, "Metarecord hash computed from metarecord: ", "Metarecord hash stored in log signature file: ");
+		res = continue_on_hash_fail(res, set, blocks, blocks->metarecordHash, recordHash, &replacement);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: metarecord hashes not equal.", blocks->blockNo);
 
-		res = add_record_hash_to_merkle_tree(ksi, blocks, 1, blocks->metarecordHash);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
+		res = add_record_hash_to_merkle_tree(ksi, blocks, 1, replacement);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
 
 		KSI_DataHash_free(blocks->metarecordHash);
 		blocks->metarecordHash = NULL;
@@ -981,23 +1156,30 @@ static int process_record_hash(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks,
 		/* This is a logline record hash. */
 		if (files->files.inLog) {
 			res = get_hash_of_logline(ksi, blocks, files, &hash);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate hash of logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
+			if (res == KT_IO_ERROR) {
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: record hash no. %zu does not have a matching logline, end of logfile reached.", blocks->blockNo, get_nof_lines(blocks));
+			} else {
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate hash of logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
+			}
 
-			res = logksi_datahash_compare(err, hash, recordHash);
+			res = logksi_datahash_compare(err, hash, recordHash, "Record hash computed from logline: ", "Record hash stored in log signature file: ");
 			if (res != KT_OK) {
 				print_debug("Received logline: %s", blocks->logLine);
 			}
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: record hashes not equal for logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
+			res = continue_on_hash_fail(res, set, blocks, hash, recordHash, &replacement);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: record hashes not equal for logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
+		} else {
+			replacement = KSI_DataHash_ref(recordHash);
 		}
 
-		res = add_record_hash_to_merkle_tree(ksi, blocks, 0, recordHash);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to add hash to Merkle tree.", blocks->blockNo);
+		res = add_record_hash_to_merkle_tree(ksi, blocks, 0, replacement);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add hash to Merkle tree.", blocks->blockNo);
 	}
 
 	if (files->files.outSig) {
 		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->files.outSig) != blocks->ftlv_len) {
 			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to copy record hash.", blocks->blockNo);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to copy record hash.", blocks->blockNo);
 		}
 	}
 	res = KT_OK;
@@ -1005,6 +1187,7 @@ static int process_record_hash(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks,
 cleanup:
 
 	print_progressResult(res);
+	KSI_DataHash_free(replacement);
 	KSI_DataHash_free(recordHash);
 	KSI_DataHash_free(hash);
 	return res;
@@ -1024,6 +1207,19 @@ static int max_final_hashes(BLOCK_INFO *blocks) {
 	return finalHashes;
 }
 
+static size_t nof_unverified_hashes(BLOCK_INFO *blocks) {
+	size_t count = 0;
+	size_t i;
+
+	for (i = 0; i < blocks->treeHeight; i++) {
+		if (blocks->notVerified[i]) {
+			count++;
+		}
+	}
+
+	return count;
+}
+
 static int is_tree_hash_expected(ERR_TRCKR *err, BLOCK_INFO *blocks) {
 	int res;
 	int i;
@@ -1037,20 +1233,24 @@ static int is_tree_hash_expected(ERR_TRCKR *err, BLOCK_INFO *blocks) {
 	/* Check if tree hash is received between block header and block signature. */
 	if (blocks->blockNo == blocks->sigNo) {
 		res = KT_VERIFICATION_FAILURE;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: tree hash without preceding block header found.", blocks->blockNo + 1);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: tree hash without preceding block header found.", blocks->blockNo + 1);
 	}
 	/* Check if tree hashes are present for previous records. */
 	if (blocks->nofRecordHashes > 1 && blocks->keepTreeHashes == 0) {
 		res = KT_VERIFICATION_FAILURE;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing tree hash for logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks) - 1);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing tree hash for logline no. %zu.", blocks->blockNo, get_nof_lines(blocks) - 1);
 	}
 	/* Check if all record hashes are present for previous records. */
 	if (blocks->keepRecordHashes && blocks->nofTreeHashes == max_tree_hashes(blocks->nofRecordHashes)) {
-		/* Either a record hash is missing or the tree hash is used in finalizing the unbalanced tree. */
+		/* All the tree hashes that can be computed from the received record hashes have been received.
+		 * However, another tree hash was just received, so either the preceding record hash is missing or
+		 * the tree hash is used in finalizing the unbalanced tree. */
 		if (blocks->balanced) {
+			/* The tree is balanced, so no finalizing is needed. Thus the tree hash is unexpected, probably due to a missing record hash. */
 			res = KT_VERIFICATION_FAILURE;
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing record hash for logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks) + 1);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing record hash for logline no. %zu.", blocks->blockNo, get_nof_lines(blocks) + 1);
 		} else {
+			/* Assuming that no record hashes are missing, let's start the finalizing process. */
 			blocks->finalTreeHashesSome = 1;
 			/* Prepare tree hashes for verification of finalizing. */
 			for (i = 0; i < blocks->treeHeight; i++) {
@@ -1058,16 +1258,17 @@ static int is_tree_hash_expected(ERR_TRCKR *err, BLOCK_INFO *blocks) {
 			}
 		}
 	}
+
 	/* Check if all final tree hashes are present. */
 	if (blocks->finalTreeHashesSome && blocks->nofTreeHashes == max_tree_hashes(blocks->nofRecordHashes) + max_final_hashes(blocks)) {
 		res = KT_VERIFICATION_FAILURE;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unexpected final tree hash no. %3zu.", blocks->blockNo, blocks->nofTreeHashes + 1);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unexpected final tree hash no. %zu.", blocks->blockNo, blocks->nofTreeHashes + 1);
 	}
 
 	/* Check if tree hashes are present in previous blocks. */
 	if (blocks->blockNo > 1 && blocks->keepTreeHashes == 0) {
 		res = KT_VERIFICATION_FAILURE;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: all tree hashes missing.", blocks->blockNo - 1);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: all tree hashes missing.", blocks->blockNo - 1);
 	}
 	res = KT_OK;
 
@@ -1076,12 +1277,13 @@ cleanup:
 	return res;
 }
 
-static int process_tree_hash(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
+static int process_tree_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	KSI_DataHash *treeHash = NULL;
 	KSI_DataHash *recordHash = NULL;
 	KSI_DataHash *tmpRoot = NULL;
 	KSI_DataHash *root = NULL;
+	KSI_DataHash *replacement = NULL;
 	unsigned char i;
 
 	if (err == NULL || files == NULL || blocks == NULL) {
@@ -1098,43 +1300,51 @@ static int process_tree_hash(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, I
 	blocks->nofTreeHashes++;
 
 	res = LOGKSI_DataHash_fromImprint(err, ksi, blocks->ftlv_raw + blocks->ftlv.hdr_len, blocks->ftlv.dat_len, &treeHash);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse tree hash.", blocks->blockNo);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse tree hash.", blocks->blockNo);
 
 	if (files->files.outSig) {
 		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->files.outSig) != blocks->ftlv_len) {
 			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to copy record hash.", blocks->blockNo);
-		}
-	}
-
-	/* If the block contains tree hashes, but not record hashes:
-	 * Calculate missing record hashes from the records in the logfile and
-	 * build the Merkle tree according to the number of tree hashes encountered. */
-	if (blocks->keepRecordHashes == 0 && blocks->nofTreeHashes > max_tree_hashes(blocks->nofRecordHashes)) {
-		blocks->nofRecordHashes++;
-		if (files->files.inLog) {
-			if (blocks->metarecordHash) {
-				res = add_record_hash_to_merkle_tree(ksi, blocks, 1, blocks->metarecordHash);
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
-
-				KSI_DataHash_free(blocks->metarecordHash);
-				blocks->metarecordHash = NULL;
-			} else {
-				res = get_hash_of_logline(ksi, blocks, files, &recordHash);
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate hash of logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
-				res = add_record_hash_to_merkle_tree(ksi, blocks, 0, recordHash);
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to add record hash to Merkle tree.", blocks->blockNo);
-				KSI_DataHash_free(recordHash);
-				recordHash = NULL;
-			}
-		} else {
-			/* No log file available so build the Merkle tree from tree hashes alone. */
-			res = add_leaf_hash_to_merkle_tree(ksi, blocks, treeHash, 0);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to add leaf hash to Merkle tree.", blocks->blockNo);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to copy tree hash.", blocks->blockNo);
 		}
 	}
 
 	if (!blocks->finalTreeHashesSome) {
+		/* If the block contains tree hashes, but not record hashes:
+		 * Calculate missing record hashes from the records in the logfile and
+		 * build the Merkle tree according to the number of tree hashes encountered. */
+		if (blocks->keepRecordHashes == 0 && blocks->nofTreeHashes > max_tree_hashes(blocks->nofRecordHashes)) {
+			/* If the block is closed prematurely with a metarecord, process the current tree hash as a mandatory leaf hash.
+			 * Subsequent tree hashes are either mandatory tree hashes corresponding to the metarecord hash or optional final tree hashes. */
+			if (blocks->metarecordHash) {
+				blocks->finalTreeHashesLeaf = 1;
+			}
+			blocks->nofRecordHashes++;
+			if (files->files.inLog) {
+				if (blocks->metarecordHash) {
+					res = add_record_hash_to_merkle_tree(ksi, blocks, 1, blocks->metarecordHash);
+					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
+
+					KSI_DataHash_free(blocks->metarecordHash);
+					blocks->metarecordHash = NULL;
+				} else {
+					res = get_hash_of_logline(ksi, blocks, files, &recordHash);
+					if (res == KT_IO_ERROR) {
+						ERR_CATCH_MSG(err, res, "Error: Block no. %zu: tree hash does not have a matching logline no. %zu, end of logfile reached.", blocks->blockNo, get_nof_lines(blocks));
+					} else {
+						ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate hash of logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
+					}
+					res = add_record_hash_to_merkle_tree(ksi, blocks, 0, recordHash);
+					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add record hash to Merkle tree.", blocks->blockNo);
+					KSI_DataHash_free(recordHash);
+					recordHash = NULL;
+				}
+			} else {
+				/* No log file available so build the Merkle tree from tree hashes alone. */
+				res = add_leaf_hash_to_merkle_tree(ksi, blocks, treeHash, 0);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add leaf hash to Merkle tree.", blocks->blockNo);
+			}
+		}
 		if (blocks->nofRecordHashes) {
 			/* Find the corresponding tree hash from the Merkle tree. */
 			for (i = 0; i < blocks->treeHeight; i++) {
@@ -1142,22 +1352,32 @@ static int process_tree_hash(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, I
 			}
 			if (i == blocks->treeHeight) {
 				res = KT_VERIFICATION_FAILURE;
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unexpected tree hash for logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unexpected tree hash for logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
 			}
 
-			res = logksi_datahash_compare(err, blocks->notVerified[i], treeHash);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: tree hashes not equal for logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
+			res = logksi_datahash_compare(err, blocks->notVerified[i], treeHash, "Tree hash computed from record hashes: ", "Tree hash stored in log signature file: ");
+			res = continue_on_hash_fail(res, set, blocks, blocks->notVerified[i], treeHash, &replacement);
+			if (blocks->keepRecordHashes) {
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: tree hashes not equal for logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
+			} else {
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: tree hashes not equal.", blocks->blockNo);
+			}
 
 			KSI_DataHash_free(blocks->notVerified[i]);
 			blocks->notVerified[i] = NULL;
 		}
+		if (blocks->finalTreeHashesLeaf && !nof_unverified_hashes(blocks)) {
+			/* This was the last mandatory tree hash. From this point forward all tree hashes must be interpreted as optional final tree hashes. */
+			blocks->finalTreeHashesSome = 1;
+			for (i = 0; i < blocks->treeHeight; i++) {
+				blocks->notVerified[i] = KSI_DataHash_ref(blocks->MerkleTree[i]);
+			}
+		}
 	} else {
 		if (blocks->nofRecordHashes) {
+			print_progressResult(res);
+			print_progressDesc(0, "Block no. %3zu: interpreting tree hash no. %3zu as a final hash... ", blocks->blockNo, blocks->nofTreeHashes);
 			/* Find the corresponding tree hash from the Merkle tree. */
-			if (blocks && blocks->finalTreeHashesSome) {
-				print_progressResult(res);
-				print_progressDesc(0, "Block no. %3zu: interpreting tree hash no. %3zu as a final hash... ", blocks->blockNo, blocks->nofTreeHashes);
-			}
 			i = 0;
 			while (i < blocks->treeHeight) {
 				if (root == NULL) {
@@ -1179,13 +1399,15 @@ static int process_tree_hash(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, I
 			}
 			if (i == blocks->treeHeight) {
 				res = KT_VERIFICATION_FAILURE;
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unexpected tree hash for logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unexpected tree hash for logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
 			}
 
-			res = logksi_datahash_compare(err, blocks->notVerified[i], treeHash);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: tree hashes not equal for logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
+			res = logksi_datahash_compare(err, blocks->notVerified[i], treeHash, "Tree hash computed from record hashes: ", "Tree hash stored in log signature file: ");
+			res = continue_on_hash_fail(res, set, blocks, blocks->notVerified[i], treeHash, &replacement);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: tree hashes not equal for logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
 		}
 	}
+
 	res = KT_OK;
 
 cleanup:
@@ -1195,6 +1417,7 @@ cleanup:
 	KSI_DataHash_free(recordHash);
 	KSI_DataHash_free(tmpRoot);
 	KSI_DataHash_free(root);
+	KSI_DataHash_free(replacement);
 	return res;
 }
 
@@ -1212,10 +1435,10 @@ static int process_metarecord(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, 
 	print_progressDesc(0, "Block no. %3zu: processing metarecord... ", blocks->blockNo);
 
 	res = tlv_element_parse_and_check_sub_elements(err, ksi, blocks->ftlv_raw, blocks->ftlv_len, blocks->ftlv.hdr_len, &tlv);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse metarecord as TLV element.", blocks->blockNo);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse metarecord as TLV element.", blocks->blockNo);
 
 	res = tlv_element_get_uint(tlv, ksi, 0x01, &metarecord_index);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing metarecord index.", blocks->blockNo);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing metarecord index.", blocks->blockNo);
 
 	if (files->files.inLog) {
 		/* If the block contains metarecords but not the corresponding record hashes:
@@ -1225,27 +1448,31 @@ static int process_metarecord(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, 
 			/* Add the previous metarecord to Merkle tree. */
 			blocks->nofRecordHashes++;
 			res = add_record_hash_to_merkle_tree(ksi, blocks, 1, blocks->metarecordHash);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
 		}
 
 		while (blocks->nofRecordHashes < metarecord_index) {
 			blocks->nofRecordHashes++;
 			res = get_hash_of_logline(ksi, blocks, files, &hash);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing logline no. %4zu up to metarecord index %3zu.", blocks->blockNo, get_nof_lines(blocks), metarecord_index);
+			if (res == KT_IO_ERROR) {
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: at least %zu loglines expected up to metarecord index %zu, end of logfile reached.", blocks->blockNo, get_nof_lines(blocks), metarecord_index);
+			} else {
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate hash of logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
+			}
 			res = add_record_hash_to_merkle_tree(ksi, blocks, 0, hash);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
 			KSI_DataHash_free(hash);
 			hash = NULL;
 		}
 	}
 
 	res = get_hash_of_metarecord(ksi, blocks, tlv, &hash);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate metarecord hash with index %3zu.", blocks->blockNo, metarecord_index);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate metarecord hash with index %zu.", blocks->blockNo, metarecord_index);
 
 	if (files->files.outSig) {
 		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->files.outSig) != blocks->ftlv_len) {
 			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to copy metarecord hash.", blocks->blockNo);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to copy metarecord hash.", blocks->blockNo);
 		}
 	}
 
@@ -1280,36 +1507,48 @@ int is_block_signature_expected(ERR_TRCKR *err, BLOCK_INFO *blocks) {
 		/* Check if record hash is present for the most recent metarecord (if any). */
 		if (blocks->metarecordHash) {
 			res = KT_VERIFICATION_FAILURE;
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing record hash for metarecord with index %3zu.", blocks->blockNo, blocks->nofRecordHashes);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing record hash for metarecord with index %zu.", blocks->blockNo, blocks->nofRecordHashes);
 		}
 		/* Check if all record hashes are present in the current block. */
 		if (blocks->nofRecordHashes < blocks->recordCount) {
 			res = KT_VERIFICATION_FAILURE;
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing record hash for logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks) + 1);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing record hash for logline no. %zu.", blocks->blockNo, get_nof_lines(blocks) + 1);
 		}
 	}
 
 	if (blocks->keepTreeHashes) {
+		if (!blocks->keepRecordHashes && !blocks->balanced && !blocks->finalTreeHashesSome) {
+			res = KT_VERIFICATION_FAILURE;
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: incomplete block is closed without a metarecord.", blocks->blockNo);
+		}
 		/* Check if all mandatory tree hashes are present in the current block. */
 		if (blocks->nofTreeHashes < maxTreeHashes) {
 			res = KT_VERIFICATION_FAILURE;
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing tree hash(es) for logline no. %4zu.", blocks->blockNo, blocks->recordCount + blocks->nofTotalRecordHashes);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing tree hash(es) for logline no. %zu.", blocks->blockNo, blocks->recordCount + blocks->nofTotalRecordHashes);
 		}
-		/* Check if the block contains too few optional tree hashes. */
+		/* Check if the block contains too few final tree hashes. */
 		if (blocks->nofTreeHashes < maxTreeHashes + maxFinalHashes) {
+			/* Check if none of the final tree hashes have yet been received. (Final tree hashes must all be present or all missing.) */
 			if (blocks->nofTreeHashes == maxTreeHashes) {
-				/* Special case: if all optional tree hashes are missing, we issue just a warning. */
-				blocks->finalTreeHashesNone = 1;
+				/* Check if there is reason to expect final tree hashes. */
+				if (blocks->finalTreeHashesSome || blocks->keepRecordHashes) {
+					/* All final tree hashes are missing, but at least they are being expected -> this is OK and can be repaired. */
+					blocks->finalTreeHashesNone = 1;
+				} else {
+					/* All of the final tree hashes are missing, but they are not being expected either (e.g. missing metarecord). This should never happen. */
+					res = KT_VERIFICATION_FAILURE;
+					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: all final tree hashes are missing and block is closed without a metarecord.", blocks->blockNo);
+				}
 			} else {
-				/* If however some optional tree hashes are present, they must all be present. */
+				/* If some final tree hashes are present, they must all be present. */
 				res = KT_VERIFICATION_FAILURE;
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: found %3zu final tree hashes instead of %3zu.", blocks->blockNo, blocks->nofTreeHashes - maxTreeHashes, maxFinalHashes);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: found %zu final tree hashes instead of %zu.", blocks->blockNo, blocks->nofTreeHashes - maxTreeHashes, maxFinalHashes);
 			}
 		}
 		/* Check if the block contains too many optional tree hashes. */
 		if (blocks->nofTreeHashes > maxTreeHashes + maxFinalHashes) {
 			res = KT_VERIFICATION_FAILURE;
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: found %3zu final tree hashes instead of %3zu.", blocks->blockNo, blocks->nofTreeHashes - maxTreeHashes, maxFinalHashes);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: found %zu final tree hashes instead of %zu.", blocks->blockNo, blocks->nofTreeHashes - maxTreeHashes, maxFinalHashes);
 		}
 		if (blocks->nofTreeHashes == maxTreeHashes + maxFinalHashes) {
 			blocks->finalTreeHashesAll = 1;
@@ -1346,23 +1585,23 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 	blocks->sigNo++;
 	if (blocks->sigNo > blocks->blockNo) {
 		res = KT_VERIFICATION_FAILURE;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: block signature data without preceding block header found.", blocks->sigNo);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: block signature data without preceding block header found.", blocks->sigNo);
 	}
 
 	print_progressDesc(0, "Block no. %3zu: processing block signature data... ", blocks->blockNo);
 
 	res = tlv_element_parse_and_check_sub_elements(err, ksi, blocks->ftlv_raw, blocks->ftlv_len, blocks->ftlv.hdr_len, &tlv);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse block signature as TLV element.", blocks->blockNo);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse block signature as TLV element.", blocks->blockNo);
 
 	res = tlv_element_get_uint(tlv, ksi, 0x01, &blocks->recordCount);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing record count in block signature.", blocks->blockNo);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing record count in block signature.", blocks->blockNo);
 
 	res = KSI_TlvElement_getElement(tlv, 0x905, &tlvSig);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to extract KSI signature element in block signature.", blocks->blockNo);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to extract KSI signature element in block signature.", blocks->blockNo);
 
 	if (tlvSig == NULL) {
 		res = KT_INVALID_INPUT_FORMAT;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing KSI signature in block signature.", blocks->blockNo);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing KSI signature in block signature.", blocks->blockNo);
 	}
 
 	res = is_block_signature_expected(err, blocks);
@@ -1376,7 +1615,7 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 			/* Add the previous metarecord to Merkle tree. */
 			blocks->nofRecordHashes++;
 			res = add_record_hash_to_merkle_tree(ksi, blocks, 1, blocks->metarecordHash);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
 		}
 
 		/* If the block contains neither record hashes nor tree hashes:
@@ -1386,9 +1625,13 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 			while (blocks->nofRecordHashes < blocks->recordCount) {
 				blocks->nofRecordHashes++;
 				res = get_hash_of_logline(ksi, blocks, files, &hash);
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate hash of logline no. %3zu.", blocks->blockNo, blocks->nofRecordHashes);
+				if (res == KT_IO_ERROR) {
+					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: at least %zu loglines expected, end of logfile reached.", blocks->blockNo, get_nof_lines(blocks));
+				} else {
+					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate hash of logline no. %zu.", blocks->blockNo, blocks->nofRecordHashes);
+				}
 				res = add_record_hash_to_merkle_tree(ksi, blocks, 0, hash);
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to add hash to Merkle tree.", blocks->blockNo);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add hash to Merkle tree.", blocks->blockNo);
 				KSI_DataHash_free(hash);
 				hash = NULL;
 			}
@@ -1405,57 +1648,57 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 	 * their count must match the record count in block signature. */
 	if (blocks->nofRecordHashes && blocks->nofRecordHashes != blocks->recordCount) {
 		res = KT_VERIFICATION_FAILURE;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: expected %zu record hashes, but found %zu.", blocks->blockNo, blocks->recordCount, blocks->nofRecordHashes);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: expected %zu record hashes, but found %zu.", blocks->blockNo, blocks->recordCount, blocks->nofRecordHashes);
 	}
 	print_progressResult(res);
 	print_progressDesc(1, "Block no. %3zu: verifying KSI signature... ", blocks->blockNo);
 
 	blocks->nofTotalRecordHashes += blocks->nofRecordHashes;
 	res = calculate_root_hash(ksi, blocks, (KSI_DataHash**)&context.documentHash);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to get root hash for verification.", blocks->blockNo);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to get root hash for verification.", blocks->blockNo);
 
 	if (processors->verify_signature) {
-		res = KSI_Signature_parseWithPolicy(ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_EMPTY, NULL, &sig);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse KSI signature.", blocks->blockNo);
+		res = LOGKSI_Signature_parseWithPolicy(err, ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_EMPTY, NULL, &sig);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse KSI signature.", blocks->blockNo);
 
 		res = processors->verify_signature(set, err, ksi, sig, (KSI_DataHash*)context.documentHash, &verificationResult);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: KSI signature verification failed.", blocks->blockNo);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: KSI signature verification failed.", blocks->blockNo);
 		/* TODO: add dumping of verification results. */
 		KSI_PolicyVerificationResult_free(verificationResult);
 		verificationResult = NULL;
 
 	} else if (processors->extend_signature) {
-		res = KSI_Signature_parseWithPolicy(ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_INTERNAL, &context, &sig);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse KSI signature.", blocks->blockNo);
+		res = LOGKSI_Signature_parseWithPolicy(err, ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_INTERNAL, &context, &sig);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse KSI signature.", blocks->blockNo);
 
 		print_progressResult(res);
 		print_progressDesc(1, "Block no. %3zu: extending KSI signature... ", blocks->blockNo);
 
 		res = processors->extend_signature(set, err, ksi, sig, &context, &ext);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to extend KSI signature.", blocks->blockNo);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to extend KSI signature.", blocks->blockNo);
 
 		res = tlv_element_set_signature(tlv, ksi, 0x905, ext);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to serialize extended KSI signature.", blocks->blockNo);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to serialize extended KSI signature.", blocks->blockNo);
 
 		res = KSI_TlvElement_serialize(tlv, blocks->ftlv_raw, SOF_FTLV_BUFFER, &blocks->ftlv_len, 0);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to serialize extended block signature.", blocks->blockNo);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to serialize extended block signature.", blocks->blockNo);
 
 		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->files.outSig) != blocks->ftlv_len) {
 			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to write extended signature to extended log signature file.", blocks->blockNo);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to write extended signature to extended log signature file.", blocks->blockNo);
 		}
 
 		KSI_DataHash_free((KSI_DataHash*)context.documentHash);
 		context.documentHash = NULL;
 		KSI_VerificationContext_clean(&context);
 	} else if (processors->extract_signature) {
-		res = KSI_Signature_parseWithPolicy(ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_INTERNAL, &context, &sig);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse KSI signature.", blocks->blockNo);
+		res = LOGKSI_Signature_parseWithPolicy(err, ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_INTERNAL, &context, &sig);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse KSI signature.", blocks->blockNo);
 
 		if (blocks->nofExtractPositionsInBlock) {
 			if (fwrite(tlvSig->ptr, 1, tlvSig->ftlv.dat_len + tlvSig->ftlv.hdr_len, files->files.outProof) != tlvSig->ftlv.dat_len + tlvSig->ftlv.hdr_len) {
 				res = KT_IO_ERROR;
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to write KSI signature to integrity proof file.", blocks->blockNo);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to write KSI signature to integrity proof file.", blocks->blockNo);
 			}
 		}
 
@@ -1469,25 +1712,25 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 
 			if (blocks->extractInfo[j].extractOffset && blocks->extractInfo[j].extractOffset <= blocks->nofRecordHashes) {
 				res = KSI_TlvElement_new(&recChain);
-				ERR_CATCH_MSG(err, res, "Error: Record no. %4zu: unable to create record chain.", blocks->extractInfo[j].extractPos);
+				ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to create record chain.", blocks->extractInfo[j].extractPos);
 				recChain->ftlv.tag = 0x0907;
 
 				if (blocks->extractInfo[j].logLine) {
 					if (fwrite(blocks->extractInfo[j].logLine, 1, strlen(blocks->extractInfo[j].logLine), files->files.outLog) != strlen(blocks->extractInfo[j].logLine)) {
 						res = KT_IO_ERROR;
-						ERR_CATCH_MSG(err, res, "Error: Record no. %4zu: unable to write log record to log records file.", blocks->extractInfo[j].extractPos);
+						ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to write log record to log records file.", blocks->extractInfo[j].extractPos);
 					}
 				} else if (blocks->extractInfo[j].metaRecord){
 					res = KSI_TlvElement_setElement(recChain, blocks->extractInfo[j].metaRecord);
-					ERR_CATCH_MSG(err, res, "Error: Record no. %4zu: unable to add metarecord to record chain.", blocks->extractInfo[j].extractPos);
+					ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to add metarecord to record chain.", blocks->extractInfo[j].extractPos);
 				}
 				res = tlv_element_set_hash(recChain, ksi, 0x01, blocks->extractInfo[j].extractRecord);
-				ERR_CATCH_MSG(err, res, "Error: Record no. %4zu: unable to add record hash to record chain.", blocks->extractInfo[j].extractPos);
+				ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to add record hash to record chain.", blocks->extractInfo[j].extractPos);
 
 				for (i = 0; i < blocks->extractInfo[j].extractLevel; i++) {
 					if (blocks->extractInfo[j].extractChain[i].sibling) {
 						res = KSI_TlvElement_new(&hashStep);
-						ERR_CATCH_MSG(err, res, "Error: Record no. %4zu: unable to create hash step no. %2zu.", blocks->extractInfo[j].extractPos, i + 1);
+						ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to create hash step no. %zu.", blocks->extractInfo[j].extractPos, i + 1);
 
 						if (blocks->extractInfo[j].extractChain[i].dir == LEFT_LINK) {
 							hashStep->ftlv.tag = 0x02;
@@ -1497,23 +1740,23 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 						}
 						if (blocks->extractInfo[j].extractChain[i].corr) {
 							res = tlv_element_set_uint(hashStep, ksi, 0x01, blocks->extractInfo[j].extractChain[i].corr);
-							ERR_CATCH_MSG(err, res, "Error: Record no. %4zu: unable to add level correction to hash step no. %2zu.", blocks->extractInfo[j].extractPos, i + 1);
+							ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to add level correction to hash step no. %zu.", blocks->extractInfo[j].extractPos, i + 1);
 						}
 						res = tlv_element_set_hash(hashStep, ksi, 0x02, blocks->extractInfo[j].extractChain[i].sibling);
-						ERR_CATCH_MSG(err, res, "Error: Record no. %4zu: unable to add sibling hash to hash step no. %2zu.", blocks->extractInfo[j].extractPos, i + 1);
+						ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to add sibling hash to hash step no. %zu.", blocks->extractInfo[j].extractPos, i + 1);
 						res = KSI_TlvElement_appendElement(recChain, hashStep);
-						ERR_CATCH_MSG(err, res, "Error: Record no. %4zu: unable to add hash step no. %2zu.", blocks->extractInfo[j].extractPos, i + 1);
+						ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to add hash step no. %zu.", blocks->extractInfo[j].extractPos, i + 1);
 
 						KSI_TlvElement_free(hashStep);
 						hashStep = NULL;
 					}
 				}
 				res = KSI_TlvElement_serialize(recChain, buf, sizeof(buf), &len, 0);
-				ERR_CATCH_MSG(err, res, "Error: Record no. %4zu: unable to serialize record chain.", blocks->extractInfo[j].extractPos);
+				ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to serialize record chain.", blocks->extractInfo[j].extractPos);
 
 				if (fwrite(buf, 1, len, files->files.outProof) != len) {
 					res = KT_IO_ERROR;
-					ERR_CATCH_MSG(err, res, "Error: Record no. %4zu: unable to write record chain to integrity proof file.", blocks->extractInfo[j].extractPos);
+					ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to write record chain to integrity proof file.", blocks->extractInfo[j].extractPos);
 				}
 				KSI_TlvElement_free(recChain);
 				recChain = NULL;
@@ -1527,7 +1770,7 @@ cleanup:
 	print_progressResult(res);
 	if (blocks) {
 		if (blocks->finalTreeHashesNone) {
-			print_debug("Warning: Block no. %3zu: all final tree hashes are missing.\n", blocks->blockNo);
+			print_debug("Warning: Block no. %3zu: all final tree hashes are missing. Run 'logksi sign' with '--insert-missing-hashes' to repair the log signature.\n", blocks->blockNo);
 			blocks->warningTreeHashes = 1;
 		} else if (blocks->finalTreeHashesAll) {
 			print_debug("Block no. %3zu: all final tree hashes are present.\n", blocks->blockNo);
@@ -1563,26 +1806,26 @@ static int process_ksi_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, S
 	print_progressDesc(0, "Block no. %3zu: processing KSI signature ... ", blocks->blockNo);
 
 	res = tlv_element_parse_and_check_sub_elements(err, ksi, blocks->ftlv_raw, blocks->ftlv_len, blocks->ftlv.hdr_len, &tlvSig);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse KSI signature as TLV element.", blocks->blockNo);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse KSI signature as TLV element.", blocks->blockNo);
 
 	print_progressResult(res);
 	print_progressDesc(1, "Block no. %3zu: verifying KSI signature... ", blocks->blockNo);
 
 	if (processors->verify_signature) {
-		res = KSI_Signature_parseWithPolicy(ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_EMPTY, NULL, &sig);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse KSI signature.", blocks->blockNo);
+		res = LOGKSI_Signature_parseWithPolicy(err, ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_EMPTY, NULL, &sig);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse KSI signature.", blocks->blockNo);
 
 		res = processors->verify_signature(set, err, ksi, sig, NULL, &verificationResult);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: KSI signature verification failed.", blocks->blockNo);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: KSI signature verification failed.", blocks->blockNo);
 		/* TODO: add dumping of verification results. */
 		KSI_PolicyVerificationResult_free(verificationResult);
 		verificationResult = NULL;
 
 		res = KSI_Signature_getDocumentHash(sig, &hash);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to get root hash from KSI signature.", blocks->blockNo);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to get root hash from KSI signature.", blocks->blockNo);
 
 		res = KSI_DataHash_getHashAlg(hash, &blocks->hashAlgo);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to get algorithm ID from root hash.", blocks->blockNo);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to get algorithm ID from root hash.", blocks->blockNo);
 
 		KSI_DataHash_free(blocks->rootHash);
 		blocks->rootHash = KSI_DataHash_ref(hash);
@@ -1639,7 +1882,7 @@ cleanup:
 	return res;
 }
 
-static int process_record_chain(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
+static int process_record_chain(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	KSI_DataHash *recordHash = NULL;
 	KSI_DataHash *hash = NULL;
@@ -1647,6 +1890,7 @@ static int process_record_chain(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks
 	KSI_TlvElement *tlvMetaRecord = NULL;
 	KSI_DataHash *tmpHash = NULL;
 	KSI_DataHash *root = NULL;
+	KSI_DataHash *replacement = NULL;
 
 	if (err == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -1658,42 +1902,53 @@ static int process_record_chain(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks
 	blocks->nofRecordHashes++;
 
 	res = tlv_element_parse_and_check_sub_elements(err, ksi, blocks->ftlv_raw, blocks->ftlv_len, blocks->ftlv.hdr_len, &tlv);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse record chain as TLV element.", blocks->blockNo);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse record chain as TLV element.", blocks->blockNo);
 
 	res = KSI_TlvElement_getElement(tlv, 0x911, &tlvMetaRecord);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to extract metarecord in record chain.", blocks->blockNo);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to extract metarecord in record chain.", blocks->blockNo);
 
 	KSI_DataHash_free(blocks->metarecordHash);
 	blocks->metarecordHash = NULL;
 	if (tlvMetaRecord != NULL) {
 		res = get_hash_of_metarecord(ksi, blocks, tlvMetaRecord, &hash);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate metarecord hash.", blocks->blockNo);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate metarecord hash.", blocks->blockNo);
 
 		blocks->metarecordHash = KSI_DataHash_ref(hash);
 	}
 
 	res = tlv_element_get_hash(err, tlv, ksi, 0x01, &recordHash);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse hash of logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse hash of logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
 
 	if (blocks->metarecordHash != NULL) {
 		/* This is a metarecord hash. */
-		res = logksi_datahash_compare(err, blocks->metarecordHash, recordHash);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: metarecord hashes not equal.", blocks->blockNo);
+		res = logksi_datahash_compare(err, blocks->metarecordHash, recordHash, "Metarecord hash computed from metarecord: ", "Metarecord hash stored in integrity proof file: ");
+		res = continue_on_hash_fail(res, set, blocks, blocks->metarecordHash, recordHash, &replacement);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: metarecord hashes not equal.", blocks->blockNo);
 	} else {
 		/* This is a logline record hash. */
 		if (files->files.inLog) {
 			res = get_hash_of_logline(ksi, blocks, files, &hash);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate hash of logline no. %4zu.", blocks->blockNo, get_nof_lines(blocks));
+			if (res == KT_IO_ERROR) {
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: record hash no. %zu does not have a matching logline, end of logfile reached.", blocks->blockNo, get_nof_lines(blocks));
+			} else {
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate hash of logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
+			}
 
-			res = logksi_datahash_compare(err, hash, recordHash);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: record hashes not equal.", blocks->blockNo);
+			res = logksi_datahash_compare(err, hash, recordHash, "Record hash computed from logline: ", "Record hash stored in integrity proof file: ");
+			if (res != KT_OK) {
+				print_debug("Received logline: %s", blocks->logLine);
+			}
+			res = continue_on_hash_fail(res, set, blocks, hash, recordHash, &replacement);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: record hashes not equal.", blocks->blockNo);
+		} else {
+			replacement = KSI_DataHash_ref(recordHash);
 		}
 	}
 
 	if (tlv->subList) {
 		int i;
 		blocks->treeHeight = 0;
-		root = KSI_DataHash_ref(recordHash);
+		root = KSI_DataHash_ref(replacement);
 
 		print_progressResult(res);
 		print_progressDesc(0, "Block no. %3zu: processing hash chain... ", blocks->blockNo);
@@ -1701,10 +1956,10 @@ static int process_record_chain(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks
 			KSI_TlvElement *tmpTlv = NULL;
 
 			res = KSI_TlvElementList_elementAt(tlv->subList, i, &tmpTlv);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to get element %d from TLV.", blocks->blockNo, i);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to get element %d from TLV.", blocks->blockNo, i);
 			if (tmpTlv && (tmpTlv->ftlv.tag == 0x02 || tmpTlv->ftlv.tag == 0x03)) {
 				res = process_hash_step(err, ksi, tmpTlv, blocks, root, &tmpHash);
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to process hash step.", blocks->blockNo);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to process hash step.", blocks->blockNo);
 
 				KSI_DataHash_free(root);
 				root = tmpHash;
@@ -1712,11 +1967,14 @@ static int process_record_chain(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks
 			}
 		}
 
-		res = logksi_datahash_compare(err, blocks->rootHash, root);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: root hashes not equal.", blocks->blockNo);
+		res = logksi_datahash_compare(err, root, blocks->rootHash, "Root hash computed from hash chain: ", "Root hash stored in KSI signature: ");
+		KSI_DataHash_free(replacement);
+		replacement = NULL;
+		res = continue_on_hash_fail(res, set, blocks, root, blocks->rootHash, &replacement);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: root hashes not equal.", blocks->blockNo);
 	} else {
 		res = KT_INVALID_INPUT_FORMAT;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to get sub TLVs from record chain.", blocks->blockNo);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to get sub TLVs from record chain.", blocks->blockNo);
 	}
 	res = KT_OK;
 
@@ -1727,15 +1985,17 @@ cleanup:
 	KSI_DataHash_free(hash);
 	KSI_DataHash_free(root);
 	KSI_DataHash_free(tmpHash);
+	KSI_DataHash_free(replacement);
 	KSI_TlvElement_free(tlv);
 	KSI_TlvElement_free(tlvMetaRecord);
 	return res;
 }
 
-static int process_partial_block(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
+static int process_partial_block(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	KSI_DataHash *hash = NULL;
 	KSI_DataHash *rootHash = NULL;
+	KSI_DataHash *replacement = NULL;
 	KSI_TlvElement *tlv = NULL;
 	KSI_TlvElement *tlvNoSig = NULL;
 
@@ -1749,37 +2009,42 @@ static int process_partial_block(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *block
 	blocks->partNo++;
 	if (blocks->partNo > blocks->blockNo) {
 		res = KT_INVALID_INPUT_FORMAT;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: partial block data without preceding block header found.", blocks->sigNo);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: partial block data without preceding block header found.", blocks->sigNo);
 	}
 
 	res = tlv_element_parse_and_check_sub_elements(err, ksi, blocks->ftlv_raw, blocks->ftlv_len, blocks->ftlv.hdr_len, &tlv);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse block signature as TLV element.", blocks->blockNo);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse block signature as TLV element.", blocks->blockNo);
 
 	res = tlv_element_get_uint(tlv, ksi, 0x01, &blocks->recordCount);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing record count in blocks file.", blocks->blockNo);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing record count in blocks file.", blocks->blockNo);
+
+	res = is_block_signature_expected(err, blocks);
+	if (res != KT_OK) goto cleanup;
 
 	res = KSI_TlvElement_getElement(tlv, 0x02, &tlvNoSig);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to extract 'no-sig' element in blocks file.", blocks->blockNo);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to extract 'no-sig' element in blocks file.", blocks->blockNo);
 
 	res = tlv_element_get_hash(err, tlvNoSig, ksi, 0x01, &hash);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse root hash.", blocks->blockNo);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse root hash.", blocks->blockNo);
 
 	if (blocks->nofRecordHashes && blocks->nofRecordHashes != blocks->recordCount) {
 		res = KT_INVALID_INPUT_FORMAT;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: expected %zu records in blocks file, but found %zu records.", blocks->blockNo, blocks->recordCount, blocks->nofRecordHashes);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: expected %zu records in blocks file, but found %zu records.", blocks->blockNo, blocks->recordCount, blocks->nofRecordHashes);
 	}
 
 	/* If the blocks file contains hashes, re-compute and compare the root hash against the provided root hash. */
 	if (blocks->nofRecordHashes) {
 		res = calculate_root_hash(ksi, blocks, &rootHash);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate root hash.", blocks->blockNo);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate root hash.", blocks->blockNo);
 
-		res = logksi_datahash_compare(err, rootHash, hash);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: root hashes not equal.", blocks->blockNo);
-
-		blocks->rootHash = hash;
-		hash = NULL;
+		res = logksi_datahash_compare(err, rootHash, hash, "Root hash computed from record hashes: ", "Unsigned root hash stored in block data file: ");
+		res = continue_on_hash_fail(res, set, blocks, rootHash, hash, &replacement);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: root hashes not equal.", blocks->blockNo);
+	} else {
+		replacement = KSI_DataHash_ref(hash);
 	}
+
+	blocks->rootHash = replacement;
 
 	res = KT_OK;
 
@@ -1793,14 +2058,17 @@ cleanup:
 	return res;
 }
 
-static int process_partial_signature(ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PROCESSORS *processors, BLOCK_INFO *blocks, IO_FILES *files, int progress) {
+static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PROCESSORS *processors, BLOCK_INFO *blocks, IO_FILES *files, int progress) {
 	int res;
 	KSI_Signature *sig = NULL;
 	KSI_DataHash *hash = NULL;
-	KSI_DataHash *docHash = NULL;
+	KSI_DataHash *rootHash = NULL;
+	KSI_DataHash *missing = NULL;
+	KSI_DataHash *replacement = NULL;
 	KSI_TlvElement *tlv = NULL;
 	KSI_TlvElement *tlvSig = NULL;
 	KSI_TlvElement *tlvNoSig = NULL;
+	int insertHashes = 0;
 
 	if (err == NULL || ksi == NULL || processors == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -1812,59 +2080,93 @@ static int process_partial_signature(ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PRO
 	blocks->sigNo++;
 	if (blocks->sigNo > blocks->blockNo) {
 		res = KT_INVALID_INPUT_FORMAT;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: block signature data without preceding block header found.", blocks->sigNo);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: block signature data without preceding block header found.", blocks->sigNo);
 	}
 	res = tlv_element_parse_and_check_sub_elements(err, ksi, blocks->ftlv_raw, blocks->ftlv_len, blocks->ftlv.hdr_len, &tlv);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse block signature as TLV element.", blocks->blockNo);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse block signature as TLV element.", blocks->blockNo);
 
 	res = tlv_element_get_uint(tlv, ksi, 0x01, &blocks->recordCount);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: missing record count in signatures file.", blocks->blockNo);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing record count in signatures file.", blocks->blockNo);
 
 	res = is_block_signature_expected(err, blocks);
 	if (res != KT_OK) goto cleanup;
 
+	/* If no record hashes were computed or encountered, previous leaf hashes must not be compared. */
+	if (blocks->nofRecordHashes == 0) {
+		KSI_DataHash_free(blocks->prevLeaf);
+		blocks->prevLeaf = NULL;
+	}
+
 	if (blocks->nofRecordHashes && blocks->nofRecordHashes != blocks->recordCount) {
 		res = KT_INVALID_INPUT_FORMAT;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: expected %zu records in signatures file, but found %zu records in blocks file.", blocks->blockNo, blocks->recordCount, blocks->nofRecordHashes);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: expected %zu records in signatures file, but found %zu records in blocks file.", blocks->blockNo, blocks->recordCount, blocks->nofRecordHashes);
+	}
+
+	insertHashes = PARAM_SET_isSetByName(set, "insert-missing-hashes");
+	if (blocks->finalTreeHashesNone && insertHashes) {
+		if (blocks->keepRecordHashes || (!blocks->keepRecordHashes && blocks->finalTreeHashesSome)) {
+			do {
+				missing = NULL;
+				res = merge_one_level(ksi, blocks, &missing);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing tree hash could not be computed.", blocks->blockNo);
+				if (missing) {
+					res = tlv_element_write_hash(missing, 0x903, files->files.outSig);
+					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing tree hash could not be written.", blocks->blockNo);
+					KSI_DataHash_free(missing);
+				}
+			} while (missing);
+			blocks->finalTreeHashesNone = 0;
+		}
 	}
 
 	res = KSI_TlvElement_getElement(tlv, 0x905, &tlvSig);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to extract KSI signature element in signatures file.", blocks->blockNo);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to extract KSI signature element in signatures file.", blocks->blockNo);
 
 	res = KSI_TlvElement_getElement(tlv, 0x02, &tlvNoSig);
-	ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to extract 'no-sig' element in signatures file.", blocks->blockNo);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to extract 'no-sig' element in signatures file.", blocks->blockNo);
 
 	if (tlvSig != NULL) {
-		res = KSI_Signature_parseWithPolicy(ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_EMPTY, NULL, &sig);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse KSI signature in signatures file.", blocks->blockNo);
+		KSI_DataHash *docHash = NULL;
+
+		res = LOGKSI_Signature_parseWithPolicy(err, ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_EMPTY, NULL, &sig);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse KSI signature in signatures file.", blocks->blockNo);
 
 		res = KSI_Signature_getDocumentHash(sig, &docHash);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to get root hash from KSI signature.", blocks->blockNo);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to get root hash from KSI signature.", blocks->blockNo);
 
-		/* If the blocks file contains hashes, re-compute and compare the root hash against the provided root hash. */
-		if (blocks->nofRecordHashes) {
-			if (blocks->rootHash == NULL) {
-				res = calculate_root_hash(ksi, blocks, &blocks->rootHash);
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate root hash.", blocks->blockNo);
-			}
+		/* Compare signed root hash with unsigned root hash. */
+		if (blocks->rootHash) {
+			res = logksi_datahash_compare(err, blocks->rootHash, docHash, "Unsigned root hash stored in block data file: ", "Signed root hash stored in KSI signature: ");
+			res = continue_on_hash_fail(res, set, blocks, blocks->rootHash, docHash, &replacement);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: root hashes not equal.", blocks->blockNo);
+		} else if (blocks->nofRecordHashes) {
+			/* Compute the root hash and compare with signed root hash. */
+			res = calculate_root_hash(ksi, blocks, &rootHash);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate root hash.", blocks->blockNo);
 
-			res = logksi_datahash_compare(err, blocks->rootHash, docHash);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: root hashes not equal.", blocks->blockNo);
-		} else {
-			KSI_DataHash_free(blocks->prevLeaf);
-			blocks->prevLeaf = NULL;
+			res = logksi_datahash_compare(err, rootHash, docHash, "Root hash computed from record hashes: ", "Signed root hash stored in KSI signature: ");
+			res = continue_on_hash_fail(res, set, blocks, rootHash, docHash, &replacement);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: root hashes not equal.", blocks->blockNo);
 		}
 	} else if (tlvNoSig != NULL) {
 		blocks->noSigNo++;
 		res = tlv_element_get_hash(err, tlvNoSig, ksi, 0x01, &hash);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse root hash.", blocks->blockNo);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse root hash.", blocks->blockNo);
 
-		if (blocks->rootHash == NULL) {
-			res = calculate_root_hash(ksi, blocks, &blocks->rootHash);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to calculate root hash.", blocks->blockNo);
+		/* Compare unsigned root hashes. */
+		if (blocks->rootHash) {
+			res = logksi_datahash_compare(err, blocks->rootHash, hash, "Unsigned root hash stored in block data file: ", "Unsigned root hash stored in block signature file: ");
+			res = continue_on_hash_fail(res, set, blocks, blocks->rootHash, hash, &replacement);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: root hashes not equal.", blocks->blockNo);
+		} else if (blocks->nofRecordHashes) {
+			/* Compute the root hash and compare with unsigned root hash. */
+			res = calculate_root_hash(ksi, blocks, &rootHash);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate root hash.", blocks->blockNo);
+
+			res = logksi_datahash_compare(err, rootHash, hash, "Root hash computed from record hashes: ", "Unsigned root hash stored in block signature file: ");
+			res = continue_on_hash_fail(res, set, blocks, rootHash, hash, &replacement);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: root hashes not equal.", blocks->blockNo);
 		}
-		res = logksi_datahash_compare(err, blocks->rootHash, hash);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: root hashes not equal.", blocks->blockNo);
 
 		if (processors->create_signature) {
 			print_progressResult(res);
@@ -1875,24 +2177,28 @@ static int process_partial_signature(ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PRO
 			print_progressDesc(1, "Block no. %3zu: creating missing KSI signature... ", blocks->blockNo);
 
 			res = processors->create_signature(err, ksi, hash, get_aggregation_level(blocks), &sig);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to sign root hash.", blocks->blockNo);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to sign root hash.", blocks->blockNo);
 
 			res = KSI_TlvElement_new(&tlvSig);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to serialize KSI signature.", blocks->blockNo);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to serialize KSI signature.", blocks->blockNo);
 			tlvSig->ftlv.tag = 0x904;
 
 			res = tlv_element_set_uint(tlvSig, ksi, 0x01, blocks->recordCount);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to serialize KSI signature.", blocks->blockNo);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to serialize KSI signature.", blocks->blockNo);
 
 			res = tlv_element_set_signature(tlvSig, ksi, 0x905, sig);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to serialize KSI signature.", blocks->blockNo);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to serialize KSI signature.", blocks->blockNo);
 
 			res = KSI_TlvElement_serialize(tlvSig, blocks->ftlv_raw, SOF_FTLV_BUFFER, &blocks->ftlv_len, 0);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to serialize KSI signature.", blocks->blockNo);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to serialize KSI signature.", blocks->blockNo);
+		} else {
+			/* Missing signatures found during integration. */
+			blocks->warningSignatures = 1;
+			blocks->unsignedRootHash = 1;
 		}
 	} else {
 		res = KT_INVALID_INPUT_FORMAT;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: block signature missing in signatures file.", blocks->blockNo);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: block signature missing in signatures file.", blocks->blockNo);
 	}
 
 	if (files->files.outSig) {
@@ -1901,7 +2207,7 @@ static int process_partial_signature(ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PRO
 
 		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->files.outSig) != blocks->ftlv_len) {
 			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to write signature data log signature file.", blocks->blockNo);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to write signature data log signature file.", blocks->blockNo);
 		}
 	}
 
@@ -1912,18 +2218,33 @@ cleanup:
 	print_progressResult(res);
 	if (blocks) {
 		if (blocks->finalTreeHashesNone) {
-			print_debug("Warning: Block no. %3zu: all final tree hashes are missing.\n", blocks->blockNo);
+			print_debug("Warning: Block no. %3zu: all final tree hashes are missing. Run 'logksi sign' with '--insert-missing-hashes' to repair the log signature.\n", blocks->blockNo);
 			blocks->warningTreeHashes = 1;
 		} else if (blocks->finalTreeHashesAll) {
 			print_debug("Block no. %3zu: all final tree hashes are present.\n", blocks->blockNo);
 		}
+		if (blocks->unsignedRootHash) {
+			print_debug("Warning: Block no. %3zu: unsigned root hash found.\n", blocks->blockNo);
+		}
 	}
 	KSI_Signature_free(sig);
 	KSI_DataHash_free(hash);
+	KSI_DataHash_free(rootHash);
+	KSI_DataHash_free(missing);
+	KSI_DataHash_free(replacement);
 	KSI_TlvElement_free(tlvSig);
 	KSI_TlvElement_free(tlvNoSig);
 	KSI_TlvElement_free(tlv);
 	return res;
+}
+
+static int check_warnings(BLOCK_INFO *blocks) {
+	if (blocks) {
+		if (blocks->warningSignatures || blocks->warningTreeHashes) {
+			return 1;
+		}
+	}
+	return 0;
 }
 
 static int finalize_log_signature(ERR_TRCKR *err, BLOCK_INFO *blocks, IO_FILES *files) {
@@ -1942,19 +2263,19 @@ static int finalize_log_signature(ERR_TRCKR *err, BLOCK_INFO *blocks, IO_FILES *
 		ERR_CATCH_MSG(err, res, "Error: no blocks found.");
 	} else if (blocks->blockNo > blocks->sigNo) {
 		res = KT_INVALID_INPUT_FORMAT;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: block signature data missing.", blocks->blockNo);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: block signature data missing.", blocks->blockNo);
 	}
 
 	if (blocks->partNo > blocks->sigNo) {
 		res = KT_INVALID_INPUT_FORMAT;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: block signature data missing.", blocks->blockNo);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: block signature data missing.", blocks->blockNo);
 	}
 
 	/* Log file must not contain more records than log signature file. */
 	if (files->files.inLog) {
 		if (fread(buf, 1, 1, files->files.inLog) > 0) {
 			res = KT_VERIFICATION_FAILURE;
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: end of log file contains unexpected records.", blocks->blockNo);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: end of log file contains unexpected records.", blocks->blockNo);
 		}
 	}
 
@@ -1962,18 +2283,29 @@ static int finalize_log_signature(ERR_TRCKR *err, BLOCK_INFO *blocks, IO_FILES *
 	if (files->files.partsSig) {
 		if (fread(buf, 1, 1, files->files.partsSig) > 0) {
 			res = KT_VERIFICATION_FAILURE;
-			ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: end of signatures file contains unexpected data.", blocks->blockNo);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: end of signatures file contains unexpected data.", blocks->blockNo);
 		}
 	}
 
+	if (blocks->nofHashFails) {
+		res = KT_VERIFICATION_FAILURE;
+		ERR_CATCH_MSG(err, res, "Error: %zu hash comparison failures found.", blocks->nofHashFails);
+	}
 	res = KT_OK;
 
 cleanup:
 
 	print_progressResult(res);
 
-	if (blocks && blocks->warningTreeHashes) {
-		print_warnings("Warning: Some tree hashes are missing from the log signature file.\n");
+	if (check_warnings(blocks)) {
+		print_warnings("\n");
+		if (blocks && blocks->warningTreeHashes) {
+			print_warnings("Warning: Some tree hashes are missing from the log signature file. Run 'logksi sign' with '--insert-missing-hashes' to repair the log signature.\n");
+		}
+
+		if (blocks && blocks->warningSignatures) {
+			print_warnings("Warning: Unsigned root hashes found. Run 'logksi sign' to perform signing recovery.\n");
+		}
 	}
 
 	return res;
@@ -2045,9 +2377,9 @@ static int count_blocks(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, FILE *
 
 				case 0x904:
 					res = tlv_element_parse_and_check_sub_elements(err, ksi, blocks->ftlv_raw, blocks->ftlv_len, blocks->ftlv.hdr_len, &tlv);
-					ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to parse block signature as TLV element.", blocks->blockNo);
+					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse block signature as TLV element.", blocks->blockNo);
 					res = KSI_TlvElement_getElement(tlv, 0x02, &tlvNoSig);
-					ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unable to extract 'no-sig' element in signatures file.", blocks->blockNo);
+					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to extract 'no-sig' element in signatures file.", blocks->blockNo);
 
 					if (tlvNoSig) blocks->noSigCount++;
 
@@ -2064,7 +2396,7 @@ static int count_blocks(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, FILE *
 		} else {
 			if (blocks->ftlv_len > 0) {
 				res = KT_INVALID_INPUT_FORMAT;
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: incomplete data found in log signature file.", blocks->blockNo);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: incomplete data found in log signature file.", blocks->blockNo);
 			} else {
 				break;
 			}
@@ -2115,17 +2447,17 @@ int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_
 		if (res == KSI_OK) {
 			switch (blocks.ftlv.tag) {
 				case 0x901:
-					res = process_block_header(err, ksi, &blocks, files);
+					res = process_block_header(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
 				case 0x902:
-					res = process_record_hash(err, ksi, &blocks, files);
+					res = process_record_hash(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
 				case 0x903:
-					res = process_tree_hash(err, ksi, &blocks, files);
+					res = process_tree_hash(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
@@ -2152,7 +2484,7 @@ int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_
 		} else {
 			if (blocks.ftlv_len > 0) {
 				res = KT_INVALID_INPUT_FORMAT;
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: incomplete data found in log signature file.", blocks.blockNo);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: incomplete data found in log signature file.", blocks.blockNo);
 			} else {
 				break;
 			}
@@ -2198,17 +2530,17 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, VERIFYING_
 				case LOGSIG12:
 					switch (blocks.ftlv.tag) {
 						case 0x901:
-							res = process_block_header(err, ksi, &blocks, files);
+							res = process_block_header(set, err, ksi, &blocks, files);
 							if (res != KT_OK) goto cleanup;
 						break;
 
 						case 0x902:
-							res = process_record_hash(err, ksi, &blocks, files);
+							res = process_record_hash(set, err, ksi, &blocks, files);
 							if (res != KT_OK) goto cleanup;
 						break;
 
 						case 0x903:
-							res = process_tree_hash(err, ksi, &blocks, files);
+							res = process_tree_hash(set, err, ksi, &blocks, files);
 							if (res != KT_OK) goto cleanup;
 						break;
 
@@ -2246,7 +2578,7 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, VERIFYING_
 
 						case 0x907:
 						{
-							res = process_record_chain(err, ksi, &blocks, files);
+							res = process_record_chain(set, err, ksi, &blocks, files);
 							if (res != KT_OK) goto cleanup;
 						}
 						break;
@@ -2268,7 +2600,7 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, VERIFYING_
 		} else {
 			if (blocks.ftlv_len > 0) {
 				res = KT_INVALID_INPUT_FORMAT;
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: incomplete data found in log signature file.", blocks.blockNo);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: incomplete data found in log signature file.", blocks.blockNo);
 			} else {
 				break;
 			}
@@ -2429,17 +2761,17 @@ int logsignature_extract(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES 
 		if (res == KSI_OK) {
 			switch (blocks.ftlv.tag) {
 				case 0x901:
-					res = process_block_header(err, ksi, &blocks, files);
+					res = process_block_header(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
 				case 0x902:
-					res = process_record_hash(err, ksi, &blocks, files);
+					res = process_record_hash(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
 				case 0x903:
-					res = process_tree_hash(err, ksi, &blocks, files);
+					res = process_tree_hash(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
@@ -2466,7 +2798,7 @@ int logsignature_extract(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES 
 		} else {
 			if (blocks.ftlv_len > 0) {
 				res = KT_INVALID_INPUT_FORMAT;
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: incomplete data found in log signature file.", blocks.blockNo);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: incomplete data found in log signature file.", blocks.blockNo);
 			} else {
 				break;
 			}
@@ -2485,7 +2817,7 @@ cleanup:
 	return res;
 }
 
-int logsignature_integrate(ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files) {
+int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files) {
 	int res;
 	BLOCK_INFO blocks;
 	unsigned char ftlv_raw[SOF_FTLV_BUFFER];
@@ -2508,17 +2840,17 @@ int logsignature_integrate(ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files) {
 		if (res == KSI_OK) {
 			switch (blocks.ftlv.tag) {
 				case 0x901:
-					res = process_block_header(err, ksi, &blocks, files);
+					res = process_block_header(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
 				case 0x902:
-					res = process_record_hash(err, ksi, &blocks, files);
+					res = process_record_hash(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
 				case 0x903:
-					res = process_tree_hash(err, ksi, &blocks, files);
+					res = process_tree_hash(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
@@ -2529,25 +2861,25 @@ int logsignature_integrate(ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files) {
 
 				case 0x904:
 				{
-					res = process_partial_block(err, ksi, &blocks, files);
+					res = process_partial_block(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 
 					res = KSI_FTLV_fileRead(files->files.partsSig, blocks.ftlv_raw, SOF_FTLV_BUFFER, &blocks.ftlv_len, &blocks.ftlv);
 					if (res != KT_OK) {
 						if (blocks.ftlv_len > 0) {
 							res = KT_INVALID_INPUT_FORMAT;
-							ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: incomplete data found in signatures file.", blocks.blockNo);
+							ERR_CATCH_MSG(err, res, "Error: Block no. %zu: incomplete data found in signatures file.", blocks.blockNo);
 						} else {
 							res = KT_VERIFICATION_FAILURE;
-							ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unexpected end of signatures file.", blocks.blockNo);
+							ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unexpected end of signatures file.", blocks.blockNo);
 						}
 					}
 					if (blocks.ftlv.tag != 0x904) {
 						res = KT_INVALID_INPUT_FORMAT;
-						ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: unexpected TLV %04X read from block-signatures file.", blocks.blockNo, blocks.ftlv.tag);
+						ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unexpected TLV %04X read from block-signatures file.", blocks.blockNo, blocks.ftlv.tag);
 					}
 
-					res = process_partial_signature(err, ksi, &processors, &blocks, files, 0);
+					res = process_partial_signature(set, err, ksi, &processors, &blocks, files, 0);
 					if (res != KT_OK) goto cleanup;
 				}
 				break;
@@ -2563,7 +2895,7 @@ int logsignature_integrate(ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files) {
 		} else {
 			if (blocks.ftlv_len > 0) {
 				res = KT_INVALID_INPUT_FORMAT;
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: incomplete data found in blocks file.", blocks.blockNo);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: incomplete data found in blocks file.", blocks.blockNo);
 			} else {
 				break;
 			}
@@ -2620,17 +2952,17 @@ int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *fi
 		if (res == KSI_OK) {
 			switch (blocks.ftlv.tag) {
 				case 0x901:
-					res = process_block_header(err, ksi, &blocks, files);
+					res = process_block_header(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
 				case 0x902:
-					res = process_record_hash(err, ksi, &blocks, files);
+					res = process_record_hash(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
 				case 0x903:
-					res = process_tree_hash(err, ksi, &blocks, files);
+					res = process_tree_hash(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
@@ -2641,7 +2973,7 @@ int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *fi
 
 				case 0x904:
 				{
-					res = process_partial_signature(err, ksi, &processors, &blocks, files, progress);
+					res = process_partial_signature(set, err, ksi, &processors, &blocks, files, progress);
 					if (res != KT_OK) goto cleanup;
 				}
 				break;
@@ -2657,7 +2989,7 @@ int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *fi
 		} else {
 			if (blocks.ftlv_len > 0) {
 				res = KT_INVALID_INPUT_FORMAT;
-				ERR_CATCH_MSG(err, res, "Error: Block no. %3zu: incomplete data found in log signature file.", blocks.blockNo);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: incomplete data found in log signature file.", blocks.blockNo);
 			} else {
 				break;
 			}

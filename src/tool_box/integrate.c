@@ -38,7 +38,7 @@
 
 static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
 static int generate_filenames(ERR_TRCKR *err, IO_FILES *files);
-static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files);
+static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files, int forceOverwrite);
 static int acquire_file_locks(ERR_TRCKR *err, IO_FILES *files);
 static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files);
 static void close_input_and_output_files(ERR_TRCKR *err, int res, IO_FILES *files);
@@ -53,6 +53,7 @@ int integrate_run(int argc, char **argv, char **envp) {
 	ERR_TRCKR *err = NULL;
 	SMART_FILE *logfile = NULL;
 	int d = 0;
+	int forceOverwrite = 0;
 	IO_FILES files;
 
 	memset(&files, 0, sizeof(files));
@@ -61,7 +62,7 @@ int integrate_run(int argc, char **argv, char **envp) {
 	 * Extract command line parameters.
 	 */
 	res = PARAM_SET_new(
-			CONF_generate_param_set_desc("{input}{o}{d}{log}{h|help}", "", buf, sizeof(buf)),
+			CONF_generate_param_set_desc("{input}{o}{insert-missing-hashes}{force-overwrite}{use-computed-hash-on-fail}{use-stored-hash-on-fail}{d}{log}{h|help}", "", buf, sizeof(buf)),
 			&set);
 	if (res != KT_OK) goto cleanup;
 
@@ -91,7 +92,9 @@ int integrate_run(int argc, char **argv, char **envp) {
 	res = generate_filenames(err, &files);
 	if (res != KT_OK) goto cleanup;
 
-	res = open_input_and_output_files(err, &files);
+	forceOverwrite = PARAM_SET_isSetByName(set, "force-overwrite");
+
+	res = open_input_and_output_files(err, &files, forceOverwrite);
 	if (res != KT_OK) goto cleanup;
 
 	res = acquire_file_locks(err, &files);
@@ -100,7 +103,7 @@ int integrate_run(int argc, char **argv, char **envp) {
 		goto cleanup;
 	} else if (res != KT_OK) goto cleanup;
 
-	res = logsignature_integrate(err, ksi, &files);
+	res = logsignature_integrate(set, err, ksi, &files);
 	if (res != KT_OK) goto cleanup;
 
 	res = rename_temporary_and_backup_files(err, &files);
@@ -149,7 +152,12 @@ char *integrate_help_toString(char *buf, size_t len) {
 		"             the log signature file is saved as <logfile.logsig> in the same folder where\n"
 		"             the <logfile> is located. An attempt to overwrite an existing log signature file will result in an error.\n"
 		"             Use '-' to redirect the integrated log signature binary stream to stdout.\n"
-		" -d        - Print detailed information about processes and errors to stderr.\n"
+		" --insert-missing-hashes\n"
+		"           - Generate and insert missing tree hashes into the log signature file.\n"
+		" --force-overwrite\n"
+		"           - Force overwriting of existing log signature file.\n"
+		" -d\n"
+		"           - Print detailed information about processes and errors to stderr.\n"
 		" --log <file>\n"
 		"           - Write libksi log to the given file. Use '-' as file name to redirect the log to stdout.\n",
 		TOOL_getName()
@@ -176,10 +184,11 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	 */
 	PARAM_SET_addControl(set, "{input}", isFormatOk_path, NULL, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{log}{o}", isFormatOk_inputFile, NULL, convertRepair_path, NULL);
-	PARAM_SET_addControl(set, "{d}", isFormatOk_flag, NULL, NULL, NULL);
+	PARAM_SET_addControl(set, "{insert-missing-hashes}{force-overwrite}{use-computed-hash-on-fail}{use-stored-hash-on-fail}{d}", isFormatOk_flag, NULL, NULL, NULL);
 
 	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
 
+	PARAM_SET_setParseOptions(set, "insert-missing-hashes,force-overwrite,use-computed-hash-on-fail,use-stored-hash-on-fail", PST_PRSCMD_HAS_NO_VALUE);
 	PARAM_SET_setParseOptions(set, "d", PST_PRSCMD_HAS_NO_VALUE | PST_PRSCMD_NO_TYPOS);
 
 	/**
@@ -241,7 +250,7 @@ cleanup:
 	return res;
 }
 
-static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
+static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files, int forceOverwrite) {
 	int res;
 	int partsBlkErr = 0;
 	int partsSigErr = 0;
@@ -264,10 +273,12 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 		/* If both of the input files exist and the output log signature file also exists,
 		 * the output log signature file must not be overwritten because it may contain KSI signatures
 		 * obtained by sign recovery but not present in the input signatures file. */
-		tmp.files.outSig = fopen(files->internal.outSig, "rb");
-		if (tmp.files.outSig != NULL) {
-			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: overwriting of existing output log signature file %s not supported.", files->internal.outSig);
+		if (!forceOverwrite) {
+			tmp.files.outSig = fopen(files->internal.outSig, "rb");
+			if (tmp.files.outSig != NULL) {
+				res = KT_IO_ERROR;
+				ERR_CATCH_MSG(err, res, "Error: overwriting of existing log signature file %s not allowed. Run 'logksi integrate' with '--force-overwrite' to force overwriting.", files->internal.outSig);
+			}
 		}
 		res = logksi_file_create_temporary(files->internal.tempSig, &tmp.files.outSig, files->internal.bStdout);
 		ERR_CATCH_MSG(err, res, "Error: could not create temporary output log signature file.");

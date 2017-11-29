@@ -145,13 +145,17 @@ typedef struct {
 	char finalTreeHashesSome;
 	char finalTreeHashesNone;
 	char finalTreeHashesAll;
+	char finalTreeHashesLeaf;
 	char warningTreeHashes;
+	char unsignedRootHash;
+	char warningSignatures;
+	size_t nofHashFails;
 } BLOCK_INFO;
 
 int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_FUNCTION extend_signature, IO_FILES *files);
 int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, VERIFYING_FUNCTION verify_signature, IO_FILES *files);
 int logsignature_extract(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files);
-int logsignature_integrate(ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files);
+int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files);
 int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files);
 int get_file_read_lock(FILE *in);
 int concat_names(char *org, const char *extension, char **derived);
