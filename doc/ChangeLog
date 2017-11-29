@@ -1,4 +1,9 @@
-* IMPROVEMENT: Debian packaging implemented.
+Version 1.2
+
+2017-11-29 1.2.323
+
+* IMPROVEMENT: Presence of a closing metarecord is checked for incomplete blocks.
+* IMPROVEMENT: Presence of final tree hashes is now also checked when only tree hashes are stored.
 * IMPROVEMENT: New switch '--insert-missing-hashes' can be used to fix log signatures with missing final tree hashes.
 * IMPROVEMENT: New switch '--force-overwrite' can be used to overwrite the existing log signature during integration.
 * IMPROVEMENT: User is warned about unsigned root hashes during integration.
