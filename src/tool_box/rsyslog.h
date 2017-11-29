@@ -145,6 +145,7 @@ typedef struct {
 	char finalTreeHashesSome;
 	char finalTreeHashesNone;
 	char finalTreeHashesAll;
+	char finalTreeHashesLeaf;
 	char warningTreeHashes;
 	char unsignedRootHash;
 	char warningSignatures;
