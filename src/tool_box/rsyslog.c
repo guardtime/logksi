@@ -2116,6 +2116,7 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 				}
 			} while (missing);
 			blocks->finalTreeHashesNone = 0;
+			blocks->finalTreeHashesAll = 1;
 		}
 	}
 
