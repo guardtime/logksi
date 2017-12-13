@@ -56,12 +56,14 @@ AC_CHECK_LIB([crypto], [SHA256_Init], [], [AC_MSG_FAILURE([Could not find OpenSS
 AC_CHECK_LIB([curl], [curl_easy_init], [], [AC_MSG_FAILURE([Could not find Curl libraries.])])
 
 LIBKSI_VER="3.14"
-AC_ARG_ENABLE(static-build,         
-[  --enable-static-build              enable static linking of ksi library)],:,:)
-AC_ARG_ENABLE(use-installed-libksi, 
-[  --enable-use-installed-libksi      use installed ksi library)],:,:)
+AC_ARG_ENABLE(static-build,         AS_HELP_STRING([--enable-static-build], [Enable static linking of libksi. Note that on some platforms this option may not work and user has to provide the static libksi library file explicitly. See option --without-libksi instead. Default is no static.]),:,:)
+AC_ARG_ENABLE(libksi-as-packaging-dependency, AS_HELP_STRING([--enable-libksi-as-packaging-dependency], [Add libksi as dependency to RPM and DEB package. Default is not added.]),:,:)
 
-if test "$enable_use_installed_libksi" = "yes" ; then
+AC_ARG_WITH(libksi,
+AS_HELP_STRING([--without-libksi], [Do not check or add libksi automatically for linking (no -lksi is added). Libksi library file must be provided by user (via LIBS variable) explicitly. Usable when default automatic linking does not work as expected (e.g. unable to link libksi statically). Default is with libksi.]),:,:)
+
+
+if test "$enable_libksi_as_packaging_dependency" = "yes" ; then
 	KSI_RPM_BUILD_DEPENDECY="BuildRequires: libksi-devel >= $LIBKSI_VER"
 	KSI_DEB_BUILD_DEPENDECY="Build-Depends: libksi-dev(>=$LIBKSI_VER)"
 	KSI_RPM_RUN_DEPENDECY="Requires: libksi >= $LIBKSI_VER"
@@ -79,12 +81,21 @@ if test "$enable_static_build" = "yes" ; then
 		dy_link_flag="-dynamic"
 	fi
 
-	AC_MSG_NOTICE([KSI library will be linked statically.])
+	if test "$with_libksi" != "no" ; then
+		AC_MSG_NOTICE([libksi will be linked statically.])
 	AC_CHECK_LIB([ksi], [KSI_CTX_new], [LIBS="-Wl,-static -lksi -Wl,$dy_link_flag $LIBS"], [AC_MSG_FAILURE([Could not find libksi (KSI C SDK). Install libksi or specify the library path manually.])])
+	else
+		AC_MSG_ERROR("Error: flags --without-libksi and --enable-static-build can not be used at the same time!")
+	fi
+
 	KSI_PACKAGING_BUILD_FLAGS="--enable-static-build"
 else
-	AC_MSG_NOTICE([KSI library will be linked dynamically.])
+	if test "$with_libksi" != "no" ; then
+		AC_MSG_NOTICE([libksi will be linked dynamically.])
 	AC_CHECK_LIB([ksi], [KSI_CTX_new], [], [AC_MSG_FAILURE([Could not find libksi (KSI C SDK). Install libksi or specify the library path manually.])])
+	else
+		AC_MSG_NOTICE([Note that user must specify libksi explicitly! See configure option (configure -h) --without-libksi and environment variable LIBS.])
+	fi
 fi
 
 AC_SUBST(KSI_RPM_RUN_DEPENDECY)

@@ -19,18 +19,4 @@
 # reserves and retains all trademark rights.
 
 
-BUILD_DIR=~/rpmbuild
-PACKAGE_NAME=logksi
-version=$(tr -d [:space:] < VERSION)
-
-autoreconf -if && \
-./configure --enable-use-installed-libksi $* && \
-make clean && \
-make dist && \
-mkdir -p $BUILD_DIR/{BUILD,RPMS,SOURCES,SPECS,SRPMS,tmp} && \
-cp packaging/redhat/$PACKAGE_NAME.spec $BUILD_DIR/SPECS/ && \
-cp $PACKAGE_NAME-*$version*.tar.gz $BUILD_DIR/SOURCES/ && \
-rpmbuild -ba $BUILD_DIR/SPECS/$PACKAGE_NAME.spec && \
-cp $BUILD_DIR/RPMS/*/$PACKAGE_NAME-*$version*.rpm . && \
-cp $BUILD_DIR/SRPMS/$PACKAGE_NAME-*$version*.rpm .
-chmod -v 644 *.rpm
+./rebuild.sh --build-rpm -c '--enable-libksi-as-packaging-dependency' $*
