@@ -64,6 +64,10 @@ void print_disable(unsigned print) {
 	printer_conf.print &= ~print;
 }
 
+int print_enabled(unsigned print) {
+	return printer_conf.print & print;
+}
+
 void print_init(void) {
 	print_setStream(PRINT_RESULT | PRINT_INFO, stdout);
 	print_setStream(PRINT_DEBUG | PRINT_ERRORS | PRINT_WARNINGS, stderr);

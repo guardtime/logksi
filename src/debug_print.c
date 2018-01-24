@@ -49,43 +49,46 @@ void print_progressDesc(int showTiming, const char *msg, ...) {
 	va_list va;
 	char buf[1024];
 
+	if (print_enabled(PRINT_DEBUG)) {
+		if (inProgress == 0) {
+			inProgress = 1;
+			/*If timing info is needed, then measure time*/
+			if (showTiming == 1) {
+				timerOn = 1;
+				measureLastCall();
+			}
 
-	if (inProgress == 0) {
-		inProgress = 1;
-		/*If timing info is needed, then measure time*/
-		if (showTiming == 1) {
-			timerOn = 1;
-			measureLastCall();
+			va_start(va, msg);
+			KSI_vsnprintf(buf, sizeof(buf), msg, va);
+			buf[sizeof(buf) - 1] = 0;
+			va_end(va);
+
+			print_debug("%s", buf);
 		}
-
-		va_start(va, msg);
-		KSI_vsnprintf(buf, sizeof(buf), msg, va);
-		buf[sizeof(buf) - 1] = 0;
-		va_end(va);
-
-		print_debug("%s", buf);
 	}
 }
 
 void print_progressResult(int res) {
 	static char time_str[32];
 
-	if (inProgress == 1) {
-		inProgress = 0;
+	if (print_enabled(PRINT_DEBUG)) {
+		if (inProgress == 1) {
+			inProgress = 0;
 
-		if (timerOn == 1) {
-			measureLastCall();
+			if (timerOn == 1) {
+				measureLastCall();
 
-			KSI_snprintf(time_str, sizeof(time_str), " (%i ms)", elapsed_time_ms);
-			time_str[sizeof(time_str) - 1] = 0;
+				KSI_snprintf(time_str, sizeof(time_str), " (%i ms)", elapsed_time_ms);
+				time_str[sizeof(time_str) - 1] = 0;
+			}
+
+			if (res == KT_OK) {
+				print_debug("ok.%s\n", timerOn ? time_str : "");
+			} else {
+				print_debug("failed.%s\n", timerOn ? time_str : "");
+			}
+
+			timerOn = 0;
 		}
-
-		if (res == KT_OK) {
-			print_debug("ok.%s\n", timerOn ? time_str : "");
-		} else {
-			print_debug("failed.%s\n", timerOn ? time_str : "");
-		}
-
-		timerOn = 0;
 	}
 }
