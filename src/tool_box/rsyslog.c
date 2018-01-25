@@ -600,21 +600,39 @@ static size_t max_tree_hashes(size_t nof_records) {
 
 int tlv_element_get_uint(KSI_TlvElement *tlv, KSI_CTX *ksi, unsigned tag, size_t *out) {
 	int res;
-	KSI_Integer *tmp = NULL;
+	KSI_TlvElement *el = NULL;
+	size_t len;
+	size_t i;
+	size_t val = 0;
+	unsigned char buf[0xffff + 4];
 
-	res = KSI_TlvElement_getInteger(tlv, ksi, tag, &tmp);
+
+	res = KSI_TlvElement_getElement(tlv, tag, &el);
 	if (res != KSI_OK) goto cleanup;
-	if (tmp == NULL) {
+
+	if (el != NULL) {
+		if (el->ftlv.dat_len > 8 ) {
+			res = KT_INVALID_INPUT_FORMAT;
+			goto cleanup;
+		}
+
+		res = KSI_TlvElement_serialize(el, buf, sizeof(buf), &len, KSI_TLV_OPT_NO_HEADER);
+		if (res != KSI_OK) goto cleanup;
+
+		for (i = 0; i < len; i++) {
+			val = (val << 8) | buf[i];
+		}
+	} else {
 		res = KT_INVALID_INPUT_FORMAT;
 		goto cleanup;
 	}
 
-	*out = (size_t)KSI_Integer_getUInt64(tmp);
+	*out = val;
 	res = KT_OK;
 
 cleanup:
 
-	KSI_Integer_free(tmp);
+	KSI_TlvElement_free(el);
 	return res;
 }
 
@@ -984,7 +1002,6 @@ cleanup:
 
 static int process_block_header(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
-	KSI_OctetString *seed = NULL;
 	KSI_DataHash *hash = NULL;
 	KSI_DataHash *replacement = NULL;
 	unsigned char i = 0;
@@ -1025,7 +1042,9 @@ static int process_block_header(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BL
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: could not open datahasher.", blocks->blockNo);
 	}
 
-	res = tlv_get_octet_string(tlv, ksi, 0x02, &seed);
+	KSI_OctetString_free(blocks->randomSeed);
+	blocks->randomSeed = NULL;
+	res = tlv_get_octet_string(tlv, ksi, 0x02, &blocks->randomSeed);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing random seed in block header.", blocks->blockNo);
 
 	res = tlv_element_get_hash(err, tlv, ksi, 0x03, &hash);
@@ -1052,9 +1071,6 @@ static int process_block_header(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BL
 		blocks->hasher = hasher;
 		hasher = NULL;
 	}
-	KSI_OctetString_free(blocks->randomSeed);
-	blocks->randomSeed = seed;
-	seed = NULL;
 	KSI_DataHash_free(blocks->prevLeaf);
 	blocks->prevLeaf = replacement;
 
@@ -1096,7 +1112,6 @@ static int process_block_header(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BL
 cleanup:
 
 	print_progressResult(res);
-	KSI_OctetString_free(seed);
 	KSI_DataHash_free(hash);
 	KSI_TlvElement_free(tlv);
 	KSI_DataHasher_free(hasher);
@@ -1486,7 +1501,9 @@ static int process_metarecord(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, 
 		}
 	}
 
-	res = get_hash_of_metarecord(blocks, tlv, &hash);
+	KSI_DataHash_free(blocks->metarecordHash);
+	blocks->metarecordHash = NULL;
+	res = get_hash_of_metarecord(blocks, tlv, &blocks->metarecordHash);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate metarecord hash with index %zu.", blocks->blockNo, metarecord_index);
 
 	if (files->files.outSig) {
@@ -1495,10 +1512,6 @@ static int process_metarecord(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, 
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to copy metarecord hash.", blocks->blockNo);
 		}
 	}
-
-	KSI_DataHash_free(blocks->metarecordHash);
-	blocks->metarecordHash = hash;
-	hash = NULL;
 
 	res = KT_OK;
 
