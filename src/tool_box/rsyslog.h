@@ -130,6 +130,7 @@ typedef struct {
 	KSI_DataHash *rootHash;
 	KSI_DataHash *metarecordHash;
 	KSI_DataHash *extractMask;
+	KSI_DataHasher *hasher;
 	char *logLine;
 	unsigned char *metaRecord;
 	size_t nofExtractPositions;

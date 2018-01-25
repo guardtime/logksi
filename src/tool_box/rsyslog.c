@@ -41,7 +41,6 @@
 
 int calculate_new_tree_hash(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *leftHash, KSI_DataHash *rightHash, unsigned char level, KSI_DataHash **nodeHash) {
 	int res;
-	KSI_DataHasher *hasher = NULL;
 	KSI_DataHash *tmp = NULL;
 
 	if (ksi == NULL || blocks == NULL || leftHash == NULL || rightHash == NULL || nodeHash == NULL) {
@@ -49,15 +48,15 @@ int calculate_new_tree_hash(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *left
 		goto cleanup;
 	}
 
-	res = KSI_DataHasher_open(ksi, blocks->hashAlgo, &hasher);
+	res = KSI_DataHasher_reset(blocks->hasher);
 	if (res != KSI_OK) goto cleanup;
-	res = KSI_DataHasher_addImprint(hasher, leftHash);
+	res = KSI_DataHasher_addImprint(blocks->hasher, leftHash);
 	if (res != KSI_OK) goto cleanup;
-	res = KSI_DataHasher_addImprint(hasher, rightHash);
+	res = KSI_DataHasher_addImprint(blocks->hasher, rightHash);
 	if (res != KSI_OK) goto cleanup;
-	res = KSI_DataHasher_add(hasher, &level, 1);
+	res = KSI_DataHasher_add(blocks->hasher, &level, 1);
 	if (res != KSI_OK) goto cleanup;
-	res = KSI_DataHasher_close(hasher, &tmp);
+	res = KSI_DataHasher_close(blocks->hasher, &tmp);
 	if (res != KSI_OK) goto cleanup;
 
 	*nodeHash = tmp;
@@ -67,13 +66,11 @@ int calculate_new_tree_hash(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *left
 cleanup:
 
 	KSI_DataHash_free(tmp);
-	KSI_DataHasher_free(hasher);
 	return res;
 }
 
 int calculate_new_leaf_hash(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *recordHash, int isMetaRecordHash, KSI_DataHash **leafHash) {
 	int res;
-	KSI_DataHasher *hasher = NULL;
 	KSI_DataHash *mask = NULL;
 	KSI_DataHash *tmp = NULL;
 
@@ -82,13 +79,13 @@ int calculate_new_leaf_hash(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *reco
 		goto cleanup;
 	}
 
-	res = KSI_DataHasher_open(ksi, blocks->hashAlgo, &hasher);
+	res = KSI_DataHasher_reset(blocks->hasher);
 	if (res != KSI_OK) goto cleanup;
-	res = KSI_DataHasher_addImprint(hasher, blocks->prevLeaf);
+	res = KSI_DataHasher_addImprint(blocks->hasher, blocks->prevLeaf);
 	if (res != KSI_OK) goto cleanup;
-	res = KSI_DataHasher_addOctetString(hasher, blocks->randomSeed);
+	res = KSI_DataHasher_addOctetString(blocks->hasher, blocks->randomSeed);
 	if (res != KSI_OK) goto cleanup;
-	res = KSI_DataHasher_close(hasher, &mask);
+	res = KSI_DataHasher_close(blocks->hasher, &mask);
 	if (res != KSI_OK) goto cleanup;
 
 	KSI_DataHash_free(blocks->extractMask);
@@ -110,7 +107,6 @@ cleanup:
 
 	KSI_DataHash_free(mask);
 	KSI_DataHash_free(tmp);
-	KSI_DataHasher_free(hasher);
 	return res;
 }
 
@@ -487,7 +483,7 @@ cleanup:
 	return res;
 }
 
-int get_hash_of_logline(KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_DataHash **hash) {
+int get_hash_of_logline(BLOCK_INFO *blocks, IO_FILES *files, KSI_DataHash **hash) {
 	int res;
 	KSI_DataHash *tmp = NULL;
 	char buf[1024];
@@ -502,8 +498,14 @@ int get_hash_of_logline(KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_D
 			res = KT_IO_ERROR;
 			goto cleanup;
 		}
+		res = KSI_DataHasher_reset(blocks->hasher);
+		if (res != KSI_OK) goto cleanup;
+
 		/* Last character (newline) is not used in hash calculation. */
-		res = KSI_DataHash_create(ksi, buf, strlen(buf) - 1, blocks->hashAlgo, &tmp);
+		res = KSI_DataHasher_add(blocks->hasher, buf, strlen(buf) - 1);
+		if (res != KSI_OK) goto cleanup;
+
+		res = KSI_DataHasher_close(blocks->hasher, &tmp);
 		if (res != KSI_OK) goto cleanup;
 
 		/* Store logline for extraction. */
@@ -554,7 +556,7 @@ cleanup:
 	return res;
 }
 
-int get_hash_of_metarecord(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_TlvElement *tlv, KSI_DataHash **hash) {
+int get_hash_of_metarecord(BLOCK_INFO *blocks, KSI_TlvElement *tlv, KSI_DataHash **hash) {
 	int res;
 	KSI_DataHash *tmp = NULL;
 
@@ -563,8 +565,14 @@ int get_hash_of_metarecord(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_TlvElement *tlv
 		goto cleanup;
 	}
 
+	res = KSI_DataHasher_reset(blocks->hasher);
+	if (res != KSI_OK) goto cleanup;
+
 	/* The complete metarecord TLV us used in hash calculation. */
-	res = KSI_DataHash_create(ksi, tlv->ptr, tlv->ftlv.hdr_len + tlv->ftlv.dat_len, blocks->hashAlgo, &tmp);
+	res = KSI_DataHasher_add(blocks->hasher, tlv->ptr, tlv->ftlv.hdr_len + tlv->ftlv.dat_len);
+	if (res != KSI_OK) goto cleanup;
+
+	res = KSI_DataHasher_close(blocks->hasher, &tmp);
 	if (res != KSI_OK) goto cleanup;
 
 	/* Store metarecord for extraction. */
@@ -983,6 +991,7 @@ static int process_block_header(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BL
 	KSI_TlvElement *tlv = NULL;
 	size_t algo;
 	size_t j;
+	KSI_DataHasher *hasher = NULL;
 
 	if (err == NULL || ksi == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -1011,6 +1020,11 @@ static int process_block_header(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BL
 	res = tlv_element_get_uint(tlv, ksi, 0x01, &algo);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing hash algorithm in block header.", blocks->blockNo);
 
+	if (blocks->hasher == NULL || blocks->hashAlgo != algo) {
+		res = KSI_DataHasher_open(ksi, algo, &hasher);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: could not open datahasher.", blocks->blockNo);
+	}
+
 	res = tlv_get_octet_string(tlv, ksi, 0x02, &seed);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing random seed in block header.", blocks->blockNo);
 
@@ -1033,6 +1047,11 @@ static int process_block_header(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BL
 	}
 
 	blocks->hashAlgo = algo;
+	if (hasher) {
+		KSI_DataHasher_free(blocks->hasher);
+		blocks->hasher = hasher;
+		hasher = NULL;
+	}
 	KSI_OctetString_free(blocks->randomSeed);
 	blocks->randomSeed = seed;
 	seed = NULL;
@@ -1080,6 +1099,7 @@ cleanup:
 	KSI_OctetString_free(seed);
 	KSI_DataHash_free(hash);
 	KSI_TlvElement_free(tlv);
+	KSI_DataHasher_free(hasher);
 	return res;
 }
 
@@ -1097,7 +1117,7 @@ static int is_record_hash_expected(ERR_TRCKR *err, BLOCK_INFO *blocks) {
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: record hash without preceding block header found.", blocks->blockNo + 1);
 	}
 	/* Check if record hashes are present for previous records. */
-	if (blocks->nofRecordHashes > 0 && blocks->keepRecordHashes == 0) {
+	if (blocks->keepRecordHashes == 0 && blocks->nofRecordHashes > 0) {
 		res = KT_VERIFICATION_FAILURE;
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing record hash for logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
 	}
@@ -1107,7 +1127,7 @@ static int is_record_hash_expected(ERR_TRCKR *err, BLOCK_INFO *blocks) {
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing tree hash(es) for logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
 	}
 	/* Check if record hashes are present in previous blocks. */
-	if (blocks->blockNo > 1 && blocks->keepRecordHashes == 0) {
+	if (blocks->keepRecordHashes == 0 && blocks->blockNo > 1) {
 		res = KT_VERIFICATION_FAILURE;
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: all record hashes missing.", blocks->blockNo - 1);
 	}
@@ -1155,7 +1175,7 @@ static int process_record_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLO
 	} else {
 		/* This is a logline record hash. */
 		if (files->files.inLog) {
-			res = get_hash_of_logline(ksi, blocks, files, &hash);
+			res = get_hash_of_logline(blocks, files, &hash);
 			if (res == KT_IO_ERROR) {
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: record hash no. %zu does not have a matching logline, end of logfile reached.", blocks->blockNo, get_nof_lines(blocks));
 			} else {
@@ -1236,7 +1256,7 @@ static int is_tree_hash_expected(ERR_TRCKR *err, BLOCK_INFO *blocks) {
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: tree hash without preceding block header found.", blocks->blockNo + 1);
 	}
 	/* Check if tree hashes are present for previous records. */
-	if (blocks->nofRecordHashes > 1 && blocks->keepTreeHashes == 0) {
+	if (blocks->keepTreeHashes == 0 && blocks->nofRecordHashes > 1) {
 		res = KT_VERIFICATION_FAILURE;
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing tree hash for logline no. %zu.", blocks->blockNo, get_nof_lines(blocks) - 1);
 	}
@@ -1266,7 +1286,7 @@ static int is_tree_hash_expected(ERR_TRCKR *err, BLOCK_INFO *blocks) {
 	}
 
 	/* Check if tree hashes are present in previous blocks. */
-	if (blocks->blockNo > 1 && blocks->keepTreeHashes == 0) {
+	if (blocks->keepTreeHashes == 0 && blocks->blockNo > 1) {
 		res = KT_VERIFICATION_FAILURE;
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: all tree hashes missing.", blocks->blockNo - 1);
 	}
@@ -1328,7 +1348,7 @@ static int process_tree_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK
 					KSI_DataHash_free(blocks->metarecordHash);
 					blocks->metarecordHash = NULL;
 				} else {
-					res = get_hash_of_logline(ksi, blocks, files, &recordHash);
+					res = get_hash_of_logline(blocks, files, &recordHash);
 					if (res == KT_IO_ERROR) {
 						ERR_CATCH_MSG(err, res, "Error: Block no. %zu: tree hash does not have a matching logline no. %zu, end of logfile reached.", blocks->blockNo, get_nof_lines(blocks));
 					} else {
@@ -1453,7 +1473,7 @@ static int process_metarecord(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, 
 
 		while (blocks->nofRecordHashes < metarecord_index) {
 			blocks->nofRecordHashes++;
-			res = get_hash_of_logline(ksi, blocks, files, &hash);
+			res = get_hash_of_logline(blocks, files, &hash);
 			if (res == KT_IO_ERROR) {
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: at least %zu loglines expected up to metarecord index %zu, end of logfile reached.", blocks->blockNo, get_nof_lines(blocks), metarecord_index);
 			} else {
@@ -1466,7 +1486,7 @@ static int process_metarecord(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, 
 		}
 	}
 
-	res = get_hash_of_metarecord(ksi, blocks, tlv, &hash);
+	res = get_hash_of_metarecord(blocks, tlv, &hash);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate metarecord hash with index %zu.", blocks->blockNo, metarecord_index);
 
 	if (files->files.outSig) {
@@ -1624,7 +1644,7 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 		if (blocks->keepRecordHashes == 0 && blocks->keepTreeHashes == 0) {
 			while (blocks->nofRecordHashes < blocks->recordCount) {
 				blocks->nofRecordHashes++;
-				res = get_hash_of_logline(ksi, blocks, files, &hash);
+				res = get_hash_of_logline(blocks, files, &hash);
 				if (res == KT_IO_ERROR) {
 					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: at least %zu loglines expected, end of logfile reached.", blocks->blockNo, get_nof_lines(blocks));
 				} else {
@@ -1795,6 +1815,8 @@ static int process_ksi_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, S
 	KSI_PolicyVerificationResult *verificationResult = NULL;
 	KSI_DataHash *hash = NULL;
 	KSI_TlvElement *tlvSig = NULL;
+	KSI_DataHasher *hasher = NULL;
+	KSI_HashAlgorithm algo;
 
 	if (set == NULL || err == NULL || ksi == NULL || processors == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -1824,8 +1846,20 @@ static int process_ksi_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, S
 		res = KSI_Signature_getDocumentHash(sig, &hash);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to get root hash from KSI signature.", blocks->blockNo);
 
-		res = KSI_DataHash_getHashAlg(hash, &blocks->hashAlgo);
+		res = KSI_DataHash_getHashAlg(hash, &algo);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to get algorithm ID from root hash.", blocks->blockNo);
+
+		if (blocks->hasher == NULL || blocks->hashAlgo != algo) {
+			res = KSI_DataHasher_open(ksi, algo, &hasher);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: could not open datahasher.", blocks->blockNo);
+		}
+
+		blocks->hashAlgo = algo;
+		if (hasher) {
+			KSI_DataHasher_free(blocks->hasher);
+			blocks->hasher = hasher;
+			hasher = NULL;
+		}
 
 		KSI_DataHash_free(blocks->rootHash);
 		blocks->rootHash = KSI_DataHash_ref(hash);
@@ -1838,6 +1872,7 @@ cleanup:
 	KSI_Signature_free(sig);
 	KSI_PolicyVerificationResult_free(verificationResult);
 	KSI_TlvElement_free(tlvSig);
+	KSI_DataHasher_free(hasher);
 	return res;
 }
 
@@ -1910,7 +1945,7 @@ static int process_record_chain(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BL
 	KSI_DataHash_free(blocks->metarecordHash);
 	blocks->metarecordHash = NULL;
 	if (tlvMetaRecord != NULL) {
-		res = get_hash_of_metarecord(ksi, blocks, tlvMetaRecord, &hash);
+		res = get_hash_of_metarecord(blocks, tlvMetaRecord, &hash);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate metarecord hash.", blocks->blockNo);
 
 		blocks->metarecordHash = KSI_DataHash_ref(hash);
@@ -1927,7 +1962,7 @@ static int process_record_chain(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BL
 	} else {
 		/* This is a logline record hash. */
 		if (files->files.inLog) {
-			res = get_hash_of_logline(ksi, blocks, files, &hash);
+			res = get_hash_of_logline(blocks, files, &hash);
 			if (res == KT_IO_ERROR) {
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: record hash no. %zu does not have a matching logline, end of logfile reached.", blocks->blockNo, get_nof_lines(blocks));
 			} else {
@@ -2339,6 +2374,7 @@ static void free_blocks(BLOCK_INFO *blocks) {
 		free(blocks->extractInfo);
 		free(blocks->logLine);
 		free(blocks->metaRecord);
+		KSI_DataHasher_free(blocks->hasher);
 	}
 }
 
