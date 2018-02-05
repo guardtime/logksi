@@ -63,12 +63,12 @@ enum {
 
 static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
 
-static int signature_verify_general(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_PolicyVerificationResult **out);
-static int signature_verify_internally(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_PolicyVerificationResult **out);
-static int signature_verify_key_based(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_PolicyVerificationResult **out);
-static int signature_verify_publication_based_with_user_pub(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_PolicyVerificationResult **out);
-static int signature_verify_publication_based_with_pubfile(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,  KSI_Signature *sig, KSI_DataHash *hsh, KSI_PolicyVerificationResult **out);
-static int signature_verify_calendar_based(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_PolicyVerificationResult **out);
+static int signature_verify_general(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
+static int signature_verify_internally(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
+static int signature_verify_key_based(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
+static int signature_verify_publication_based_with_user_pub(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
+static int signature_verify_publication_based_with_pubfile(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,  KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
+static int signature_verify_calendar_based(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
 static int generate_filenames(ERR_TRCKR *err, IO_FILES *files);
 static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files);
 static void close_log_and_signature_files(IO_FILES *files);
@@ -356,7 +356,7 @@ cleanup:
 }
 
 static int signature_verify_general(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
-									KSI_Signature *sig, KSI_DataHash *hsh, KSI_PolicyVerificationResult **out) {
+									KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out) {
 	int res;
 	int d = PARAM_SET_isSetByName(set, "d");
 	int x = PARAM_SET_isSetByName(set, "x");
@@ -380,7 +380,7 @@ static int signature_verify_general(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi
 	 * Verify signature.
 	 */
 	print_progressDesc(d, "%s... ", task);
-	res = LOGKSI_SignatureVerify_general(err, sig, ksi, hsh, pub_data, x, out);
+	res = LOGKSI_SignatureVerify_general(err, sig, ksi, hsh, rootLevel, pub_data, x, out);
 	if (*out != NULL) {
 		ERR_CATCH_MSG(err, res, "Error: [%s] %s. %s failed.", OBJPRINT_getVerificationErrorCode((*out)->finalResult.errorCode),
 				OBJPRINT_getVerificationErrorDescription((*out)->finalResult.errorCode), task);
@@ -400,7 +400,7 @@ cleanup:
 }
 
 static int signature_verify_internally(PARAM_SET *set, ERR_TRCKR *err,
-									   KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh,
+									   KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
 									   KSI_PolicyVerificationResult **out) {
 	int res;
 	int d;
@@ -409,7 +409,7 @@ static int signature_verify_internally(PARAM_SET *set, ERR_TRCKR *err,
 	d = PARAM_SET_isSetByName(set, "d");
 
 	print_progressDesc(d, "%s... ", task);
-	res = LOGKSI_SignatureVerify_internally(err, sig, ksi, hsh, out);
+	res = LOGKSI_SignatureVerify_internally(err, sig, ksi, hsh, rootLevel, out);
 	if (*out != NULL) {
 		ERR_CATCH_MSG(err, res, "Error: [%s] %s. %s failed.", OBJPRINT_getVerificationErrorCode((*out)->finalResult.errorCode),
 				OBJPRINT_getVerificationErrorDescription((*out)->finalResult.errorCode), task);
@@ -428,7 +428,7 @@ cleanup:
 
 
 static int signature_verify_key_based(PARAM_SET *set, ERR_TRCKR *err,
-									  KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh,
+									  KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
 									  KSI_PolicyVerificationResult **out) {
 	int res;
 	int d = PARAM_SET_isSetByName(set, "d");
@@ -438,7 +438,7 @@ static int signature_verify_key_based(PARAM_SET *set, ERR_TRCKR *err,
 	 * Verify signature.
 	 */
 	print_progressDesc(d, "%s... ", task);
-	res = LOGKSI_SignatureVerify_keyBased(err, sig, ksi, hsh, out);
+	res = LOGKSI_SignatureVerify_keyBased(err, sig, ksi, hsh, rootLevel, out);
 	if (*out != NULL) {
 		ERR_CATCH_MSG(err, res, "Error: [%s] %s. %s failed.", OBJPRINT_getVerificationErrorCode((*out)->finalResult.errorCode),
 				OBJPRINT_getVerificationErrorDescription((*out)->finalResult.errorCode), task);
@@ -456,7 +456,7 @@ cleanup:
 }
 
 static int signature_verify_publication_based_with_user_pub(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
-															KSI_Signature *sig, KSI_DataHash *hsh, KSI_PolicyVerificationResult **out) {
+															KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out) {
 	int res;
 	int d = PARAM_SET_isSetByName(set, "d");
 	int x = PARAM_SET_isSetByName(set, "x");
@@ -478,7 +478,7 @@ static int signature_verify_publication_based_with_user_pub(PARAM_SET *set, ERR_
 	 * Verify signature.
 	 */
 	print_progressDesc(d, "%s... ", task);
-	res = LOGKSI_SignatureVerify_userProvidedPublicationBased(err, sig, ksi, hsh, pub_data, x, out);
+	res = LOGKSI_SignatureVerify_userProvidedPublicationBased(err, sig, ksi, hsh, rootLevel, pub_data, x, out);
 	if (*out != NULL) {
 		ERR_CATCH_MSG(err, res, "Error: [%s] %s. %s failed.", OBJPRINT_getVerificationErrorCode((*out)->finalResult.errorCode),
 				OBJPRINT_getVerificationErrorDescription((*out)->finalResult.errorCode), task);
@@ -498,7 +498,7 @@ cleanup:
 }
 
 static int signature_verify_publication_based_with_pubfile(PARAM_SET *set, ERR_TRCKR *err,
-														   KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh,
+														   KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
 														   KSI_PolicyVerificationResult **out) {
 	int res;
 	int d = PARAM_SET_isSetByName(set, "d");
@@ -509,7 +509,7 @@ static int signature_verify_publication_based_with_pubfile(PARAM_SET *set, ERR_T
 	 * Verify signature.
 	 */
 	print_progressDesc(d, "%s... ", task);
-	res = LOGKSI_SignatureVerify_publicationsFileBased(err, sig, ksi, hsh, x, out);
+	res = LOGKSI_SignatureVerify_publicationsFileBased(err, sig, ksi, hsh, rootLevel, x, out);
 	if (*out != NULL) {
 		ERR_CATCH_MSG(err, res, "Error: [%s] %s. %s failed.", OBJPRINT_getVerificationErrorCode((*out)->finalResult.errorCode),
 				OBJPRINT_getVerificationErrorDescription((*out)->finalResult.errorCode), task);
@@ -527,7 +527,7 @@ cleanup:
 }
 
 static int signature_verify_calendar_based(PARAM_SET *set, ERR_TRCKR *err,
-										   KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh,
+										   KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
 										   KSI_PolicyVerificationResult **out) {
 	int res;
 	int d = PARAM_SET_isSetByName(set, "d");
@@ -538,7 +538,7 @@ static int signature_verify_calendar_based(PARAM_SET *set, ERR_TRCKR *err,
 	 * Verify signature.
 	 */
 	print_progressDesc(d, "%s... ", task);
-	res = LOGKSI_SignatureVerify_calendarBased(err, sig, ksi, hsh, out);
+	res = LOGKSI_SignatureVerify_calendarBased(err, sig, ksi, hsh, rootLevel, out);
 	if (*out != NULL) {
 		ERR_CATCH_MSG(err, res, "Error: [%s] %s. %s failed.", OBJPRINT_getVerificationErrorCode((*out)->finalResult.errorCode),
 				OBJPRINT_getVerificationErrorDescription((*out)->finalResult.errorCode), task);
