@@ -20,7 +20,7 @@
 #include <ksi/tlv_element.h>
 
 typedef int (*EXTENDING_FUNCTION)(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_VerificationContext *context, KSI_Signature **ext);
-typedef int (*VERIFYING_FUNCTION)(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hash, KSI_PolicyVerificationResult **verificationResult);
+typedef int (*VERIFYING_FUNCTION)(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hash, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **verificationResult);
 typedef int (*SIGNING_FUNCTION)(ERR_TRCKR *err, KSI_CTX *ksi, KSI_DataHash *hash, KSI_uint64_t rootLevel, KSI_Signature **sig);
 
 typedef struct {
