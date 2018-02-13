@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <unistd.h>
 #include <ksi/ksi.h>
 #include <ksi/compatibility.h>
 #include <ksi/policy.h>
@@ -560,6 +561,7 @@ cleanup:
 static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 	int res;
 	IO_FILES tmp;
+	char *legacy_name = NULL;
 
 	memset(&tmp.internal, 0, sizeof(tmp.internal));
 
@@ -578,6 +580,15 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 		/* Generate input log signature file name. */
 		res = concat_names(files->user.inLog, ".logsig", &tmp.internal.inSig);
 		ERR_CATCH_MSG(err, res, "Error: could not generate input log signature file name.");
+		if (access(tmp.internal.inSig, F_OK) == -1) {
+			res = concat_names(files->user.inLog, ".gtsig", &legacy_name);
+			ERR_CATCH_MSG(err, res, "Error: could not generate input log signature file name.");
+			if (access(legacy_name, F_OK) != -1) {
+				KSI_free(tmp.internal.inSig);
+				tmp.internal.inSig = legacy_name;
+				legacy_name = NULL;
+			}
+		}
 	} else {
 		res = duplicate_name(files->user.inSig, &tmp.internal.inSig);
 		ERR_CATCH_MSG(err, res, "Error: could not duplicate input log signature file name.");
@@ -589,6 +600,7 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 
 cleanup:
 
+	KSI_free(legacy_name);
 	logksi_internal_filenames_free(&tmp.internal);
 
 	return res;
