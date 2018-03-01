@@ -167,13 +167,6 @@ int main(int argc, char** argv, char **envp) {
 	if (res != PST_OK) goto cleanup;
 
 	/**
-	 * Load the configuration file from environment.
-	 */
-	res = CONF_fromEnvironment(configuration, "KSI_CONF", envp, 0, 1);
-	res = conf_report_errors(configuration, CONF_getEnvNameContent(), res);
-	if (res != KT_OK) goto cleanup;
-
-	/**
 	 * Get all possible components to run.
 	 */
 	res = logksi_compo_get(tasks, &set_task_name, &components);
@@ -224,6 +217,13 @@ int main(int argc, char** argv, char **envp) {
 			print_result("%s\n", TOOL_COMPONENT_LIST_helpToString(components, TASK_getID(task),buf, sizeof(buf)));
 		}
 
+		/**
+		 * Load the configuration file from environment.
+		 */
+		res = CONF_fromEnvironment(configuration, "KSI_CONF", envp, 0, 1);
+		res = conf_report_errors(configuration, CONF_getEnvNameContent(), res);
+		if (res != KT_OK) goto cleanup;
+
 		print_general_help(configuration, CONF_getEnvNameContent());
 		res = KT_OK;
 		goto cleanup;
@@ -232,14 +232,6 @@ int main(int argc, char** argv, char **envp) {
 		res = KT_OK;
 		goto cleanup;
 	}
-
-	if (CONF_isInvalid(configuration)) {
-		print_errors("KSI configuration file from KSI_CONF is invalid:\n");
-		print_errors("%s\n", CONF_errorsToString(configuration, "  ", buf, sizeof(buf)));
-		res = KT_INVALID_CONF;
-		goto cleanup;
-	}
-
 
 	/**
 	 * Invalid task. Give user some hints.
