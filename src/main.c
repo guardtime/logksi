@@ -221,10 +221,10 @@ int main(int argc, char** argv, char **envp) {
 		 * Load the configuration file from environment.
 		 */
 		res = CONF_fromEnvironment(configuration, "KSI_CONF", envp, 0, 1);
+		print_general_help(configuration, CONF_getEnvNameContent());
 		res = conf_report_errors(configuration, CONF_getEnvNameContent(), res);
 		if (res != KT_OK) goto cleanup;
 
-		print_general_help(configuration, CONF_getEnvNameContent());
 		res = KT_OK;
 		goto cleanup;
 	} else if (PARAM_SET_isSetByName(set, "version")) {
