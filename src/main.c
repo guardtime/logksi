@@ -214,7 +214,7 @@ int main(int argc, char** argv, char **envp) {
 			);
 			print_result("%s", TOOL_COMPONENT_LIST_toString(components, "  ", buf, sizeof(buf)));
 		} else {
-			print_result("%s\n", TOOL_COMPONENT_LIST_helpToString(components, TASK_getID(task),buf, sizeof(buf)));
+			print_result("%s", TOOL_COMPONENT_LIST_helpToString(components, TASK_getID(task),buf, sizeof(buf)));
 		}
 
 		/**
