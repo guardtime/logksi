@@ -1,3 +1,10 @@
+Version 1.3
+
+2018-03-01 1.3.xxx
+
+* IMPROVEMENT: When KSI_CONF environment variable points to a non-existent file or the file cannot be accessed, a warning is displayed instead of exiting with an error message. An error in the configuration file is still handled as an error.
+* BUGFIX: User is warned about an empty KSI_CONF environment variable.
+
 Version 1.2
 
 2017-11-29 1.2.323
