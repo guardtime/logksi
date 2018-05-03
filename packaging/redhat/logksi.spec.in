@@ -1,5 +1,5 @@
 #
-# Copyright 2013-2016 Guardtime, Inc.
+# Copyright 2013-2018 Guardtime, Inc.
 #
 # This file is part of the Guardtime client SDK.
 #
@@ -40,8 +40,10 @@ Distribution: Guardtime utilities
 BuildRoot: %{_tmppath}/%{name_package}-%{version}-build
 
 # Dependencies are set in config.ac
-@KSI_RPM_BUILD_DEPENDECY@
-@KSI_RPM_RUN_DEPENDECY@
+@KSI_RPM_BUILD_DEPENDENCY@
+@KSI_RPM_RUN_DEPENDENCY@
+@GTRFC3161_RPM_BUILD_DEPENDENCY@
+@GTRFC3161_RPM_RUN_DEPENDENCY@
 
 
 %description
