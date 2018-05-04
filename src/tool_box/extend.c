@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <errno.h>
 #include <ksi/ksi.h>
 #include <ksi/compatibility.h>
@@ -71,7 +72,7 @@ int extend_run(int argc, char** argv, char **envp) {
 	 * Extract command line parameters.
 	 */
 	res = PARAM_SET_new(
-			CONF_generate_param_set_desc("{input}{o}{sig-from-stdin}{d}{x}{T}{pub-str}{conf}{log}{h|help}", "XP", buf, sizeof(buf)),
+			CONF_generate_param_set_desc("{input}{o}{sig-from-stdin}{enable-rfc3161-conversion}{d}{x}{T}{pub-str}{conf}{log}{h|help}", "XP", buf, sizeof(buf)),
 			&set);
 	if (res != KT_OK) goto cleanup;
 
@@ -171,8 +172,9 @@ char *extend_help_toString(char*buf, size_t len) {
 		" %s extend --sig-from-stdin [-o <out.logsig>] --conf <logksi.conf> [more_options]\n"
 		"\n"
 		" <logfile>\n"
-		"           - Name of the log file whose log signature file is to be extended.\n"
-		"             If specified, the --sig-from-stdin switch cannot be used.\n"
+		"           - Name of the log file whose log signature file is to be extended. Log signature file name is\n"
+		"             derived by adding either .logsig or .gtsig to <logfile>. The file is expected to be found in\n"
+		"             the same folder as the <logfile>. If specified, the --sig-from-stdin switch cannot be used.\n"
 		" --sig-from-stdin\n"
 		"             The log signature file is read from stdin.\n"
 		" -o <out.logsig>\n"
@@ -201,6 +203,8 @@ char *extend_help_toString(char*buf, size_t len) {
 		" -V\n"
 		"           - Certificate file in PEM format for publications file verification.\n"
 		"             All values from lower priority sources are ignored.\n"
+		" --enable-rfc3161-conversion\n"
+		"           - Enable conversion, extending and replacing of RFC3161 timestamps with KSI signatures.\n"
 		" -d\n"
 		"           - Print detailed information about processes and errors to stderr.\n"
 		" --conf <file>\n"
@@ -390,12 +394,12 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	PARAM_SET_addControl(set, "{log}{o}", isFormatOk_path, NULL, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{input}", isFormatOk_inputFile, NULL, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{T}", isFormatOk_utcTime, isContentOk_utcTime, NULL, extract_utcTime);
-	PARAM_SET_addControl(set, "{sig-from-stdin}{d}", isFormatOk_flag, NULL, NULL, NULL);
+	PARAM_SET_addControl(set, "{sig-from-stdin}{enable-rfc3161-conversion}{d}", isFormatOk_flag, NULL, NULL, NULL);
 	PARAM_SET_addControl(set, "{pub-str}", isFormatOk_pubString, NULL, NULL, extract_pubString);
 
 	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
 	PARAM_SET_setParseOptions(set, "d", PST_PRSCMD_HAS_NO_VALUE | PST_PRSCMD_NO_TYPOS);
-	PARAM_SET_setParseOptions(set, "sig-from-stdin", PST_PRSCMD_HAS_NO_VALUE);
+	PARAM_SET_setParseOptions(set, "sig-from-stdin,enable-rfc3161-conversion", PST_PRSCMD_HAS_NO_VALUE);
 
 	/**
 	 * Define possible tasks.
@@ -441,6 +445,7 @@ cleanup:
 static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 	int res;
 	IO_FILES tmp;
+	char *legacy_name = NULL;
 
 	memset(&tmp.internal, 0, sizeof(tmp.internal));
 
@@ -465,6 +470,15 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 		/* Generate input log signature file name. */
 		res = concat_names(files->user.inLog, ".logsig", &tmp.internal.inSig);
 		ERR_CATCH_MSG(err, res, "Error: could not generate input log signature file name.");
+		if (access(tmp.internal.inSig, F_OK) == -1) {
+			res = concat_names(files->user.inLog, ".gtsig", &legacy_name);
+			ERR_CATCH_MSG(err, res, "Error: could not generate input log signature file name.");
+			if (access(legacy_name, F_OK) != -1) {
+				KSI_free(tmp.internal.inSig);
+				tmp.internal.inSig = legacy_name;
+				legacy_name = NULL;
+			}
+		}
 
 		/* Check if output would overwrite the input log signature file. */
 		if (files->user.inSig == NULL || !strcmp(files->user.inSig, tmp.internal.inSig)) {
@@ -474,6 +488,7 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 			/* Input must kept in a backup file when overwritten by the output log signature file. */
 			res = concat_names(tmp.internal.inSig, ".bak", &tmp.internal.backupSig);
 			ERR_CATCH_MSG(err, res, "Error: could not generate backup input log signature file name.");
+			tmp.internal.bOverwrite = 1;
 		} else if (!strcmp(files->user.inSig, "-")) {
 			/* Output must go to a nameless temporary file before redirecting it to stdout. */
 			tmp.internal.bStdout = 1;
@@ -491,6 +506,7 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 
 cleanup:
 
+	KSI_free(legacy_name);
 	logksi_internal_filenames_free(&tmp.internal);
 
 	return res;

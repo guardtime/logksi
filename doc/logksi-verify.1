@@ -24,11 +24,13 @@
 \fBlogksi verify --ver-pub \fIlogfile \fR[\fIlogfile.logsig\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... \fR[\fB-x -X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR]] [\fImore_options\fR]
 .\"
 .SH DESCRIPTION
-Verifies the log file \fIlogfile\fR. The name of the log signature file is expected to be \fIlogfile.logsig\fR by default. If this is not the case, the name of the log signature file must be given explicitly after the \fIlogfile\fR.
+Verifies the log file \fIlogfile\fR. The name of the log signature file is expected to be \fIlogfile.logsig\fR or \fIlogfile.gtsig\fR by default. If this is not the case, the name of the log signature file must be given explicitly after the \fIlogfile\fR.
 .LP
 Alternatively the extracted log records present in the \fIlogfile.excerpt\fR file can be verified. If not defined otherwise, then the log signature file acting as record integrity proof is expected to be \fIlogfile.excerpt.logsig\fR. See \fBlogksi-extract\fR(1) for details regarding log records' extraction.
 .LP
 The log file to be verified can also be read from \fIstdin\fR using the \fB--log-from-stdin\fR option. In such case there is no default log signature file, thus its name should be explicitly defined.
+.LP
+If the log signature file contains RFC3161 timestamps, they are internally converted to KSI signatures before verification.
 .LP
 For each signed log block the root hash of the block is recomputed and then verified using the KSI signature of that block.
 .LP
