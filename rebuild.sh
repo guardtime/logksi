@@ -24,12 +24,15 @@ set -e
 help_txt() {
 	echo "Usage:"
 	echo "  $0 [-s] [-d|-r] [Options]"
+	echo "  $0 --get-dep-online [-s] [-d|-r --no-dep-check] [Options]"
 	echo "  $0 -l path -i path [-s] [-d|-r --no-dep-check] [Options]"
 	echo ""
 
 	echo "Description:"
 	echo "  This is logksi general build script. It can be used to build logksi"
 	echo "  (packages rpm or deb) with libksi and libgtrfc3161 statically or dynamically."
+	echo "  See sections 'Examples' and 'Problems that can be resolved with this script'"
+	echo "  to see why and how this script is used."
 	echo ""
 	echo ""
 
@@ -37,7 +40,7 @@ help_txt() {
 	echo "  --link-static | -s"
 	echo "       - Link libksi and libgtrfc3161 statically. Note that only libksi and"
 	echo "         libgtrfc3161 are linked statically. On some platforms this may not work."
-	echo "         See example 2 and ./configure -h to alter linking process."
+	echo "         See examples 2, 4 and ./configure -h to alter linking process."
 	echo ""
 	echo "  --build-rpm | -r"
 	echo "       - Build RPM package."
@@ -56,7 +59,7 @@ help_txt() {
 	echo "  --lib | -b"
 	echo "       - Alter environment variable LIBS (see configure -h). Can be used to"
 	echo "         specify library file explicitly. Note that full path is required!"
-	echo "         See example 2."
+	echo "         See examples 2 and 4."
 	echo ""
 	echo "  --configure-flags | -c"
 	echo "       - Extra flags for configure script. Note that -s will already add"
@@ -67,11 +70,17 @@ help_txt() {
 	echo ""
 	echo "  --linker-flags | -L"
 	echo "       - Extra flags that are set to temporary environment variable LDFLAGS."
-	echo "         Note that -l will affect that."
+	echo "         Note that -l and --get-dep-online will affect that."
 	echo ""
 	echo "  --compiler-flags | -C"
 	echo "       - Extra flags that are set to temporary environment variable CPPFLAGS."
-	echo "         Note that -i will affect that."
+	echo "         Note that -i and --get-dep-online will affect that."
+	echo ""
+	echo "  --get-dep-online"
+	echo "       - When this flag is set, libksi and libparamset are downloaded from"
+	echo "         github and built. Result is dumped in directory 'dependencies' that"
+	echo "         will contain 'include' and 'lib' directory. Libraries built should"
+	echo "         be available automatically. If not, see -l and -i."
 	echo ""
 	echo "  --no-dep-check"
 	echo "       - No dependency check is performed when building rpm or deb package. Note"
@@ -84,6 +93,23 @@ help_txt() {
 	echo ""
 	echo "  --help | -h"
 	echo "       - You are reading it right now."
+	echo ""
+	echo ""
+
+	echo "Problems that can be resolved with this script:"
+	echo "  1) When all required dependencies are installed, just run ./rebuild.sh."
+	echo "  2) When there are wrong dependencies installed or it is prohibited to install"
+	echo "     extra packages, specify include and library paths for libksi and/or"
+	echo "     libgtrfc3161 with -i and -l. If there are no library and include files"
+	echo "     present, consider using --get-dep-online. Use --link-static to make binary"
+	echo "     work without depending on installed libksi or libgtrfc3161. See example 1."
+	echo "  3) When packaging is performed in a 'sterile' environment and it is prohibited"
+	echo "     to install any packages, use advice given in point 2 with --no-dep-check."
+	echo "     This option skips checking if libksi or libgtrfc3161 packages are installed"
+	echo "     during the build. Constructed packages are correct and dependency check is"
+	echo "     performed during the install. See example 3."
+	echo "  4) When option --link-static just does not work (OSX) and prebuilt binaries are"
+	echo "     linked dynamically. See examples 2 and 4 for forced static linking."
 	echo ""
 	echo ""
 
@@ -101,6 +127,21 @@ help_txt() {
 	echo "    ./rebuild.sh -i /usr/src/ksi/ -c '--without-libksi --disable-silent-rules' \\"
 	echo "     --lib /usr/lib/libksi.a'"
 	echo ""
+	echo "  3) Build logksi rpm packages with libksi and libgtrfc3161 from github. Libksi"
+	echo "  and libgtrfc3161 are linked and packaged statically."
+	echo ""
+	echo "    ./rebuild.sh --get-dep-online --no-dep-check --link-static --build-rpm"
+	echo ""
+	echo "  4) Build logksi deb packages with libksi and libgtrfc3161 from github. Force"
+	echo "  libksi and libgtrfc3161 to be linked and packaged statically (see"
+	echo "  ./configure -h)."
+	echo ""
+	echo "    ./rebuild.sh --get-dep-online --no-dep-check --build-deb \\"
+	echo "    -c '--without-libksi --without-libgtrfc3161' \\"
+	echo "    --lib \`pwd\`/dependencies/lib/libksi.a \\"
+	echo "    --lib \`pwd\`/dependencies/lib/libgtrfc3161.a"
+	echo ""
+
 }
 
 conf_args=""
@@ -122,6 +163,7 @@ is_extra_l_or_c_flags=false
 is_verbose=false
 do_build_rpm=false
 do_build_deb=false
+do_build_dependecies=false
 show_help=false
 
 
@@ -169,6 +211,9 @@ while [ "$1" != "" ]; do
 								 extra_compiler_flags="$extra_compiler_flags $1"
 								 is_extra_l_or_c_flags=true
 								 ;;
+		--get-dep-online )	     echo "Download and build libksi and libgtrfc3161."
+								 do_build_dependecies=true
+								 ;;
 		--no-dep-check )	     echo "Ignoring 'build depends on' when building a package."
 								 rpmbuild_flags="--nodeps"
 								 debuild_flags="-d"
@@ -186,6 +231,15 @@ done
 if $show_help ; then
 	help_txt
 	exit 0
+fi
+
+if $do_build_dependecies ; then
+	is_inc_dir_set=true
+	is_lib_dir_set=true
+	./rebuild-tool-dependencies.sh
+	include_dir="$include_dir -I$(pwd)/dependencies/include"
+	lib_dir="$lib_dir -L$(pwd)/dependencies/lib"
+	lib_path="$lib_path $(pwd)/dependencies/lib:"
 fi
 
 if $is_extra_l_or_c_flags ; then
@@ -249,7 +303,7 @@ if $do_build_rpm || $do_build_deb; then
 		mkdir -p $BUILD_DIR/{BUILD,RPMS,SOURCES,SPECS,SRPMS,tmp} && \
 		cp packaging/redhat/logksi.spec $BUILD_DIR/SPECS/ && \
 		cp logksi-*.tar.gz $BUILD_DIR/SOURCES/ && \
-		rpmbuild -ba $BUILD_DIR/SPECS/logksi.spec && \
+		rpmbuild -ba $rpmbuild_flags $BUILD_DIR/SPECS/logksi.spec && \
 		cp $BUILD_DIR/RPMS/*/logksi-*$version*.rpm . && \
 		cp $BUILD_DIR/SRPMS/logksi-*$version*.rpm . && \
 		chmod -v 644 *.rpm
