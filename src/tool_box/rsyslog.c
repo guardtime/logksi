@@ -36,6 +36,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <inttypes.h>
+#include <gtrfc3161/tsconvert.h>
 
 #define SOF_ARRAY(x) (sizeof(x) / sizeof((x)[0]))
 
@@ -1551,8 +1552,11 @@ int is_block_signature_expected(ERR_TRCKR *err, BLOCK_INFO *blocks) {
 
 	if (blocks->keepTreeHashes) {
 		if (!blocks->keepRecordHashes && !blocks->balanced && !blocks->finalTreeHashesSome) {
-			res = KT_VERIFICATION_FAILURE;
-			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: incomplete block is closed without a metarecord.", blocks->blockNo);
+			/* If LOGSIG12 format is used, metarecords are mandatory for closing unbalanced blocks. */
+			if (blocks->version == LOGSIG12) {
+				res = KT_VERIFICATION_FAILURE;
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: incomplete block is closed without a metarecord.", blocks->blockNo);
+			}
 		}
 		/* Check if all mandatory tree hashes are present in the current block. */
 		if (blocks->nofTreeHashes < maxTreeHashes) {
@@ -1568,9 +1572,12 @@ int is_block_signature_expected(ERR_TRCKR *err, BLOCK_INFO *blocks) {
 					/* All final tree hashes are missing, but at least they are being expected -> this is OK and can be repaired. */
 					blocks->finalTreeHashesNone = 1;
 				} else {
-					/* All of the final tree hashes are missing, but they are not being expected either (e.g. missing metarecord). This should never happen. */
-					res = KT_VERIFICATION_FAILURE;
-					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: all final tree hashes are missing and block is closed without a metarecord.", blocks->blockNo);
+					/* If LOGSIG12 format is used, metarecords are mandatory for closing unbalanced blocks. */
+					if (blocks->version == LOGSIG12) {
+						/* All of the final tree hashes are missing, but they are not being expected either (e.g. missing metarecord). This should never happen. */
+						res = KT_VERIFICATION_FAILURE;
+						ERR_CATCH_MSG(err, res, "Error: Block no. %zu: all final tree hashes are missing and block is closed without a metarecord.", blocks->blockNo);
+					}
 				}
 			} else {
 				/* If some final tree hashes are present, they must all be present. */
@@ -1604,6 +1611,7 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 	KSI_DataHash *hash = NULL;
 	KSI_TlvElement *tlv = NULL;
 	KSI_TlvElement *tlvSig = NULL;
+	KSI_TlvElement *tlvNoSig = NULL;
 	KSI_TlvElement *recChain = NULL;
 	KSI_TlvElement *hashStep = NULL;
 	size_t j;
@@ -1629,6 +1637,23 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 	res = tlv_element_get_uint(tlv, ksi, 0x01, &blocks->recordCount);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing record count in block signature.", blocks->blockNo);
 
+	res = KSI_TlvElement_getElement(tlv, 0x906, &tlvNoSig);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to extract RFC3161 element in block signature.", blocks->blockNo);
+
+	if (tlvNoSig != NULL) {
+		/* Convert the RFC3161 timestamp into KSI signature and replace it in the TLV. */
+		res = convert_signature(ksi, tlvNoSig->ptr + tlvNoSig->ftlv.hdr_len, tlvNoSig->ftlv.dat_len, &sig);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to convert RFC3161 element in block signature.", blocks->blockNo);
+
+		res = KSI_TlvElement_removeElement(tlv, 0x906, NULL);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to remove RFC3161 timestamp from block signature.", blocks->blockNo);
+		res = tlv_element_set_signature(tlv, ksi, 0x905, sig);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to insert KSI signature in block signature.", blocks->blockNo);
+		KSI_Signature_free(sig);
+		sig = NULL;
+
+		blocks->warningLegacy = 1;
+	}
 	res = KSI_TlvElement_getElement(tlv, 0x905, &tlvSig);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to extract KSI signature element in block signature.", blocks->blockNo);
 
@@ -1636,6 +1661,7 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 		res = KT_INVALID_INPUT_FORMAT;
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing KSI signature in block signature.", blocks->blockNo);
 	}
+
 
 	res = is_block_signature_expected(err, blocks);
 	if (res != KT_OK) goto cleanup;
@@ -1718,6 +1744,15 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 		res = KSI_TlvElement_serialize(tlv, blocks->ftlv_raw, SOF_FTLV_BUFFER, &blocks->ftlv_len, 0);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to serialize extended block signature.", blocks->blockNo);
 
+		if (blocks->warningLegacy) {
+			int convertLegacy = PARAM_SET_isSetByName(set, "enable-rfc3161-conversion");
+
+			if (files->internal.bOverwrite && !convertLegacy) {
+				res = KT_RFC3161_EXT_IMPOSSIBLE;
+				ERR_CATCH_MSG(err, res, "Error: overwriting of legacy log signature file not enabled. Run 'logksi extend' with '--enable-rfc3161-conversion' to convert RFC3161 timestamps to KSI signatures.");
+			}
+			blocks->warningLegacy = 0;
+		}
 		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->files.outSig) != blocks->ftlv_len) {
 			res = KT_IO_ERROR;
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to write extended signature to extended log signature file.", blocks->blockNo);
@@ -1818,6 +1853,7 @@ cleanup:
 	KSI_VerificationContext_clean(&context);
 	KSI_PolicyVerificationResult_free(verificationResult);
 	KSI_TlvElement_free(tlvSig);
+	KSI_TlvElement_free(tlvNoSig);
 	KSI_TlvElement_free(tlv);
 	KSI_TlvElement_free(hashStep);
 	KSI_TlvElement_free(recChain);
@@ -2291,7 +2327,7 @@ cleanup:
 
 static int check_warnings(BLOCK_INFO *blocks) {
 	if (blocks) {
-		if (blocks->warningSignatures || blocks->warningTreeHashes) {
+		if (blocks->warningSignatures || blocks->warningTreeHashes || blocks->warningLegacy) {
 			return 1;
 		}
 	}
@@ -2356,6 +2392,10 @@ cleanup:
 
 		if (blocks && blocks->warningSignatures) {
 			print_warnings("Warning: Unsigned root hashes found. Run 'logksi sign' to perform signing recovery.\n");
+		}
+
+		if (blocks && blocks->warningLegacy) {
+			print_warnings("Warning: RFC3161 timestamp(s) found in log signature. Run 'logksi extend' with '--enable-rfc3161-conversion' to convert RFC3161 timestamps to KSI signatures.\n");
 		}
 	}
 

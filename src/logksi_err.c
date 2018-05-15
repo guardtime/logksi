@@ -52,6 +52,7 @@ static int logksi_ErrToExitcode(int error_code) {
 		case KT_VERIFICATION_FAILURE:
 			return EXIT_VERIFY_ERROR;
 		case KT_PUBFILE_HAS_NO_PUBREC_TO_EXTEND_TO:
+		case KT_RFC3161_EXT_IMPOSSIBLE:
 			return EXIT_EXTEND_ERROR;
 		default:
 			return EXIT_FAILURE;
@@ -122,6 +123,8 @@ static const char* logksiErrToString(int error_code) {
 			return "Log signature verification failed.";
 		case KT_PUBFILE_HAS_NO_PUBREC_TO_EXTEND_TO:
 			return "No publication record found to extend to.";
+		case KT_RFC3161_EXT_IMPOSSIBLE:
+			return "Unable to extend RFC3161 signature.";
 		case KT_UNKNOWN_ERROR:
 			return "Unknown error.";
 		default:

@@ -62,6 +62,7 @@ typedef struct {
 	char bStdout;
 	char bStdoutLog;
 	char bStdoutProof;
+	char bOverwrite;
 } INTERNAL_FILE_NAMES;
 
 typedef struct {
@@ -141,6 +142,7 @@ typedef struct {
 	unsigned char treeHeight;
 	unsigned char balanced;
 	LOGSIG_VERSION version;
+	char warningLegacy;
 	char keepRecordHashes;
 	char keepTreeHashes;
 	char finalTreeHashesSome;
