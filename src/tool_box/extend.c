@@ -205,6 +205,8 @@ char *extend_help_toString(char*buf, size_t len) {
 		"             All values from lower priority sources are ignored.\n"
 		" --enable-rfc3161-conversion\n"
 		"           - Enable conversion, extending and replacing of RFC3161 timestamps with KSI signatures.\n"
+		"             Note: this flag is not required if a different output log signature file name is specified\n"
+		"             with -o to avoid overwriting of the original log signature file.\n"
 		" -d\n"
 		"           - Print detailed information about processes and errors to stderr.\n"
 		" --conf <file>\n"
@@ -470,7 +472,7 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 		/* Generate input log signature file name. */
 		res = concat_names(files->user.inLog, ".logsig", &tmp.internal.inSig);
 		ERR_CATCH_MSG(err, res, "Error: could not generate input log signature file name.");
-		if (access(tmp.internal.inSig, F_OK) == -1) {
+		if (!SMART_FILE_doFileExist(tmp.internal.inSig)) {
 			res = concat_names(files->user.inLog, ".gtsig", &legacy_name);
 			ERR_CATCH_MSG(err, res, "Error: could not generate input log signature file name.");
 			if (access(legacy_name, F_OK) != -1) {
