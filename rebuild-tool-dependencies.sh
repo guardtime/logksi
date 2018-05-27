@@ -23,7 +23,7 @@ set -e
 #libksi_git="https://github.com/guardtime/libksi.git"
 #libksi_version=v3.17.2693
 libksi_git="git@git.ee.guardtime.com:developers/libksi.git"
-libksi_version="remove_tlv_element"
+libksi_version="develop"
 #libgtrfc3161_git="https://github.com/guardtime/signatureconverter-c.git"
 #libgtrfc3161_version=v1.0.000
 libgtrfc3161_git="git@git.ee.guardtime.com:developers/signatureconverter-c.git"
