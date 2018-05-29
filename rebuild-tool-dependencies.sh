@@ -50,7 +50,7 @@ cd $tmp_build_dir_name
 
   cd $libgtrfc3161_dir_name
     git checkout $libgtrfc3161_version
-    ./rebuild.sh
+    ./rebuild.sh LDFLAGS=-L$(pwd)/../libksi/src/ksi/.libs/ CPPFLAGS=-I$(pwd)/../libksi/src/
   cd ..
 cd ..
 
