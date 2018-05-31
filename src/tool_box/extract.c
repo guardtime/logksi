@@ -258,18 +258,18 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 
 	if (files->user.inLog) {
 		res = duplicate_name(files->user.inLog, &tmp.internal.inLog);
-		ERR_CATCH_MSG(err, res, "Error: could not duplicate input log file name.");
+		ERR_CATCH_MSG(err, res, "Error: Could not duplicate input log file name.");
 		/* If input log signature file name is not specified, it is generared from the input log file name. */
 		if (files->user.inSig == NULL) {
 			/* Generate input log signature file name. */
 			res = concat_names(files->user.inLog, ".logsig", &tmp.internal.inSig);
-			ERR_CATCH_MSG(err, res, "Error: could not generate input log signature file name.");
+			ERR_CATCH_MSG(err, res, "Error: Could not generate input log signature file name.");
 		}
 	}
 
 	if (files->user.inSig) {
 		res = duplicate_name(files->user.inSig, &tmp.internal.inSig);
-		ERR_CATCH_MSG(err, res, "Error: could not duplicate input log signature file name.");
+		ERR_CATCH_MSG(err, res, "Error: Could not duplicate input log signature file name.");
 	}
 
 	if (files->user.outLog) {
@@ -277,23 +277,23 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 			tmp.internal.bStdoutLog = 1;
 		} else {
 			res = duplicate_name(files->user.outLog, &tmp.internal.outLog);
-			ERR_CATCH_MSG(err, res, "Error: could not duplicate output log records file name.");
+			ERR_CATCH_MSG(err, res, "Error: Could not duplicate output log records file name.");
 		}
 	} else if (files->user.outBase) {
 		if (!strcmp(files->user.outBase, "-")) {
 			res = KT_INVALID_CMD_PARAM;
-			ERR_CATCH_MSG(err, res, "Error: both output files cannot be redirected to stdout.");
+			ERR_CATCH_MSG(err, res, "Error: Both output files cannot be redirected to stdout.");
 		} else {
 			res = concat_names(files->user.outBase, ".excerpt", &tmp.internal.outLog);
-			ERR_CATCH_MSG(err, res, "Error: could not generate output log records file name.");
+			ERR_CATCH_MSG(err, res, "Error: Could not generate output log records file name.");
 		}
 	} else {
 		if (files->user.inLog) {
 			res = concat_names(files->user.inLog, ".excerpt", &tmp.internal.outLog);
-			ERR_CATCH_MSG(err, res, "Error: could not generate output log records file name.");
+			ERR_CATCH_MSG(err, res, "Error: Could not generate output log records file name.");
 		} else {
 			res = KT_INVALID_CMD_PARAM;
-			ERR_CATCH_MSG(err, res, "Error: output log records file name must be specified if log file is read from stdin.");
+			ERR_CATCH_MSG(err, res, "Error: Output log records file name must be specified if log file is read from stdin.");
 		}
 	}
 
@@ -302,39 +302,39 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 			tmp.internal.bStdoutProof = 1;
 		} else {
 			res = duplicate_name(files->user.outProof, &tmp.internal.outProof);
-			ERR_CATCH_MSG(err, res, "Error: could not duplicate output integrity proof file name.");
+			ERR_CATCH_MSG(err, res, "Error: Could not duplicate output integrity proof file name.");
 		}
 	} else if (files->user.outBase) {
 		if (!strcmp(files->user.outBase, "-")) {
 			res = KT_INVALID_CMD_PARAM;
-			ERR_CATCH_MSG(err, res, "Error: both output files cannot be redirected to stdout.");
+			ERR_CATCH_MSG(err, res, "Error: Both output files cannot be redirected to stdout.");
 		} else {
 			res = concat_names(files->user.outBase, ".excerpt.logsig", &tmp.internal.outProof);
-			ERR_CATCH_MSG(err, res, "Error: could not generate output log records file name.");
+			ERR_CATCH_MSG(err, res, "Error: Could not generate output log records file name.");
 		}
 	} else {
 		if (files->user.inLog) {
 			res = concat_names(files->user.inLog, ".excerpt.logsig", &tmp.internal.outProof);
-			ERR_CATCH_MSG(err, res, "Error: could not generate output integrity proof file name.");
+			ERR_CATCH_MSG(err, res, "Error: Could not generate output integrity proof file name.");
 		} else {
 			res = KT_INVALID_CMD_PARAM;
-			ERR_CATCH_MSG(err, res, "Error: output integrity proof file name must be specified if log file is read from stdin.");
+			ERR_CATCH_MSG(err, res, "Error: Output integrity proof file name must be specified if log file is read from stdin.");
 		}
 	}
 
 	if (tmp.internal.bStdoutLog && tmp.internal.bStdoutProof) {
 		res = KT_INVALID_CMD_PARAM;
-		ERR_CATCH_MSG(err, res, "Error: both output files cannot be redirected to stdout.");
+		ERR_CATCH_MSG(err, res, "Error: Both output files cannot be redirected to stdout.");
 	}
 
 	if(!tmp.internal.bStdoutLog) {
 		res = temp_name(tmp.internal.outLog, &tmp.internal.tempLog);
-		ERR_CATCH_MSG(err, res, "Error: could not generate temporary output log records file name.");
+		ERR_CATCH_MSG(err, res, "Error: Could not generate temporary output log records file name.");
 	}
 
 	if (!tmp.internal.bStdoutProof) {
 		res = temp_name(tmp.internal.outProof, &tmp.internal.tempProof);
-		ERR_CATCH_MSG(err, res, "Error: could not generate temporary output integrity proof file name.");
+		ERR_CATCH_MSG(err, res, "Error: Could not generate temporary output integrity proof file name.");
 	}
 
 	files->internal = tmp.internal;
@@ -374,10 +374,10 @@ static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files) {
 	}
 
 	res = logksi_file_create_temporary(files->internal.tempLog, &tmp.files.outLog, files->internal.bStdoutLog);
-	ERR_CATCH_MSG(err, res, "Error: could not create temporary output log records file.");
+	ERR_CATCH_MSG(err, res, "Error: Could not create temporary output log records file.");
 
 	res = logksi_file_create_temporary(files->internal.tempProof, &tmp.files.outProof, files->internal.bStdoutProof);
-	ERR_CATCH_MSG(err, res, "Error: could not create temporary output integrity proof file.");
+	ERR_CATCH_MSG(err, res, "Error: Could not create temporary output integrity proof file.");
 
 	files->files = tmp.files;
 	memset(&tmp.files, 0, sizeof(tmp.files));
@@ -402,20 +402,20 @@ static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files) {
 		/* Output must be saved in log records file, so the temporary file is renamed. */
 		logksi_file_close(&files->files.outLog);
 		res = logksi_file_rename(files->internal.tempLog, files->internal.outLog);
-		ERR_CATCH_MSG(err, res, "Error: could not rename temporary file %s to output log records file %s.", files->internal.tempLog, files->internal.outLog);
+		ERR_CATCH_MSG(err, res, "Error: Could not rename temporary file %s to output log records file %s.", files->internal.tempLog, files->internal.outLog);
 	} else if (files->internal.bStdoutLog) {
 		res = logksi_file_redirect_to_stdout(files->files.outLog);
-		ERR_CATCH_MSG(err, res, "Error: could not write temporary output log records file to stdout.");
+		ERR_CATCH_MSG(err, res, "Error: Could not write temporary output log records file to stdout.");
 	}
 
 	if (files->internal.tempProof) {
 		/* Output must be saved in integrity proof file, so the temporary file is renamed. */
 		logksi_file_close(&files->files.outProof);
 		res = logksi_file_rename(files->internal.tempProof, files->internal.outProof);
-		ERR_CATCH_MSG(err, res, "Error: could not rename temporary file %s to output integrity proof file %s.", files->internal.tempProof, files->internal.outProof);
+		ERR_CATCH_MSG(err, res, "Error: Could not rename temporary file %s to output integrity proof file %s.", files->internal.tempProof, files->internal.outProof);
 	} else if (files->internal.bStdoutProof) {
 		res = logksi_file_redirect_to_stdout(files->files.outProof);
-		ERR_CATCH_MSG(err, res, "Error: could not write temporary output integrity proof file to stdout.");
+		ERR_CATCH_MSG(err, res, "Error: Could not write temporary output integrity proof file to stdout.");
 	}
 
 	res = KT_OK;
@@ -430,12 +430,12 @@ static void close_log_and_signature_files(ERR_TRCKR *err, int res, IO_FILES *fil
 		logksi_files_close(&files->files);
 		if (files->internal.tempLog && res != KT_OK) {
 			if (remove(files->internal.tempLog) != 0) {
-				if (err) ERR_TRCKR_ADD(err, KT_IO_ERROR, "Error: could not remove temporary log records file %s.", files->internal.tempLog);
+				if (err) ERR_TRCKR_ADD(err, KT_IO_ERROR, "Error: Could not remove temporary log records file %s.", files->internal.tempLog);
 			}
 		}
 		if (files->internal.tempProof && res != KT_OK) {
 			if (remove(files->internal.tempProof) != 0) {
-				if (err) ERR_TRCKR_ADD(err, KT_IO_ERROR, "Error: could not remove temporary integrity proof file %s.", files->internal.tempProof);
+				if (err) ERR_TRCKR_ADD(err, KT_IO_ERROR, "Error: Could not remove temporary integrity proof file %s.", files->internal.tempProof);
 			}
 		}
 		logksi_internal_filenames_free(&files->internal);

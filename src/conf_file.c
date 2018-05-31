@@ -236,7 +236,7 @@ int conf_report_errors(PARAM_SET *set, const char *fname, int res) {
 	char buf[0xffff];
 
 	if (res == KT_IO_ERROR) {
-		print_warnings("\nWarning: configuration file '%s' pointed to by KSI_CONF does not exist.\n", fname);
+		print_warnings("\nWarning: Configuration file '%s' pointed to by KSI_CONF does not exist.\n", fname);
 		res = KT_OK;
 		goto cleanup;
 	} else if (res == KT_NO_PRIVILEGES) {
@@ -244,13 +244,13 @@ int conf_report_errors(PARAM_SET *set, const char *fname, int res) {
 		res = KT_OK;
 		goto cleanup;
 	} else if (res == KT_INVALID_INPUT_FORMAT) {
-		print_warnings("\nWarning: environment variable KSI_CONF is an empty string.\n");
+		print_warnings("\nWarning: Environment variable KSI_CONF is an empty string.\n");
 		res = KT_OK;
 		goto cleanup;
 	}
 
 	if (CONF_isInvalid(set)) {
-		print_errors("\nError: configuration file '%s' pointed to by KSI_CONF is invalid:\n", fname);
+		print_errors("\nError: Configuration file '%s' pointed to by KSI_CONF is invalid:\n", fname);
 		print_errors("%s\n", CONF_errorsToString(set, "  ", buf, sizeof(buf)));
 		res = KT_INVALID_CONF;
 		goto cleanup;

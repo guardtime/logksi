@@ -1750,7 +1750,7 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 
 			if (files->internal.bOverwrite && !convertLegacy) {
 				res = KT_RFC3161_EXT_IMPOSSIBLE;
-				ERR_CATCH_MSG(err, res, "Error: overwriting of legacy log signature file not enabled. Run 'logksi extend' with '--enable-rfc3161-conversion' to convert RFC3161 timestamps to KSI signatures.");
+				ERR_CATCH_MSG(err, res, "Error: Overwriting of legacy log signature file not enabled. Run 'logksi extend' with '--enable-rfc3161-conversion' to convert RFC3161 timestamps to KSI signatures.");
 			}
 			blocks->warningLegacy = 0;
 		}
@@ -2348,7 +2348,7 @@ static int finalize_log_signature(ERR_TRCKR *err, BLOCK_INFO *blocks, IO_FILES *
 
 	if (blocks->blockNo == 0) {
 		res = KT_INVALID_INPUT_FORMAT;
-		ERR_CATCH_MSG(err, res, "Error: no blocks found.");
+		ERR_CATCH_MSG(err, res, "Error: No blocks found.");
 	} else if (blocks->blockNo > blocks->sigNo) {
 		res = KT_INVALID_INPUT_FORMAT;
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: block signature data missing.", blocks->blockNo);
@@ -2457,7 +2457,7 @@ static int count_blocks(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, FILE *
 	pos = ftell(in);
 	if (pos == -1) {
 		res = KT_IO_ERROR;
-		ERR_CATCH_MSG(err, res, "Error: unable to get file handle position.");
+		ERR_CATCH_MSG(err, res, "Error: Unable to get file handle position.");
 	}
 
 	while (!feof(in)) {
@@ -2505,7 +2505,7 @@ cleanup:
 		if (fseek(in, pos, SEEK_SET) != 0) {
 			if (res == KT_OK) {
 				res = KT_IO_ERROR;
-				if (err) ERR_TRCKR_ADD(err, res, "Error: could not rewind input stream.");
+				if (err) ERR_TRCKR_ADD(err, res, "Error: Could not rewind input stream.");
 			}
 		}
 	}
@@ -3219,10 +3219,10 @@ int logksi_file_check_and_open(ERR_TRCKR *err, char *name, FILE **out) {
 	if (tmp == NULL) {
 		if (errno == ENOENT) {
 			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: could not find file %s.", name);
+			ERR_CATCH_MSG(err, res, "Error: Could not find file %s.", name);
 		} else {
 			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: could not open file %s.", name);
+			ERR_CATCH_MSG(err, res, "Error: Could not open file %s.", name);
 		}
 	}
 
