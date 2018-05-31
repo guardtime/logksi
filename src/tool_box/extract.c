@@ -177,7 +177,7 @@ char *extract_help_toString(char *buf, size_t len) {
 		"             The log signature file is read from stdin. Cannot be used with --log-from-stdin.\n"
 		"             If --sig-from-stdin is used, the log file name must be specified explicitly.\n"
 		" -o <outfile>\n"
-		"             Names of the output files will be derived from <outfile> by adding the appropriate sufixes.\n"
+		"             Names of the output files will be derived from <outfile> by adding the appropriate suffixes.\n"
 		"             Name of the excerpt file will be <outfile.excerpt>.\n"
 		"             Name of the integrity proof file will be <outfile.excerpt.logsig>.\n"
 		"             If <outfile> is not specified, names of the output files will be derived from <logfile>.\n"
