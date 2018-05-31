@@ -487,7 +487,8 @@ cleanup:
 int get_hash_of_logline(BLOCK_INFO *blocks, IO_FILES *files, KSI_DataHash **hash) {
 	int res;
 	KSI_DataHash *tmp = NULL;
-	char buf[1024];
+	/* Maximum line size is 64K characters, without newline character. */
+	char buf[0x10000 + 2];
 
 	if (files == NULL || hash == NULL) {
 		res = KT_INVALID_ARGUMENT;
