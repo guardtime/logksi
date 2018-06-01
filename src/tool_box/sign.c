@@ -166,8 +166,6 @@ char *sign_help_toString(char*buf, size_t len) {
 		" --aggr-hmac-alg <alg>\n"
 		"           - Hash algorithm to be used for computing HMAC on outgoing messages\n"
 		"             towards KSI aggregator. If not set, default algorithm is used.\n"
-		" --insert-missing-hashes\n"
-		"           - Generate and insert missing tree hashes into the log signature file.\n"
 		" -d\n"
 		"           - Print detailed information about processes and errors to stderr.\n"
 		" --show-progress\n"
