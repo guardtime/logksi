@@ -572,17 +572,17 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 
 	if (files->user.inLog) {
 		res = duplicate_name(files->user.inLog, &tmp.internal.inLog);
-		ERR_CATCH_MSG(err, res, "Error: could not duplicate input log file name.");
+		ERR_CATCH_MSG(err, res, "Error: Could not duplicate input log file name.");
 	}
 
 	/* If input log signature file name is not specified, it is generared from the input log file name. */
 	if (files->user.inSig == NULL) {
 		/* Generate input log signature file name. */
 		res = concat_names(files->user.inLog, ".logsig", &tmp.internal.inSig);
-		ERR_CATCH_MSG(err, res, "Error: could not generate input log signature file name.");
+		ERR_CATCH_MSG(err, res, "Error: Could not generate input log signature file name.");
 		if (access(tmp.internal.inSig, F_OK) == -1) {
 			res = concat_names(files->user.inLog, ".gtsig", &legacy_name);
-			ERR_CATCH_MSG(err, res, "Error: could not generate input log signature file name.");
+			ERR_CATCH_MSG(err, res, "Error: Could not generate input log signature file name.");
 			if (access(legacy_name, F_OK) != -1) {
 				KSI_free(tmp.internal.inSig);
 				tmp.internal.inSig = legacy_name;
@@ -591,7 +591,7 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 		}
 	} else {
 		res = duplicate_name(files->user.inSig, &tmp.internal.inSig);
-		ERR_CATCH_MSG(err, res, "Error: could not duplicate input log signature file name.");
+		ERR_CATCH_MSG(err, res, "Error: Could not duplicate input log signature file name.");
 	}
 
 	files->internal = tmp.internal;

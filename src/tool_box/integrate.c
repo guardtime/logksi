@@ -217,26 +217,26 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 
 	/* Input consists of two parts - blocks and signatures. Names of these files are generated from the log file name. */
 	res = concat_names(files->user.inLog, ".logsig.parts/blocks.dat", &tmp.internal.partsBlk);
-	ERR_CATCH_MSG(err, res, "Error: could not generate input blocks file name.");
+	ERR_CATCH_MSG(err, res, "Error: Could not generate input blocks file name.");
 
 	res = concat_names(files->user.inLog, ".logsig.parts/block-signatures.dat", &tmp.internal.partsSig);
-	ERR_CATCH_MSG(err, res, "Error: could not generate input signatures file name.");
+	ERR_CATCH_MSG(err, res, "Error: Could not generate input signatures file name.");
 
 	/* Output log signature file name, if not specified, is generated from the log file name. */
 	if (files->user.inSig == NULL) {
 		res = concat_names(files->user.inLog, ".logsig", &tmp.internal.outSig);
-		ERR_CATCH_MSG(err, res, "Error: could not generate output log signature file name.");
+		ERR_CATCH_MSG(err, res, "Error: Could not generate output log signature file name.");
 		res = temp_name(tmp.internal.outSig, &tmp.internal.tempSig);
-		ERR_CATCH_MSG(err, res, "Error: could not generate temporary output log signature file name.");
+		ERR_CATCH_MSG(err, res, "Error: Could not generate temporary output log signature file name.");
 	} else if (!strcmp(files->user.inSig, "-")) {
 		/* Output must go to a nameless temporary file before redirecting it to stdout. */
 		tmp.internal.bStdout = 1;
 	} else {
 		/* Output must go to a named temporary file that is renamed appropriately on success. */
 		res = temp_name(files->user.inSig, &tmp.internal.tempSig);
-		ERR_CATCH_MSG(err, res, "Error: could not generate temporary output log signature file name.");
+		ERR_CATCH_MSG(err, res, "Error: Could not generate temporary output log signature file name.");
 		res = duplicate_name(files->user.inSig, &tmp.internal.outSig);
-		ERR_CATCH_MSG(err, res, "Error: could not duplicate output log signature file name.");
+		ERR_CATCH_MSG(err, res, "Error: Could not duplicate output log signature file name.");
 	}
 
 	files->internal = tmp.internal;
@@ -277,11 +277,11 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files, int forc
 			tmp.files.outSig = fopen(files->internal.outSig, "rb");
 			if (tmp.files.outSig != NULL) {
 				res = KT_IO_ERROR;
-				ERR_CATCH_MSG(err, res, "Error: overwriting of existing log signature file %s not allowed. Run 'logksi integrate' with '--force-overwrite' to force overwriting.", files->internal.outSig);
+				ERR_CATCH_MSG(err, res, "Error: Overwriting of existing log signature file %s not allowed. Run 'logksi integrate' with '--force-overwrite' to force overwriting.", files->internal.outSig);
 			}
 		}
 		res = logksi_file_create_temporary(files->internal.tempSig, &tmp.files.outSig, files->internal.bStdout);
-		ERR_CATCH_MSG(err, res, "Error: could not create temporary output log signature file.");
+		ERR_CATCH_MSG(err, res, "Error: Could not create temporary output log signature file.");
 	} else if (partsBlkErr == ENOENT && partsSigErr == ENOENT) {
 		/* If none of the input files exist, but the output log signature file exists,
 		 * the output log signature file is the result of the synchronous signing process
@@ -294,18 +294,18 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files, int forc
 		} else {
 			if (errno == ENOENT) {
 				res = KT_KSI_SIG_VER_IMPOSSIBLE;
-				ERR_CATCH_MSG(err, res, "Error: unable to find input blocks file %s.", files->internal.partsBlk);
+				ERR_CATCH_MSG(err, res, "Error: Unable to find input blocks file %s.", files->internal.partsBlk);
 			} else {
 				res = KT_IO_ERROR;
-				ERR_CATCH_MSG(err, res, "Error: could not open output log signature file %s in read mode.", files->internal.inSig);
+				ERR_CATCH_MSG(err, res, "Error: Could not open output log signature file %s in read mode.", files->internal.inSig);
 			}
 		}
 	} else {
 		res = KT_KSI_SIG_VER_IMPOSSIBLE;
 		if (partsBlkErr != 0) {
-			ERR_CATCH_MSG(err, res, "Error: unable to %s blocks file %s.", partsBlkErr == ENOENT ? "find ": "open", files->internal.partsBlk);
+			ERR_CATCH_MSG(err, res, "Error: Unable to %s blocks file %s.", partsBlkErr == ENOENT ? "find ": "open", files->internal.partsBlk);
 		} else {
-			ERR_CATCH_MSG(err, res, "Error: unable to %s signatures file %s.", partsSigErr == ENOENT ? "find ": "open", files->internal.partsSig);
+			ERR_CATCH_MSG(err, res, "Error: Unable to %s signatures file %s.", partsSigErr == ENOENT ? "find ": "open", files->internal.partsSig);
 		}
 	}
 
@@ -331,13 +331,13 @@ static int acquire_file_locks(ERR_TRCKR *err, IO_FILES *files) {
 	if (files->files.partsBlk && files->files.partsSig) {
 		/* Check that the asynchronous signing process has completed writing to blocks and signatures files. */
 		res = get_file_read_lock(files->files.partsBlk);
-		ERR_CATCH_MSG(err, res, "Error: could not acquire read lock for input blocks file %s.", files->internal.partsBlk);
+		ERR_CATCH_MSG(err, res, "Error: Could not acquire read lock for input blocks file %s.", files->internal.partsBlk);
 		res = get_file_read_lock(files->files.partsSig);
-		ERR_CATCH_MSG(err, res, "Error: could not acquire read lock for input signatures file %s.", files->internal.partsSig);
+		ERR_CATCH_MSG(err, res, "Error: Could not acquire read lock for input signatures file %s.", files->internal.partsSig);
 		res = KT_OK;
 	} else if (files->files.partsBlk == NULL && files->files.partsSig == NULL) {
 		res = get_file_read_lock(files->files.inSig);
-		ERR_CATCH_MSG(err, res, "Error: could not acquire read lock for output log signature file %s.", files->internal.inSig);
+		ERR_CATCH_MSG(err, res, "Error: Could not acquire read lock for output log signature file %s.", files->internal.inSig);
 		res = KT_VERIFICATION_SKIPPED;
 	}
 
@@ -360,10 +360,10 @@ static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files) {
 		/* Output must be saved in output log signature file, so the temporary file is renamed. */
 		logksi_file_close(&files->files.outSig);
 		res = logksi_file_rename(files->internal.tempSig, files->internal.outSig);
-		ERR_CATCH_MSG(err, res, "Error: could not rename temporary file %s to output log signature file %s.", files->internal.tempSig, files->internal.outSig);
+		ERR_CATCH_MSG(err, res, "Error: Could not rename temporary file %s to output log signature file %s.", files->internal.tempSig, files->internal.outSig);
 	} else if (files->internal.bStdout) {
 		res = logksi_file_redirect_to_stdout(files->files.outSig);
-		ERR_CATCH_MSG(err, res, "Error: could not write temporary output log signature file to stdout.");
+		ERR_CATCH_MSG(err, res, "Error: Could not write temporary output log signature file to stdout.");
 	}
 
 	res = KT_OK;
@@ -378,7 +378,7 @@ void close_input_and_output_files(ERR_TRCKR *err, int res, IO_FILES *files) {
 		logksi_files_close(&files->files);
 		if (files->internal.tempSig && res != KT_OK) {
 			if (remove(files->internal.tempSig) != 0) {
-				if (err) ERR_TRCKR_ADD(err, KT_IO_ERROR, "Error: could not remove temporary output log signature %s.", files->internal.tempSig);
+				if (err) ERR_TRCKR_ADD(err, KT_IO_ERROR, "Error: Could not remove temporary output log signature %s.", files->internal.tempSig);
 			}
 		}
 		logksi_internal_filenames_free(&files->internal);
