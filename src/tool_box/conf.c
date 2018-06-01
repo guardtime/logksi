@@ -33,8 +33,8 @@ static void print_conf_file(const char *fname, int (*print)(const char *format, 
 int conf_run(int argc, char** argv, char **envp) {
 	int res;
 	PARAM_SET *set = NULL;
+	PARAM_SET *configuration = NULL;
 	char buf[0xffff];
-	VARIABLE_IS_NOT_USED(envp);
 
 	res = PARAM_SET_new("{h|help}{dump}{d}", &set);
 	if (res != PST_OK) goto cleanup;
@@ -45,6 +45,9 @@ int conf_run(int argc, char** argv, char **envp) {
 		print_errors("Error: Unable to parse command-line.\n");
 		goto cleanup;
 	}
+
+	res = CONF_createSet(&configuration);
+	if (res != KT_OK) goto cleanup;
 
 	/**
 	 * Check for typos and unknown parameters.
@@ -59,14 +62,19 @@ int conf_run(int argc, char** argv, char **envp) {
 			goto cleanup;
 	}
 
-
+	if (!CONF_isEnvSet()) {
+		res = CONF_fromEnvironment(configuration, "KSI_CONF", envp, 0, 1);
+		res = conf_report_errors(configuration, CONF_getEnvNameContent(), res);
+		if (res != KT_OK) goto cleanup;
+	}
 	if (PARAM_SET_isSetByName(set, "dump")) {
 		if (CONF_isEnvSet()) {
 			print_conf_file(CONF_getEnvNameContent(), print_result);
+			print_result("\n");
 		}
 	} else if (PARAM_SET_isSetByName(set, "d")) {
 		if (CONF_isEnvSet()) {
-			print_debug("%s", CONF_getEnvNameContent());
+			print_debug("%s\n", CONF_getEnvNameContent());
 		}
 	} else {
 		print_result("%s\n", conf_help_toString(buf, sizeof(buf)));
@@ -77,6 +85,7 @@ int conf_run(int argc, char** argv, char **envp) {
 cleanup:
 
 	PARAM_SET_free(set);
+	PARAM_SET_free(configuration);
 
 	return LOGKSI_errToExitCode(res);
 }
