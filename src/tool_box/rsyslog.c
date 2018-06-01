@@ -2379,6 +2379,11 @@ static int finalize_log_signature(ERR_TRCKR *err, BLOCK_INFO *blocks, IO_FILES *
 		res = KT_VERIFICATION_FAILURE;
 		ERR_CATCH_MSG(err, res, "Error: %zu hash comparison failures found.", blocks->nofHashFails);
 	}
+
+	if (blocks->nofExtractPositionsFound < blocks->nofExtractPositions) {
+		res = KT_INVALID_CMD_PARAM;
+		ERR_CATCH_MSG(err, res, "Error: Extract position %zu out of range - not enough loglines.", blocks->extractPositions[blocks->nofExtractPositionsFound]);
+	}
 	res = KT_OK;
 
 cleanup:

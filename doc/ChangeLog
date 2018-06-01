@@ -9,6 +9,7 @@ Version 1.3
 * IMPROVEMENT: When KSI_CONF environment variable points to a non-existent file or the file cannot be accessed, a warning is displayed instead of exiting with an error message. An error in the configuration file is still handled as an error.
 * BUGFIX: User is warned about an empty KSI_CONF environment variable.
 * BUGFIX: Maximum length of logline is now 64K, without newline separator.
+* BUGFIX: Out of range extract positions not allowed.
 
 Version 1.2
 
