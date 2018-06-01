@@ -20,6 +20,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <ctype.h>
 #include "param_set/param_set.h"
 #include "tool_box/param_control.h"
 #include "err_trckr.h"
@@ -2765,6 +2766,10 @@ int extract_positions(ERR_TRCKR *err, char *records, BLOCK_INFO *blocks) {
 	}
 
 	while (*records) {
+		if (isspace(*records)) {
+			res = KT_INVALID_CMD_PARAM;
+			ERR_CATCH_MSG(err, res, "Error: List of positions must not contain whitespace. Use ',' and '-' as separators.");
+		}
 		if(!digit_expected) {
 			digit_expected = 1;
 			if (*records == ',') {
