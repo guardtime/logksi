@@ -2165,6 +2165,8 @@ char* PARAM_SET_typosToString(PARAM_SET *set, int flags, const char *prefix, cha
 
 	if (flags & PST_TOSTR_DOUBLE_HYPHEN) {
 		d_hyphen = "--";
+	} else if (flags == PST_TOSTR_NONE) {
+		d_hyphen = "";
 	}
 
 	if (set == NULL || buf == NULL || buf_len == 0) {
