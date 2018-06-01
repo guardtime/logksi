@@ -849,7 +849,7 @@ int logksi_datahash_compare(ERR_TRCKR *err, KSI_DataHash *left, KSI_DataHash *ri
 		if (KSI_DataHash_getHashAlg(left, &leftId) == KSI_OK &&
 			KSI_DataHash_getHashAlg(right, &rightId) == KSI_OK &&
 			leftId != rightId) {
-			ERR_TRCKR_ADD(err, res, "Error: Hash algorithm in block header does not match the hash algorithm in received hash.");
+			ERR_TRCKR_ADD(err, res, "Error: Hash algorithm in block header does not match the hash algorithm that was used for building the tree.");
 		}
 
 		if(format_hash_help(helpLeft, helpRight, bufLeft, bufRight, 256) != KT_OK) goto cleanup;
