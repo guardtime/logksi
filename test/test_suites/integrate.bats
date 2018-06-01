@@ -32,7 +32,7 @@ cp -r test/resource/logsignatures/signed.logsig.parts test/out
 	run chmod 0444 test/out/signed.logsig
 	run ./src/logksi integrate test/out/signed -d
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ " Error: overwriting of existing log signature" ]]
+	[[ "$output" =~ " Error: Overwriting of existing log signature" ]]
 	run test -f test/out/signed.logsig
 	[ "$status" -eq 0 ]
 	run test -f test/out/signed.logsig.bak

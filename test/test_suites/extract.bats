@@ -127,10 +127,10 @@ cp -r test/out/extract.base test/out/extract.base.10
 @test "extract record 1, attempt to redirect both outputs to stdout" {
 	run bash -c "./src/logksi extract test/out/extract.base.8 --out-log - --out-proof - -r 1 -d"
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: both output files cannot be redirected to stdout." ]]
+	[[ "$output" =~ "Error: Both output files cannot be redirected to stdout." ]]
 	run bash -c "./src/logksi extract test/out/extract.base.8 -o - -r 1 -d"
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: both output files cannot be redirected to stdout." ]]
+	[[ "$output" =~ "Error: Both output files cannot be redirected to stdout." ]]
 }
 
 @test "extract record 1, read log file from stdin" {
@@ -173,10 +173,10 @@ cp -r test/out/extract.base test/out/extract.base.10
 @test "extract record 1, attemp to read log file from stdin without specifying the output file" {
 	run ./src/logksi extract --log-from-stdin test/out/extract.base.10.logsig -r 1 -d
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: output log records file name must be specified if log file is read from stdin." ]]
+	[[ "$output" =~ "Error: Output log records file name must be specified if log file is read from stdin." ]]
 	run ./src/logksi extract --log-from-stdin test/out/extract.base.10.logsig --out-log test/out/extract.user.10.excerpt -r 1 -d
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: output integrity proof file name must be specified if log file is read from stdin." ]]
+	[[ "$output" =~ "Error: Output integrity proof file name must be specified if log file is read from stdin." ]]
 }
 
 @test "verify record 1 modified" {

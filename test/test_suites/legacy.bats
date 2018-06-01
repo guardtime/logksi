@@ -24,7 +24,7 @@ cp -r test/resource/logsignatures/legacy.gtsig test/out
 @test "try extending and overwriting legacy.gtsig" {
 	run ./src/logksi extend test/out/legacy -d
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: overwriting of legacy log signature file not enabled." ]]
+	[[ "$output" =~ "Error: Overwriting of legacy log signature file not enabled." ]]
 	[[ "$output" =~ "Run 'logksi extend' with '--enable-rfc3161-conversion' to convert RFC3161 timestamps to KSI signatures." ]]
 }
 
