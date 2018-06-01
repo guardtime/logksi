@@ -1840,7 +1840,7 @@ cleanup:
 
 	print_progressResult(res);
 	if (blocks) {
-		if (blocks->finalTreeHashesNone) {
+		if (blocks->finalTreeHashesNone && !blocks->warningLegacy) {
 			print_debug("Warning: Block no. %3zu: all final tree hashes are missing. Run 'logksi sign' with '--insert-missing-hashes' to repair the log signature.\n", blocks->blockNo);
 			blocks->warningTreeHashes = 1;
 		} else if (blocks->finalTreeHashesAll) {
@@ -2387,7 +2387,7 @@ cleanup:
 
 	if (check_warnings(blocks)) {
 		print_warnings("\n");
-		if (blocks && blocks->warningTreeHashes) {
+		if (blocks && blocks->warningTreeHashes && !blocks->warningLegacy) {
 			print_warnings("Warning: Some tree hashes are missing from the log signature file. Run 'logksi sign' with '--insert-missing-hashes' to repair the log signature.\n");
 		}
 
