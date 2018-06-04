@@ -7,6 +7,7 @@ Version 1.3
 * IMPROVEMENT: rebuild.sh can be used with '--get-dep-online' option to build logksi without explicitly downloading and/or installing dependencies.
 * IMPROVEMENT: libgtrfc3161 dependency added to build scripts.
 * IMPROVEMENT: When KSI_CONF environment variable points to a non-existent file or the file cannot be accessed, a warning is displayed instead of exiting with an error message. An error in the configuration file is still handled as an error.
+* IMPROVEMENT: Allow storing of record and tree hashes to be switched on and off between blocks in the same file.
 * BUGFIX: User is warned about an empty KSI_CONF environment variable.
 * BUGFIX: Maximum length of logline is now 64K, without newline separator.
 

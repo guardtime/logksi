@@ -1032,6 +1032,8 @@ static int process_block_header(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BL
 	blocks->finalTreeHashesAll = 0;
 	blocks->finalTreeHashesLeaf = 0;
 	blocks->unsignedRootHash = 0;
+	blocks->keepRecordHashes = 0;
+	blocks->keepTreeHashes = 0;
 
 	res = tlv_element_parse_and_check_sub_elements(err, ksi, blocks->ftlv_raw, blocks->ftlv_len, blocks->ftlv.hdr_len, &tlv);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse block header as TLV element.", blocks->blockNo);
@@ -1142,11 +1144,6 @@ static int is_record_hash_expected(ERR_TRCKR *err, BLOCK_INFO *blocks) {
 	if (blocks->keepTreeHashes && blocks->nofTreeHashes != max_tree_hashes(blocks->nofRecordHashes)) {
 		res = KT_VERIFICATION_FAILURE;
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing tree hash(es) for logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
-	}
-	/* Check if record hashes are present in previous blocks. */
-	if (blocks->keepRecordHashes == 0 && blocks->blockNo > 1) {
-		res = KT_VERIFICATION_FAILURE;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: all record hashes missing.", blocks->blockNo - 1);
 	}
 
 	res = KT_OK;
@@ -1302,11 +1299,6 @@ static int is_tree_hash_expected(ERR_TRCKR *err, BLOCK_INFO *blocks) {
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unexpected final tree hash no. %zu.", blocks->blockNo, blocks->nofTreeHashes + 1);
 	}
 
-	/* Check if tree hashes are present in previous blocks. */
-	if (blocks->keepTreeHashes == 0 && blocks->blockNo > 1) {
-		res = KT_VERIFICATION_FAILURE;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: all tree hashes missing.", blocks->blockNo - 1);
-	}
 	res = KT_OK;
 
 cleanup:
