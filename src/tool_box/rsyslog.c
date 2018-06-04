@@ -1032,6 +1032,8 @@ static int process_block_header(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BL
 	blocks->finalTreeHashesAll = 0;
 	blocks->finalTreeHashesLeaf = 0;
 	blocks->unsignedRootHash = 0;
+	blocks->keepRecordHashes = 0;
+	blocks->keepTreeHashes = 0;
 
 	res = tlv_element_parse_and_check_sub_elements(err, ksi, blocks->ftlv_raw, blocks->ftlv_len, blocks->ftlv.hdr_len, &tlv);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse block header as TLV element.", blocks->blockNo);
@@ -1089,6 +1091,8 @@ static int process_block_header(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BL
 	blocks->rootHash = NULL;
 	KSI_DataHash_free(blocks->metarecordHash);
 	blocks->metarecordHash = NULL;
+	free(blocks->metaRecord);
+	blocks->metaRecord = NULL;
 
 	KSI_DataHash_free(blocks->extractMask);
 	blocks->extractMask = NULL;
@@ -1142,11 +1146,6 @@ static int is_record_hash_expected(ERR_TRCKR *err, BLOCK_INFO *blocks) {
 	if (blocks->keepTreeHashes && blocks->nofTreeHashes != max_tree_hashes(blocks->nofRecordHashes)) {
 		res = KT_VERIFICATION_FAILURE;
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing tree hash(es) for logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
-	}
-	/* Check if record hashes are present in previous blocks. */
-	if (blocks->keepRecordHashes == 0 && blocks->blockNo > 1) {
-		res = KT_VERIFICATION_FAILURE;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: all record hashes missing.", blocks->blockNo - 1);
 	}
 
 	res = KT_OK;
@@ -1286,6 +1285,10 @@ static int is_tree_hash_expected(ERR_TRCKR *err, BLOCK_INFO *blocks) {
 			/* The tree is balanced, so no finalizing is needed. Thus the tree hash is unexpected, probably due to a missing record hash. */
 			res = KT_VERIFICATION_FAILURE;
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing record hash for logline no. %zu.", blocks->blockNo, get_nof_lines(blocks) + 1);
+		} else if (blocks->metarecordHash) {
+			/* A metarecord hash is missing while the tree hash for the metarecord is present. */
+			res = KT_VERIFICATION_FAILURE;
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing record hash for metarecord with index %zu.", blocks->blockNo, blocks->nofRecordHashes);
 		} else {
 			/* Assuming that no record hashes are missing, let's start the finalizing process. */
 			blocks->finalTreeHashesSome = 1;
@@ -1302,11 +1305,6 @@ static int is_tree_hash_expected(ERR_TRCKR *err, BLOCK_INFO *blocks) {
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unexpected final tree hash no. %zu.", blocks->blockNo, blocks->nofTreeHashes + 1);
 	}
 
-	/* Check if tree hashes are present in previous blocks. */
-	if (blocks->keepTreeHashes == 0 && blocks->blockNo > 1) {
-		res = KT_VERIFICATION_FAILURE;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: all tree hashes missing.", blocks->blockNo - 1);
-	}
 	res = KT_OK;
 
 cleanup:
@@ -1562,7 +1560,11 @@ int is_block_signature_expected(ERR_TRCKR *err, BLOCK_INFO *blocks) {
 		/* Check if all mandatory tree hashes are present in the current block. */
 		if (blocks->nofTreeHashes < maxTreeHashes) {
 			res = KT_VERIFICATION_FAILURE;
-			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing tree hash(es) for logline no. %zu.", blocks->blockNo, blocks->recordCount + blocks->nofTotalRecordHashes);
+			if (blocks->metaRecord) {
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing tree hash(es) for metarecord with index %zu.", blocks->blockNo, blocks->nofRecordHashes - 1);
+			} else {
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing tree hash(es) for logline no. %zu.", blocks->blockNo, blocks->recordCount + blocks->nofTotalRecordHashes);
+			}
 		}
 		/* Check if the block contains too few final tree hashes. */
 		if (blocks->nofTreeHashes < maxTreeHashes + maxFinalHashes) {
