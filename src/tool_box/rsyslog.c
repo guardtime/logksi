@@ -1605,7 +1605,7 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 	KSI_DataHash *hash = NULL;
 	KSI_TlvElement *tlv = NULL;
 	KSI_TlvElement *tlvSig = NULL;
-	KSI_TlvElement *tlvNoSig = NULL;
+	KSI_TlvElement *tlvRfc3161 = NULL;
 	KSI_TlvElement *recChain = NULL;
 	KSI_TlvElement *hashStep = NULL;
 	size_t j;
@@ -1631,12 +1631,12 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 	res = tlv_element_get_uint(tlv, ksi, 0x01, &blocks->recordCount);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing record count in block signature.", blocks->blockNo);
 
-	res = KSI_TlvElement_getElement(tlv, 0x906, &tlvNoSig);
+	res = KSI_TlvElement_getElement(tlv, 0x906, &tlvRfc3161);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to extract RFC3161 element in block signature.", blocks->blockNo);
 
-	if (tlvNoSig != NULL) {
+	if (tlvRfc3161 != NULL) {
 		/* Convert the RFC3161 timestamp into KSI signature and replace it in the TLV. */
-		res = convert_signature(ksi, tlvNoSig->ptr + tlvNoSig->ftlv.hdr_len, tlvNoSig->ftlv.dat_len, &sig);
+		res = convert_signature(ksi, tlvRfc3161->ptr + tlvRfc3161->ftlv.hdr_len, tlvRfc3161->ftlv.dat_len, &sig);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to convert RFC3161 element in block signature.", blocks->blockNo);
 
 		res = KSI_TlvElement_removeElement(tlv, 0x906, NULL);
@@ -1833,7 +1833,7 @@ cleanup:
 
 	print_progressResult(res);
 	if (blocks) {
-		if (blocks->finalTreeHashesNone && !blocks->warningLegacy) {
+		if (blocks->finalTreeHashesNone) {
 			print_debug("Warning: Block no. %3zu: all final tree hashes are missing. Run 'logksi sign' with '--insert-missing-hashes' to repair the log signature.\n", blocks->blockNo);
 			blocks->warningTreeHashes = 1;
 		} else if (blocks->finalTreeHashesAll) {
@@ -1847,7 +1847,7 @@ cleanup:
 	KSI_VerificationContext_clean(&context);
 	KSI_PolicyVerificationResult_free(verificationResult);
 	KSI_TlvElement_free(tlvSig);
-	KSI_TlvElement_free(tlvNoSig);
+	KSI_TlvElement_free(tlvRfc3161);
 	KSI_TlvElement_free(tlv);
 	KSI_TlvElement_free(hashStep);
 	KSI_TlvElement_free(recChain);
@@ -2148,6 +2148,7 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 	KSI_TlvElement *tlv = NULL;
 	KSI_TlvElement *tlvSig = NULL;
 	KSI_TlvElement *tlvNoSig = NULL;
+	KSI_TlvElement *tlvRfc3161 = NULL;
 	int insertHashes = 0;
 
 	if (err == NULL || ksi == NULL || processors == NULL || files == NULL || blocks == NULL) {
@@ -2200,17 +2201,27 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 		}
 	}
 
+	res = KSI_TlvElement_getElement(tlv, 0x906, &tlvRfc3161);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to extract RFC3161 element in block signature.", blocks->blockNo);
+
 	res = KSI_TlvElement_getElement(tlv, 0x905, &tlvSig);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to extract KSI signature element in signatures file.", blocks->blockNo);
 
 	res = KSI_TlvElement_getElement(tlv, 0x02, &tlvNoSig);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to extract 'no-sig' element in signatures file.", blocks->blockNo);
 
-	if (tlvSig != NULL) {
+	if (tlvSig != NULL || tlvRfc3161 != NULL) {
 		KSI_DataHash *docHash = NULL;
 
-		res = LOGKSI_Signature_parseWithPolicy(err, ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_EMPTY, NULL, &sig);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse KSI signature in signatures file.", blocks->blockNo);
+		if (tlvSig != NULL) {
+			res = LOGKSI_Signature_parseWithPolicy(err, ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_EMPTY, NULL, &sig);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse KSI signature in signatures file.", blocks->blockNo);
+		} else {
+			/* Convert the RFC3161 timestamp into KSI signature. */
+			res = convert_signature(ksi, tlvRfc3161->ptr + tlvRfc3161->ftlv.hdr_len, tlvRfc3161->ftlv.dat_len, &sig);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to convert RFC3161 element in block signature.", blocks->blockNo);
+			blocks->warningLegacy = 1;
+		}
 
 		res = KSI_Signature_getDocumentHash(sig, &docHash);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to get root hash from KSI signature.", blocks->blockNo);
@@ -2284,7 +2295,7 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 
 	if (files->files.outSig) {
 		print_progressResult(res);
-		print_progressDesc(0, "Block no. %3zu: writing KSI signature to file... ", blocks->blockNo);
+		print_progressDesc(0, "Block no. %3zu: writing block signature to file... ", blocks->blockNo);
 
 		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->files.outSig) != blocks->ftlv_len) {
 			res = KT_IO_ERROR;
@@ -2315,6 +2326,7 @@ cleanup:
 	KSI_DataHash_free(replacement);
 	KSI_TlvElement_free(tlvSig);
 	KSI_TlvElement_free(tlvNoSig);
+	KSI_TlvElement_free(tlvRfc3161);
 	KSI_TlvElement_free(tlv);
 	return res;
 }
@@ -2385,7 +2397,7 @@ cleanup:
 
 	if (check_warnings(blocks)) {
 		print_warnings("\n");
-		if (blocks && blocks->warningTreeHashes && !blocks->warningLegacy) {
+		if (blocks && blocks->warningTreeHashes) {
 			print_warnings("Warning: Some tree hashes are missing from the log signature file. Run 'logksi sign' with '--insert-missing-hashes' to repair the log signature.\n");
 		}
 
