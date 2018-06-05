@@ -392,3 +392,15 @@ cp -r test/out/extract.base test/out/extract.base.10
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
 }
+
+@test "attempt to extract a list that contains positions out of range" {
+	run ./src/logksi extract test/out/extract.base -r 1415 -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: Extract position 1415 out of range - not enough loglines." ]]
+	run ./src/logksi extract test/out/extract.base -r 1413-1416 -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: Extract position 1415 out of range - not enough loglines." ]]
+	run ./src/logksi extract test/out/extract.base -r 1413,1414,1415,1416 -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: Extract position 1415 out of range - not enough loglines." ]]
+}
