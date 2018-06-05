@@ -1199,7 +1199,7 @@ static int process_record_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLO
 
 			res = logksi_datahash_compare(err, hash, recordHash, "Record hash computed from logline: ", "Record hash stored in log signature file: ");
 			if (res != KT_OK) {
-				print_debug("Received logline: %s", blocks->logLine);
+				print_debug("Failed to verify logline no. %zu: %s", get_nof_lines(blocks), blocks->logLine);
 			}
 			res = continue_on_hash_fail(res, set, blocks, hash, recordHash, &replacement);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: record hashes not equal for logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
@@ -2016,7 +2016,7 @@ static int process_record_chain(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BL
 
 			res = logksi_datahash_compare(err, hash, recordHash, "Record hash computed from logline: ", "Record hash stored in integrity proof file: ");
 			if (res != KT_OK) {
-				print_debug("Received logline: %s", blocks->logLine);
+				print_debug("Failed to verify logline no. %zu: %s", get_nof_lines(blocks), blocks->logLine);
 			}
 			res = continue_on_hash_fail(res, set, blocks, hash, recordHash, &replacement);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: record hashes not equal.", blocks->blockNo);
