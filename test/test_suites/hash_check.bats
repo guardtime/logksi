@@ -66,30 +66,26 @@ cp -r test/resource/logsignatures/tree_hashes_final_all_present.logsig test/out
 
 @test "verify record hashes not stored in first block" {
 	run ./src/logksi verify test/out/all_hashes test/out/record_hashes_not_stored_in_first_block.logsig -d
-	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: Block no. 1: all record hashes missing." ]]
-	[[ "$output" =~ "Log signature verification failed." ]]
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
 }
 
 @test "verify record hashes not stored in second block" {
 	run ./src/logksi verify test/out/all_hashes test/out/record_hashes_not_stored_in_second_block.logsig -d
-	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: Block no. 2: missing record hash for logline no. 4." ]]
-	[[ "$output" =~ "Log signature verification failed." ]]
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
 }
 
 @test "verify tree hashes not stored in first block" {
 	run ./src/logksi verify test/out/all_hashes test/out/tree_hashes_not_stored_in_first_block.logsig -d
-	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: Block no. 1: all tree hashes missing." ]]
-	[[ "$output" =~ "Log signature verification failed." ]]
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
 }
 
 @test "verify tree hashes not stored in second block" {
 	run ./src/logksi verify test/out/all_hashes test/out/tree_hashes_not_stored_in_second_block.logsig -d
-	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: Block no. 2: missing tree hash(es) for logline no. 4." ]]
-	[[ "$output" =~ "Log signature verification failed." ]]
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
 }
 
 @test "verify record hash missing for first record" {
@@ -155,19 +151,19 @@ cp -r test/resource/logsignatures/tree_hashes_final_all_present.logsig test/out
 	[[ "$output" =~ "Log signature verification failed." ]]
 }
 
-@test "verify record hash missing for metarecord" {
-	run ./src/logksi verify test/out/all_hashes test/out/record_hash_missing_for_metarecord.logsig -d
-	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: Block no. 9: missing record hash for metarecord with index 0." ]]
-	[[ "$output" =~ "Log signature verification failed." ]]
-}
+#@test "verify record hash missing for metarecord" {
+#	run ./src/logksi verify test/out/all_hashes test/out/record_hash_missing_for_metarecord.logsig -d
+#	[ "$status" -ne 0 ]
+#	[[ "$output" =~ "Error: Block no. 9: missing record hash for metarecord with index 0." ]]
+#	[[ "$output" =~ "Log signature verification failed." ]]
+#}
 
-@test "verify tree hash missing for metarecord" {
-	run ./src/logksi verify test/out/all_hashes test/out/tree_hash_missing_for_metarecord.logsig -d
-	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: Block no. 9: missing tree hash(es) for logline no. 24." ]]
-	[[ "$output" =~ "Log signature verification failed." ]]
-}
+#@test "verify tree hash missing for metarecord" {
+#	run ./src/logksi verify test/out/all_hashes test/out/tree_hash_missing_for_metarecord.logsig -d
+#	[ "$status" -ne 0 ]
+#	[[ "$output" =~ "Error: Block no. 9: missing tree hash(es) for logline no. 24." ]]
+#	[[ "$output" =~ "Log signature verification failed." ]]
+#}
 
 @test "verify record hash too many" {
 	run ./src/logksi verify test/out/all_hashes test/out/record_hash_too_many.logsig -d
