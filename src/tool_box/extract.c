@@ -220,7 +220,7 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	 * Configure parameter set, control, repair and object extractor function.
 	 */
 	PARAM_SET_addControl(set, "{log}{out-log}{out-proof}{o}", isFormatOk_path, NULL, convertRepair_path, NULL);
-	PARAM_SET_addControl(set, "{input}", isFormatOk_inputFile, isContentOk_inputFile, convertRepair_path, NULL);
+	PARAM_SET_addControl(set, "{input}", isFormatOk_inputFile, NULL, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{log-from-stdin}{sig-from-stdin}{d}", isFormatOk_flag, NULL, NULL, NULL);
 	PARAM_SET_addControl(set, "{r}", isFormatOk_string, NULL, NULL, NULL);
 

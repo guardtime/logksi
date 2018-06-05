@@ -339,6 +339,45 @@ cp -r test/out/extract.base test/out/extract.base.10
 	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
 }
 
+@test "attempt to extract a list that contains whitepace" {
+	run ./src/logksi extract test/out/extract.base -r "5 6" -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
+	run ./src/logksi extract test/out/extract.base -r "5 ,6" -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
+	run ./src/logksi extract test/out/extract.base -r "5, 6" -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
+	run ./src/logksi extract test/out/extract.base -r "5 -7" -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
+	run ./src/logksi extract test/out/extract.base -r "5- 7" -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
+	run ./src/logksi extract test/out/extract.base -r "5,7 " -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
+	run ./src/logksi extract test/out/extract.base -r " 5-7" -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
+	run ./src/logksi extract test/out/extract.base -r " 5\t7" -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
+	run ./src/logksi extract test/out/extract.base -r " 5\n7" -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
+	run ./src/logksi extract test/out/extract.base -r " 5\v7" -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
+	run ./src/logksi extract test/out/extract.base -r " 5\f7" -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
+	run ./src/logksi extract test/out/extract.base -r " 5\r7" -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
+}
+
 @test "attempt to extract a list that contains non-decimal integers" {
 	run ./src/logksi extract test/out/extract.base -r 0x5 -d
 	[ "$status" -ne 0 ]
@@ -352,4 +391,16 @@ cp -r test/out/extract.base test/out/extract.base.10
 	run ./src/logksi extract test/out/extract.base -r 5-0X6 -d
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+}
+
+@test "attempt to extract a list that contains positions out of range" {
+	run ./src/logksi extract test/out/extract.base -r 1415 -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: Extract position 1415 out of range - not enough loglines." ]]
+	run ./src/logksi extract test/out/extract.base -r 1413-1416 -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: Extract position 1415 out of range - not enough loglines." ]]
+	run ./src/logksi extract test/out/extract.base -r 1413,1414,1415,1416 -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: Extract position 1415 out of range - not enough loglines." ]]
 }
