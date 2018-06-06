@@ -279,6 +279,17 @@ cp -r test/out/extract.base test/out/extract.base.10
 	[ "$status" -eq 0 ]
 }
 
+@test "extract range over three blocks, isolated positions" {
+	run ./src/logksi extract test/out/extract.base -r 3,6,9 -d
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
+	run ./src/logksi verify test/out/extract.base.excerpt -d
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
+	run diff test/out/extract.base.excerpt test/resource/logfiles/r3.6.9.excerpt
+	[ "$status" -eq 0 ]
+}
+
 @test "attempt to extract a range given in descending order" {
 	run ./src/logksi extract test/out/extract.base -r 7-3 -d
 	[ "$status" -ne 0 ]
@@ -401,6 +412,9 @@ cp -r test/out/extract.base test/out/extract.base.10
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: Extract position 1415 out of range - not enough loglines." ]]
 	run ./src/logksi extract test/out/extract.base -r 1413,1414,1415,1416 -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: Extract position 1415 out of range - not enough loglines." ]]
+	run ./src/logksi extract test/out/extract.base -r 1-999999999999999 -d
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: Extract position 1415 out of range - not enough loglines." ]]
 }

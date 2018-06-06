@@ -1,0 +1,3 @@
+Apr 27 11:00:30 CentOS sshd[2782]: pam_unix(sshd:session): session closed for user vagrant
+Apr 28 08:15:52 CentOS sudo:  vagrant : TTY=pts/0 ; PWD=/home/vagrant/work/logksi ; USER=root ; COMMAND=/bin/kill -9 15487
+Apr 28 12:46:35 CentOS sudo:  vagrant : TTY=pts/0 ; PWD=/home/vagrant/work/libksi ; USER=root ; COMMAND=/usr/bin/yum remove libksi-3.13.2043-1.el6.src.rpm libksi-3.13.2043-1.el6.x86_64.rpm libksi.config libksi.creator libksi.creator.user libksi-debuginfo-3.13.2043-1.el6.x86_64.rpm libksi-devel-3.13.2043-1.el6.x86_64.rpm libksi.files libksi.includes libksi.pc libksi.pc.in
