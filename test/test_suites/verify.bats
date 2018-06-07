@@ -29,6 +29,7 @@ export KSI_CONF=test/test.cfg
 @test "try verifying unsigned.logsig against signed logfile" {
 	run ./src/logksi verify test/out/signed test/out/unsigned.logsig -d
 	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Failed to verify logline no. 1:" ]]
 	[[ "$output" =~ "Log signature verification failed." ]]
 }
 

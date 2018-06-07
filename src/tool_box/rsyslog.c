@@ -1092,6 +1092,8 @@ static int process_block_header(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BL
 	blocks->rootHash = NULL;
 	KSI_DataHash_free(blocks->metarecordHash);
 	blocks->metarecordHash = NULL;
+	free(blocks->metaRecord);
+	blocks->metaRecord = NULL;
 
 	KSI_DataHash_free(blocks->extractMask);
 	blocks->extractMask = NULL;
@@ -1199,7 +1201,7 @@ static int process_record_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLO
 
 			res = logksi_datahash_compare(err, hash, recordHash, "Record hash computed from logline: ", "Record hash stored in log signature file: ");
 			if (res != KT_OK) {
-				print_debug("Received logline: %s", blocks->logLine);
+				print_debug("Failed to verify logline no. %zu: %s", get_nof_lines(blocks), blocks->logLine);
 			}
 			res = continue_on_hash_fail(res, set, blocks, hash, recordHash, &replacement);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: record hashes not equal for logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
@@ -1284,6 +1286,10 @@ static int is_tree_hash_expected(ERR_TRCKR *err, BLOCK_INFO *blocks) {
 			/* The tree is balanced, so no finalizing is needed. Thus the tree hash is unexpected, probably due to a missing record hash. */
 			res = KT_VERIFICATION_FAILURE;
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing record hash for logline no. %zu.", blocks->blockNo, get_nof_lines(blocks) + 1);
+		} else if (blocks->metarecordHash) {
+			/* A metarecord hash is missing while the tree hash for the metarecord is present. */
+			res = KT_VERIFICATION_FAILURE;
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing record hash for metarecord with index %zu.", blocks->blockNo, blocks->nofRecordHashes);
 		} else {
 			/* Assuming that no record hashes are missing, let's start the finalizing process. */
 			blocks->finalTreeHashesSome = 1;
@@ -1555,7 +1561,11 @@ int is_block_signature_expected(ERR_TRCKR *err, BLOCK_INFO *blocks) {
 		/* Check if all mandatory tree hashes are present in the current block. */
 		if (blocks->nofTreeHashes < maxTreeHashes) {
 			res = KT_VERIFICATION_FAILURE;
-			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing tree hash(es) for logline no. %zu.", blocks->blockNo, blocks->recordCount + blocks->nofTotalRecordHashes);
+			if (blocks->metaRecord) {
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing tree hash(es) for metarecord with index %zu.", blocks->blockNo, blocks->nofRecordHashes - 1);
+			} else {
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing tree hash(es) for logline no. %zu.", blocks->blockNo, blocks->recordCount + blocks->nofTotalRecordHashes);
+			}
 		}
 		/* Check if the block contains too few final tree hashes. */
 		if (blocks->nofTreeHashes < maxTreeHashes + maxFinalHashes) {
@@ -2016,7 +2026,7 @@ static int process_record_chain(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BL
 
 			res = logksi_datahash_compare(err, hash, recordHash, "Record hash computed from logline: ", "Record hash stored in integrity proof file: ");
 			if (res != KT_OK) {
-				print_debug("Received logline: %s", blocks->logLine);
+				print_debug("Failed to verify logline no. %zu: %s", get_nof_lines(blocks), blocks->logLine);
 			}
 			res = continue_on_hash_fail(res, set, blocks, hash, recordHash, &replacement);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: record hashes not equal.", blocks->blockNo);

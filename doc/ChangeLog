@@ -10,6 +10,7 @@ Version 1.3
 * IMPROVEMENT: Allow storing of record and tree hashes to be switched on and off between blocks in the same file.
 * IMPROVEMENT: The sign command now also searches for .gtsig files when resolving log signature file names.
 * IMPROVEMENT: The --insert-missing-hashes switch can be used to insert missing tree hashes into legacy log signatures without overwriting the RFC3161 timestamps.
+* IMPROVEMENT: Logline is now prefixed with logline number when verifying with -d switch.
 * BUGFIX: User is warned about an empty KSI_CONF environment variable.
 * BUGFIX: Maximum length of logline is now 64K, without newline separator.
 * BUGFIX: Conf command can be used to dump the value of KSI_CONF variable and contents of the configuration file that KSI_CONF points to.
