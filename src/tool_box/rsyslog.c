@@ -299,7 +299,7 @@ int add_position(ERR_TRCKR *err, long int n, BLOCK_INFO *blocks) {
 	int res;
 	size_t *tmp = NULL;
 
-	if (n == 0 || blocks == NULL) {
+	if (n <= 0 || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
@@ -366,8 +366,7 @@ int extract_next_position(ERR_TRCKR *err, char *range, BLOCK_INFO *blocks) {
 				from = 0;
 				get_next_n = 1;
 				continue;
-			}
-			if (*records == '-') {
+			} else if (*records == '-') {
 				if (dash_allowed) {
 					dash_allowed = 0;
 					records++;
@@ -378,6 +377,9 @@ int extract_next_position(ERR_TRCKR *err, char *range, BLOCK_INFO *blocks) {
 					res = KT_INVALID_CMD_PARAM;
 					ERR_CATCH_MSG(err, res, "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges.");
 				}
+			} else {
+				res = KT_INVALID_CMD_PARAM;
+				ERR_CATCH_MSG(err, res, "Error: List of positions must be separated with ',' or '-'.");
 			}
 		} else {
 			/* Get the next integer and interpret it as a single position or range of positions. */
@@ -2849,6 +2851,33 @@ cleanup:
 	return res;
 }
 
+int verify_extract_positions(ERR_TRCKR *err, char *records) {
+	int res;
+
+	if (records == NULL || *records == 0) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	while (*records) {
+		char c = *records;
+		if (isspace(c)) {
+			res = KT_INVALID_CMD_PARAM;
+			ERR_CATCH_MSG(err, res, "Error: List of positions must not contain whitespace. Use ',' and '-' as separators.");
+		}
+		if (!isdigit(c) && c != ',' && c != '-') {
+			res = KT_INVALID_CMD_PARAM;
+			ERR_CATCH_MSG(err, res, "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges.");
+		}
+		records++;
+	}
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
+
 int logsignature_extract(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files) {
 	int res;
 	BLOCK_INFO blocks;
@@ -2866,6 +2895,9 @@ int logsignature_extract(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES 
 	processors.extract_signature = 1;
 
 	res = PARAM_SET_getStr(set, "r", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &blocks.records);
+	if (res != KT_OK) goto cleanup;
+
+	res = verify_extract_positions(err, blocks.records);
 	if (res != KT_OK) goto cleanup;
 
 	res = process_magic_number(err, &blocks, files);

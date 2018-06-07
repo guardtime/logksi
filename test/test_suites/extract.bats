@@ -404,6 +404,33 @@ cp -r test/out/extract.base test/out/extract.base.10
 	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
 }
 
+@test "attempt to extract a list that contains illegal characters" {
+	run ./src/logksi extract test/out/extract.base -r a -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	run ./src/logksi extract test/out/extract.base -r Z -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	run ./src/logksi extract test/out/extract.base -r + -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	run ./src/logksi extract test/out/extract.base -r * -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	run ./src/logksi extract test/out/extract.base -r % -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	run ./src/logksi extract test/out/extract.base -r $ -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	run ./src/logksi extract test/out/extract.base -r . -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	run ./src/logksi extract test/out/extract.base -r : -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+}
+
 @test "attempt to extract a list that contains positions out of range" {
 	run ./src/logksi extract test/out/extract.base -r 1415 -d
 	[ "$status" -ne 0 ]
