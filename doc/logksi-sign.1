@@ -10,7 +10,7 @@
 \fBlogksi sign --sig-from-stdin [\fB-o \fIout.logsig\fR] \fB-S \fIURL \fR[\fB--aggr-user \fIuser \fB--aggr-key \fIkey\fR] [\fImore options\fR]
 .\"
 .SH DESCRIPTION
-Signs the unsigned log blocks in a log signature file of a given \fIlogfile\fR. The name of the log signature file located in the same directory as the \fIlogfile\fR is expected to be \fIlogfile.logsig\fR. Alternatively, if no \fIlogfile\fR is specified, the \fB--sig-from-stdin\fR option should be used to read the log signature file from the \fIstdin\fR. If neither the \fIlogfile\fR nor \fB--sig-from-stdin\fR option is given, help text is returned.
+Signs the unsigned log blocks in a log signature file of a given \fIlogfile\fR. The name of the log signature file located in the same directory as the \fIlogfile\fR is expected to be \fIlogfile.logsig\fR or \fIlogfile.gtsig\fR. Alternatively, if no \fIlogfile\fR is specified, the \fB--sig-from-stdin\fR option should be used to read the log signature file from the \fIstdin\fR. If neither the \fIlogfile\fR nor \fB--sig-from-stdin\fR option is given, help text is returned.
 .LP
 \fBlogksi sign\fR provides the recovery signing functionality for cases when some log blocks have been left unsigned during routine signing/logging. For instance, when the KSI service was not reachable.
 .LP

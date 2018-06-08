@@ -12,7 +12,7 @@
 \fBlogksi extract --sig-from-stdin \fIlogfile \fR[\fB-o \fIoutfile\fR] \fB-r \fIrecords\fR... [\fImore_options\fR]
 .\"
 .SH DESCRIPTION
-Extracts the specified record(s) from the given \fIlogfile\fR and their KSI signature(s) from the respective log signature file \fIlogfile.logsig\fR. If the log signature file \fIlogfile.logsig\fR is not specified, its name is derived from \fIlogfile\fR by adding the \fI.logsig\fR suffix.
+Extracts the specified record(s) from the given \fIlogfile\fR and their KSI signature(s) from the respective log signature file \fIlogfile.logsig\fR or \fIlogfile.gtsig\fR. If the log signature file \fIlogfile.logsig\fR is not specified, its name is derived from \fIlogfile\fR by adding the \fI.logsig\fR suffix.
 .LP
 \fBlogksi extract\fR outputs the requested log record(s) to the file \fIlogfile.excerpt\fR and creates the record integrity proof file \fIlogfile.excerpt.logsig\fR for these records. If the files already exist, they will be overwritten.
 .LP
