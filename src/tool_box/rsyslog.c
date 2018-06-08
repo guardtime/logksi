@@ -471,11 +471,6 @@ int update_extract_info(ERR_TRCKR *err, BLOCK_INFO *blocks, int isMetaRecordHash
 		goto cleanup;
 	}
 
-	if (blocks->records && blocks->nofExtractPositionsFound == blocks->nofExtractPositions) {
-		res = extract_next_position(err, blocks->records, blocks);
-		if (res != KT_OK) goto cleanup;
-	}
-
 	if (blocks->nofExtractPositionsFound < blocks->nofExtractPositions && blocks->extractPositions[blocks->nofExtractPositionsFound] - blocks->nofTotalRecordHashes == blocks->nofRecordHashes) {
 		/* make room in extractInfo */
 		res = expand_extract_info(blocks);
@@ -507,6 +502,11 @@ int update_extract_info(ERR_TRCKR *err, BLOCK_INFO *blocks, int isMetaRecordHash
 		}
 		if (res != KT_OK) goto cleanup;
 
+	}
+
+	if (blocks->records && blocks->nofExtractPositionsFound == blocks->nofExtractPositions) {
+		res = extract_next_position(err, blocks->records, blocks);
+		if (res != KT_OK) goto cleanup;
 	}
 
 	res = KT_OK;
@@ -2920,6 +2920,10 @@ int logsignature_extract(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES 
 	if (res != KT_OK) goto cleanup;
 
 	res = verify_extract_positions(err, blocks.records);
+	if (res != KT_OK) goto cleanup;
+
+	/* Initialize the first extract position. */
+	res = extract_next_position(err, blocks.records, &blocks);
 	if (res != KT_OK) goto cleanup;
 
 	res = process_magic_number(err, &blocks, files);

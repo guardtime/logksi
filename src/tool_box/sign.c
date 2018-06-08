@@ -148,6 +148,7 @@ char *sign_help_toString(char*buf, size_t len) {
 		"\n"
 		" <logfile>\n"
 		"           - Name of the log file whose log signature file's unsigned blocks are to be signed.\n"
+		"             Name of the log signature file is derived by adding either .logsig or .gtsig to <logfile>.\n"
 		"             If specified, the --sig-from-stdin switch cannot be used.\n"
 		" --sig-from-stdin\n"
 		"             The log signature file is read from stdin.\n"

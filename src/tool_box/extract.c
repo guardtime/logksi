@@ -168,7 +168,7 @@ char *extract_help_toString(char *buf, size_t len) {
 		"           - Log file from where to extract log records.\n"
 		" <logfile.logsig>\n"
 		"             Log signature file from where to extract the KSI signature for integrity proof.\n"
-		"             If omitted, the log signature file name is derived by adding .logsig to <logfile>.\n"
+		"             If omitted, the log signature file name is derived by adding either .logsig or .gtsig to <logfile>.\n"
 		"             It is expected to be found in the same folder as the <logfile>.\n"
 		" --log-from-stdin\n"
 		"             The log file is read from stdin. Cannot be used with --sig-from-stdin.\n"
@@ -248,6 +248,7 @@ cleanup:
 static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 	int res;
 	IO_FILES tmp;
+	char *legacy_name = NULL;
 
 	memset(&tmp.internal, 0, sizeof(tmp.internal));
 
@@ -264,6 +265,15 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 			/* Generate input log signature file name. */
 			res = concat_names(files->user.inLog, ".logsig", &tmp.internal.inSig);
 			ERR_CATCH_MSG(err, res, "Error: Could not generate input log signature file name.");
+			if (!SMART_FILE_doFileExist(tmp.internal.inSig)) {
+				res = concat_names(files->user.inLog, ".gtsig", &legacy_name);
+				ERR_CATCH_MSG(err, res, "Error: Could not generate input log signature file name.");
+				if (SMART_FILE_doFileExist(legacy_name)) {
+					KSI_free(tmp.internal.inSig);
+					tmp.internal.inSig = legacy_name;
+					legacy_name = NULL;
+				}
+			}
 		}
 	}
 
@@ -343,6 +353,7 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 
 cleanup:
 
+	KSI_free(legacy_name);
 	logksi_internal_filenames_free(&tmp.internal);
 
 	return res;
