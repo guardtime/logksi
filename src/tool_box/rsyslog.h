@@ -134,6 +134,7 @@ typedef struct {
 	KSI_DataHasher *hasher;
 	char *logLine;
 	unsigned char *metaRecord;
+	char *records;
 	size_t nofExtractPositions;
 	size_t *extractPositions;
 	size_t nofExtractPositionsInBlock;

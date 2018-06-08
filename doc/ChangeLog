@@ -15,6 +15,7 @@ Version 1.3
 * BUGFIX: Maximum length of logline is now 64K, without newline separator.
 * BUGFIX: Conf command can be used to dump the value of KSI_CONF variable and contents of the configuration file that KSI_CONF points to.
 * BUGFIX: Out of range extract positions not allowed.
+* BUGFIX: Memory allocation optimized to avoid pre-allocation of out-of-range extract positions.
 * BUGFIX: Use of whitespace prohibited for specifying extract positions.
 
 Version 1.2

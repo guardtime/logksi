@@ -295,6 +295,142 @@ static size_t get_nof_lines(BLOCK_INFO *blocks) {
 	}
 }
 
+int add_position(ERR_TRCKR *err, long int n, BLOCK_INFO *blocks) {
+	int res;
+	size_t *tmp = NULL;
+
+	if (n <= 0 || blocks == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	if (blocks->nofExtractPositions) {
+		if (n <= blocks->extractPositions[blocks->nofExtractPositions - 1]) {
+			res = KT_INVALID_CMD_PARAM;
+			ERR_CATCH_MSG(err, res, "Error: List of positions must be given in strictly ascending order.");
+		}
+	}
+
+	if (blocks->extractPositions == NULL) {
+		tmp = (size_t*)malloc(sizeof(size_t));
+	} else {
+		tmp = (size_t*)realloc(blocks->extractPositions, sizeof(size_t) * (blocks->nofExtractPositions + 1));
+	}
+
+	if (tmp == NULL) {
+		res = KT_OUT_OF_MEMORY;
+		goto cleanup;
+	}
+
+	blocks->extractPositions = tmp;
+	tmp = NULL;
+	blocks->extractPositions[blocks->nofExtractPositions] = n;
+	blocks->nofExtractPositions++;
+	res = KT_OK;
+
+
+cleanup:
+
+	return res;
+}
+
+int extract_next_position(ERR_TRCKR *err, char *range, BLOCK_INFO *blocks) {
+	int res;
+	static long int n = 0;
+	static long int from = 0;
+	static char *endp = NULL;
+	static char digit_expected = 1;
+	static char dash_allowed = 1;
+	static char get_next_n = 1;
+	static char *records = NULL;
+
+	if (range == NULL || blocks == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	if (records == NULL) {
+		records = range;
+	}
+	while (*records) {
+		if (isspace(*records)) {
+			res = KT_INVALID_CMD_PARAM;
+			ERR_CATCH_MSG(err, res, "Error: List of positions must not contain whitespace. Use ',' and '-' as separators.");
+		}
+		if(!digit_expected) {
+			/* Process either ',' or '-' as a separator. */
+			digit_expected = 1;
+			if (*records == ',') {
+				dash_allowed = 1;
+				records++;
+				from = 0;
+				get_next_n = 1;
+				continue;
+			} else if (*records == '-') {
+				if (dash_allowed) {
+					dash_allowed = 0;
+					records++;
+					from = n;
+					get_next_n = 1;
+					continue;
+				} else {
+					res = KT_INVALID_CMD_PARAM;
+					ERR_CATCH_MSG(err, res, "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges.");
+				}
+			} else {
+				res = KT_INVALID_CMD_PARAM;
+				ERR_CATCH_MSG(err, res, "Error: List of positions must be separated with ',' or '-'.");
+			}
+		} else {
+			/* Get the next integer and interpret it as a single position or range of positions. */
+			if (get_next_n) {
+				n = strtol(records, &endp, 10);
+				get_next_n = 0;
+				if (endp == records) {
+					res = KT_INVALID_CMD_PARAM;
+					ERR_CATCH_MSG(err, res, "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges.");
+				}
+			}
+			if (n <= 0) {
+				res = KT_INVALID_CMD_PARAM;
+				ERR_CATCH_MSG(err, res, "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges.");
+			} else if (from == 0) {
+				/* Add a single position. */
+				res = add_position(err, n, blocks);
+				if (res != KT_OK) goto cleanup;
+				records = endp;
+				digit_expected = 0;
+				goto cleanup;
+			} else if (from < n) {
+				/* Add the next position in the range. */
+				from++;
+				res = add_position(err, from, blocks);
+				if (res != KT_OK) goto cleanup;
+				if (from < n) {
+					goto cleanup;
+				} else {
+					records = endp;
+					digit_expected = 0;
+				}
+			} else {
+				res = KT_INVALID_CMD_PARAM;
+				ERR_CATCH_MSG(err, res, "Error: List of positions must be given in strictly ascending order.");
+			}
+		}
+	}
+
+	/* Make sure the last processed character was a digit. */
+	if(digit_expected) {
+		res = KT_INVALID_CMD_PARAM;
+		ERR_CATCH_MSG(err, res, "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges.");
+	}
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
+
 int expand_extract_info(BLOCK_INFO *blocks) {
 	int res;
 	EXTRACT_INFO *tmp = NULL;
@@ -326,13 +462,18 @@ cleanup:
 	return res;
 }
 
-int update_extract_info(BLOCK_INFO *blocks, int isMetaRecordHash, KSI_DataHash *hash) {
+int update_extract_info(ERR_TRCKR *err, BLOCK_INFO *blocks, int isMetaRecordHash, KSI_DataHash *hash) {
 	int res;
 	EXTRACT_INFO *extractInfo = NULL;
 
 	if (blocks == NULL || hash == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
+	}
+
+	if (blocks->records && blocks->nofExtractPositionsFound == blocks->nofExtractPositions) {
+		res = extract_next_position(err, blocks->records, blocks);
+		if (res != KT_OK) goto cleanup;
 	}
 
 	if (blocks->nofExtractPositionsFound < blocks->nofExtractPositions && blocks->extractPositions[blocks->nofExtractPositionsFound] - blocks->nofTotalRecordHashes == blocks->nofRecordHashes) {
@@ -428,7 +569,7 @@ cleanup:
 	return res;
 }
 
-int add_record_hash_to_merkle_tree(KSI_CTX *ksi, BLOCK_INFO *blocks, int isMetaRecordHash, KSI_DataHash *hash) {
+int add_record_hash_to_merkle_tree(KSI_CTX *ksi, ERR_TRCKR *err, BLOCK_INFO *blocks, int isMetaRecordHash, KSI_DataHash *hash) {
 	int res;
 	KSI_DataHash *lastHash = NULL;
 
@@ -445,7 +586,7 @@ int add_record_hash_to_merkle_tree(KSI_CTX *ksi, BLOCK_INFO *blocks, int isMetaR
 	res = calculate_new_leaf_hash(ksi, blocks, hash, isMetaRecordHash, &lastHash);
 	if (res != KT_OK) goto cleanup;
 
-	res = update_extract_info(blocks, isMetaRecordHash, hash);
+	res = update_extract_info(err, blocks, isMetaRecordHash, hash);
 	if (res != KT_OK) goto cleanup;
 
 	res = add_leaf_hash_to_merkle_tree(ksi, blocks, lastHash, isMetaRecordHash);
@@ -1184,7 +1325,7 @@ static int process_record_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLO
 		res = continue_on_hash_fail(res, set, blocks, blocks->metarecordHash, recordHash, &replacement);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: metarecord hashes not equal.", blocks->blockNo);
 
-		res = add_record_hash_to_merkle_tree(ksi, blocks, 1, replacement);
+		res = add_record_hash_to_merkle_tree(ksi, err, blocks, 1, replacement);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
 
 		KSI_DataHash_free(blocks->metarecordHash);
@@ -1209,7 +1350,7 @@ static int process_record_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLO
 			replacement = KSI_DataHash_ref(recordHash);
 		}
 
-		res = add_record_hash_to_merkle_tree(ksi, blocks, 0, replacement);
+		res = add_record_hash_to_merkle_tree(ksi, err, blocks, 0, replacement);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add hash to Merkle tree.", blocks->blockNo);
 	}
 
@@ -1358,7 +1499,7 @@ static int process_tree_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK
 			blocks->nofRecordHashes++;
 			if (files->files.inLog) {
 				if (blocks->metarecordHash) {
-					res = add_record_hash_to_merkle_tree(ksi, blocks, 1, blocks->metarecordHash);
+					res = add_record_hash_to_merkle_tree(ksi, err, blocks, 1, blocks->metarecordHash);
 					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
 
 					KSI_DataHash_free(blocks->metarecordHash);
@@ -1370,7 +1511,7 @@ static int process_tree_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK
 					} else {
 						ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate hash of logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
 					}
-					res = add_record_hash_to_merkle_tree(ksi, blocks, 0, recordHash);
+					res = add_record_hash_to_merkle_tree(ksi, err, blocks, 0, recordHash);
 					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add record hash to Merkle tree.", blocks->blockNo);
 					KSI_DataHash_free(recordHash);
 					recordHash = NULL;
@@ -1483,7 +1624,7 @@ static int process_metarecord(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, 
 		if (blocks->metarecordHash != NULL) {
 			/* Add the previous metarecord to Merkle tree. */
 			blocks->nofRecordHashes++;
-			res = add_record_hash_to_merkle_tree(ksi, blocks, 1, blocks->metarecordHash);
+			res = add_record_hash_to_merkle_tree(ksi, err, blocks, 1, blocks->metarecordHash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
 		}
 
@@ -1495,7 +1636,7 @@ static int process_metarecord(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, 
 			} else {
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate hash of logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
 			}
-			res = add_record_hash_to_merkle_tree(ksi, blocks, 0, hash);
+			res = add_record_hash_to_merkle_tree(ksi, err, blocks, 0, hash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
 			KSI_DataHash_free(hash);
 			hash = NULL;
@@ -1677,7 +1818,7 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 		if (blocks->metarecordHash) {
 			/* Add the previous metarecord to Merkle tree. */
 			blocks->nofRecordHashes++;
-			res = add_record_hash_to_merkle_tree(ksi, blocks, 1, blocks->metarecordHash);
+			res = add_record_hash_to_merkle_tree(ksi, err, blocks, 1, blocks->metarecordHash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
 		}
 
@@ -1693,7 +1834,7 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 				} else {
 					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate hash of logline no. %zu.", blocks->blockNo, blocks->nofRecordHashes);
 				}
-				res = add_record_hash_to_merkle_tree(ksi, blocks, 0, hash);
+				res = add_record_hash_to_merkle_tree(ksi, err, blocks, 0, hash);
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add hash to Merkle tree.", blocks->blockNo);
 				KSI_DataHash_free(hash);
 				hash = NULL;
@@ -2732,113 +2873,25 @@ cleanup:
 	return res;
 }
 
-int add_position(ERR_TRCKR *err, long int n, BLOCK_INFO *blocks) {
+int verify_extract_positions(ERR_TRCKR *err, char *records) {
 	int res;
-	size_t *tmp = NULL;
 
-	if (n == 0 || blocks == NULL) {
-		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
-
-	if (blocks->nofExtractPositions) {
-		if (n <= blocks->extractPositions[blocks->nofExtractPositions - 1]) {
-			res = KT_INVALID_CMD_PARAM;
-			ERR_CATCH_MSG(err, res, "Error: List of positions must be given in strictly ascending order.");
-		}
-	}
-
-	if (blocks->extractPositions == NULL) {
-		tmp = (size_t*)malloc(sizeof(size_t));
-	} else {
-		tmp = (size_t*)realloc(blocks->extractPositions, sizeof(size_t) * (blocks->nofExtractPositions + 1));
-	}
-
-	if (tmp == NULL) {
-		res = KT_OUT_OF_MEMORY;
-		goto cleanup;
-	}
-
-	blocks->extractPositions = tmp;
-	tmp = NULL;
-	blocks->extractPositions[blocks->nofExtractPositions] = n;
-	blocks->nofExtractPositions++;
-	res = KT_OK;
-
-
-cleanup:
-
-	return res;
-}
-
-int extract_positions(ERR_TRCKR *err, char *records, BLOCK_INFO *blocks) {
-	int res;
-	long int n = 0;
-	long int from = 0;
-	char *endp = NULL;
-	char digit_expected = 1;
-	char dash_allowed = 1;
-
-	if (records == NULL || blocks == NULL) {
+	if (records == NULL || *records == 0) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
 
 	while (*records) {
-		if (isspace(*records)) {
+		char c = *records;
+		if (isspace(c)) {
 			res = KT_INVALID_CMD_PARAM;
 			ERR_CATCH_MSG(err, res, "Error: List of positions must not contain whitespace. Use ',' and '-' as separators.");
 		}
-		if(!digit_expected) {
-			digit_expected = 1;
-			if (*records == ',') {
-				dash_allowed = 1;
-				records++;
-				from = 0;
-				continue;
-			}
-			if (*records == '-') {
-				if (dash_allowed) {
-					dash_allowed = 0;
-					records++;
-					from = n;
-					continue;
-				} else {
-					res = KT_INVALID_CMD_PARAM;
-					ERR_CATCH_MSG(err, res, "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges.");
-				}
-			}
-		} else {
-			digit_expected = 0;
-			n = strtol(records, &endp, 10);
-			if (endp == records) {
-				res = KT_INVALID_CMD_PARAM;
-				ERR_CATCH_MSG(err, res, "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges.");
-			} else {
-				if (n <= 0) {
-					res = KT_INVALID_CMD_PARAM;
-					ERR_CATCH_MSG(err, res, "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges.");
-				} else if (from == 0) {
-					res = add_position(err, n, blocks);
-					if (res != KT_OK) goto cleanup;
-				} else if (n <= from) {
-					res = KT_INVALID_CMD_PARAM;
-					ERR_CATCH_MSG(err, res, "Error: List of positions must be given in strictly ascending order.");
-				} else {
-					while (from++ < n) {
-						res = add_position(err, from, blocks);
-						if (res != KT_OK) goto cleanup;
-					}
-				}
-				from = 0;
-				records = endp;
-			}
+		if (!isdigit(c) && c != ',' && c != '-') {
+			res = KT_INVALID_CMD_PARAM;
+			ERR_CATCH_MSG(err, res, "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges.");
 		}
-	}
-
-	if(digit_expected) {
-		res = KT_INVALID_CMD_PARAM;
-		ERR_CATCH_MSG(err, res, "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges.");
+		records++;
 	}
 	res = KT_OK;
 
@@ -2852,7 +2905,6 @@ int logsignature_extract(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES 
 	BLOCK_INFO blocks;
 	unsigned char ftlv_raw[SOF_FTLV_BUFFER];
 	SIGNATURE_PROCESSORS processors;
-	char *records = NULL;
 
 	if (set == NULL || err == NULL || ksi == NULL || files == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -2864,10 +2916,10 @@ int logsignature_extract(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES 
 	memset(&processors, 0, sizeof(processors));
 	processors.extract_signature = 1;
 
-	res = PARAM_SET_getStr(set, "r", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &records);
+	res = PARAM_SET_getStr(set, "r", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &blocks.records);
 	if (res != KT_OK) goto cleanup;
 
-	res = extract_positions(err, records, &blocks);
+	res = verify_extract_positions(err, blocks.records);
 	if (res != KT_OK) goto cleanup;
 
 	res = process_magic_number(err, &blocks, files);
