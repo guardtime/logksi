@@ -24,6 +24,8 @@ cp -r test/out/extract.base.logsig test/out/extract.base.9.logsig
 cp -r test/out/extract.base test/out/extract.base.9
 cp -r test/out/extract.base.logsig test/out/extract.base.10.logsig
 cp -r test/out/extract.base test/out/extract.base.10
+cp -r test/resource/logsignatures/legacy_extract.gtsig test/out
+cp -r test/resource/logfiles/legacy_extract test/out
 
 @test "extract record 1" {
 	run ./src/logksi extract test/out/extract.base -r 1 -d
@@ -290,6 +292,36 @@ cp -r test/out/extract.base test/out/extract.base.10
 	[ "$status" -eq 0 ]
 }
 
+@test "extract records from non-extended legacy.gtsig" {
+	run ./src/logksi verify test/out/legacy_extract -d
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Warning: RFC3161 timestamp(s) found in log signature." ]]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
+	run ./src/logksi extract test/out/legacy_extract -r 1-20 -d
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Warning: RFC3161 timestamp(s) found in log signature." ]]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
+	run ./src/logksi verify test/out/legacy_extract.excerpt -d
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
+	run diff test/out/legacy_extract.excerpt test/resource/logfiles/legacy_extract.r1-20.excerpt
+	[ "$status" -eq 0 ]
+}
+
+@test "extract records from extended legacy.gtsig" {
+	run ./src/logksi extend test/out/legacy_extract --enable-rfc3161-conversion -d
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
+	run ./src/logksi extract test/out/legacy_extract -r 21-204 -d
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
+	run ./src/logksi verify test/out/legacy_extract.excerpt -d
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
+	run diff test/out/legacy_extract.excerpt test/resource/logfiles/legacy_extract.r21-204.excerpt
+	[ "$status" -eq 0 ]
+}
+
 @test "attempt to extract a range given in descending order" {
 	run ./src/logksi extract test/out/extract.base -r 7-3 -d
 	[ "$status" -ne 0 ]
@@ -444,4 +476,7 @@ cp -r test/out/extract.base test/out/extract.base.10
 	run ./src/logksi extract test/out/extract.base -r 1-999999999999999 -d
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: Extract position 1415 out of range - not enough loglines." ]]
+	run ./src/logksi extract test/out/legacy_extract -r 1-205 -d
+	[ "$status" -ne 0 ]
+	[[ "$output" =~ "Error: Extract position 205 out of range - not enough loglines." ]]
 }

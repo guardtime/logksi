@@ -580,10 +580,10 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 		/* Generate input log signature file name. */
 		res = concat_names(files->user.inLog, ".logsig", &tmp.internal.inSig);
 		ERR_CATCH_MSG(err, res, "Error: Could not generate input log signature file name.");
-		if (access(tmp.internal.inSig, F_OK) == -1) {
+		if (!SMART_FILE_doFileExist(tmp.internal.inSig)) {
 			res = concat_names(files->user.inLog, ".gtsig", &legacy_name);
 			ERR_CATCH_MSG(err, res, "Error: Could not generate input log signature file name.");
-			if (access(legacy_name, F_OK) != -1) {
+			if (SMART_FILE_doFileExist(legacy_name)) {
 				KSI_free(tmp.internal.inSig);
 				tmp.internal.inSig = legacy_name;
 				legacy_name = NULL;
