@@ -28,5 +28,5 @@ Package: @PACKAGE@
 Architecture: any
 Section: utils
 Priority: optional
-Description: Log signature command-line tool for Keyless Signature Infrastructure.
+Description: Log signature command-line tool for KSI Blockchain.
 Build-Depends: @KSI_DEB_RUN_DEPENDENCY@, @GTRFC3161_DEB_RUN_DEPENDENCY@
