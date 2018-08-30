@@ -1,6 +1,6 @@
 Version 1.3
 
-2018-05-08 1.3.xxx
+2018-08-30 1.3.396
 
 * FEATURE: Legacy log signatures (.gtsig files) containing RFC3161 timestamps can be verified.
 * FEATURE: RFC3161 timestamps in legacy log signatures can be converted and saved as extended KSI signatures when extending with '--enable-rfc3161-conversion' switch.
