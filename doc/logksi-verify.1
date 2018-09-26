@@ -5,28 +5,28 @@
 .\"
 .SH SYNOPSIS
 .HP 4
-\fBlogksi verify \fIlogfile \fR[\fIlogfile.logsig\fR] [\fImore_options\fR]
+\fBlogksi verify \fI<logfile> \fR[\fI<logfile>.logsig\fR] [\fImore_options\fR]
 .HP 4
-\fBlogksi verify --log-from-stdin \fIlogfile.logsig\fR [\fImore_options\fR]
+\fBlogksi verify --log-from-stdin \fI<logfile>.logsig\fR [\fImore_options\fR]
 .HP 4
-\fBlogksi verify \fIlogfile.excerpt \fR[\fIlogfile.excerpt.logsig\fR] [\fImore_options\fR]
+\fBlogksi verify \fI<logfile>.excerpt \fR[\fI<logfile>.excerpt.logsig\fR] [\fImore_options\fR]
 .HP 4
-\fBlogksi verify --log-from-stdin \fIlogfile.excerpt.logsig\fR [\fImore_options\fR]
+\fBlogksi verify --log-from-stdin \fI<logfile>.excerpt.logsig\fR [\fImore_options\fR]
 .HP 4
-\fBlogksi verify --ver-int \fIlogfile \fR[\fIlogfile.logsig\fR] [\fImore_options\fR]
+\fBlogksi verify --ver-int \fI<logfile> \fR[\fI<logfile>.logsig\fR] [\fImore_options\fR]
 .HP 4
-\fBlogksi verify --ver-cal \fIlogfile \fR[\fIlogfile.logsig\fR] \fB-X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR] [\fImore_options\fR]
+\fBlogksi verify --ver-cal \fI<logfile> \fR[\fI<logfile>.logsig\fR] \fB-X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR] [\fImore_options\fR]
 .HP 4
-\fBlogksi verify --ver-key \fIlogfile \fR[\fIlogfile.logsig\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... [\fImore_options\fR]
+\fBlogksi verify --ver-key \fI<logfile> \fR[\fI<logfile>.logsig\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... [\fImore_options\fR]
 .HP 4
-\fBlogksi verify --ver-pub \fIlogfile \fR[\fIlogfile.logsig\fR] \fB--pub-str \fIpubstr \fR[\fB-x -X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR]] [\fImore_options\fR]
+\fBlogksi verify --ver-pub \fI<logfile> \fR[\fI<logfile>.logsig\fR] \fB--pub-str \fIpubstr \fR[\fB-x -X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR]] [\fImore_options\fR]
 .HP 4
-\fBlogksi verify --ver-pub \fIlogfile \fR[\fIlogfile.logsig\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... \fR[\fB-x -X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR]] [\fImore_options\fR]
+\fBlogksi verify --ver-pub \fI<logfile> \fR[\fI<logfile>.logsig\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... \fR[\fB-x -X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR]] [\fImore_options\fR]
 .\"
 .SH DESCRIPTION
-Verifies the log file \fIlogfile\fR. The name of the log signature file is expected to be \fIlogfile.logsig\fR or \fIlogfile.gtsig\fR by default. If this is not the case, the name of the log signature file must be given explicitly after the \fIlogfile\fR.
+Verifies the log file \fI<logfile>\fR. The name of the log signature file is expected to be \fI<logfile>.logsig\fR or \fI<logfile>.gtsig\fR by default. If this is not the case, the name of the log signature file must be given explicitly after the \fI<logfile>\fR.
 .LP
-Alternatively the extracted log records present in the \fIlogfile.excerpt\fR file can be verified. If not defined otherwise, then the log signature file acting as record integrity proof is expected to be \fIlogfile.excerpt.logsig\fR. See \fBlogksi-extract\fR(1) for details regarding log records' extraction.
+Alternatively the extracted log records present in the \fI<logfile>.excerpt\fR file can be verified. If not defined otherwise, then the log signature file acting as record integrity proof is expected to be \fI<logfile>.excerpt.logsig\fR. See \fBlogksi-extract\fR(1) for details regarding log records' extraction.
 .LP
 The log file to be verified can also be read from \fIstdin\fR using the \fB--log-from-stdin\fR option. In such case there is no default log signature file, thus its name should be explicitly defined.
 .LP
@@ -65,8 +65,8 @@ Perform key-based verification.
 Perform publication-based verification (use with \fB-x\fR to permit extending).
 .\"
 .TP
-\fIlogfile\fR
-Log file to be verified. If \fIlogfile\fR is specified, \fB--log-from-stdin\fR cannot be used.
+\fI<logfile>\fR
+Log file to be verified. If \fI<logfile>\fR is specified, \fB--log-from-stdin\fR cannot be used.
 .\"
 .TP
 \fB--log-from-stdin\fR
