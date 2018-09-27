@@ -282,6 +282,7 @@ char *verify_help_toString(char *buf, size_t len) {
 		TOOL_getName(),
 		TOOL_getName(),
 		TOOL_getName(),
+		TOOL_getName(),
 		TOOL_getName()
 	);
 
