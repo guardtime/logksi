@@ -5,16 +5,16 @@
 .\"
 .SH SYNOPSIS
 .HP 4
-\fBlogksi extend \fIlogfile\fR [\fB-o \fIout.logsig\fR] \fB-X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... [\fImore_options\fR]
+\fBlogksi extend \fI<logfile>\fR [\fB-o \fI<out>.logsig\fR] \fB-X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... [\fImore_options\fR]
 .HP 4
-\fBlogksi extend \fIlogfile\fR [\fB-o \fIout.logsig\fR] \fB-X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... \fB--pub-str \fIstr \fR[\fImore_options\fR]
+\fBlogksi extend \fI<logfile>\fR [\fB-o \fI<out>.logsig\fR] \fB-X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... \fB--pub-str \fIstr \fR[\fImore_options\fR]
 .HP 4
-\fBlogksi extend \fIlogfile\fR [\fB-o \fIout.logsig\fR] \fB--conf \fIlogksi.conf\fR [\fImore_options\fR]
+\fBlogksi extend \fI<logfile>\fR [\fB-o \fI<out>.logsig\fR] \fB--conf \fIlogksi.conf\fR [\fImore_options\fR]
 .HP 4
-\fBlogksi extend \fB--sig-from-stdin\fR [\fB-o \fIout.logsig\fR] \fB--conf \fIlogksi.conf\fR [\fImore_options\fR]
+\fBlogksi extend \fB--sig-from-stdin\fR [\fB-o \fI<out>.logsig\fR] \fB--conf \fIlogksi.conf\fR [\fImore_options\fR]
 .\"
 .SH DESCRIPTION
-Finds the log signature file (\fIlogfile.logsig\fR or \fIlogfile.gtsig\fR ) based on the specified log file \fIlogfile\fR and extends KSI signatures in it to the desired publication. The log signature file is expected to be located in the same directory as the log file. Alternatively, if no \fIlogfile\fR is specified, the log signature file may be read from \fIstdin\fR. To do that the \fB--sig-from-stdin\fR option should be used. If neither the \fIlogfile\fR nor \fB--sig-from-stdin\fR option is given, help text is returned.
+Finds the log signature file (\fI<logfile>.logsig\fR or \fI<logfile>.gtsig\fR ) based on the specified log file \fI<logfile>\fR and extends KSI signatures in it to the desired publication. The log signature file is expected to be located in the same directory as the log file. Alternatively, if no \fI<logfile>\fR is specified, the log signature file may be read from \fIstdin\fR. To do that the \fB--sig-from-stdin\fR option should be used. If neither the \fI<logfile>\fR nor \fB--sig-from-stdin\fR option is given, help text is returned.
 .LP
 After the signatures are extended and the corresponding publication records are attached, the log signatures can be verified using publication-based verification where only trusted publications file or a publication string in printed media is needed to perform the verification. See \fBlogksi-verify\fR(1) for details.
 .LP
@@ -24,16 +24,16 @@ Note that all KSI signatures present in the log signature file will be attempted
 .\"
 .SH OPTIONS
 .TP
-\fIlogfile\fR
-Name of the log file whose log signature file is to be extended. If \fIlogfile\fR is specified, the \fB--sig-from-stdin\fR option cannot be used.
+\fI<logfile>\fR
+Name of the log file whose log signature file is to be extended. If \fI<logfile>\fR is specified, the \fB--sig-from-stdin\fR option cannot be used.
 .\"
 .TP
 \fB--sig-from-stdin\fR
 Use to read the log signature file from \fIstdin\fR. If no output file is specified with \fB-o\fR, the result will be returned to \fIstdout\fR.
 .\"
 .TP
-\fB-o \fIout.logsig\fR
-Specify the name of the extended output log signature file. If not specified, the input file \fIlogfile.logsig\fR or \fIlogfile.gtsig\fR is modified. If the input file that is to be modified contains RFC3161 timestamps, the user must specify the \fB--enable-rfc3161-conversion\fR option to enable conversion, extending and replacing of RFC3161 timestamps with KSI signatures. The backup of the original log signature file will be saved to \fIlogfile.logsig.bak\fR. If extending fails, the newly created \fIlogfile.logsig\fR will be deleted and the original \fIlogfile.logsig\fR will be restored from the backup file. If the output file name is explicitly specified, the existing file will always be overwritten and no backup file will be created. Use '-' as file name to redirect the output as a binary stream to \fIstdout\fR.
+\fB-o \fI<out>.logsig\fR
+Specify the name of the extended output log signature file. If not specified, the input file \fI<logfile>.logsig\fR or \fI<logfile>.gtsig\fR is modified. If the input file that is to be modified contains RFC3161 timestamps, the user must specify the \fB--enable-rfc3161-conversion\fR option to enable conversion, extending and replacing of RFC3161 timestamps with KSI signatures. The backup of the original log signature file will be saved to \fI<logfile>.logsig.bak\fR. If extending fails, the newly created \fI<logfile>.logsig\fR will be deleted and the original \fI<logfile>.logsig\fR will be restored from the backup file. If the output file name is explicitly specified, the existing file will always be overwritten and no backup file will be created. Use '-' as file name to redirect the output as a binary stream to \fIstdout\fR.
 .\"
 .TP
 \fB-X \fIURL\fR

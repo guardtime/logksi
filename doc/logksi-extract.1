@@ -5,35 +5,39 @@
 .\"
 .SH SYNOPSIS
 .HP 4
-\fBlogksi extract \fIlogfile \fR[\fIlogfile.logsig\fR] [\fB-o \fIoutfile\fR] \fB-r \fIrecords\fR... [\fImore_options\fR]
+\fBlogksi extract \fI<logfile> \fR[\fI<logfile>.logsig\fR] [\fB-o \fI<outfile>\fR] \fB-r \fIrecords\fR... [\fImore_options\fR]
 .HP 4
-\fBlogksi extract --log-from-stdin \fIlogfile.logsig \fB-o \fIoutfile \fB-r \fIrecords\fR... [\fImore_options\fR]
+\fBlogksi extract --log-from-stdin \fI<logfile>.logsig \fB-o \fI<outfile> \fB-r \fIrecords\fR... [\fImore_options\fR]
 .HP 4
-\fBlogksi extract --sig-from-stdin \fIlogfile \fR[\fB-o \fIoutfile\fR] \fB-r \fIrecords\fR... [\fImore_options\fR]
+\fBlogksi extract --sig-from-stdin \fI<logfile> \fR[\fB-o \fI<outfile>\fR] \fB-r \fIrecords\fR... [\fImore_options\fR]
 .\"
 .SH DESCRIPTION
-Extracts the specified record(s) from the given \fIlogfile\fR and their KSI signature(s) from the respective log signature file \fIlogfile.logsig\fR or \fIlogfile.gtsig\fR. If the log signature file \fIlogfile.logsig\fR is not specified, its name is derived from \fIlogfile\fR by adding the \fI.logsig\fR suffix.
+Extracts the specified record(s) from the given \fI<logfile>\fR and their KSI signature(s) from the respective log signature file \fI<logfile>.logsig\fR or \fI<logfile>.gtsig\fR. If the log signature file \fI<logfile>.logsig\fR is not specified, its name is derived from \fI<logfile>\fR by adding the \fI.logsig\fR suffix.
 .LP
-\fBlogksi extract\fR outputs the requested log record(s) to the file \fIlogfile.excerpt\fR and creates the record integrity proof file \fIlogfile.excerpt.logsig\fR for these records. If the files already exist, they will be overwritten.
+\fBlogksi extract\fR outputs the requested log record(s) to the file \fI<logfile>.excerpt\fR and creates the record integrity proof file \fI<logfile>.excerpt.logsig\fR for these records. If the files already exist, they will be overwritten.
 .LP
-The extracted log records' KSI signatures can be verified independently, thus individual log records can be presented and their integrity proven regardless the state or content of other log records saved in the same \fIlogfile\fR. See \fBlogksi-verify\fR(1) for verification details.
+The extracted log records' KSI signatures can be verified independently, thus individual log records can be presented and their integrity proven regardless the state or content of other log records saved in the same \fI<logfile>\fR. See \fBlogksi-verify\fR(1) for verification details.
 .\"
 .SH OPTIONS
 .TP
+.TP
+\fI<logfile>\fR
+Log file from which the specified log records will be extracted.
+.\"
 \fB--log-from-stdin\fR
-Read the log file from \fIstdin\fR. If \fB--log-from-stdin\fR is used, the log signature file \fIlogfile.logsig\fR must be specified and \fB--sig-from-stdin\fR cannot be used.
+Read the log file from \fIstdin\fR. If \fB--log-from-stdin\fR is used, the log signature file \fI<logfile>.logsig\fR must be specified and \fB--sig-from-stdin\fR cannot be used.
 .TP
 \fB--sig-from-stdin\fR
-Read the log signature file from \fIstdin\fR. If \fB--sig-from-stdin\fR is specified, the log file \fIlogfile\fR must be specified and \fB--log-from-stdin\fR cannot be used.
+Read the log signature file from \fIstdin\fR. If \fB--sig-from-stdin\fR is specified, the log file \fI<logfile>\fR must be specified and \fB--log-from-stdin\fR cannot be used.
 .TP
-\fB-o \fIoutfile\fR
-Names of output files will be derived from \fIoutfile\fR by adding the appropriate suffixes. Name of the log records file will be \fIoutfile.excerpt\fR. Name of the integrity proof file will be \fIoutfile.excerpt.logsig\fR. If \fIoutfile\fR is not specified, names of output files will be derived from \fIlogfile\fR by adding the same suffixes. If \fB--log-from-stdin\fR is specified, \fIoutfile\fR must also be specified.
+\fB-o \fI<outfile>\fR
+Names of output files will be derived from \fI<outfile>\fR by adding the appropriate suffixes. Name of the log records file will be \fI<outfile>.excerpt\fR. Name of the integrity proof file will be \fI<outfile>.excerpt.logsig\fR. If \fI<outfile>\fR is not specified, names of output files will be derived from \fI<logfile>\fR by adding the same suffixes. If \fB--log-from-stdin\fR is specified, \fI<outfile>\fR must also be specified.
 .TP
 \fB--out-log \fIlog.records\fR
-Specify the name of the log records file. The log records file can be redirected to \fIstdout\fR by using '-' as the file name. If the log records file name is not specified with \fB--out-log\fR, its name will be derived from either \fIoutfile\fR or \fIlogfile\fR by adding the \fI.excerpt\fR suffix.
+Specify the name of the log records file. The log records file can be redirected to \fIstdout\fR by using '-' as the file name. If the log records file name is not specified with \fB--out-log\fR, its name will be derived from either \fI<outfile>\fR or \fI<logfile>\fR by adding the \fI.excerpt\fR suffix.
 .TP
 \fB--out-proof \fIintegrity.proof\fR
-Specify the name of the integrity proof file. The integrity proof file can be redirected to \fIstdout\fR (unless the log records file is also redirected to \fIstdout\fR) by using '-' as the file name. If the integrity proof file name is not specified with \fB--out-proof\fR, its name will be derived from either \fIoutfile\fR or \fIlogfile\fR by adding the \fI.excerpt.logsig\fR suffix.
+Specify the name of the integrity proof file. The integrity proof file can be redirected to \fIstdout\fR (unless the log records file is also redirected to \fIstdout\fR) by using '-' as the file name. If the integrity proof file name is not specified with \fB--out-proof\fR, its name will be derived from either \fI<outfile>\fR or \fI<logfile>\fR by adding the \fI.excerpt.logsig\fR suffix.
 .TP
 \fB-r \fIrecords\fR
 Specify the position(s) of record(s) to be extracted. Position of the first record is 1 and all positions must be defined in a strictly ascending order, using positive decimal numbers. Positions to be extracted can be defined either:
