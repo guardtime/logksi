@@ -141,9 +141,9 @@ cleanup:
 char *sign_help_toString(char*buf, size_t len) {
 	KSI_snprintf(buf, len,
 		"Usage:\n"
-		" %s sign <logfile> [-o <out>.logsig] -S <URL> [--aggr-user <user> --aggr-key <key>]\n"
+		" %s sign <logfile> [-o <out.logsig>] -S <URL> [--aggr-user <user> --aggr-key <key>]\n"
 		"          [more_options]\n"
-		" %s sign --sig-from-stdin [-o <out>.logsig] -S <URL> [--aggr-user <user> --aggr-key <key>]\n"
+		" %s sign --sig-from-stdin [-o <out.logsig>] -S <URL> [--aggr-user <user> --aggr-key <key>]\n"
 		"          [more_options]\n"
 		"\n"
 		" <logfile>\n"
@@ -152,7 +152,7 @@ char *sign_help_toString(char*buf, size_t len) {
 		"             If specified, the '--sig-from-stdin' switch cannot be used.\n"
 		" --sig-from-stdin\n"
 		"             The log signature file is read from stdin.\n"
-		" -o <out>.logsig\n"
+		" -o <out.logsig>\n"
 		"           - Name of the signed output log signature file. An existing log signature file is overwritten.\n"
 		"             If not specified, the log signature is saved to '<logfile>.logsig' while a backup of '<logfile>.logsig'\n"
 		"             is saved in '<logfile>.logsig.bak'.\n"
