@@ -139,7 +139,7 @@ cleanup:
 char *integrate_help_toString(char *buf, size_t len) {
 	KSI_snprintf(buf, len,
 		"Usage:\n"
-		" %s integrate <logfile> [-o <out>.logsig]\n"
+		" %s integrate <logfile> [-o <out.logsig>]\n"
 		"\n"
 		" <logfile>\n"
 		"           - Name of the log file whose temporary files are to be integrated.\n"
@@ -147,7 +147,7 @@ char *integrate_help_toString(char *buf, size_t len) {
 		"               * the log signature blocks file: '<logfile>.logsig.parts/blocks.dat'; and\n"
 		"               * the log signature file containing the respective KSI signatures: \n"
 		"                 '<logfile>.logsig.parts/block-signatures.dat'.\n"
-		" -o <out>.logsig\n"
+		" -o <out.logsig>\n"
 		"           - Name of the integrated output log signature file. If not specified,\n"
 		"             the log signature file is saved as '<logfile>.logsig' in the same folder where\n"
 		"             the '<logfile>' is located. An attempt to overwrite an existing log signature file will result in an error.\n"
