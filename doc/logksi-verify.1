@@ -5,23 +5,23 @@
 .\"
 .SH SYNOPSIS
 .HP 4
-\fBlogksi verify \fI<logfile> \fR[\fI<logfile>.logsig\fR] [\fImore_options\fR]
+\fBlogksi verify \fI<logfile> \fR[\fI<logfile.logsig>\fR] [\fImore_options\fR]
 .HP 4
-\fBlogksi verify --log-from-stdin \fI<logfile>.logsig\fR [\fImore_options\fR]
+\fBlogksi verify --log-from-stdin \fI<logfile.logsig>\fR [\fImore_options\fR]
 .HP 4
-\fBlogksi verify \fI<logfile>.excerpt \fR[\fI<logfile>.excerpt.logsig\fR] [\fImore_options\fR]
+\fBlogksi verify \fI<logfile>.excerpt \fR[\fI<logfile.excerpt.logsig>\fR] [\fImore_options\fR]
 .HP 4
-\fBlogksi verify --log-from-stdin \fI<logfile>.excerpt.logsig\fR [\fImore_options\fR]
+\fBlogksi verify --log-from-stdin \fI<logfile.excerpt.logsig>\fR [\fImore_options\fR]
 .HP 4
-\fBlogksi verify --ver-int \fI<logfile> \fR[\fI<logfile>.logsig\fR] [\fImore_options\fR]
+\fBlogksi verify --ver-int \fI<logfile> \fR[\fI<logfile.logsig>\fR] [\fImore_options\fR]
 .HP 4
-\fBlogksi verify --ver-cal \fI<logfile> \fR[\fI<logfile>.logsig\fR] \fB-X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR] [\fImore_options\fR]
+\fBlogksi verify --ver-cal \fI<logfile> \fR[\fI<logfile.logsig>\fR] \fB-X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR] [\fImore_options\fR]
 .HP 4
-\fBlogksi verify --ver-key \fI<logfile> \fR[\fI<logfile>.logsig\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... [\fImore_options\fR]
+\fBlogksi verify --ver-key \fI<logfile> \fR[\fI<logfile.logsig>\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... [\fImore_options\fR]
 .HP 4
-\fBlogksi verify --ver-pub \fI<logfile> \fR[\fI<logfile>.logsig\fR] \fB--pub-str \fIpubstr \fR[\fB-x -X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR]] [\fImore_options\fR]
+\fBlogksi verify --ver-pub \fI<logfile> \fR[\fI<logfile.logsig>\fR] \fB--pub-str \fIpubstr \fR[\fB-x -X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR]] [\fImore_options\fR]
 .HP 4
-\fBlogksi verify --ver-pub \fI<logfile> \fR[\fI<logfile>.logsig\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... \fR[\fB-x -X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR]] [\fImore_options\fR]
+\fBlogksi verify --ver-pub \fI<logfile> \fR[\fI<logfile.logsig>\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... \fR[\fB-x -X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR]] [\fImore_options\fR]
 .\"
 .SH DESCRIPTION
 Verifies the log file \fI<logfile>\fR. The name of the log signature file is expected to be \fI<logfile>.logsig\fR or \fI<logfile>.gtsig\fR by default. If this is not the case, the name of the log signature file must be given explicitly after the \fI<logfile>\fR.

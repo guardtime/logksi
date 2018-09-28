@@ -12,7 +12,7 @@
 \fBlogksi extend \fB--sig-from-stdin\fR [\fB-o \fI<out.logsig>\fR] [\fImore_options\fR]
 .\"
 .SH DESCRIPTION
-Finds the log signature file (\fI<logfile>.logsig\fR or \fI<logfile>.gtsig\fR ) based on the specified log file \fI<logfile>\fR and extends KSI signatures in it to the desired publication. The log signature file is expected to be located in the same directory as the log file. Alternatively, if no \fI<logfile>\fR is specified, the log signature file may be read from \fIstdin\fR. To do that the \fB--sig-from-stdin\fR option should be used. If neither the \fI<logfile>\fR nor \fB--sig-from-stdin\fR option is given, help text is returned.
+Finds the log signature file (\fI<logfile>.logsig\fR or \fI<logfile>.gtsig\fR) based on the specified log file \fI<logfile>\fR and extends KSI signatures in it to the desired publication. The log signature file is expected to be located in the same directory as the log file. Alternatively, if no \fI<logfile>\fR is specified, the log signature file may be read from \fIstdin\fR. To do that the \fB--sig-from-stdin\fR option should be used. If neither the \fI<logfile>\fR nor \fB--sig-from-stdin\fR option is given, help text is returned.
 .LP
 After the signatures are extended and the corresponding publication records are attached, the log signatures can be verified using publication-based verification where only trusted publications file or a publication string in printed media is needed to perform the verification. See \fBlogksi-verify\fR(1) for details.
 .LP
