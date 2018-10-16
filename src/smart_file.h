@@ -76,9 +76,10 @@ int SMART_FILE_open(const char *fname, const char *mode, SMART_FILE **file);
 void SMART_FILE_close(SMART_FILE *file);
 int SMART_FILE_write(SMART_FILE *file, char *raw, size_t raw_len, size_t *count);
 int SMART_FILE_read(SMART_FILE *file, char *raw, size_t raw_len, size_t *count);
+int SMART_FILE_readLine(SMART_FILE *file, char *raw, size_t raw_len, size_t *row_pointer, size_t *count);
 const char *SMART_FILE_getFname(SMART_FILE *file);
 /**
- * 
+ *
  * @param file
  * @return A non-zero value is returned in the case that the end-of-file indicator associated with the stream is set.
  * Otherwise, zero is returned.
