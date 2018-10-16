@@ -669,7 +669,6 @@ int is_imprint(const char *str) {
 
 	res = imprint_extract_fields(str, &alg, &isColon, hex, sizeof(hex));
 	if (res != KT_OK) return 0;
-
 	if (!isColon) correctness = 0;
 	if (alg == KSI_HASHALG_INVALID) correctness = 0;
 

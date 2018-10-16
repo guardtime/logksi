@@ -73,7 +73,7 @@ static int signature_verify_calendar_based(PARAM_SET *set, ERR_TRCKR *err, KSI_C
 static int generate_filenames(ERR_TRCKR *err, IO_FILES *files);
 static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files);
 static void close_log_and_signature_files(IO_FILES *files);
-static int save_output_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_DataHash *hash);
+static int save_output_hash(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *ioFiles, KSI_DataHash *hash);
 
 
 int verify_run(int argc, char **argv, char **envp) {
@@ -191,7 +191,7 @@ int verify_run(int argc, char **argv, char **envp) {
 	res = logsignature_verify(set, err, ksi, inputHash, verify_signature, &files, &outputHash);
 	if (res != KT_OK) goto cleanup;
 
-	res = save_output_hash(set, err, outputHash);
+	res = save_output_hash(set, err, &files, outputHash);
 	if (res != KT_OK) goto cleanup;
 
 cleanup:
@@ -665,11 +665,11 @@ static void close_log_and_signature_files(IO_FILES *files) {
 }
 
 
-static int save_output_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_DataHash *hash) {
+static int save_output_hash(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *ioFiles, KSI_DataHash *hash) {
 	int res;
 	SMART_FILE *out = NULL;
 
-	if (set == NULL || err == NULL) {
+	if (set == NULL || err == NULL || ioFiles == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
@@ -682,8 +682,8 @@ static int save_output_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_DataHash *hash) 
 		size_t write_count = 0;
 
 		if (hash == NULL) {
-			res = KT_INVALID_INPUT_FORMAT;
-			ERR_TRCKR_ADD(err, res, "Error: excerpt file has no last leaf?");
+			res = KT_INVALID_CMD_PARAM;
+			ERR_TRCKR_ADD(err, res, "Error: --output-hash does not work with excerpt signature file.");
 			goto cleanup;
 		}
 
@@ -692,7 +692,7 @@ static int save_output_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_DataHash *hash) 
 
 		LOGKSI_DataHash_toString(hash, imprint, sizeof(imprint));
 
-		count += KSI_snprintf(buf + count, sizeof(buf) - count, "# Last leaf from previous block.\n");
+		count += KSI_snprintf(buf + count, sizeof(buf) - count, "# Last leaf from previous log signature (%s).\n", ioFiles->internal.inSig);
 		count += KSI_snprintf(buf + count, sizeof(buf) - count, "%s", imprint);
 
 
