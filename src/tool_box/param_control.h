@@ -36,13 +36,13 @@ typedef struct COMPOSITE_st COMPOSITE;
 struct COMPOSITE_st {
 	/** A pointer to KSI context. Mandatory. */
 	void *ctx;
-	
+
 	/** A pointer to tool error handler. Mandatory. */
 	void *err;
-	
+
 	/** A pointer to hash algorithm. Mandatory if hashing input file. */
 	void *h_alg;
-	
+
 	/** A optional pointer to file name to save input data to file when hashing. */
 	void *fname_out;
 };
@@ -85,8 +85,8 @@ enum formatStatus_enum{
 	FORMAT_INVALID_OID,
 	FORMAT_URL_UNKNOWN_SCHEME,
 	FORMAT_FLAG_HAS_ARGUMENT,
-	FORMAT_INVALID_UTC,		
-	FORMAT_INVALID_UTC_OUT_OF_RANGE,		
+	FORMAT_INVALID_UTC,
+	FORMAT_INVALID_UTC_OUT_OF_RANGE,
 	FORMAT_UNKNOWN_ERROR
 };
 
@@ -99,6 +99,11 @@ int isFormatOk_hashAlg(const char *hashAlg);
 int isContentOk_hashAlg(const char *alg);
 /** extra is not used.*/
 int extract_hashAlg(void *extra, const char* str, void** obj);
+
+int isFormatOk_inputHash(const char *str);
+int isContentOk_inputHash(const char *str);
+int extract_inputHashFromImprintOrImprintInFile(void *extra, const char* str, void** obj);
+
 
 int isFormatOk_inputFile(const char *path);
 int isContentOk_inputFile(const char* path);
