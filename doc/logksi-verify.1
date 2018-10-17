@@ -73,6 +73,14 @@ Log file to be verified. If \fI<logfile>\fR is specified, \fB--log-from-stdin\fR
 Use to read the log file to be verified from the \fIstdin\fR. The corresponding log signature file must be explicitly specified.
 .\"
 .TP
+\fB--input-hash \fIhash\fR
+Specify hash imprint for inter-linking (the last leaf from the previous log signature) verification. Hash can be specified on command line or from a file containing its string representation. Hash format: <alg>:<hash in hex>. Use '\fB-\fR' as file name to read the imprint from \fIstdin\fR. Call \fBlogksi -h\fR to get the list of supported hash algorithms. See \fB--output-hash\fR to see how to extract the hash imprint from the previous log signature.
+.\"
+.TP
+\fB--output-hash \fIhash\fR
+Output the last leaf from the log signature into file. Use '\fB-\fR' as file name to redirect hash imprint to \fIstdout\fR. See \fB--input-hash\fR to see how to verify that log signature is bound with this log signature (where from the output hash was extracted).
+.\"
+.TP
 \fB-x\fR
 Permit to use extender for publication-based verification. See \fBlogksi-exted\fR(1) fo details.
 .\"
@@ -196,6 +204,18 @@ To verify the compressed log file \fI/var/log/secure.gz\fR using any policy poss
 .LP
 .RS 4
 \fBzcat \fI/var/log/secure.gz\fR | \fBlogksi verify \fI/var/log/secure.logsig \fB--log-from-stdin
+.RE
+.\"
+.RE
+.\"
+.TP 2
+\fB8
+To verify inter-linking of two log signatures where the previous signature is not available but its last leaf hash imprint is stored to a file:
+.LP
+.RS 4
+\fBlogksi verify \fI/var/log/previous\fR \fB--output-hash \fIlastleaf\fR
+.LP
+\fBlogksi verify \fI/var/log/next\fR \fB--input-hash \fIlastleaf\fR
 .RE
 .\"
 .SH ENVIRONMENT
