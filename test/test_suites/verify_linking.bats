@@ -38,5 +38,28 @@ echo SHA-512:dd4e870e7e0c998f160688b97c7bdeef3d6d01b1c5f02db117018058ad51996777a
 
 @test "try to write excerpt signature output hash to stdout. It must fail." {
 	run ./src/logksi verify test/out/extract.base.10.excerpt --output-hash -
+	[ "$status" -eq 3 ]
 	[[ "$output" =~ "Error: --output-hash does not work with excerpt signature file" ]]
+}
+
+@test "Verify inter-linking of two sequential log signatures by saving temporary hash imprint to file." {
+	run ./src/logksi verify test/resource/interlink/ok-testlog-interlink-1 -d --output-hash test/out/ok-testlog-interlink-1-output-hash
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok" ]]
+
+	run ./src/logksi verify test/resource/interlink/ok-testlog-interlink-2 -d --input-hash test/out/ok-testlog-interlink-1-output-hash
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok" ]]
+}
+
+@test "Verify inter-linking of two sequential log signatures by passing previous leaf hash imprint value via stdout." {
+	run bash -c "./src/logksi verify test/resource/interlink/ok-testlog-interlink-1 -d --output-hash - | ./src/logksi verify test/resource/interlink/ok-testlog-interlink-2 -d --input-hash -"
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok" ]]
+}
+
+@test "Verify inter-linking of two NOT matching log signatures by passing previous leaf hash imprint value via stdout." {
+	run bash -c "./src/logksi verify test/out/unsigned -d --output-hash - | ./src/logksi verify test/resource/interlink/ok-testlog-interlink-2 -d --input-hash -"
+	[ "$status" -eq 6 ]
+	[[ "$output" =~ "Error: The last leaf from the previous block does not match with the current first block." ]]
 }
