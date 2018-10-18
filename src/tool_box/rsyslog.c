@@ -2757,7 +2757,7 @@ cleanup:
 	return res;
 }
 
-int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_DataHash *firstLink, VERIFYING_FUNCTION verify_signature, IO_FILES *files, KSI_DataHash ** lastLeaf) {
+int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_DataHash *firstLink, VERIFYING_FUNCTION verify_signature, IO_FILES *files, KSI_DataHash **lastLeaf) {
 	int res;
 	BLOCK_INFO blocks;
 	unsigned char ftlv_raw[SOF_FTLV_BUFFER];
@@ -2791,6 +2791,7 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_DataHa
 
 							/* Check if the last leaf from the previous block matches with the current first block. */
 							if (isFirst == 1 && firstLink != NULL) {
+								print_progressDesc(0, "Verifying inter-linking input hash... ");
 								isFirst = 0;
 								if (!KSI_DataHash_equals(firstLink, blocks.prevLeaf)) {
 									char buf_imp[1024];
@@ -2801,6 +2802,7 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_DataHa
 
 									goto cleanup;
 								}
+								print_progressResult(res);
 							}
 						break;
 
