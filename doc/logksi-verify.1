@@ -13,6 +13,8 @@
 .HP 4
 \fBlogksi verify --log-from-stdin \fI<logfile.excerpt.logsig>\fR [\fImore_options\fR]
 .HP 4
+\fBlogksi verify \fR[\fImore_options\fR] \fB--\fR \fI<logfile>\fR...
+.HP 4
 \fBlogksi verify --ver-int \fI<logfile> \fR[\fI<logfile.logsig>\fR] [\fImore_options\fR]
 .HP 4
 \fBlogksi verify --ver-cal \fI<logfile> \fR[\fI<logfile.logsig>\fR] \fB-X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR] [\fImore_options\fR]
@@ -24,7 +26,7 @@
 \fBlogksi verify --ver-pub \fI<logfile> \fR[\fI<logfile.logsig>\fR] \fB-P \fIURL \fR[\fB--cnstr \fIoid\fR=\fIvalue\fR]... \fR[\fB-x -X \fIURL \fR[\fB--ext-user \fIuser \fB--ext-key \fIkey\fR]] [\fImore_options\fR]
 .\"
 .SH DESCRIPTION
-Verifies the log file \fI<logfile>\fR. The name of the log signature file is expected to be \fI<logfile>.logsig\fR or \fI<logfile>.gtsig\fR by default. If this is not the case, the name of the log signature file must be given explicitly after the \fI<logfile>\fR.
+Verifies the log file \fI<logfile>\fR. The name of the log signature file is expected to be \fI<logfile>.logsig\fR or \fI<logfile>.gtsig\fR by default. To verify multiple log files and their inter-linking, ordered list of log files must be given after option \fB--\fR. If log signature file has not matching name and only one log file is verified, the name of the log signature file must be given explicitly after the \fI<logfile>\fR.
 .LP
 Alternatively the extracted log records present in the \fI<logfile>.excerpt\fR file can be verified. If not defined otherwise, then the log signature file acting as record integrity proof is expected to be \fI<logfile>.excerpt.logsig\fR. See \fBlogksi-extract\fR(1) for details regarding log records' extraction.
 .LP
@@ -71,14 +73,20 @@ Log file to be verified. If \fI<logfile>\fR is specified, \fB--log-from-stdin\fR
 .TP
 \fB--log-from-stdin\fR
 Use to read the log file to be verified from the \fIstdin\fR. The corresponding log signature file must be explicitly specified.
+
+.\"
+.TP
+\fB--\fR
+If used, \fBeverything\fR specified after the token is interpreted as \fI<logfile>\fR. Note that log signature files can NOT be specified manually and must have matching file names to log files. If multiple log files are specified, both integrity and inter-linking between them is verified.
+
 .\"
 .TP
 \fB--input-hash \fIhash\fR
-Specify hash imprint for inter-linking (the last leaf from the previous log signature) verification. Hash can be specified on command line or from a file containing its string representation. Hash format: <alg>:<hash in hex>. Use '\fB-\fR' as file name to read the imprint from \fIstdin\fR. Call \fBlogksi -h\fR to get the list of supported hash algorithms. See \fB--output-hash\fR to see how to extract the hash imprint from the previous log signature.
+Specify hash imprint for inter-linking (the last leaf from the previous log signature) verification. Hash can be specified on command line or from a file containing its string representation. Hash format: <alg>:<hash in hex>. Use '\fB-\fR' as file name to read the imprint from \fIstdin\fR. Call \fBlogksi -h\fR to get the list of supported hash algorithms. See \fB--output-hash\fR to see how to extract the hash imprint from the previous log signature. When used together with \fB--\fR, only the first log file is verified against specified value.
 .\"
 .TP
 \fB--output-hash \fIhash\fR
-Output the last leaf from the log signature into file. Use '\fB-\fR' as file name to redirect hash imprint to \fIstdout\fR. See \fB--input-hash\fR to see how to verify that log signature is bound with this log signature (where from the output hash was extracted).
+Output the last leaf from the log signature into file. Use '\fB-\fR' as file name to redirect hash imprint to \fIstdout\fR. See \fB--input-hash\fR to see how to verify that log signature is bound with this log signature (where from the output hash was extracted). When used together with \fB--\fR, only the output hash of the last log file is returned.
 .\"
 .TP
 \fB-x\fR
@@ -206,16 +214,22 @@ To verify the compressed log file \fI/var/log/secure.gz\fR using any policy poss
 \fBzcat \fI/var/log/secure.gz\fR | \fBlogksi verify \fI/var/log/secure.logsig \fB--log-from-stdin
 .RE
 .\"
-.RE
-.\"
 .TP 2
 \fB8
-To verify inter-linking of two log signatures where the previous signature is not available but its last leaf hash imprint is stored to a file:
+To verify integrity and inter-linking of two log signatures where the previous signature is not available but its last leaf hash imprint is stored to a file:
 .LP
 .RS 4
 \fBlogksi verify \fI/var/log/previous\fR \fB--output-hash \fIlastleaf\fR
 .LP
 \fBlogksi verify \fI/var/log/next\fR \fB--input-hash \fIlastleaf\fR
+.RE
+.\"
+.TP 2
+\fB9
+To verify integrity and inter-linking of multiple log files (note that signature files must match with log file e.g. log1.logsig):
+.LP
+.RS 4
+\fBlogksi verify -- log1 log2 log3 log4
 .RE
 .\"
 .SH ENVIRONMENT
