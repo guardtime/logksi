@@ -63,6 +63,7 @@ enum {
 };
 
 static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
+static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err);
 
 static int signature_verify_general(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
 static int signature_verify_internally(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
@@ -75,6 +76,62 @@ static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files);
 static void close_log_and_signature_files(IO_FILES *files);
 static int save_output_hash(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *ioFiles, KSI_DataHash *hash);
 
+static int getLogFiles(PARAM_SET *set, ERR_TRCKR *err, int i, IO_FILES *files) {
+	int res = KT_UNKNOWN_ERROR;
+	int log_from_stdin = 0;
+
+
+	if (set == NULL || err == NULL || i < 0) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+
+	log_from_stdin = PARAM_SET_isSetByName(set, "log-from-stdin") ? 1 : 0;
+
+	if (PARAM_SET_isSetByName(set, "multiple_logs")) {
+		if (log_from_stdin) {
+			ERR_TRCKR_ADD(err, res = KT_INVALID_CMD_PARAM, "Error: When specifying multiple log files, option --log-from-stdin can not be used.");
+			goto cleanup;
+		}
+		res = PARAM_SET_getStr(set, "multiple_logs", NULL, PST_PRIORITY_NONE, i, &files->user.inLog);
+		if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
+
+		files->user.inSig = NULL;
+	} else if (PARAM_SET_isSetByName(set, "input")) {
+		int count = 0;
+
+		if (i > 0) {
+			res = PST_PARAMETER_VALUE_NOT_FOUND;
+			goto cleanup;
+		}
+
+		res = PARAM_SET_getValueCount(set, "input", NULL, PST_PRIORITY_NONE, &count);
+		if (res != KT_OK) goto cleanup;
+
+		if (!log_from_stdin) {
+			res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, 0, &files->user.inLog);
+			if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
+		}
+
+		if (count > (1 - log_from_stdin)) {
+			res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, (1 - log_from_stdin), &files->user.inSig);
+			if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
+		}
+
+	} else {
+		res = PST_PARAMETER_EMPTY;
+		goto cleanup;
+	}
+
+
+
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
 
 int verify_run(int argc, char **argv, char **envp) {
 	int res;
@@ -87,12 +144,13 @@ int verify_run(int argc, char **argv, char **envp) {
 	SMART_FILE *logfile = NULL;
 	KSI_DataHash *inputHash = NULL;
 	KSI_DataHash *outputHash = NULL;
+	KSI_DataHash *pLastOutputHash = NULL;
 	int d = 0;
+	int isMultipleLog = 0;
 	KSI_Signature *sig = NULL;
 	IO_FILES files;
 	VERIFYING_FUNCTION verify_signature = NULL;
-	int count = 0;
-	int log_from_stdin = 0;
+	int i = 0;
 
 	memset(&files, 0, sizeof(files));
 
@@ -100,7 +158,7 @@ int verify_run(int argc, char **argv, char **envp) {
 	 * Extract command line parameters and also add configuration specific parameters.
 	 */
 	res = PARAM_SET_new(
-			CONF_generate_param_set_desc("{input}{input-hash}{output-hash}{log-from-stdin}{x}{d}{pub-str}{ver-int}{ver-cal}{ver-key}{ver-pub}{use-computed-hash-on-fail}{use-stored-hash-on-fail}{conf}{log}{h|help}", "XP", buf, sizeof(buf)),
+			CONF_generate_param_set_desc("{multiple_logs}{input}{input-hash}{output-hash}{log-from-stdin}{x}{d}{pub-str}{ver-int}{ver-cal}{ver-key}{ver-pub}{use-computed-hash-on-fail}{use-stored-hash-on-fail}{conf}{log}{h|help}", "XP", buf, sizeof(buf)),
 			&set);
 	if (res != KT_OK) goto cleanup;
 
@@ -120,29 +178,10 @@ int verify_run(int argc, char **argv, char **envp) {
 	if (res != KT_OK) goto cleanup;
 
 	d = PARAM_SET_isSetByName(set, "d");
+	isMultipleLog = PARAM_SET_isSetByName(set, "multiple_logs");
 
-	log_from_stdin = PARAM_SET_isSetByName(set, "log-from-stdin");
-
-	res = PARAM_SET_getValueCount(set, "input", NULL, PST_PRIORITY_NONE, &count);
+	res = check_pipe_errors(set, err);
 	if (res != KT_OK) goto cleanup;
-
-	if (!log_from_stdin) {
-		res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, 0, &files.user.inLog);
-		if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
-	}
-
-	if (count > (1 - log_from_stdin)) {
-		res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, (1 - log_from_stdin), &files.user.inSig);
-		if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
-	}
-
-	if (PARAM_SET_isSetByName(set, "input-hash")) {
-		COMPOSITE extra;
-		extra.ctx = ksi;
-		extra.err = err;
-		res = PARAM_SET_getObjExtended(set, "input-hash", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &extra, (void**)&inputHash);
-		ERR_CATCH_MSG(err, res, "Unable to extract input hash value!");
-	}
 
 	switch(TASK_getID(task)) {
 		case ANC_BASED_DEFAULT:
@@ -182,16 +221,50 @@ int verify_run(int argc, char **argv, char **envp) {
 		break;
 	}
 
-	res = generate_filenames(err, &files);
-	if (res != KT_OK) goto cleanup;
 
-	res = open_log_and_signature_files(err, &files);
-	if (res != KT_OK) goto cleanup;
 
-	res = logsignature_verify(set, err, ksi, inputHash, verify_signature, &files, &outputHash);
-	if (res != KT_OK) goto cleanup;
+	if (PARAM_SET_isSetByName(set, "input-hash")) {
+		COMPOSITE extra;
+		extra.ctx = ksi;
+		extra.err = err;
+		res = PARAM_SET_getObjExtended(set, "input-hash", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &extra, (void**)&inputHash);
+		ERR_CATCH_MSG(err, res, "Unable to extract input hash value!");
+	}
 
-	res = save_output_hash(set, err, &files, outputHash);
+
+	do {
+		 res = getLogFiles(set, err, i, &files);
+		 if (res == PST_PARAMETER_VALUE_NOT_FOUND) {
+			 res = KT_OK;
+			 break;
+		 }
+		ERR_CATCH_MSG(err, res, "Error: Unable to get file names for log and log signature file.");
+
+		res = generate_filenames(err, &files);
+		if (res != KT_OK) goto cleanup;
+
+		res = open_log_and_signature_files(err, &files);
+		if (res != KT_OK) goto cleanup;
+
+		if (isMultipleLog) {
+			print_debug("%sLog file '%s'.\n", (i == 0 ? "" : "\n"), files.internal.inLog);
+		}
+
+		res = logsignature_verify(set, err, ksi, inputHash, verify_signature, &files, &outputHash);
+		if (res != KT_OK) goto cleanup;
+
+		KSI_DataHash_free(inputHash);
+		inputHash = outputHash;
+		pLastOutputHash = outputHash;
+		outputHash = NULL;
+
+		close_log_and_signature_files(&files);
+		memset(&files, 0, sizeof(files));
+		i++;
+	} while(1);
+
+
+	res = save_output_hash(set, err, &files, pLastOutputHash);
 	if (res != KT_OK) goto cleanup;
 
 cleanup:
@@ -263,6 +336,10 @@ char *verify_help_toString(char *buf, size_t len) {
 		"           - The log or excerpt file is read from stdin.\n"
 		"             If '--log-from-stdin' is used, the log signature or integrity proof file name must\n"
 		"             be specified explicitly.\n"
+		" --        - If used, everything specified after the token is interpreted as\n"
+		"             <logfile>. Note that log signature files can NOT be specified manually\n"
+		"             and must have matching file names to log files. If multiple log files\n"
+		"             are specified, both integrity and inter-linking between them is verified.\n"
 		" --input-hash <hash>\n"
 		"           - Specify hash imprint for inter-linking (the last leaf from the previous\n"
 		"             log signature) verification. Hash can be specified on command line or\n"
@@ -270,12 +347,14 @@ char *verify_help_toString(char *buf, size_t len) {
 		"             <alg>:<hash in hex>. Use '-' as file name to read the imprint from\n"
 		"             stdin. Call logksi -h to get the list of supported hash algorithms.\n"
 		"             See --output-hash to see how to extract the hash imprint from the previous\n"
-		"             log signature.\n"
+		"             log signature. When used together with --, only the first log file is\n"
+		"             verified against specified value.\n"
 		" --output-hash <hash>\n"
 		"           - Output the last leaf from the log signature into file. Use '-' as\n"
 		"             file name to redirect hash imprint to stdout. See --input-hash to\n"
 		"             see how to verify that log signature is bound with this log signature\n"
-		"             (where from the output hash was extracted).\n"
+		"             (where from the output hash was extracted). When used together with\n"
+		"             '--', only the output hash of the last log file is returned.\n"
 		" -x\n"
 		"           - Permit to use extender for publication-based verification.\n"
 		" -X <URL>\n"
@@ -340,12 +419,16 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 
 	PARAM_SET_addControl(set, "{conf}", isFormatOk_inputFile, isContentOk_inputFileRestrictPipe, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{log}{output-hash}", isFormatOk_path, NULL, convertRepair_path, NULL);
-	PARAM_SET_addControl(set, "{input}", isFormatOk_path, NULL, convertRepair_path, NULL);
+	PARAM_SET_addControl(set, "{input}{multiple_logs}", isFormatOk_path, NULL, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{input-hash}", isFormatOk_inputHash, isContentOk_inputHash, convertRepair_path, extract_inputHashFromImprintOrImprintInFile);
 	PARAM_SET_addControl(set, "{log-from-stdin}{d}{x}{ver-int}{ver-cal}{ver-key}{ver-pub}{use-computed-hash-on-fail}{use-stored-hash-on-fail}", isFormatOk_flag, NULL, NULL, NULL);
 	PARAM_SET_addControl(set, "{pub-str}", isFormatOk_pubString, NULL, NULL, extract_pubString);
 
-	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
+	PARAM_SET_setParseOptions(set, "m", PST_PRSCMD_HAS_MULTIPLE_INSTANCES | PST_PRSCMD_BREAK_VALUE_WITH_EXISTING_PARAMETER_MATCH);
+
+	/* Make input also collect same values as multiple_logs. It simplifies task handling. */
+	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_COLLECT_WHEN_PARSING_IS_CLOSED |PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
+	PARAM_SET_setParseOptions(set, "multiple_logs", PST_PRSCMD_CLOSE_PARSING | PST_PRSCMD_COLLECT_WHEN_PARSING_IS_CLOSED | PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
 	PARAM_SET_setParseOptions(set, "d,x", PST_PRSCMD_HAS_NO_VALUE | PST_PRSCMD_NO_TYPOS);
 	PARAM_SET_setParseOptions(set, "log-from-stdin,ver-int,ver-cal,ver-key,ver-pub,use-computed-hash-on-fail,use-stored-hash-on-fail", PST_PRSCMD_HAS_NO_VALUE);
 
@@ -729,5 +812,18 @@ cleanup:
 
 	SMART_FILE_close(out);
 
+	return res;
+}
+
+static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err) {
+	int res;
+
+	res = get_pipe_out_error(set, err, NULL, "log,output-hash", "dump");
+	if (res != KT_OK) goto cleanup;
+
+	res = get_pipe_in_error(set, err, NULL, "input-hash", "log-from-stdin");
+	if (res != KT_OK) goto cleanup;
+
+cleanup:
 	return res;
 }
