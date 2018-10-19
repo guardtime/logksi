@@ -175,8 +175,15 @@ static int smart_file_read_line(void *file, char *buf, size_t len, size_t *row_p
 	 * Windows CR LF 0x0D 0x0A \r \n.
 	 * Mac LF and possibly CR.
 	 */
-	while ((c = fgetc(fp)) != 0 && lineSize < len - 1) {
-		if (c == EOF || (c == 0x0D || c == 0x0A)) {
+	while ((c = fgetc(fp)) != 0) {
+		if (c != EOF && lineSize >= len - 1) {
+			buf[len - 1] = '\0';
+			*count = lineSize;
+			res = SMART_FILE_BUFFER_TOO_SMALL;
+			goto cleanup;
+		}
+
+		if (c == EOF || (c == '\r' || c == '\n')) {
 			if (c == '\r') {
 				fpos_t position;
 				int next_char;
@@ -194,7 +201,7 @@ static int smart_file_read_line(void *file, char *buf, size_t len, size_t *row_p
 
 		if (c != '\r' && c != '\n') {
 			is_line_open = 1;
-			buf[lineSize++] = 0xff & c;
+			buf[lineSize++] = (char)c;
 		} else if (is_line_open) {
 			break;
 		}

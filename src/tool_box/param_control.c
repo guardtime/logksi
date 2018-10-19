@@ -404,12 +404,8 @@ int extract_hashAlg(void *extra, const char* str, void** obj) {
 
 static int imprint_extract_fields(const char *imprint, KSI_HashAlgorithm *ID, int *isColon, char *hash, size_t buf_len) {
 	int res;
-	int i = 0;
-	int n = 0;
-	int reading_alg = 1;
 	const char *colon = NULL;
 	char alg[1024];
-	size_t size_limit = sizeof(alg);
 
 	if (imprint == NULL || hash == NULL || buf_len == 0) {
 		res = KT_INVALID_ARGUMENT;
@@ -419,6 +415,11 @@ static int imprint_extract_fields(const char *imprint, KSI_HashAlgorithm *ID, in
 	colon = strchr(imprint, ':');
 
 	if (colon != NULL) {
+		int i = 0;
+		int n = 0;
+		int reading_alg = 1;
+		size_t size_limit = sizeof(alg);
+
 		while (imprint[i] != '\0') {
 			if (colon == &imprint[i]) {
 				reading_alg = 0;

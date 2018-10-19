@@ -27,7 +27,6 @@
 #include "tool_box/param_control.h"
 #include "tool_box.h"
 #include "logksi_err.h"
-#include "smart_file.h"
 #include "printer.h"
 
 char* CONF_generate_param_set_desc(char *description, const char *flags, char *buf, size_t buf_len) {
