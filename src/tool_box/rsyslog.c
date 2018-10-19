@@ -2757,11 +2757,12 @@ cleanup:
 	return res;
 }
 
-int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, VERIFYING_FUNCTION verify_signature, IO_FILES *files) {
+int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_DataHash *firstLink, VERIFYING_FUNCTION verify_signature, IO_FILES *files, KSI_DataHash ** lastLeaf) {
 	int res;
 	BLOCK_INFO blocks;
 	unsigned char ftlv_raw[SOF_FTLV_BUFFER];
 	SIGNATURE_PROCESSORS processors;
+	int isFirst = 1;
 
 	if (set == NULL || err == NULL || ksi == NULL || verify_signature == NULL || files == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -2784,8 +2785,23 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, VERIFYING_
 				case LOGSIG12:
 					switch (blocks.ftlv.tag) {
 						case 0x901:
+
 							res = process_block_header(set, err, ksi, &blocks, files);
 							if (res != KT_OK) goto cleanup;
+
+							/* Check if the last leaf from the previous block matches with the current first block. */
+							if (isFirst == 1 && firstLink != NULL) {
+								isFirst = 0;
+								if (!KSI_DataHash_equals(firstLink, blocks.prevLeaf)) {
+									char buf_imp[1024];
+									char buf_exp_imp[1024];
+
+									res = KT_VERIFICATION_FAILURE;
+									ERR_TRCKR_ADD(err, res, "Error: The last leaf from the previous block does not match with the current first block. Expecting '%s', but got '%s'.", LOGKSI_DataHash_toString(firstLink, buf_exp_imp, sizeof(buf_exp_imp)), LOGKSI_DataHash_toString(blocks.prevLeaf, buf_imp, sizeof(buf_imp)));
+
+									goto cleanup;
+								}
+							}
 						break;
 
 						case 0x902:
@@ -2859,6 +2875,11 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, VERIFYING_
 				break;
 			}
 		}
+	}
+
+	/* If requested, return last leaf of last block. */
+	if (lastLeaf != NULL) {
+		*lastLeaf = KSI_DataHash_ref(blocks.prevLeaf);
 	}
 
 	res = finalize_log_signature(err, &blocks, files);

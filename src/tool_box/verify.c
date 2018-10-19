@@ -73,6 +73,8 @@ static int signature_verify_calendar_based(PARAM_SET *set, ERR_TRCKR *err, KSI_C
 static int generate_filenames(ERR_TRCKR *err, IO_FILES *files);
 static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files);
 static void close_log_and_signature_files(IO_FILES *files);
+static int save_output_hash(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *ioFiles, KSI_DataHash *hash);
+
 
 int verify_run(int argc, char **argv, char **envp) {
 	int res;
@@ -83,6 +85,8 @@ int verify_run(int argc, char **argv, char **envp) {
 	KSI_CTX *ksi = NULL;
 	ERR_TRCKR *err = NULL;
 	SMART_FILE *logfile = NULL;
+	KSI_DataHash *inputHash = NULL;
+	KSI_DataHash *outputHash = NULL;
 	int d = 0;
 	KSI_Signature *sig = NULL;
 	IO_FILES files;
@@ -96,7 +100,7 @@ int verify_run(int argc, char **argv, char **envp) {
 	 * Extract command line parameters and also add configuration specific parameters.
 	 */
 	res = PARAM_SET_new(
-			CONF_generate_param_set_desc("{input}{log-from-stdin}{x}{d}{pub-str}{ver-int}{ver-cal}{ver-key}{ver-pub}{use-computed-hash-on-fail}{use-stored-hash-on-fail}{conf}{log}{h|help}", "XP", buf, sizeof(buf)),
+			CONF_generate_param_set_desc("{input}{input-hash}{output-hash}{log-from-stdin}{x}{d}{pub-str}{ver-int}{ver-cal}{ver-key}{ver-pub}{use-computed-hash-on-fail}{use-stored-hash-on-fail}{conf}{log}{h|help}", "XP", buf, sizeof(buf)),
 			&set);
 	if (res != KT_OK) goto cleanup;
 
@@ -130,6 +134,14 @@ int verify_run(int argc, char **argv, char **envp) {
 	if (count > (1 - log_from_stdin)) {
 		res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, (1 - log_from_stdin), &files.user.inSig);
 		if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
+	}
+
+	if (PARAM_SET_isSetByName(set, "input-hash")) {
+		COMPOSITE extra;
+		extra.ctx = ksi;
+		extra.err = err;
+		res = PARAM_SET_getObjExtended(set, "input-hash", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &extra, (void**)&inputHash);
+		ERR_CATCH_MSG(err, res, "Unable to extract input hash value!");
 	}
 
 	switch(TASK_getID(task)) {
@@ -176,7 +188,10 @@ int verify_run(int argc, char **argv, char **envp) {
 	res = open_log_and_signature_files(err, &files);
 	if (res != KT_OK) goto cleanup;
 
-	res = logsignature_verify(set, err, ksi, verify_signature, &files);
+	res = logsignature_verify(set, err, ksi, inputHash, verify_signature, &files, &outputHash);
+	if (res != KT_OK) goto cleanup;
+
+	res = save_output_hash(set, err, &files, outputHash);
 	if (res != KT_OK) goto cleanup;
 
 cleanup:
@@ -195,6 +210,8 @@ cleanup:
 		else  ERR_TRCKR_printErrors(err);
 	}
 
+	KSI_DataHash_free(inputHash);
+	KSI_DataHash_free(outputHash);
 	SMART_FILE_close(logfile);
 	PARAM_SET_free(set);
 	TASK_SET_free(task_set);
@@ -244,7 +261,21 @@ char *verify_help_toString(char *buf, size_t len) {
 		"             same folder as the '<logfile>.excerpt'\n"
 		" --log-from-stdin\n"
 		"           - The log or excerpt file is read from stdin.\n"
-		"             If '--log-from-stdin' is used, the log signature or integrity proof file name must be specified explicitly.\n"
+		"             If '--log-from-stdin' is used, the log signature or integrity proof file name must\n"
+		"             be specified explicitly.\n"
+		" --input-hash <hash>\n"
+		"           - Specify hash imprint for inter-linking (the last leaf from the previous\n"
+		"             log signature) verification. Hash can be specified on command line or\n"
+		"             from a file containing its string representation. Hash format:\n"
+		"             <alg>:<hash in hex>. Use '-' as file name to read the imprint from\n"
+		"             stdin. Call logksi -h to get the list of supported hash algorithms.\n"
+		"             See --output-hash to see how to extract the hash imprint from the previous\n"
+		"             log signature.\n"
+		" --output-hash <hash>\n"
+		"           - Output the last leaf from the log signature into file. Use '-' as\n"
+		"             file name to redirect hash imprint to stdout. See --input-hash to\n"
+		"             see how to verify that log signature is bound with this log signature\n"
+		"             (where from the output hash was extracted).\n"
 		" -x\n"
 		"           - Permit to use extender for publication-based verification.\n"
 		" -X <URL>\n"
@@ -308,8 +339,9 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	if (res != KT_OK) goto cleanup;
 
 	PARAM_SET_addControl(set, "{conf}", isFormatOk_inputFile, isContentOk_inputFileRestrictPipe, convertRepair_path, NULL);
-	PARAM_SET_addControl(set, "{log}", isFormatOk_path, NULL, convertRepair_path, NULL);
+	PARAM_SET_addControl(set, "{log}{output-hash}", isFormatOk_path, NULL, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{input}", isFormatOk_path, NULL, convertRepair_path, NULL);
+	PARAM_SET_addControl(set, "{input-hash}", isFormatOk_inputHash, isContentOk_inputHash, convertRepair_path, extract_inputHashFromImprintOrImprintInFile);
 	PARAM_SET_addControl(set, "{log-from-stdin}{d}{x}{ver-int}{ver-cal}{ver-key}{ver-pub}{use-computed-hash-on-fail}{use-stored-hash-on-fail}", isFormatOk_flag, NULL, NULL, NULL);
 	PARAM_SET_addControl(set, "{pub-str}", isFormatOk_pubString, NULL, NULL, extract_pubString);
 
@@ -644,4 +676,58 @@ static void close_log_and_signature_files(IO_FILES *files) {
 		logksi_files_close(&files->files);
 		logksi_internal_filenames_free(&files->internal);
 	}
+}
+
+
+static int save_output_hash(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *ioFiles, KSI_DataHash *hash) {
+	int res;
+	SMART_FILE *out = NULL;
+
+	if (set == NULL || err == NULL || ioFiles == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	if (PARAM_SET_isSetByName(set, "output-hash")) {
+		char *fname = NULL;
+		char buf[0xfff];
+		char imprint[1024];
+		size_t count = 0;
+		size_t write_count = 0;
+
+		if (hash == NULL) {
+			res = KT_INVALID_CMD_PARAM;
+			ERR_TRCKR_ADD(err, res, "Error: --output-hash does not work with excerpt signature file.");
+			goto cleanup;
+		}
+
+		res = PARAM_SET_getStr(set, "output-hash", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &fname);
+		ERR_CATCH_MSG(err, res, "Error: Unable to get file name for output hash.");
+
+		LOGKSI_DataHash_toString(hash, imprint, sizeof(imprint));
+
+		count += KSI_snprintf(buf + count, sizeof(buf) - count, "# Last leaf from previous log signature (%s).\n", ioFiles->internal.inSig);
+		count += KSI_snprintf(buf + count, sizeof(buf) - count, "%s", imprint);
+
+
+		res = SMART_FILE_open(fname, "ws", &out);
+		ERR_CATCH_MSG(err, res, "Error: Unable to open file '%s'.", fname);
+
+		res = SMART_FILE_write(out, buf, count, &write_count);
+		ERR_CATCH_MSG(err, res, "Error: Unable to write to file '%s'.", fname);
+
+		if (write_count != count) {
+			res = KT_IO_ERROR;
+			ERR_TRCKR_ADD(err, res, "Error: Only %zu bytes from %zu written.", write_count, count);
+			goto cleanup;
+		}
+	}
+
+	res = KT_OK;
+
+cleanup:
+
+	SMART_FILE_close(out);
+
+	return res;
 }

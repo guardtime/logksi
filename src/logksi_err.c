@@ -125,6 +125,10 @@ static const char* logksiErrToString(int error_code) {
 			return "No publication record found to extend to.";
 		case KT_RFC3161_EXT_IMPOSSIBLE:
 			return "Unable to extend RFC3161 signature.";
+		case KT_HASH_LENGTH_IS_NOT_EVEN:
+			return "The hash length is not even number.";
+		case KT_INVALID_HEX_CHAR:
+			return "The hex data contains invalid characters.";
 		case KT_UNKNOWN_ERROR:
 			return "Unknown error.";
 		default:

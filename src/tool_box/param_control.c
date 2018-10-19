@@ -402,6 +402,423 @@ int extract_hashAlg(void *extra, const char* str, void** obj) {
 	return PST_OK;
 }
 
+static int imprint_extract_fields(const char *imprint, KSI_HashAlgorithm *ID, int *isColon, char *hash, size_t buf_len) {
+	int res;
+	int i = 0;
+	int n = 0;
+	int reading_alg = 1;
+	const char *colon = NULL;
+	char alg[1024];
+	size_t size_limit = sizeof(alg);
+
+	if (imprint == NULL || hash == NULL || buf_len == 0) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	colon = strchr(imprint, ':');
+
+	if (colon != NULL) {
+		while (imprint[i] != '\0') {
+			if (colon == &imprint[i]) {
+				reading_alg = 0;
+				alg[n] = '\0';
+				size_limit = buf_len;
+				n = 0;
+				i++;
+			}
+
+			if (n < size_limit - 1) {
+				if (reading_alg) {
+					alg[n] = imprint[i];
+				} else {
+					hash[n] = imprint[i];
+				}
+				n++;
+			}
+		i++;
+		}
+
+		hash[n] = '\0';
+	} else {
+		alg[0] = '\0';
+		hash[0] = '\0';
+	}
+
+	if (ID != NULL) {
+		*ID = KSI_getHashAlgorithmByName(alg);
+	}
+
+	if (isColon != NULL) {
+		*isColon = colon == NULL ? 0 : 1;
+	}
+
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
+
+static int hex_string_to_bin(const char *hexin, unsigned char *buf, size_t buf_len, size_t *lenout){
+	int res;
+	size_t len;
+	size_t arraySize;
+	unsigned int i, j;
+	int tmp;
+
+	if (hexin == NULL || buf == NULL || lenout == NULL || buf_len == 0) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	len = strlen(hexin);
+	arraySize = len / 2;
+
+	if (len%2 != 0) {
+		res = KT_HASH_LENGTH_IS_NOT_EVEN;
+		goto cleanup;
+	}
+
+	for (i = 0, j = 0; i < arraySize; i++, j += 2){
+		tmp = xx(hexin[j], hexin[j+1]);
+		if (tmp == -1) {
+			res = KT_INVALID_HEX_CHAR;
+			goto cleanup;
+		}
+
+		if (i < buf_len) {
+			buf[i] = (unsigned char)tmp;
+		} else {
+			res = KT_INDEX_OVF;
+			goto cleanup;
+		}
+	}
+
+	*lenout = arraySize;
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
+
+static int imprint_get_hash_obj(const char *imprint, KSI_CTX *ksi, ERR_TRCKR *err, KSI_DataHash **hash){
+	int res;
+	char hash_hex[1024];
+	unsigned char bin[1024];
+	size_t bin_len = 0;
+	KSI_HashAlgorithm alg_id = KSI_HASHALG_INVALID;
+	KSI_DataHash *tmp = NULL;
+
+	if (imprint == NULL || ksi == NULL || err == NULL || hash == NULL) {
+		ERR_TRCKR_ADD(err, res = KT_INVALID_ARGUMENT, NULL);
+		goto cleanup;
+	}
+
+	res = imprint_extract_fields(imprint, &alg_id, NULL, hash_hex, sizeof(hash_hex));
+	if (res != KT_OK) goto cleanup;
+
+	res = hex_string_to_bin(hash_hex, bin, sizeof(bin), &bin_len);
+	if (res != KT_OK) goto cleanup;
+
+	if (alg_id == KSI_HASHALG_INVALID) {
+		res = KT_UNKNOWN_HASH_ALG;
+		goto cleanup;
+	}
+
+	res = KSI_DataHash_fromDigest(ksi, alg_id, bin, bin_len, &tmp);
+	if (res != KSI_OK) goto cleanup;
+
+	*hash = tmp;
+	tmp = NULL;
+	res = KT_OK;
+
+cleanup:
+
+	KSI_DataHash_free(tmp);
+
+	if (res != KT_OK) {
+		ERR_TRCKR_ADD(err, res, "Error: Unable to get hash from command-line");
+		ERR_TRCKR_ADD(err, res, "Error: %s", LOGKSI_errToString(res));
+	}
+
+	return res;
+}
+
+static int analyze_hexstring_format(const char *hex, double *cor) {
+	int i = 0;
+	int C;
+	size_t count = 0;
+	size_t valid_count = 0;
+	double tmp = 0;
+
+	if (hex == NULL) {
+		return FORMAT_NULLPTR;
+	}
+
+	while ((C = 0xff & hex[i++]) != '\0') {
+		count++;
+		if (isxdigit(C)) {
+			valid_count++;
+		}
+	}
+	if (count > 0) {
+		tmp = (double)valid_count / (double)count;
+	}
+
+	if (cor != NULL) {
+		*cor = tmp;
+	}
+
+	if (valid_count == count && count > 0) {
+		return FORMAT_OK;
+	} else if (count == 0) {
+		return FORMAT_NOCONTENT;
+	} else if (valid_count != count) {
+		return FORMAT_INVALID_HEX_CHAR;
+	} else {
+		return FORMAT_INVALID;
+	}
+
+}
+
+int isFormatOk_imprint(const char *imprint){
+	char *colon;
+
+	if (imprint == NULL) return FORMAT_NULLPTR;
+	if (strlen(imprint) == 0) return FORMAT_NOCONTENT;
+
+	colon = strchr(imprint, ':');
+
+	if (colon == NULL) return FORMAT_IMPRINT_NO_COLON;
+	if (colon != NULL && colon == imprint) return FORMAT_IMPRINT_NO_HASH_ALG;
+	if (*(colon + 1) == '\0') return FORMAT_IMPRINT_NO_HASH;
+
+	return analyze_hexstring_format(colon + 1, NULL);
+}
+
+int isContentOk_imprint(const char *imprint) {
+	int res = PARAM_INVALID;
+	char hash[1024];
+	KSI_HashAlgorithm alg_id = KSI_HASHALG_INVALID;
+	unsigned len = 0;
+	unsigned expected_len = 0;
+
+	if (imprint == NULL) return PARAM_INVALID;
+
+	res = imprint_extract_fields(imprint, &alg_id, NULL, hash, sizeof(hash));
+	if (res != KT_OK) {
+		res = PARAM_INVALID;
+		goto cleanup;
+	}
+
+	if (alg_id == KSI_HASHALG_INVALID) {
+		res = HASH_ALG_INVALID_NAME;
+		goto cleanup;
+	}
+
+	expected_len = KSI_getHashLength(alg_id);
+	len = (unsigned)strlen(hash);
+
+	if (len%2 != 0 && len/2 != expected_len) {
+		res = HASH_IMPRINT_INVALID_LEN;
+		goto cleanup;
+	}
+
+	res = PARAM_OK;
+cleanup:
+
+	return res;
+}
+
+int extract_imprint(void *extra, const char* str, void** obj) {
+	int res;
+	void **extra_array = (void**)extra;
+	COMPOSITE *comp = NULL;
+	KSI_CTX *ctx = NULL;
+	ERR_TRCKR *err = NULL;
+	KSI_DataHash *tmp = NULL;
+
+	comp = (COMPOSITE*)extra_array[1];
+	ctx = comp->ctx;
+	err = comp->err;
+
+
+	res = imprint_get_hash_obj(str, ctx, err, &tmp);
+	if (res != KT_OK) goto cleanup;
+
+	*obj = (void*)tmp;
+	tmp = NULL;
+	res = KT_OK;
+
+cleanup:
+
+	KSI_DataHash_free(tmp);
+
+	return res;
+}
+
+int is_imprint(const char *str) {
+	int res;
+	KSI_HashAlgorithm alg = KSI_HASHALG_INVALID;
+	int isColon = 0;
+	char hex[1024];
+	double correctness = 1;
+	double tmp = 0;
+
+	res = imprint_extract_fields(str, &alg, &isColon, hex, sizeof(hex));
+	if (res != KT_OK) return 0;
+	if (!isColon) correctness = 0;
+	if (alg == KSI_HASHALG_INVALID) correctness = 0;
+
+	analyze_hexstring_format(hex, &tmp);
+	if (tmp < 1.0) correctness = 0;
+
+	if (isContentOk_imprint(str) != PARAM_OK) correctness = 0;
+
+	if (correctness > 0.5) return 1;
+	else return 0;
+}
+
+int isFormatOk_inputHash(const char *str) {
+	if (str == NULL) return FORMAT_NULLPTR;
+	if (strlen(str) == 0) return FORMAT_NOCONTENT;
+
+	if (is_imprint(str)) {
+		return isFormatOk_imprint(str);
+	} else {
+		return isFormatOk_inputFile(str);
+	}
+}
+
+int isContentOk_inputHash(const char *str) {
+	if (str == NULL) return FORMAT_NULLPTR;
+	if (strlen(str) == 0) return FORMAT_NOCONTENT;
+
+	if (is_imprint(str)) {
+		return isContentOk_imprint(str);
+	} else {
+		return isContentOk_inputFileWithPipe(str);
+	}
+}
+
+static int file_get_hash_from_imprint_stored_in_file(ERR_TRCKR *err, KSI_CTX *ctx, const char *open_mode, const char *fname_in, KSI_DataHash **hash) {
+	int res;
+	SMART_FILE *in = NULL;
+	char buf[0xffff];
+	char imprint[1024];
+	int imprint_is_extracted = 0;
+	size_t read_count = 0;
+	KSI_DataHash *tmp = NULL;
+	size_t row = 0;
+
+
+	if (err == NULL || ctx == NULL || open_mode == NULL || fname_in == NULL || hash == NULL) {
+		ERR_TRCKR_ADD(err, res = KT_INVALID_ARGUMENT, NULL);
+		goto cleanup;
+	}
+
+
+	/**
+	 * Open the file, read extract hash from imprint.
+	 */
+	res = SMART_FILE_open(fname_in, open_mode, &in);
+	if (res != KT_OK) {
+		ERR_TRCKR_ADD(err, res, "Error: Unable to open file for reading. '%s'", LOGKSI_errToString(res));
+		goto cleanup;
+	}
+
+	while(!SMART_FILE_isEof(in)) {
+		char *trim = NULL;
+		buf[0] = '\0';
+		res = SMART_FILE_readLine(in, buf, sizeof(buf) - 1, &row, &read_count);
+		ERR_CATCH_MSG(err, res, "Error: Unable get line.");
+
+		/* Remove leading whitespace. */
+		trim = buf;
+		while (isspace(*trim) && *trim != '\0') {
+			trim++;
+		}
+
+		if (read_count == 0) break;
+		else if (buf[0] == '#') continue;
+		else if (imprint_is_extracted == 0) {
+			int i = 0;
+			imprint_is_extracted = 1;
+
+			/* Remove trailing whitespace. */
+			for (i = read_count - 1; i >= 0; i--) {
+				if (isspace(buf[i])) buf[i] = '\0';
+				else break;
+			}
+
+			KSI_strncpy(imprint, trim, sizeof(imprint));
+		} else {
+			res = KT_INVALID_INPUT_FORMAT;
+			ERR_TRCKR_ADD(err, res, "Error: Unexpected line %zu while parsing input hash. '%s'", row, buf);
+			goto cleanup;
+		}
+	}
+
+	if (imprint_is_extracted) {
+		res = imprint_get_hash_obj(imprint, ctx, err, &tmp);
+		ERR_CATCH_MSG(err, res, "Error: Unable to extract imprint.");
+	}
+
+	*hash = tmp;
+	tmp = NULL;
+
+	res = KT_OK;
+
+cleanup:
+
+	SMART_FILE_close(in);
+	KSI_DataHash_free(tmp);
+
+	return res;
+}
+
+
+static int extract_input_hash(void *extra, const char* str, void** obj, int no_imprint, int no_stream) {
+	int res;
+	void **extra_array = (void**)extra;
+	COMPOSITE *comp = (COMPOSITE*)(extra_array[1]);
+	KSI_CTX *ctx = comp->ctx;
+	ERR_TRCKR *err = comp->err;
+
+	KSI_DataHash *tmp = NULL;
+
+	if (obj == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+
+	if (!no_imprint && is_imprint(str)) {
+		res = extract_imprint(extra, str, (void**)&tmp);
+		if (res != KT_OK) goto cleanup;
+	} else {
+		res = file_get_hash_from_imprint_stored_in_file(err, ctx, no_stream ? "rb" : "rbs", str, &tmp);
+		if (res != KT_OK) goto cleanup;
+	}
+
+
+	*obj = (void*)tmp;
+	tmp = NULL;
+	res = KT_OK;
+
+cleanup:
+
+	KSI_DataHash_free(tmp);
+
+	return res;
+}
+
+int extract_inputHashFromImprintOrImprintInFile(void *extra, const char* str, void** obj) {
+	return extract_input_hash(extra, str, obj, 0, 0);
+}
+
 int isFormatOk_pubString(const char *str) {
 	int C;
 	int i = 0;

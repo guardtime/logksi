@@ -1,3 +1,5 @@
+* FEATURE: New parameter --input-hash to specify inter-linking hash as input for verification.
+* FEATURE: New parameter --output-hash to output the last leaf hash for inter-linking.
 * BUGFIX: Verifying: help function fixed, help text now available.
 
 Version 1.3
