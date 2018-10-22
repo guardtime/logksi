@@ -74,64 +74,10 @@ static int signature_verify_calendar_based(PARAM_SET *set, ERR_TRCKR *err, KSI_C
 static int generate_filenames(ERR_TRCKR *err, IO_FILES *files);
 static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files);
 static void close_log_and_signature_files(IO_FILES *files);
-static int save_output_hash(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *ioFiles, KSI_DataHash *hash);
+static int save_output_hash(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *ioFiles, KSI_DataHash *hash, char * logFileName, char * sigFileName);
+static int getLogFiles(PARAM_SET *set, ERR_TRCKR *err, int i, IO_FILES *files);
+static int getLogFileCount(PARAM_SET *set, ERR_TRCKR *err, int *logCount);
 
-static int getLogFiles(PARAM_SET *set, ERR_TRCKR *err, int i, IO_FILES *files) {
-	int res = KT_UNKNOWN_ERROR;
-	int log_from_stdin = 0;
-
-
-	if (set == NULL || err == NULL || i < 0) {
-		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
-
-
-	log_from_stdin = PARAM_SET_isSetByName(set, "log-from-stdin") ? 1 : 0;
-
-	if (PARAM_SET_isSetByName(set, "multiple_logs")) {
-		if (log_from_stdin) {
-			ERR_TRCKR_ADD(err, res = KT_INVALID_CMD_PARAM, "Error: When specifying multiple log files, option --log-from-stdin can not be used.");
-			goto cleanup;
-		}
-		res = PARAM_SET_getStr(set, "multiple_logs", NULL, PST_PRIORITY_NONE, i, &files->user.inLog);
-		if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
-
-		files->user.inSig = NULL;
-	} else if (PARAM_SET_isSetByName(set, "input")) {
-		int count = 0;
-
-		if (i > 0) {
-			res = PST_PARAMETER_VALUE_NOT_FOUND;
-			goto cleanup;
-		}
-
-		res = PARAM_SET_getValueCount(set, "input", NULL, PST_PRIORITY_NONE, &count);
-		if (res != KT_OK) goto cleanup;
-
-		if (!log_from_stdin) {
-			res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, 0, &files->user.inLog);
-			if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
-		}
-
-		if (count > (1 - log_from_stdin)) {
-			res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, (1 - log_from_stdin), &files->user.inSig);
-			if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
-		}
-
-	} else {
-		res = PST_PARAMETER_EMPTY;
-		goto cleanup;
-	}
-
-
-
-	res = KT_OK;
-
-cleanup:
-
-	return res;
-}
 
 int verify_run(int argc, char **argv, char **envp) {
 	int res;
@@ -151,6 +97,9 @@ int verify_run(int argc, char **argv, char **envp) {
 	IO_FILES files;
 	VERIFYING_FUNCTION verify_signature = NULL;
 	int i = 0;
+	char *logFileNamecpy = NULL;
+	char *sigFileNamecpy = NULL;
+	int logCount = 0;
 
 	memset(&files, 0, sizeof(files));
 
@@ -231,20 +180,28 @@ int verify_run(int argc, char **argv, char **envp) {
 		ERR_CATCH_MSG(err, res, "Unable to extract input hash value!");
 	}
 
+	res = getLogFileCount(set, err, &logCount);
+	ERR_CATCH_MSG(err, res, "Error: Unable to get log file count.");
 
 	do {
-		 res = getLogFiles(set, err, i, &files);
+		res = getLogFiles(set, err, i, &files);
 		 if (res == PST_PARAMETER_VALUE_NOT_FOUND) {
-			 res = KT_OK;
-			 break;
-		 }
+			res = KT_OK;
+			break;
+		}
 		ERR_CATCH_MSG(err, res, "Error: Unable to get file names for log and log signature file.");
+
 
 		res = generate_filenames(err, &files);
 		if (res != KT_OK) goto cleanup;
 
 		res = open_log_and_signature_files(err, &files);
 		if (res != KT_OK) goto cleanup;
+
+		if (i + 1 == logCount) {
+			duplicate_name(files.internal.inLog, &logFileNamecpy);
+			duplicate_name(files.internal.inSig, &sigFileNamecpy);
+		}
 
 		if (isMultipleLog) {
 			print_debug("%sLog file '%s'.\n", (i == 0 ? "" : "\n"), files.internal.inLog);
@@ -264,7 +221,7 @@ int verify_run(int argc, char **argv, char **envp) {
 	} while(1);
 
 
-	res = save_output_hash(set, err, &files, pLastOutputHash);
+	res = save_output_hash(set, err, &files, pLastOutputHash, logFileNamecpy, sigFileNamecpy);
 	if (res != KT_OK) goto cleanup;
 
 cleanup:
@@ -288,6 +245,8 @@ cleanup:
 	SMART_FILE_close(logfile);
 	PARAM_SET_free(set);
 	TASK_SET_free(task_set);
+	free(logFileNamecpy);
+	free(sigFileNamecpy);
 	KSI_Signature_free(sig);
 	ERR_TRCKR_free(err);
 	KSI_CTX_free(ksi);
@@ -762,7 +721,7 @@ static void close_log_and_signature_files(IO_FILES *files) {
 }
 
 
-static int save_output_hash(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *ioFiles, KSI_DataHash *hash) {
+static int save_output_hash(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *ioFiles, KSI_DataHash *hash, char * logFileName, char * sigFileName) {
 	int res;
 	SMART_FILE *out = NULL;
 
@@ -789,7 +748,8 @@ static int save_output_hash(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *ioFiles, K
 
 		LOGKSI_DataHash_toString(hash, imprint, sizeof(imprint));
 
-		count += KSI_snprintf(buf + count, sizeof(buf) - count, "# Last leaf from previous log signature (%s).\n", ioFiles->internal.inSig);
+		count += KSI_snprintf(buf + count, sizeof(buf) - count, "# Log file (%s).\n", (logFileName != NULL ? logFileName : "stdin"));
+		count += KSI_snprintf(buf + count, sizeof(buf) - count, "# Last leaf from previous log signature (%s).\n", sigFileName);
 		count += KSI_snprintf(buf + count, sizeof(buf) - count, "%s", imprint);
 
 
@@ -825,5 +785,91 @@ static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err) {
 	if (res != KT_OK) goto cleanup;
 
 cleanup:
+	return res;
+}
+
+static int getLogFileCount(PARAM_SET *set, ERR_TRCKR *err, int *logCount) {
+	int res = KT_UNKNOWN_ERROR;
+	int count = 0;
+
+	if (set == NULL || err == NULL || logCount == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	if (PARAM_SET_isSetByName(set, "multiple_logs")) {
+		res = PARAM_SET_getValueCount(set, "multiple_logs", NULL, PST_PRIORITY_NONE, &count);
+		ERR_CATCH_MSG(err, res, "Error: Unable to get input count.");
+	} else {
+		if (PARAM_SET_isSetByName(set, "log-from-stdin")) {
+			count = 1;
+		} else {
+			res = PARAM_SET_getValueCount(set, "input", NULL, PST_PRIORITY_NONE, &count);
+			ERR_CATCH_MSG(err, res, "Error: Unable to get input count.");
+		}
+	}
+
+	*logCount = count;
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
+
+static int getLogFiles(PARAM_SET *set, ERR_TRCKR *err, int i, IO_FILES *files) {
+	int res = KT_UNKNOWN_ERROR;
+	int log_from_stdin = 0;
+
+
+	if (set == NULL || err == NULL || i < 0) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+
+	log_from_stdin = PARAM_SET_isSetByName(set, "log-from-stdin") ? 1 : 0;
+
+	if (PARAM_SET_isSetByName(set, "multiple_logs")) {
+		if (log_from_stdin) {
+			ERR_TRCKR_ADD(err, res = KT_INVALID_CMD_PARAM, "Error: When specifying multiple log files, option --log-from-stdin can not be used.");
+			goto cleanup;
+		}
+		res = PARAM_SET_getStr(set, "multiple_logs", NULL, PST_PRIORITY_NONE, i, &files->user.inLog);
+		if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
+
+		files->user.inSig = NULL;
+	} else if (PARAM_SET_isSetByName(set, "input")) {
+		int count = 0;
+
+		if (i > 0) {
+			res = PST_PARAMETER_VALUE_NOT_FOUND;
+			goto cleanup;
+		}
+
+		res = PARAM_SET_getValueCount(set, "input", NULL, PST_PRIORITY_NONE, &count);
+		if (res != KT_OK) goto cleanup;
+
+		if (!log_from_stdin) {
+			res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, 0, &files->user.inLog);
+			if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
+		}
+
+		if (count > (1 - log_from_stdin)) {
+			res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, (1 - log_from_stdin), &files->user.inSig);
+			if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
+		}
+
+	} else {
+		res = PST_PARAMETER_EMPTY;
+		goto cleanup;
+	}
+
+
+
+	res = KT_OK;
+
+cleanup:
+
 	return res;
 }
