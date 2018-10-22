@@ -2791,14 +2791,14 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_DataHa
 
 							/* Check if the last leaf from the previous block matches with the current first block. */
 							if (isFirst == 1 && firstLink != NULL) {
-								print_progressDesc(0, "Verifying inter-linking input hash... ");
+								print_progressDesc(0, "Block no. %3zu: verifying inter-linking input hash... ", blocks.blockNo);
 								isFirst = 0;
 								if (!KSI_DataHash_equals(firstLink, blocks.prevLeaf)) {
 									char buf_imp[1024];
 									char buf_exp_imp[1024];
 
 									res = KT_VERIFICATION_FAILURE;
-									ERR_TRCKR_ADD(err, res, "Error: The last leaf from the previous block does not match with the current first block. Expecting '%s', but got '%s'.", LOGKSI_DataHash_toString(firstLink, buf_exp_imp, sizeof(buf_exp_imp)), LOGKSI_DataHash_toString(blocks.prevLeaf, buf_imp, sizeof(buf_imp)));
+									ERR_TRCKR_ADD(err, res, "Error: Block no. %zu: The last leaf from the previous block does not match with the current first block. Expecting '%s', but got '%s'.", blocks.blockNo, LOGKSI_DataHash_toString(firstLink, buf_exp_imp, sizeof(buf_exp_imp)), LOGKSI_DataHash_toString(blocks.prevLeaf, buf_imp, sizeof(buf_imp)));
 
 									goto cleanup;
 								}
