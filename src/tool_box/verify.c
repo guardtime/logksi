@@ -97,8 +97,8 @@ int verify_run(int argc, char **argv, char **envp) {
 	IO_FILES files;
 	VERIFYING_FUNCTION verify_signature = NULL;
 	int i = 0;
-	char *logFileNamecpy = NULL;
-	char *sigFileNamecpy = NULL;
+	char *logFileNameCpy = NULL;
+	char *sigFileNameCpy = NULL;
 	int logCount = 0;
 
 	memset(&files, 0, sizeof(files));
@@ -199,8 +199,8 @@ int verify_run(int argc, char **argv, char **envp) {
 		if (res != KT_OK) goto cleanup;
 
 		if (i + 1 == logCount) {
-			duplicate_name(files.internal.inLog, &logFileNamecpy);
-			duplicate_name(files.internal.inSig, &sigFileNamecpy);
+			duplicate_name(files.internal.inLog, &logFileNameCpy);
+			duplicate_name(files.internal.inSig, &sigFileNameCpy);
 		}
 
 		if (isMultipleLog) {
@@ -221,7 +221,7 @@ int verify_run(int argc, char **argv, char **envp) {
 	} while(1);
 
 
-	res = save_output_hash(set, err, &files, pLastOutputHash, logFileNamecpy, sigFileNamecpy);
+	res = save_output_hash(set, err, &files, pLastOutputHash, logFileNameCpy, sigFileNameCpy);
 	if (res != KT_OK) goto cleanup;
 
 cleanup:
@@ -245,8 +245,8 @@ cleanup:
 	SMART_FILE_close(logfile);
 	PARAM_SET_free(set);
 	TASK_SET_free(task_set);
-	free(logFileNamecpy);
-	free(sigFileNamecpy);
+	free(logFileNameCpy);
+	free(sigFileNameCpy);
 	KSI_Signature_free(sig);
 	ERR_TRCKR_free(err);
 	KSI_CTX_free(ksi);
