@@ -1996,17 +1996,21 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 
 		/* When sigTime is 0 it is the first signature and there is nothing to check. */
 		if (*sigTime > 0) {
+			print_progressDesc(0, "Block no. %3zu: checking signing time with previous block... ", blocks->blockNo);
 			if (KSI_Integer_compare(t0, t1) == 1) {
 				PST_snprintf(strT0, sizeof(strT0), "(%zu) %s+00:00", KSI_Integer_getUInt64(t0), KSI_Integer_toDateString(t0, buf, sizeof(buf)));
 				PST_snprintf(strT1, sizeof(strT0), "(%zu) %s+00:00", KSI_Integer_getUInt64(t1), KSI_Integer_toDateString(t1, buf, sizeof(buf)));
 
-				res = KT_VERIFICATION_FAILURE;
-				ERR_CATCH_MSG(err, res, "Error: Block no. %zu %s is more recent than block no. %zu %s!", blocks->blockNo - 1, strT0, blocks->blockNo, strT1);
+				blocks->errSignTime = 1;
+				PST_snprintf(blocks->errorBuf, sizeof(blocks->errorBuf), "Error: Block no. %zu %s is more recent than block no. %zu %s!\n", blocks->blockNo - 1, strT0, blocks->blockNo, strT1);
+
+				print_progressResult(1);
 			}
 		}
 
 		/* Replace the old last time with new last time via output parameter. */
 		*sigTime = KSI_Integer_getUInt64(t1);
+		print_progressResult(0);
 	}
 
 
@@ -2021,6 +2025,11 @@ cleanup:
 			blocks->warningTreeHashes = 1;
 		} else if (blocks->finalTreeHashesAll) {
 			print_debug("Block no. %3zu: all final tree hashes are present.\n", blocks->blockNo);
+		}
+
+		if (blocks->errSignTime && blocks->errorBuf[0] != '\0') {
+			print_errors(blocks->errorBuf);
+			blocks->errorBuf[0] = '\0';
 		}
 	}
 	KSI_Signature_free(sig);
@@ -2916,6 +2925,12 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_DataHa
 				break;
 			}
 		}
+	}
+
+	if (blocks.errSignTime) {
+		res = KT_VERIFICATION_FAILURE;
+		ERR_TRCKR_ADD(err, res, "Error: Log block has signing time more recent than consecutive block!");
+		goto cleanup;
 	}
 
 	/* If requested, return last leaf of last block. */
