@@ -17,7 +17,7 @@ cp test/resource/logfiles/signed test/out/signed4
 }
 
 @test "verify unsigned.logsig" {
-	run ./src/logksi verify test/out/unsigned -d
+	run ./src/logksi verify test/out/unsigned -d --ignore-desc-block-time
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 }

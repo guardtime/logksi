@@ -32,6 +32,7 @@
 #include "debug_print.h"
 #include <ksi/tlv_element.h>
 #include "rsyslog.h"
+#include "param_set/strn.h"
 #include <fcntl.h>
 #include <errno.h>
 #include <sys/types.h>
@@ -1747,7 +1748,7 @@ cleanup:
 	return res;
 }
 
-static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PROCESSORS *processors, BLOCK_INFO *blocks, IO_FILES *files) {
+static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PROCESSORS *processors, BLOCK_INFO *blocks, IO_FILES *files, uint64_t *sigTime) {
 	int res;
 	KSI_Signature *sig = NULL;
 	KSI_Signature *ext = NULL;
@@ -1759,6 +1760,7 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 	KSI_TlvElement *tlvRfc3161 = NULL;
 	KSI_TlvElement *recChain = NULL;
 	KSI_TlvElement *hashStep = NULL;
+	KSI_Integer *t0 = NULL;
 	size_t j;
 
 	KSI_VerificationContext_init(&context, ksi);
@@ -1978,6 +1980,36 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 			}
 		}
 	}
+
+	/* Check if previous signature is older than the current one. If not, rise the error. */
+	if (sigTime != NULL) {
+		char buf[256];
+		char strT0[256];
+		char strT1[256];
+
+		KSI_Integer *t1 = NULL;
+		res = KSI_Integer_new(ksi, *sigTime, &t0);
+		ERR_CATCH_MSG(err, res, NULL);
+
+		res = KSI_Signature_getSigningTime(sig, &t1);
+		ERR_CATCH_MSG(err, res, NULL);
+
+		/* When sigTime is 0 it is the first signature and there is nothing to check. */
+		if (*sigTime > 0) {
+			if (KSI_Integer_compare(t0, t1) == 1) {
+				PST_snprintf(strT0, sizeof(strT0), "(%zu) %s+00:00", KSI_Integer_getUInt64(t0), KSI_Integer_toDateString(t0, buf, sizeof(buf)));
+				PST_snprintf(strT1, sizeof(strT0), "(%zu) %s+00:00", KSI_Integer_getUInt64(t1), KSI_Integer_toDateString(t1, buf, sizeof(buf)));
+
+				res = KT_VERIFICATION_FAILURE;
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu %s is more recent than block no. %zu %s!", blocks->blockNo - 1, strT0, blocks->blockNo, strT1);
+			}
+		}
+
+		/* Replace the old last time with new last time via output parameter. */
+		*sigTime = KSI_Integer_getUInt64(t1);
+	}
+
+
 	res = KT_OK;
 
 cleanup:
@@ -2002,6 +2034,7 @@ cleanup:
 	KSI_TlvElement_free(tlv);
 	KSI_TlvElement_free(hashStep);
 	KSI_TlvElement_free(recChain);
+	KSI_Integer_free(t0);
 	return res;
 }
 
@@ -2722,7 +2755,7 @@ int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_
 
 				case 0x904:
 				{
-					res = process_block_signature(set, err, ksi, &processors, &blocks, files);
+					res = process_block_signature(set, err, ksi, &processors, &blocks, files, NULL);
 					if (res != KT_OK) goto cleanup;
 				}
 				break;
@@ -2757,7 +2790,7 @@ cleanup:
 	return res;
 }
 
-int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_DataHash *firstLink, VERIFYING_FUNCTION verify_signature, IO_FILES *files, KSI_DataHash **lastLeaf) {
+int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_DataHash *firstLink, VERIFYING_FUNCTION verify_signature, IO_FILES *files, uint64_t *sigTime, KSI_DataHash **lastLeaf) {
 	int res;
 	BLOCK_INFO blocks;
 	unsigned char ftlv_raw[SOF_FTLV_BUFFER];
@@ -2823,7 +2856,7 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_DataHa
 
 						case 0x904:
 						{
-							res = process_block_signature(set, err, ksi, &processors, &blocks, files);
+							res = process_block_signature(set, err, ksi, &processors, &blocks, files, sigTime);
 							if (res != KT_OK) goto cleanup;
 						}
 						break;
@@ -2978,7 +3011,7 @@ int logsignature_extract(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES 
 
 				case 0x904:
 				{
-					res = process_block_signature(set, err, ksi, &processors, &blocks, files);
+					res = process_block_signature(set, err, ksi, &processors, &blocks, files, NULL);
 					if (res != KT_OK) goto cleanup;
 				}
 				break;

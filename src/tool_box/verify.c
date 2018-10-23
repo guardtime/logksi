@@ -100,6 +100,8 @@ int verify_run(int argc, char **argv, char **envp) {
 	char *logFileNameCpy = NULL;
 	char *sigFileNameCpy = NULL;
 	int logCount = 0;
+	int checkSigkTime = 0;
+	uint64_t sigTime = 0;	/* First sigTime MUST be 0 as this indicates the first round where signature time can not be checked as there is not any later signatures available. */
 
 	memset(&files, 0, sizeof(files));
 
@@ -107,7 +109,7 @@ int verify_run(int argc, char **argv, char **envp) {
 	 * Extract command line parameters and also add configuration specific parameters.
 	 */
 	res = PARAM_SET_new(
-			CONF_generate_param_set_desc("{multiple_logs}{input}{input-hash}{output-hash}{log-from-stdin}{x}{d}{pub-str}{ver-int}{ver-cal}{ver-key}{ver-pub}{use-computed-hash-on-fail}{use-stored-hash-on-fail}{conf}{log}{h|help}", "XP", buf, sizeof(buf)),
+			CONF_generate_param_set_desc("{ignore-desc-block-time}{multiple_logs}{input}{input-hash}{output-hash}{log-from-stdin}{x}{d}{pub-str}{ver-int}{ver-cal}{ver-key}{ver-pub}{use-computed-hash-on-fail}{use-stored-hash-on-fail}{conf}{log}{h|help}", "XP", buf, sizeof(buf)),
 			&set);
 	if (res != KT_OK) goto cleanup;
 
@@ -128,6 +130,8 @@ int verify_run(int argc, char **argv, char **envp) {
 
 	d = PARAM_SET_isSetByName(set, "d");
 	isMultipleLog = PARAM_SET_isSetByName(set, "multiple_logs");
+
+	checkSigkTime = !PARAM_SET_isSetByName(set, "ignore-desc-block-time");
 
 	res = check_pipe_errors(set, err);
 	if (res != KT_OK) goto cleanup;
@@ -207,7 +211,7 @@ int verify_run(int argc, char **argv, char **envp) {
 			print_debug("%sLog file '%s'.\n", (i == 0 ? "" : "\n"), files.internal.inLog);
 		}
 
-		res = logsignature_verify(set, err, ksi, inputHash, verify_signature, &files, &outputHash);
+		res = logsignature_verify(set, err, ksi, inputHash, verify_signature, &files, (checkSigkTime ? &sigTime : NULL), &outputHash);
 		if (res != KT_OK) goto cleanup;
 
 		KSI_DataHash_free(inputHash);
@@ -314,6 +318,9 @@ char *verify_help_toString(char *buf, size_t len) {
 		"             see how to verify that log signature is bound with this log signature\n"
 		"             (where from the output hash was extracted). When used together with\n"
 		"             '--', only the output hash of the last log file is returned.\n"
+		"--ignore-desc-block-time\n"
+		"             Skip signing time verification where more recent log blocks must have\n"
+		"             more recent signing time.\n"
 		" -x\n"
 		"           - Permit to use extender for publication-based verification.\n"
 		" -X <URL>\n"
@@ -389,7 +396,7 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_COLLECT_WHEN_PARSING_IS_CLOSED |PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
 	PARAM_SET_setParseOptions(set, "multiple_logs", PST_PRSCMD_CLOSE_PARSING | PST_PRSCMD_COLLECT_WHEN_PARSING_IS_CLOSED | PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
 	PARAM_SET_setParseOptions(set, "d,x", PST_PRSCMD_HAS_NO_VALUE | PST_PRSCMD_NO_TYPOS);
-	PARAM_SET_setParseOptions(set, "log-from-stdin,ver-int,ver-cal,ver-key,ver-pub,use-computed-hash-on-fail,use-stored-hash-on-fail", PST_PRSCMD_HAS_NO_VALUE);
+	PARAM_SET_setParseOptions(set, "ignore-desc-block-time,log-from-stdin,ver-int,ver-cal,ver-key,ver-pub,use-computed-hash-on-fail,use-stored-hash-on-fail", PST_PRSCMD_HAS_NO_VALUE);
 
 	/*						ID						DESC								MAN							ATL		FORBIDDEN											IGN	*/
 	TASK_SET_add(task_set,	ANC_BASED_DEFAULT,		"Verify, from file.",				"input",						NULL,	"log-from-stdin,ver-int,ver-cal,ver-key,ver-pub,P,cnstr,pub-str",	NULL);

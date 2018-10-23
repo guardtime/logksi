@@ -5,26 +5,26 @@ export KSI_CONF=test/test.cfg
 echo SHA-512:dd4e870e7e0c998f160688b97c7bdeef3d6d01b1c5f02db117018058ad51996777ae3dc8008d70b3e11c172b0049e8158571cea1b8a439593b67c41ebbe2b137 > test/out/input-hash.txt
 
 @test "verify unsigned.logsig with input hash from command line." {
-	run ./src/logksi verify test/out/unsigned -d --input-hash SHA-512:dd4e870e7e0c998f160688b97c7bdeef3d6d01b1c5f02db117018058ad51996777ae3dc8008d70b3e11c172b0049e8158571cea1b8a439593b67c41ebbe2b137
+	run ./src/logksi verify test/out/unsigned -d --input-hash SHA-512:dd4e870e7e0c998f160688b97c7bdeef3d6d01b1c5f02db117018058ad51996777ae3dc8008d70b3e11c172b0049e8158571cea1b8a439593b67c41ebbe2b137 --ignore-desc-block-time
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ (Block no).*(1).*(verifying inter-linking input hash... ok).*(Finalizing log signature... ok) ]]
 }
 
 @test "verify unsigned.logsig with input hash from file." {
-	run ./src/logksi verify test/out/unsigned -d --input-hash test/out/input-hash.txt
+	run ./src/logksi verify test/out/unsigned -d --input-hash test/out/input-hash.txt --ignore-desc-block-time
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ (Block no).*(1).*(verifying inter-linking input hash... ok).*(Finalizing log signature... ok) ]]
 }
 
 @test "verify unsigned.logsig output last leaf hash to file." {
-	run ./src/logksi verify test/out/unsigned -d --output-hash test/out/output-hash.txt
+	run ./src/logksi verify test/out/unsigned -d --output-hash test/out/output-hash.txt --ignore-desc-block-time
 	[ "$status" -eq 0 ]
 	run cat test/out/output-hash.txt
 	[[ "$output" =~ (Log file).*(test\/out\/unsigned).*(Last leaf from previous log signature).*(test\/out\/unsigned.logsig).*(SHA-512:7f5a178f581de2aed0d36739f908733643b316aac8bed0c9f89c040ad1d1e601ae8fd1ae1e177c2cdf9ebf59a2f43df00614893723d5019b6326b225bbcd7827) ]]
 }
 
 @test "verify unsigned.logsig output last leaf hash to stdout." {
-	run ./src/logksi verify test/out/unsigned -d --output-hash -
+	run ./src/logksi verify test/out/unsigned -d --output-hash - --ignore-desc-block-time
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ (Log file).*(test\/out\/unsigned).*(Last leaf from previous log signature).*(test\/out\/unsigned.logsig).*(SHA-512:7f5a178f581de2aed0d36739f908733643b316aac8bed0c9f89c040ad1d1e601ae8fd1ae1e177c2cdf9ebf59a2f43df00614893723d5019b6326b225bbcd7827) ]]
 }
@@ -59,7 +59,7 @@ echo SHA-512:dd4e870e7e0c998f160688b97c7bdeef3d6d01b1c5f02db117018058ad51996777a
 }
 
 @test "verify inter-linking of two NOT matching log signatures by passing previous leaf hash imprint value via stdout." {
-	run bash -c "./src/logksi verify test/out/unsigned -d --output-hash - | ./src/logksi verify test/resource/interlink/ok-testlog-interlink-2 -d --input-hash -"
+	run bash -c "./src/logksi verify test/out/unsigned -d --ignore-desc-block-time --output-hash - | ./src/logksi verify test/resource/interlink/ok-testlog-interlink-2 -d --input-hash -"
 	[ "$status" -eq 6 ]
 	[[ "$output" =~ (Block no).*(1).*(verifying inter-linking input hash... failed) ]]
 	[[ "$output" =~ .*(Error).*(Block no).*(1).*(The last leaf from the previous block does not match with the current first block).* ]]
