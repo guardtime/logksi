@@ -2709,6 +2709,12 @@ cleanup:
 	return res;
 }
 
+static void BLOCK_INFO_reset(BLOCK_INFO *block) {
+	if (block != NULL) {
+		memset(block, 0, sizeof(BLOCK_INFO));
+	}
+}
+
 int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_FUNCTION extend_signature, IO_FILES *files) {
 	int res;
 	BLOCK_INFO blocks;
@@ -2720,7 +2726,7 @@ int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_
 		goto cleanup;
 	}
 
-	memset(&blocks, 0, sizeof(blocks));
+	BLOCK_INFO_reset(&blocks);
 	blocks.ftlv_raw = ftlv_raw;
 	memset(&processors, 0, sizeof(processors));
 	processors.extend_signature = extend_signature;
@@ -2802,7 +2808,7 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_DataHa
 		goto cleanup;
 	}
 
-	memset(&blocks, 0, sizeof(blocks));
+	BLOCK_INFO_reset(&blocks);
 	blocks.ftlv_raw = ftlv_raw;
 	memset(&processors, 0, sizeof(processors));
 	processors.verify_signature = verify_signature;
@@ -2967,7 +2973,7 @@ int logsignature_extract(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES 
 		goto cleanup;
 	}
 
-	memset(&blocks, 0, sizeof(blocks));
+	BLOCK_INFO_reset(&blocks);
 	blocks.ftlv_raw = ftlv_raw;
 	memset(&processors, 0, sizeof(processors));
 	processors.extract_signature = 1;
@@ -3057,7 +3063,7 @@ int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILE
 		goto cleanup;
 	}
 
-	memset(&blocks, 0, sizeof(blocks));
+	BLOCK_INFO_reset(&blocks);
 	blocks.ftlv_raw = ftlv_raw;
 	memset(&processors, 0, sizeof(processors));
 
@@ -3155,7 +3161,7 @@ int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *fi
 		goto cleanup;
 	}
 
-	memset(&blocks, 0, sizeof(blocks));
+	BLOCK_INFO_reset(&blocks);
 	blocks.ftlv_raw = ftlv_raw;
 	memset(&processors, 0, sizeof(processors));
 	processors.create_signature = LOGKSI_createSignature;
