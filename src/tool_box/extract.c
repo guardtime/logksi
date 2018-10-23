@@ -61,7 +61,7 @@ int extract_run(int argc, char **argv, char **envp) {
 	IO_FILES files;
 	int count = 0;
 
-	memset(&files, 0, sizeof(files));
+	IO_FILES_init(&files);
 
 	/**
 	 * Extract command line parameters and also add configuration specific parameters.

@@ -103,7 +103,7 @@ int verify_run(int argc, char **argv, char **envp) {
 	int checkSigkTime = 0;
 	uint64_t sigTime = 0;	/* First sigTime MUST be 0 as this indicates the first round where signature time can not be checked as there is not any later signatures available. */
 
-	memset(&files, 0, sizeof(files));
+	IO_FILES_init(&files);
 
 	/**
 	 * Extract command line parameters and also add configuration specific parameters.
@@ -220,7 +220,7 @@ int verify_run(int argc, char **argv, char **envp) {
 		outputHash = NULL;
 
 		close_log_and_signature_files(&files);
-		memset(&files, 0, sizeof(files));
+		IO_FILES_init(&files);
 		i++;
 	} while(1);
 

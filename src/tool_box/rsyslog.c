@@ -2977,6 +2977,10 @@ cleanup:
 	return res;
 }
 
+void IO_FILES_init(IO_FILES *files) {
+	memset(files, 0, sizeof(IO_FILES));
+}
+
 int logsignature_extract(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files) {
 	int res;
 	BLOCK_INFO blocks;

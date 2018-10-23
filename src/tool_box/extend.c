@@ -66,7 +66,7 @@ int extend_run(int argc, char** argv, char **envp) {
 	IO_FILES files;
 	EXTENDING_FUNCTION extend_signature = NULL;
 
-	memset(&files, 0, sizeof(files));
+	IO_FILES_init(&files);
 
 	/**
 	 * Extract command line parameters.

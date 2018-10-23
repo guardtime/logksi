@@ -177,3 +177,5 @@ void logksi_file_close(FILE **ptr);
 void logksi_files_close(INTERNAL_FILE_HANDLES *files);
 int logksi_file_remove(char *name);
 int logksi_file_rename(char *from, char *to);
+
+void IO_FILES_init(IO_FILES *files);
