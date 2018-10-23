@@ -2001,8 +2001,21 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 				PST_snprintf(strT0, sizeof(strT0), "(%zu) %s+00:00", KSI_Integer_getUInt64(t0), KSI_Integer_toDateString(t0, buf, sizeof(buf)));
 				PST_snprintf(strT1, sizeof(strT0), "(%zu) %s+00:00", KSI_Integer_getUInt64(t1), KSI_Integer_toDateString(t1, buf, sizeof(buf)));
 
+				int logStdin = files->internal.inLog == NULL;
+				char *currentLogFile = logStdin ? "stdin" : files->internal.inLog;
+				char *previousLogFile = files->previousLogFile;
+
+
 				blocks->errSignTime = 1;
-				PST_snprintf(blocks->errorBuf, sizeof(blocks->errorBuf), "Error: Block no. %zu %s is more recent than block no. %zu %s!\n", blocks->blockNo - 1, strT0, blocks->blockNo, strT1);
+
+				if (blocks->blockNo == 1) {
+					PST_snprintf(blocks->errorBuf, sizeof(blocks->errorBuf), "Error: Last  block %s from file '%s' is more recent than\n"
+						                                                     "       first block %s from file '%s'\n", strT0, previousLogFile, strT1, currentLogFile);
+				} else {
+					PST_snprintf(blocks->errorBuf, sizeof(blocks->errorBuf), "Error: Block no. %3zu %s in %s '%s' is more recent than\n"
+						                                                     "       block no. %3zu %s\n", blocks->blockNo - 1, strT0, (logStdin ? "log from" : "file"), currentLogFile, blocks->blockNo, strT1);
+				}
+
 
 				print_progressResult(1);
 			}
