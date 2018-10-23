@@ -82,6 +82,9 @@ typedef struct {
 	INTERNAL_FILE_NAMES internal;
 	/* Files opened by logksi. */
 	INTERNAL_FILE_HANDLES files;
+
+	char previousLogFile[4096];
+	char previousSigFile[4096];
 } IO_FILES;
 
 #define MAX_TREE_HEIGHT 31
@@ -179,3 +182,4 @@ int logksi_file_remove(char *name);
 int logksi_file_rename(char *from, char *to);
 
 void IO_FILES_init(IO_FILES *files);
+void IO_FILES_StorePreviousFileNames(IO_FILES *files);

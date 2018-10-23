@@ -2978,8 +2978,33 @@ cleanup:
 }
 
 void IO_FILES_init(IO_FILES *files) {
-	memset(files, 0, sizeof(IO_FILES));
+	if (files != NULL) {
+		memset(&files->user, 0, sizeof(USER_FILE_NAMES));
+		memset(&files->internal, 0, sizeof(INTERNAL_FILE_NAMES));
+		memset(&files->files, 0, sizeof(INTERNAL_FILE_HANDLES));
+
+		files->previousLogFile[0] = '\0';
+		files->previousSigFile[0] = '\0';
+	}
 }
+
+void IO_FILES_StorePreviousFileNames(IO_FILES *files) {
+	if (files == NULL) return;
+
+	/* Make copy of previous file names. */
+	if (files->internal.inLog == NULL) {
+		PST_strncpy(files->previousLogFile, "stdin", sizeof(files->previousLogFile));
+	} else {
+		PST_strncpy(files->previousLogFile, files->internal.inLog, sizeof(files->previousLogFile));
+	}
+
+	if (files->internal.inSig == NULL) {
+		PST_strncpy(files->previousSigFile, "stdin", sizeof(files->previousSigFile));
+	} else {
+		PST_strncpy(files->previousSigFile, files->internal.inSig, sizeof(files->previousSigFile));
+	}
+}
+
 
 int logsignature_extract(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files) {
 	int res;

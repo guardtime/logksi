@@ -99,7 +99,6 @@ int verify_run(int argc, char **argv, char **envp) {
 	int i = 0;
 	char *logFileNameCpy = NULL;
 	char *sigFileNameCpy = NULL;
-	int logCount = 0;
 	int checkSigkTime = 0;
 	uint64_t sigTime = 0;	/* First sigTime MUST be 0 as this indicates the first round where signature time can not be checked as there is not any later signatures available. */
 
@@ -184,9 +183,6 @@ int verify_run(int argc, char **argv, char **envp) {
 		ERR_CATCH_MSG(err, res, "Unable to extract input hash value!");
 	}
 
-	res = getLogFileCount(set, err, &logCount);
-	ERR_CATCH_MSG(err, res, "Error: Unable to get log file count.");
-
 	do {
 		res = getLogFiles(set, err, i, &files);
 		 if (res == PST_PARAMETER_VALUE_NOT_FOUND) {
@@ -202,11 +198,6 @@ int verify_run(int argc, char **argv, char **envp) {
 		res = open_log_and_signature_files(err, &files);
 		if (res != KT_OK) goto cleanup;
 
-		if (i + 1 == logCount) {
-			duplicate_name(files.internal.inLog, &logFileNameCpy);
-			duplicate_name(files.internal.inSig, &sigFileNameCpy);
-		}
-
 		if (isMultipleLog) {
 			print_debug("%sLog file '%s'.\n", (i == 0 ? "" : "\n"), files.internal.inLog);
 		}
@@ -219,8 +210,8 @@ int verify_run(int argc, char **argv, char **envp) {
 		pLastOutputHash = outputHash;
 		outputHash = NULL;
 
+		IO_FILES_StorePreviousFileNames(&files);
 		close_log_and_signature_files(&files);
-		IO_FILES_init(&files);
 		i++;
 	} while(1);
 
@@ -755,8 +746,8 @@ static int save_output_hash(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *ioFiles, K
 
 		LOGKSI_DataHash_toString(hash, imprint, sizeof(imprint));
 
-		count += KSI_snprintf(buf + count, sizeof(buf) - count, "# Log file (%s).\n", (logFileName != NULL ? logFileName : "stdin"));
-		count += KSI_snprintf(buf + count, sizeof(buf) - count, "# Last leaf from previous log signature (%s).\n", sigFileName);
+		count += KSI_snprintf(buf + count, sizeof(buf) - count, "# Log file (%s).\n", ioFiles->previousLogFile);
+		count += KSI_snprintf(buf + count, sizeof(buf) - count, "# Last leaf from previous log signature (%s).\n", ioFiles->previousSigFile);
 		count += KSI_snprintf(buf + count, sizeof(buf) - count, "%s", imprint);
 
 
