@@ -82,6 +82,9 @@ typedef struct {
 	INTERNAL_FILE_NAMES internal;
 	/* Files opened by logksi. */
 	INTERNAL_FILE_HANDLES files;
+
+	char previousLogFile[4096];
+	char previousSigFile[4096];
 } IO_FILES;
 
 #define MAX_TREE_HEIGHT 31
@@ -153,11 +156,13 @@ typedef struct {
 	char warningTreeHashes;
 	char unsignedRootHash;
 	char warningSignatures;
+	char errSignTime;
 	size_t nofHashFails;
+	char errorBuf[2048];
 } BLOCK_INFO;
 
 int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_FUNCTION extend_signature, IO_FILES *files);
-int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_DataHash *firstLink, VERIFYING_FUNCTION verify_signature, IO_FILES *files, KSI_DataHash ** lastLeaf);
+int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_DataHash *firstLink, VERIFYING_FUNCTION verify_signature, IO_FILES *files, uint64_t *sigTime, KSI_DataHash ** lastLeaf);
 int logsignature_extract(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files);
 int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files);
 int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files);
@@ -175,3 +180,6 @@ void logksi_file_close(FILE **ptr);
 void logksi_files_close(INTERNAL_FILE_HANDLES *files);
 int logksi_file_remove(char *name);
 int logksi_file_rename(char *from, char *to);
+
+void IO_FILES_init(IO_FILES *files);
+void IO_FILES_StorePreviousFileNames(IO_FILES *files);

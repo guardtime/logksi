@@ -76,7 +76,6 @@ static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files);
 static void close_log_and_signature_files(IO_FILES *files);
 static int save_output_hash(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *ioFiles, KSI_DataHash *hash, char * logFileName, char * sigFileName);
 static int getLogFiles(PARAM_SET *set, ERR_TRCKR *err, int i, IO_FILES *files);
-static int getLogFileCount(PARAM_SET *set, ERR_TRCKR *err, int *logCount);
 
 
 int verify_run(int argc, char **argv, char **envp) {
@@ -99,15 +98,16 @@ int verify_run(int argc, char **argv, char **envp) {
 	int i = 0;
 	char *logFileNameCpy = NULL;
 	char *sigFileNameCpy = NULL;
-	int logCount = 0;
+	int checkSigkTime = 0;
+	uint64_t sigTime = 0;	/* First sigTime MUST be 0 as this indicates the first round where signature time can not be checked as there is not any later signatures available. */
 
-	memset(&files, 0, sizeof(files));
+	IO_FILES_init(&files);
 
 	/**
 	 * Extract command line parameters and also add configuration specific parameters.
 	 */
 	res = PARAM_SET_new(
-			CONF_generate_param_set_desc("{multiple_logs}{input}{input-hash}{output-hash}{log-from-stdin}{x}{d}{pub-str}{ver-int}{ver-cal}{ver-key}{ver-pub}{use-computed-hash-on-fail}{use-stored-hash-on-fail}{conf}{log}{h|help}", "XP", buf, sizeof(buf)),
+			CONF_generate_param_set_desc("{ignore-desc-block-time}{multiple_logs}{input}{input-hash}{output-hash}{log-from-stdin}{x}{d}{pub-str}{ver-int}{ver-cal}{ver-key}{ver-pub}{use-computed-hash-on-fail}{use-stored-hash-on-fail}{conf}{log}{h|help}", "XP", buf, sizeof(buf)),
 			&set);
 	if (res != KT_OK) goto cleanup;
 
@@ -128,6 +128,8 @@ int verify_run(int argc, char **argv, char **envp) {
 
 	d = PARAM_SET_isSetByName(set, "d");
 	isMultipleLog = PARAM_SET_isSetByName(set, "multiple_logs");
+
+	checkSigkTime = !PARAM_SET_isSetByName(set, "ignore-desc-block-time");
 
 	res = check_pipe_errors(set, err);
 	if (res != KT_OK) goto cleanup;
@@ -180,9 +182,6 @@ int verify_run(int argc, char **argv, char **envp) {
 		ERR_CATCH_MSG(err, res, "Unable to extract input hash value!");
 	}
 
-	res = getLogFileCount(set, err, &logCount);
-	ERR_CATCH_MSG(err, res, "Error: Unable to get log file count.");
-
 	do {
 		res = getLogFiles(set, err, i, &files);
 		 if (res == PST_PARAMETER_VALUE_NOT_FOUND) {
@@ -198,16 +197,11 @@ int verify_run(int argc, char **argv, char **envp) {
 		res = open_log_and_signature_files(err, &files);
 		if (res != KT_OK) goto cleanup;
 
-		if (i + 1 == logCount) {
-			duplicate_name(files.internal.inLog, &logFileNameCpy);
-			duplicate_name(files.internal.inSig, &sigFileNameCpy);
-		}
-
 		if (isMultipleLog) {
 			print_debug("%sLog file '%s'.\n", (i == 0 ? "" : "\n"), files.internal.inLog);
 		}
 
-		res = logsignature_verify(set, err, ksi, inputHash, verify_signature, &files, &outputHash);
+		res = logsignature_verify(set, err, ksi, inputHash, verify_signature, &files, (checkSigkTime ? &sigTime : NULL), &outputHash);
 		if (res != KT_OK) goto cleanup;
 
 		KSI_DataHash_free(inputHash);
@@ -215,8 +209,8 @@ int verify_run(int argc, char **argv, char **envp) {
 		pLastOutputHash = outputHash;
 		outputHash = NULL;
 
+		IO_FILES_StorePreviousFileNames(&files);
 		close_log_and_signature_files(&files);
-		memset(&files, 0, sizeof(files));
 		i++;
 	} while(1);
 
@@ -314,6 +308,9 @@ char *verify_help_toString(char *buf, size_t len) {
 		"             see how to verify that log signature is bound with this log signature\n"
 		"             (where from the output hash was extracted). When used together with\n"
 		"             '--', only the output hash of the last log file is returned.\n"
+		"--ignore-desc-block-time\n"
+		"             Skip signing time verification where more recent log blocks must have\n"
+		"             more recent (or equal) signing time than previous blocks.\n"
 		" -x\n"
 		"           - Permit to use extender for publication-based verification.\n"
 		" -X <URL>\n"
@@ -389,7 +386,7 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_COLLECT_WHEN_PARSING_IS_CLOSED |PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
 	PARAM_SET_setParseOptions(set, "multiple_logs", PST_PRSCMD_CLOSE_PARSING | PST_PRSCMD_COLLECT_WHEN_PARSING_IS_CLOSED | PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
 	PARAM_SET_setParseOptions(set, "d,x", PST_PRSCMD_HAS_NO_VALUE | PST_PRSCMD_NO_TYPOS);
-	PARAM_SET_setParseOptions(set, "log-from-stdin,ver-int,ver-cal,ver-key,ver-pub,use-computed-hash-on-fail,use-stored-hash-on-fail", PST_PRSCMD_HAS_NO_VALUE);
+	PARAM_SET_setParseOptions(set, "ignore-desc-block-time,log-from-stdin,ver-int,ver-cal,ver-key,ver-pub,use-computed-hash-on-fail,use-stored-hash-on-fail", PST_PRSCMD_HAS_NO_VALUE);
 
 	/*						ID						DESC								MAN							ATL		FORBIDDEN											IGN	*/
 	TASK_SET_add(task_set,	ANC_BASED_DEFAULT,		"Verify, from file.",				"input",						NULL,	"log-from-stdin,ver-int,ver-cal,ver-key,ver-pub,P,cnstr,pub-str",	NULL);
@@ -748,8 +745,8 @@ static int save_output_hash(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *ioFiles, K
 
 		LOGKSI_DataHash_toString(hash, imprint, sizeof(imprint));
 
-		count += KSI_snprintf(buf + count, sizeof(buf) - count, "# Log file (%s).\n", (logFileName != NULL ? logFileName : "stdin"));
-		count += KSI_snprintf(buf + count, sizeof(buf) - count, "# Last leaf from previous log signature (%s).\n", sigFileName);
+		count += KSI_snprintf(buf + count, sizeof(buf) - count, "# Log file (%s).\n", ioFiles->previousLogFile);
+		count += KSI_snprintf(buf + count, sizeof(buf) - count, "# Last leaf from previous log signature (%s).\n", ioFiles->previousSigFile);
 		count += KSI_snprintf(buf + count, sizeof(buf) - count, "%s", imprint);
 
 
@@ -785,35 +782,6 @@ static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err) {
 	if (res != KT_OK) goto cleanup;
 
 cleanup:
-	return res;
-}
-
-static int getLogFileCount(PARAM_SET *set, ERR_TRCKR *err, int *logCount) {
-	int res = KT_UNKNOWN_ERROR;
-	int count = 0;
-
-	if (set == NULL || err == NULL || logCount == NULL) {
-		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
-
-	if (PARAM_SET_isSetByName(set, "multiple_logs")) {
-		res = PARAM_SET_getValueCount(set, "multiple_logs", NULL, PST_PRIORITY_NONE, &count);
-		ERR_CATCH_MSG(err, res, "Error: Unable to get input count.");
-	} else {
-		if (PARAM_SET_isSetByName(set, "log-from-stdin")) {
-			count = 1;
-		} else {
-			res = PARAM_SET_getValueCount(set, "input", NULL, PST_PRIORITY_NONE, &count);
-			ERR_CATCH_MSG(err, res, "Error: Unable to get input count.");
-		}
-	}
-
-	*logCount = count;
-	res = KT_OK;
-
-cleanup:
-
 	return res;
 }
 

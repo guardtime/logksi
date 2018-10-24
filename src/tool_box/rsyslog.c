@@ -32,6 +32,7 @@
 #include "debug_print.h"
 #include <ksi/tlv_element.h>
 #include "rsyslog.h"
+#include "param_set/strn.h"
 #include <fcntl.h>
 #include <errno.h>
 #include <sys/types.h>
@@ -1747,7 +1748,7 @@ cleanup:
 	return res;
 }
 
-static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PROCESSORS *processors, BLOCK_INFO *blocks, IO_FILES *files) {
+static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PROCESSORS *processors, BLOCK_INFO *blocks, IO_FILES *files, uint64_t *sigTime) {
 	int res;
 	KSI_Signature *sig = NULL;
 	KSI_Signature *ext = NULL;
@@ -1759,6 +1760,7 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 	KSI_TlvElement *tlvRfc3161 = NULL;
 	KSI_TlvElement *recChain = NULL;
 	KSI_TlvElement *hashStep = NULL;
+	KSI_Integer *t0 = NULL;
 	size_t j;
 
 	KSI_VerificationContext_init(&context, ksi);
@@ -1978,6 +1980,55 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 			}
 		}
 	}
+
+	/* Check if previous signature is older than the current one. If not, rise the error. */
+	if (sigTime != NULL) {
+		char buf[256];
+		char strT0[256];
+		char strT1[256];
+
+		KSI_Integer *t1 = NULL;
+
+		res = KSI_Signature_getSigningTime(sig, &t1);
+		ERR_CATCH_MSG(err, res, NULL);
+
+		/* When sigTime is 0 it is the first signature and there is nothing to check. */
+		if (*sigTime > 0) {
+			print_progressDesc(0, "Block no. %3zu: checking signing time with previous block... ", blocks->blockNo);
+
+			if (*sigTime > KSI_Integer_getUInt64(t1)) {
+				res = KSI_Integer_new(ksi, *sigTime, &t0);
+				ERR_CATCH_MSG(err, res, NULL);
+
+				PST_snprintf(strT0, sizeof(strT0), "(%zu) %s+00:00", KSI_Integer_getUInt64(t0), KSI_Integer_toDateString(t0, buf, sizeof(buf)));
+				PST_snprintf(strT1, sizeof(strT1), "(%zu) %s+00:00", KSI_Integer_getUInt64(t1), KSI_Integer_toDateString(t1, buf, sizeof(buf)));
+
+				int logStdin = files->internal.inLog == NULL;
+				char *currentLogFile = logStdin ? "stdin" : files->internal.inLog;
+				char *previousLogFile = files->previousLogFile;
+
+
+				blocks->errSignTime = 1;
+
+				if (blocks->blockNo == 1) {
+					PST_snprintf(blocks->errorBuf, sizeof(blocks->errorBuf), "Error: Last  block %s from file '%s' is more recent than\n"
+						                                                     "       first block %s from file '%s'\n", strT0, previousLogFile, strT1, currentLogFile);
+				} else {
+					PST_snprintf(blocks->errorBuf, sizeof(blocks->errorBuf), "Error: Block no. %3zu %s in %s '%s' is more recent than\n"
+						                                                     "       block no. %3zu %s\n", blocks->blockNo - 1, strT0, (logStdin ? "log from" : "file"), currentLogFile, blocks->blockNo, strT1);
+				}
+
+
+				print_progressResult(1);
+			}
+		}
+
+		/* Replace the old last time with new last time via output parameter. */
+		*sigTime = KSI_Integer_getUInt64(t1);
+		print_progressResult(0);
+	}
+
+
 	res = KT_OK;
 
 cleanup:
@@ -1989,6 +2040,11 @@ cleanup:
 			blocks->warningTreeHashes = 1;
 		} else if (blocks->finalTreeHashesAll) {
 			print_debug("Block no. %3zu: all final tree hashes are present.\n", blocks->blockNo);
+		}
+
+		if (blocks->errSignTime && blocks->errorBuf[0] != '\0') {
+			print_errors(blocks->errorBuf);
+			blocks->errorBuf[0] = '\0';
 		}
 	}
 	KSI_Signature_free(sig);
@@ -2002,6 +2058,7 @@ cleanup:
 	KSI_TlvElement_free(tlv);
 	KSI_TlvElement_free(hashStep);
 	KSI_TlvElement_free(recChain);
+	KSI_Integer_free(t0);
 	return res;
 }
 
@@ -2676,6 +2733,12 @@ cleanup:
 	return res;
 }
 
+static void BLOCK_INFO_reset(BLOCK_INFO *block) {
+	if (block != NULL) {
+		memset(block, 0, sizeof(BLOCK_INFO));
+	}
+}
+
 int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_FUNCTION extend_signature, IO_FILES *files) {
 	int res;
 	BLOCK_INFO blocks;
@@ -2687,7 +2750,7 @@ int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_
 		goto cleanup;
 	}
 
-	memset(&blocks, 0, sizeof(blocks));
+	BLOCK_INFO_reset(&blocks);
 	blocks.ftlv_raw = ftlv_raw;
 	memset(&processors, 0, sizeof(processors));
 	processors.extend_signature = extend_signature;
@@ -2722,7 +2785,7 @@ int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_
 
 				case 0x904:
 				{
-					res = process_block_signature(set, err, ksi, &processors, &blocks, files);
+					res = process_block_signature(set, err, ksi, &processors, &blocks, files, NULL);
 					if (res != KT_OK) goto cleanup;
 				}
 				break;
@@ -2757,7 +2820,7 @@ cleanup:
 	return res;
 }
 
-int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_DataHash *firstLink, VERIFYING_FUNCTION verify_signature, IO_FILES *files, KSI_DataHash **lastLeaf) {
+int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_DataHash *firstLink, VERIFYING_FUNCTION verify_signature, IO_FILES *files, uint64_t *sigTime, KSI_DataHash **lastLeaf) {
 	int res;
 	BLOCK_INFO blocks;
 	unsigned char ftlv_raw[SOF_FTLV_BUFFER];
@@ -2769,7 +2832,7 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_DataHa
 		goto cleanup;
 	}
 
-	memset(&blocks, 0, sizeof(blocks));
+	BLOCK_INFO_reset(&blocks);
 	blocks.ftlv_raw = ftlv_raw;
 	memset(&processors, 0, sizeof(processors));
 	processors.verify_signature = verify_signature;
@@ -2823,7 +2886,7 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_DataHa
 
 						case 0x904:
 						{
-							res = process_block_signature(set, err, ksi, &processors, &blocks, files);
+							res = process_block_signature(set, err, ksi, &processors, &blocks, files, sigTime);
 							if (res != KT_OK) goto cleanup;
 						}
 						break;
@@ -2879,6 +2942,12 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_DataHa
 		}
 	}
 
+	if (blocks.errSignTime) {
+		res = KT_VERIFICATION_FAILURE;
+		ERR_TRCKR_ADD(err, res, "Error: Log block has signing time more recent than consecutive block!");
+		goto cleanup;
+	}
+
 	/* If requested, return last leaf of last block. */
 	if (lastLeaf != NULL) {
 		*lastLeaf = KSI_DataHash_ref(blocks.prevLeaf);
@@ -2923,6 +2992,35 @@ cleanup:
 	return res;
 }
 
+void IO_FILES_init(IO_FILES *files) {
+	if (files != NULL) {
+		memset(&files->user, 0, sizeof(USER_FILE_NAMES));
+		memset(&files->internal, 0, sizeof(INTERNAL_FILE_NAMES));
+		memset(&files->files, 0, sizeof(INTERNAL_FILE_HANDLES));
+
+		files->previousLogFile[0] = '\0';
+		files->previousSigFile[0] = '\0';
+	}
+}
+
+void IO_FILES_StorePreviousFileNames(IO_FILES *files) {
+	if (files == NULL) return;
+
+	/* Make copy of previous file names. */
+	if (files->internal.inLog == NULL) {
+		PST_strncpy(files->previousLogFile, "stdin", sizeof(files->previousLogFile));
+	} else {
+		PST_strncpy(files->previousLogFile, files->internal.inLog, sizeof(files->previousLogFile));
+	}
+
+	if (files->internal.inSig == NULL) {
+		PST_strncpy(files->previousSigFile, "stdin", sizeof(files->previousSigFile));
+	} else {
+		PST_strncpy(files->previousSigFile, files->internal.inSig, sizeof(files->previousSigFile));
+	}
+}
+
+
 int logsignature_extract(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files) {
 	int res;
 	BLOCK_INFO blocks;
@@ -2934,7 +3032,7 @@ int logsignature_extract(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES 
 		goto cleanup;
 	}
 
-	memset(&blocks, 0, sizeof(blocks));
+	BLOCK_INFO_reset(&blocks);
 	blocks.ftlv_raw = ftlv_raw;
 	memset(&processors, 0, sizeof(processors));
 	processors.extract_signature = 1;
@@ -2978,7 +3076,7 @@ int logsignature_extract(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES 
 
 				case 0x904:
 				{
-					res = process_block_signature(set, err, ksi, &processors, &blocks, files);
+					res = process_block_signature(set, err, ksi, &processors, &blocks, files, NULL);
 					if (res != KT_OK) goto cleanup;
 				}
 				break;
@@ -3024,7 +3122,7 @@ int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILE
 		goto cleanup;
 	}
 
-	memset(&blocks, 0, sizeof(blocks));
+	BLOCK_INFO_reset(&blocks);
 	blocks.ftlv_raw = ftlv_raw;
 	memset(&processors, 0, sizeof(processors));
 
@@ -3122,7 +3220,7 @@ int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *fi
 		goto cleanup;
 	}
 
-	memset(&blocks, 0, sizeof(blocks));
+	BLOCK_INFO_reset(&blocks);
 	blocks.ftlv_raw = ftlv_raw;
 	memset(&processors, 0, sizeof(processors));
 	processors.create_signature = LOGKSI_createSignature;

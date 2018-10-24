@@ -64,7 +64,7 @@ int sign_run(int argc, char** argv, char **envp) {
 	int d = 0;
 	IO_FILES files;
 
-	memset(&files, 0, sizeof(files));
+	IO_FILES_init(&files);
 
 	/**
 	 * Extract command line parameters.
