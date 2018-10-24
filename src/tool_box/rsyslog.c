@@ -1988,8 +1988,6 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 		char strT1[256];
 
 		KSI_Integer *t1 = NULL;
-		res = KSI_Integer_new(ksi, *sigTime, &t0);
-		ERR_CATCH_MSG(err, res, NULL);
 
 		res = KSI_Signature_getSigningTime(sig, &t1);
 		ERR_CATCH_MSG(err, res, NULL);
@@ -1997,9 +1995,13 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 		/* When sigTime is 0 it is the first signature and there is nothing to check. */
 		if (*sigTime > 0) {
 			print_progressDesc(0, "Block no. %3zu: checking signing time with previous block... ", blocks->blockNo);
-			if (KSI_Integer_compare(t0, t1) == 1) {
+
+			if (*sigTime > KSI_Integer_getUInt64(t1)) {
+				res = KSI_Integer_new(ksi, *sigTime, &t0);
+				ERR_CATCH_MSG(err, res, NULL);
+
 				PST_snprintf(strT0, sizeof(strT0), "(%zu) %s+00:00", KSI_Integer_getUInt64(t0), KSI_Integer_toDateString(t0, buf, sizeof(buf)));
-				PST_snprintf(strT1, sizeof(strT0), "(%zu) %s+00:00", KSI_Integer_getUInt64(t1), KSI_Integer_toDateString(t1, buf, sizeof(buf)));
+				PST_snprintf(strT1, sizeof(strT1), "(%zu) %s+00:00", KSI_Integer_getUInt64(t1), KSI_Integer_toDateString(t1, buf, sizeof(buf)));
 
 				int logStdin = files->internal.inLog == NULL;
 				char *currentLogFile = logStdin ? "stdin" : files->internal.inLog;

@@ -76,7 +76,6 @@ static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files);
 static void close_log_and_signature_files(IO_FILES *files);
 static int save_output_hash(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *ioFiles, KSI_DataHash *hash, char * logFileName, char * sigFileName);
 static int getLogFiles(PARAM_SET *set, ERR_TRCKR *err, int i, IO_FILES *files);
-static int getLogFileCount(PARAM_SET *set, ERR_TRCKR *err, int *logCount);
 
 
 int verify_run(int argc, char **argv, char **envp) {
@@ -783,35 +782,6 @@ static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err) {
 	if (res != KT_OK) goto cleanup;
 
 cleanup:
-	return res;
-}
-
-static int getLogFileCount(PARAM_SET *set, ERR_TRCKR *err, int *logCount) {
-	int res = KT_UNKNOWN_ERROR;
-	int count = 0;
-
-	if (set == NULL || err == NULL || logCount == NULL) {
-		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
-
-	if (PARAM_SET_isSetByName(set, "multiple_logs")) {
-		res = PARAM_SET_getValueCount(set, "multiple_logs", NULL, PST_PRIORITY_NONE, &count);
-		ERR_CATCH_MSG(err, res, "Error: Unable to get input count.");
-	} else {
-		if (PARAM_SET_isSetByName(set, "log-from-stdin")) {
-			count = 1;
-		} else {
-			res = PARAM_SET_getValueCount(set, "input", NULL, PST_PRIORITY_NONE, &count);
-			ERR_CATCH_MSG(err, res, "Error: Unable to get input count.");
-		}
-	}
-
-	*logCount = count;
-	res = KT_OK;
-
-cleanup:
-
 	return res;
 }
 
