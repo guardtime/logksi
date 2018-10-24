@@ -311,7 +311,7 @@ char *verify_help_toString(char *buf, size_t len) {
 		"             '--', only the output hash of the last log file is returned.\n"
 		"--ignore-desc-block-time\n"
 		"             Skip signing time verification where more recent log blocks must have\n"
-		"             more recent signing time.\n"
+		"             more recent (or equal) signing time than previous blocks.\n"
 		" -x\n"
 		"           - Permit to use extender for publication-based verification.\n"
 		" -X <URL>\n"

@@ -96,3 +96,9 @@ echo SHA-512:dd4e870e7e0c998f160688b97c7bdeef3d6d01b1c5f02db117018058ad51996777a
 	[[ "$output" =~ (Log file.*ok-testlog-interlink-2).*(Finalizing log signature... ok).*(Log file.*ok-testlog-interlink-1).*(Block no).*(1).*(verifying inter-linking input hash... failed) ]]
 	[[ "$output" =~ .*(Error).*(Block no).*(1).*(The last leaf from the previous block does not match with the current first block).*(Expecting).*(SHA-256:601697d09896bf2c537a913c77c213630e9bd9b034b328a5c93e0d2b2e35dc7d).*(but got).*(SHA-256:a558295ae8da8cf4e2b13a34289d2a17676821f14e0792ac1098d27d9bea5fc9) ]]
 }
+
+@test "verify inter-linking where first log is resigned." {
+	run src/logksi verify -d -- test/resource/interlink/ok-testlog-interlink-resigned-1 test/resource/interlink/ok-testlog-interlink-2
+	[ "$status" -eq 6 ]
+	[[ "$output" =~ .*(Error).*(Last  block).*(1540301997).*(from file).*(ok-testlog-interlink-resigned-1).*(is more recent than).*(first block).*(1539771503).*(from file).*(ok-testlog-interlink-2) ]]
+}
