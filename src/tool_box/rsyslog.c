@@ -2043,7 +2043,7 @@ cleanup:
 		}
 
 		if (blocks->errSignTime && blocks->errorBuf[0] != '\0') {
-			print_errors(blocks->errorBuf);
+			print_errors("%s", blocks->errorBuf);
 			blocks->errorBuf[0] = '\0';
 		}
 	}
