@@ -2061,7 +2061,7 @@ cleanup:
 			blocks->errorBuf[0] = '\0';
 		}
 
-		/* As this type of warning is explictly enabled it must be see without -d flag and it is printed with error printer. */
+		/* As this type of warning is explictly enabled it must be seen without -d flag and it is printed with error printer. */
 		if (blocks->warningSignatureSameTime) {
 			print_errors("%s", blocks->warnBuf);
 			blocks->warningSignatureSameTime = 0;
