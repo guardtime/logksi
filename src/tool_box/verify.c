@@ -230,8 +230,7 @@ cleanup:
 		LOGKSI_KSI_ERRTrace_LOG(ksi);
 
 		print_errors("\n");
-		if (d) ERR_TRCKR_printExtendedErrors(err);
-		else  ERR_TRCKR_printErrors(err);
+		ERR_TRCKR_print(err, d);
 	}
 
 	KSI_DataHash_free(inputHash);
