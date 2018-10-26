@@ -46,6 +46,12 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 }
 
+@test "warn about consecutive blocks that has same signing time. " {
+	run src/logksi verify test/resource/logfiles/unsigned test/resource/logsignatures/unsigned-same-sign-time.logsig --ignore-desc-block-time --warn-same-block-time
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ .*(Warning).*(Block).*(1).*(and).*(2).*(in file).*(unsigned).*(has same signing time).*(1540389597).* ]]
+}
+
 @test "CDM test: use invalid stdin combination" {
 	run src/logksi verify --log-from-stdin --input-hash - test/resource/interlink/ok-testlog-interlink-1.logsig
 	[ "$status" -eq 3 ]
