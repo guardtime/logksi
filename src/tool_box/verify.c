@@ -440,14 +440,14 @@ static void signature_set_suggestions_for_publication_based_verification(PARAM_S
 	KSI_Integer *latestPubTimeInPubfile = NULL;
 	KSI_PublicationRecord *possibilityToExtendTo = NULL;
 	int x = 0;
-	int isExtended = 0;
-	int ispubfile = userPubData == NULL ? 1 : 0;
+	int isExtendedToPublication = 0;
+	int usePubfile = userPubData == NULL ? 1 : 0;
 
 	if (verRes == NULL || verRes->errorCode != KSI_VER_ERR_GEN_2 || sig == NULL) return;
 
 
 	x = PARAM_SET_isSetByName(set, "x");
-	isExtended = LOGKSI_Signature_isPublicationRecordPresent(sig);
+	isExtendedToPublication = LOGKSI_Signature_isPublicationRecordPresent(sig);
 
 	res = KSI_Signature_getSigningTime(sig, &sigTime);
 	if (res != KSI_OK) return;
@@ -474,11 +474,11 @@ static void signature_set_suggestions_for_publication_based_verification(PARAM_S
 	}
 
 	/* If there is user publication specified get its time. */
-	if (!ispubfile && userPubData != NULL) {
+	if (!usePubfile && userPubData != NULL) {
 		res = KSI_PublicationData_getTime(userPubData, &userPubTime);
 	}
 
-	if (!isExtended && ispubfile) {
+	if (!isExtendedToPublication && usePubfile) {
 		if (possibilityToExtendTo != NULL && !x) {
 			ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion:  Use -x to permit automatic extending or use KSI tool extend command to extend the signature.\n");
 		} else if (possibilityToExtendTo == NULL) {
@@ -487,11 +487,12 @@ static void signature_set_suggestions_for_publication_based_verification(PARAM_S
 			if (!x) ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion:  When a suitable publication is available use -x to permit automatic extending or use KSI tool extend command to extend the signature.\n");
 		}
 
+		/* Note that signature extended to some random time does not count as it is beyond normal usage. */
 		ERR_TRCKR_ADD(err, errCode, "Error: Signature is not extended.");
 	} else {
 
 
-		if (ispubfile) {
+		if (usePubfile) {
 			KSI_PublicationRecord *pubrecInPubfile = NULL;
 			KSI_Integer *pubTime = NULL;
 			int isPubfileOlderThanSig;
