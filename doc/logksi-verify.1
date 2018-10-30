@@ -93,6 +93,10 @@ Output the last leaf from the log signature into file. Use '\fB-\fR' as file nam
 Skip signing time verification where more recent log blocks must have more recent (or equal) signing time than previous blocks.
 .\"
 .TP
+\fB--warn-same-block-time\fR
+Prints a warning when two consecutive blocks have same signing time. When multiple log files are verified the last block from the previous file is compared with the first block from the current file.
+.\"
+.TP
 \fB-x\fR
 Permit to use extender for publication-based verification. See \fBlogksi-exted\fR(1) fo details.
 .\"

@@ -4,6 +4,11 @@
 * FEATURE: New parameter --input-hash to specify inter-linking hash as input for verification.
 * FEATURE: New parameter --output-hash to output the last leaf hash for inter-linking.
 * IMPROVEMENT: Verification error handling improved.
+* FEATURE: New option --ignore-desc-block-time to skip signing time verification where more recent log blocks must have more recent signing time.
+* FEATURE: New option -- for verify task that enables user to list multiple log files for verification.
+* FEATURE: New option --input-hash to specify inter-linking hash as input for verification.
+* FEATURE: New option --output-hash to output the last leaf hash for inter-linking.
+* FEATURE: New option --warn-same-block-time that prints a warning when two consecutive blocks has same signing time.
 * BUGFIX: Verifying: help function fixed, help text now available.
 * BUGFIX: Verification error message fixed and improved in case where publication record is not available in publications file.
 

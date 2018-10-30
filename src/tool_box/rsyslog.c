@@ -1992,26 +1992,27 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 		res = KSI_Signature_getSigningTime(sig, &t1);
 		ERR_CATCH_MSG(err, res, NULL);
 
+		int logStdin = files->internal.inLog == NULL;
+		char *currentLogFile = logStdin ? "stdin" : files->internal.inLog;
+		char *previousLogFile = files->previousLogFile;
+
 		/* When sigTime is 0 it is the first signature and there is nothing to check. */
 		if (*sigTime > 0) {
+
 			print_progressDesc(0, "Block no. %3zu: checking signing time with previous block... ", blocks->blockNo);
 
-			if (*sigTime > KSI_Integer_getUInt64(t1)) {
+			if (*sigTime > KSI_Integer_getUInt64(t1) && !PARAM_SET_isSetByName(set, "ignore-desc-block-time")) {
+				blocks->errSignTime = 1;
+
 				res = KSI_Integer_new(ksi, *sigTime, &t0);
 				ERR_CATCH_MSG(err, res, NULL);
 
 				PST_snprintf(strT0, sizeof(strT0), "(%zu) %s+00:00", KSI_Integer_getUInt64(t0), KSI_Integer_toDateString(t0, buf, sizeof(buf)));
 				PST_snprintf(strT1, sizeof(strT1), "(%zu) %s+00:00", KSI_Integer_getUInt64(t1), KSI_Integer_toDateString(t1, buf, sizeof(buf)));
 
-				int logStdin = files->internal.inLog == NULL;
-				char *currentLogFile = logStdin ? "stdin" : files->internal.inLog;
-				char *previousLogFile = files->previousLogFile;
-
-
-				blocks->errSignTime = 1;
 
 				if (blocks->blockNo == 1) {
-					PST_snprintf(blocks->errorBuf, sizeof(blocks->errorBuf), "Error: Last  block %s from file '%s' is more recent than\n"
+					PST_snprintf(blocks->errorBuf, sizeof(blocks->errorBuf), "Error: Last block  %s from file '%s' is more recent than\n"
 						                                                     "       first block %s from file '%s'\n", strT0, previousLogFile, strT1, currentLogFile);
 				} else {
 					PST_snprintf(blocks->errorBuf, sizeof(blocks->errorBuf), "Error: Block no. %3zu %s in %s '%s' is more recent than\n"
@@ -2020,6 +2021,19 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 
 
 				print_progressResult(1);
+			}
+
+			if (*sigTime == KSI_Integer_getUInt64(t1) && PARAM_SET_isSetByName(set, "warn-same-block-time")) {
+				blocks->warningSignatureSameTime = 1;
+				PST_snprintf(strT1, sizeof(strT1), "(%zu) %s+00:00", KSI_Integer_getUInt64(t1), KSI_Integer_toDateString(t1, buf, sizeof(buf)));
+
+				if (blocks->blockNo == 1) {
+					PST_snprintf(blocks->warnBuf, sizeof(blocks->warnBuf), "Warning: Last block from file      '%s'\n"
+						                                                   "         and first block from file '%s'\n"
+																		   "         has same signing time %s.\n", previousLogFile, currentLogFile, strT1);
+				} else {
+					PST_snprintf(blocks->warnBuf, sizeof(blocks->warnBuf), "Warning: Block no. %3zu and %3zu in %s '%s' has same signing time %s.\n" , blocks->blockNo - 1, blocks->blockNo, (logStdin ? "log from" : "file"), currentLogFile, strT1);
+				}
 			}
 		}
 
@@ -2045,6 +2059,12 @@ cleanup:
 		if (blocks->errSignTime && blocks->errorBuf[0] != '\0') {
 			print_errors("%s", blocks->errorBuf);
 			blocks->errorBuf[0] = '\0';
+		}
+
+		/* As this type of warning is explictly enabled it must be seen without -d flag and it is printed with error printer. */
+		if (blocks->warningSignatureSameTime) {
+			print_errors("%s", blocks->warnBuf);
+			blocks->warningSignatureSameTime = 0;
 		}
 	}
 	KSI_Signature_free(sig);
@@ -2735,7 +2755,9 @@ cleanup:
 
 static void BLOCK_INFO_reset(BLOCK_INFO *block) {
 	if (block != NULL) {
-		memset(block, 0, sizeof(BLOCK_INFO));
+		memset(block, 0, sizeof(BLOCK_INFO) - sizeof(block->warnBuf) - sizeof(block->errorBuf));
+		block->errorBuf[0] = 0;
+		block->warnBuf[0] = 0;
 	}
 }
 
