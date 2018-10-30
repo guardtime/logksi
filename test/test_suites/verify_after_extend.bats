@@ -36,7 +36,7 @@ export KSI_CONF=test/test.cfg
 }
 
 @test "verify extended signature with publications file that does not contain needed publication record." {
-	run ./src/logksi verify /tmp/logksi/test/out/signed4
+	run ./src/logksi verify test/out/signed4
 	[ "$status" -eq 6 ]
 	[[ "$output" =~ (Block no).*(1).*(KSI signature verification failed).*(GEN-02).*(Verification inconclusive).*(Signature is extended to a publication that does not exist in publications file).* ]]
 }
