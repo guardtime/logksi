@@ -1469,7 +1469,7 @@ static int process_tree_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK
 		goto cleanup;
 	}
 
-	print_progressDesc(0, "Block no. %3zu: processing tree hash... ", blocks->blockNo);
+	print_progressDesc(0, "Block no. %3zu: processing tree hash...   ", blocks->blockNo);
 
 	res = is_tree_hash_expected(err, blocks);
 	if (res != KT_OK) goto cleanup;
@@ -2761,6 +2761,61 @@ static void BLOCK_INFO_reset(BLOCK_INFO *block) {
 	}
 }
 
+static int process_log_signature_general_components_(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, int withBlockSignature, BLOCK_INFO *blocks, IO_FILES *files, SIGNATURE_PROCESSORS *processors,  uint64_t *sigTime) {
+	int res = KT_UNKNOWN_ERROR;
+
+	if (set == NULL || err == NULL || ksi == NULL || blocks == NULL || files == NULL || (withBlockSignature && processors == NULL)) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	switch (blocks->ftlv.tag) {
+		case 0x901:
+			res = process_block_header(set, err, ksi, blocks, files);
+			if (res != KT_OK) goto cleanup;
+		break;
+
+		case 0x902:
+			res = process_record_hash(set, err, ksi, blocks, files);
+			if (res != KT_OK) goto cleanup;
+		break;
+
+		case 0x903:
+			res = process_tree_hash(set, err, ksi, blocks, files);
+			if (res != KT_OK) goto cleanup;
+		break;
+
+		case 0x911:
+			res = process_metarecord(err, ksi, blocks, files);
+			if (res != KT_OK) goto cleanup;
+		break;
+
+		default:
+			if (withBlockSignature && blocks->ftlv.tag) {
+				res = process_block_signature(set, err, ksi, processors, blocks, files, sigTime);
+				if (res != KT_OK) goto cleanup;
+			} else {
+				res = KT_INVALID_INPUT_FORMAT;
+				goto cleanup;
+			}
+		break;
+	}
+
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
+
+static int process_log_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
+	return process_log_signature_general_components_(set, err, ksi, 0, blocks, files, NULL, NULL);
+}
+
+static int process_log_signature_with_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, SIGNATURE_PROCESSORS *processors,  uint64_t *sigTime) {
+	return process_log_signature_general_components_(set, err, ksi, 1, blocks, files, processors, sigTime);
+}
+
 int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_FUNCTION extend_signature, IO_FILES *files) {
 	int res;
 	BLOCK_INFO blocks;
@@ -2786,30 +2841,12 @@ int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_
 		if (res == KSI_OK) {
 			switch (blocks.ftlv.tag) {
 				case 0x901:
-					res = process_block_header(set, err, ksi, &blocks, files);
-					if (res != KT_OK) goto cleanup;
-				break;
-
 				case 0x902:
-					res = process_record_hash(set, err, ksi, &blocks, files);
-					if (res != KT_OK) goto cleanup;
-				break;
-
 				case 0x903:
-					res = process_tree_hash(set, err, ksi, &blocks, files);
-					if (res != KT_OK) goto cleanup;
-				break;
-
 				case 0x911:
-					res = process_metarecord(err, ksi, &blocks, files);
-					if (res != KT_OK) goto cleanup;
-				break;
-
 				case 0x904:
-				{
-					res = process_block_signature(set, err, ksi, &processors, &blocks, files, NULL);
+					res = process_log_signature_with_block_signature(set, err, ksi, &blocks, files, &processors, NULL);
 					if (res != KT_OK) goto cleanup;
-				}
 				break;
 
 				default:
@@ -2870,47 +2907,12 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_DataHa
 				case LOGSIG12:
 					switch (blocks.ftlv.tag) {
 						case 0x901:
-
-							res = process_block_header(set, err, ksi, &blocks, files);
-							if (res != KT_OK) goto cleanup;
-
-							/* Check if the last leaf from the previous block matches with the current first block. */
-							if (isFirst == 1 && firstLink != NULL) {
-								print_progressDesc(0, "Block no. %3zu: verifying inter-linking input hash... ", blocks.blockNo);
-								isFirst = 0;
-								if (!KSI_DataHash_equals(firstLink, blocks.prevLeaf)) {
-									char buf_imp[1024];
-									char buf_exp_imp[1024];
-
-									res = KT_VERIFICATION_FAILURE;
-									ERR_TRCKR_ADD(err, res, "Error: Block no. %zu: The last leaf from the previous block does not match with the current first block. Expecting '%s', but got '%s'.", blocks.blockNo, LOGKSI_DataHash_toString(firstLink, buf_exp_imp, sizeof(buf_exp_imp)), LOGKSI_DataHash_toString(blocks.prevLeaf, buf_imp, sizeof(buf_imp)));
-
-									goto cleanup;
-								}
-								print_progressResult(res);
-							}
-						break;
-
 						case 0x902:
-							res = process_record_hash(set, err, ksi, &blocks, files);
-							if (res != KT_OK) goto cleanup;
-						break;
-
 						case 0x903:
-							res = process_tree_hash(set, err, ksi, &blocks, files);
-							if (res != KT_OK) goto cleanup;
-						break;
-
 						case 0x911:
-							res = process_metarecord(err, ksi, &blocks, files);
-							if (res != KT_OK) goto cleanup;
-						break;
-
 						case 0x904:
-						{
-							res = process_block_signature(set, err, ksi, &processors, &blocks, files, sigTime);
+							res = process_log_signature_with_block_signature(set, err, ksi, &blocks, files, &processors, sigTime);
 							if (res != KT_OK) goto cleanup;
-						}
 						break;
 
 						default:
@@ -2921,6 +2923,26 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_DataHa
 							 */
 						break;
 					}
+
+					/* Addidional post processor. */
+					if (blocks.ftlv.tag == 0x901) {
+						/* Check if the last leaf from the previous block matches with the current first block. */
+						if (isFirst == 1 && firstLink != NULL) {
+							print_progressDesc(0, "Block no. %3zu: verifying inter-linking input hash... ", blocks.blockNo);
+							isFirst = 0;
+							if (!KSI_DataHash_equals(firstLink, blocks.prevLeaf)) {
+								char buf_imp[1024];
+								char buf_exp_imp[1024];
+
+								res = KT_VERIFICATION_FAILURE;
+								ERR_TRCKR_ADD(err, res, "Error: Block no. %zu: The last leaf from the previous block does not match with the current first block. Expecting '%s', but got '%s'.", blocks.blockNo, LOGKSI_DataHash_toString(firstLink, buf_exp_imp, sizeof(buf_exp_imp)), LOGKSI_DataHash_toString(blocks.prevLeaf, buf_imp, sizeof(buf_imp)));
+
+								goto cleanup;
+							}
+							print_progressResult(res);
+						}
+					}
+
 				break;
 
 				case RECSIG11:
@@ -3077,30 +3099,12 @@ int logsignature_extract(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES 
 		if (res == KSI_OK) {
 			switch (blocks.ftlv.tag) {
 				case 0x901:
-					res = process_block_header(set, err, ksi, &blocks, files);
-					if (res != KT_OK) goto cleanup;
-				break;
-
 				case 0x902:
-					res = process_record_hash(set, err, ksi, &blocks, files);
-					if (res != KT_OK) goto cleanup;
-				break;
-
 				case 0x903:
-					res = process_tree_hash(set, err, ksi, &blocks, files);
-					if (res != KT_OK) goto cleanup;
-				break;
-
 				case 0x911:
-					res = process_metarecord(err, ksi, &blocks, files);
-					if (res != KT_OK) goto cleanup;
-				break;
-
 				case 0x904:
-				{
-					res = process_block_signature(set, err, ksi, &processors, &blocks, files, NULL);
+					res = process_log_signature_with_block_signature(set, err, ksi, &blocks, files, &processors, NULL);
 					if (res != KT_OK) goto cleanup;
-				}
 				break;
 
 				default:
@@ -3156,22 +3160,10 @@ int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILE
 		if (res == KSI_OK) {
 			switch (blocks.ftlv.tag) {
 				case 0x901:
-					res = process_block_header(set, err, ksi, &blocks, files);
-					if (res != KT_OK) goto cleanup;
-				break;
-
 				case 0x902:
-					res = process_record_hash(set, err, ksi, &blocks, files);
-					if (res != KT_OK) goto cleanup;
-				break;
-
 				case 0x903:
-					res = process_tree_hash(set, err, ksi, &blocks, files);
-					if (res != KT_OK) goto cleanup;
-				break;
-
 				case 0x911:
-					res = process_metarecord(err, ksi, &blocks, files);
+					res = process_log_signature(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
@@ -3268,22 +3260,10 @@ int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *fi
 		if (res == KSI_OK) {
 			switch (blocks.ftlv.tag) {
 				case 0x901:
-					res = process_block_header(set, err, ksi, &blocks, files);
-					if (res != KT_OK) goto cleanup;
-				break;
-
 				case 0x902:
-					res = process_record_hash(set, err, ksi, &blocks, files);
-					if (res != KT_OK) goto cleanup;
-				break;
-
 				case 0x903:
-					res = process_tree_hash(set, err, ksi, &blocks, files);
-					if (res != KT_OK) goto cleanup;
-				break;
-
 				case 0x911:
-					res = process_metarecord(err, ksi, &blocks, files);
+					res = process_log_signature(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 
