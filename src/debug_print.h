@@ -28,8 +28,25 @@
 extern "C" {
 #endif
 
+enum debug_lvl {
+	DEBUG_LEVEL_MASK = 0xffff,
+	DEBUG_LEVEL_1 = 0x01,
+	DEBUG_LEVEL_2 = 0x02,
+	DEBUG_LEVEL_3 = 0x03,
+
+	DEBUG_OPT_MASK = 0xffff0000,
+	DEBUG_EQUAL = 0x10000,
+	DEBUG_GREATER = 0x20000,
+	DEBUG_SMALLER = 0x40000
+};
+
 void print_progressDesc(int showTiming, const char *msg, ...) __attribute__ ((format(printf, 2, 3)));
 void print_progressResult(int res);
+
+void print_progressDescExtended(PARAM_SET *set, int showTiming, int debugLvl, const char *msg, ...);
+void print_progressResultExtended(PARAM_SET *set, int debugLvl, int res);
+void print_debugExtended(PARAM_SET *set, int debugLvl, const char *msg, ...);
+
 
 #ifdef	__cplusplus
 }
