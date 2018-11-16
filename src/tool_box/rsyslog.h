@@ -159,12 +159,14 @@ typedef struct {
 	char warningSignatureSameTime;
 	char errSignTime;
 	size_t nofHashFails;
+	uint64_t sigTime_0;
+	uint64_t sigTime_1;
 	char errorBuf[2048];
 	char warnBuf[2048];
 } BLOCK_INFO;
 
 int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_FUNCTION extend_signature, IO_FILES *files);
-int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_DataHash *firstLink, VERIFYING_FUNCTION verify_signature, IO_FILES *files, uint64_t *sigTime, KSI_DataHash ** lastLeaf);
+int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *firstLink, VERIFYING_FUNCTION verify_signature, IO_FILES *files, KSI_DataHash **lastLeaf);
 int logsignature_extract(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files);
 int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files);
 int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files);
@@ -185,3 +187,5 @@ int logksi_file_rename(char *from, char *to);
 
 void IO_FILES_init(IO_FILES *files);
 void IO_FILES_StorePreviousFileNames(IO_FILES *files);
+
+void BLOCK_INFO_reset(BLOCK_INFO *block);

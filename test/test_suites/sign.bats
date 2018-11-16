@@ -3,7 +3,7 @@
 export KSI_CONF=test/test.cfg
 
 @test "sign signed.logsig" {
-	run ./src/logksi sign test/out/signed -d
+	run ./src/logksi sign test/out/signed -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	run test -f test/out/signed.logsig
@@ -13,7 +13,7 @@ export KSI_CONF=test/test.cfg
 }
 
 @test "sign signed2.logsig to output signed3.logsig" {
-	run ./src/logksi sign test/out/signed2 -o test/out/signed3.logsig -d
+	run ./src/logksi sign test/out/signed2 -o test/out/signed3.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	run test -f test/out/signed3.logsig
@@ -23,7 +23,7 @@ export KSI_CONF=test/test.cfg
 }
 
 @test "sign from standard input" {
-	run bash -c "cat test/out/unsigned.logsig | ./src/logksi sign --sig-from-stdin -o test/out/signed_from_stdin.logsig -d"
+	run bash -c "cat test/out/unsigned.logsig | ./src/logksi sign --sig-from-stdin -o test/out/signed_from_stdin.logsig -ddd"
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	run test -f test/out/signed_from_stdin.logsig
@@ -31,7 +31,7 @@ export KSI_CONF=test/test.cfg
 }
 
 @test "sign signed2.logsig to stdout" {
-	run bash -c "./src/logksi sign test/out/signed2 -d -o - > test/out/signed_stdout.logsig"
+	run bash -c "./src/logksi sign test/out/signed2 -ddd -o - > test/out/signed_stdout.logsig"
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	run test -f test/out/signed_stdout.logsig
@@ -41,7 +41,7 @@ export KSI_CONF=test/test.cfg
 }
 
 @test "sign unsigned.logsig" {
-	run ./src/logksi sign test/out/unsigned -d
+	run ./src/logksi sign test/out/unsigned -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	run test -f test/out/unsigned.logsig
