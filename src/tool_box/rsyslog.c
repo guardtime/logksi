@@ -1250,7 +1250,7 @@ static int finalize_block(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_IN
 	}
 
 	if (blocks->finalTreeHashesNone) {
-		print_debugExtended(set, DEBUG_LEVEL_2, "Warning: All final tree hashes are missing.\n", blocks->blockNo);
+		print_debugExtended(set, DEBUG_LEVEL_2, "Warning: Block no. %3zu: all final tree hashes are missing.\n", blocks->blockNo);
 		blocks->warningTreeHashes = 1;
 	} else if (blocks->finalTreeHashesAll) {
 		print_debugExtended(set, DEBUG_LEVEL_2, "Block no. %3zu: all final tree hashes are present.\n", blocks->blockNo);
@@ -2682,7 +2682,7 @@ cleanup:
 	if (check_warnings(blocks)) {
 		print_warnings("\n");
 		if (blocks && blocks->warningTreeHashes) {
-			print_warnings("Warning: Some tree hashes are missing from the log signature file.\n        Run 'logksi sign' with '--insert-missing-hashes' to repair the log signature.\n");
+			print_warnings("Warning: Some tree hashes are missing from the log signature file.\n         Run 'logksi sign' with '--insert-missing-hashes' to repair the log signature.\n");
 		}
 
 		if (blocks && blocks->warningSignatures) {
