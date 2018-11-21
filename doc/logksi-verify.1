@@ -85,7 +85,7 @@ If used, \fBeverything\fR specified after the token is interpreted as \fI<logfil
 Specify hash imprint for inter-linking (the last leaf from the previous log signature) verification. Hash can be specified on command line or from a file containing its string representation. Hash format: <alg>:<hash in hex>. Use '\fB-\fR' as file name to read the imprint from \fIstdin\fR. Call \fBlogksi -h\fR to get the list of supported hash algorithms. See \fB--output-hash\fR to see how to extract the hash imprint from the previous log signature. When used together with \fB--\fR, only the first log file is verified against specified value.
 .\"
 .TP
-\fB--output-hash \fIhash\fR
+\fB--output-hash \fIfile\fR
 Output the last leaf from the log signature into file. Use '\fB-\fR' as file name to redirect hash imprint to \fIstdout\fR. See \fB--input-hash\fR to see how to verify that log signature is bound with this log signature (where from the output hash was extracted). When used together with \fB--\fR, only the output hash of the last log file is returned.
 .\"
 .TP
