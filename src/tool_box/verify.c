@@ -487,11 +487,11 @@ static void signature_set_suggestions_for_publication_based_verification(PARAM_S
 
 	if (!isExtendedToPublication && usePubfile) {
 		if (possibilityToExtendTo != NULL && !x) {
-			ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion:  Use -x to permit automatic extending or use KSI tool extend command to extend the signature.\n");
+			ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion:  Use -x to permit automatic extending or use logksi extend command to extend the signature.\n");
 		} else if (possibilityToExtendTo == NULL) {
 			ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion:  Check if publications file is up-to-date as there is not (yet) a publication record in the publications file specified to extend the signature to.\n");
 			ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion:  Wait until next publication and try again.\n");
-			if (!x) ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion:  When a suitable publication is available use -x to permit automatic extending or use KSI tool extend command to extend the signature.\n");
+			if (!x) ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion:  When a suitable publication is available use -x to permit automatic extending or use logksi extend command to extend the signature.\n");
 		}
 
 		/* Note that signature extended to some random time does not count as it is beyond normal usage. */
@@ -523,7 +523,7 @@ static void signature_set_suggestions_for_publication_based_verification(PARAM_S
 				if (possibilityToExtendTo == NULL && isPubfileOlderThanSig) {
 					ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion:  Check if publications file is up-to-date as the latest publication in the publications file is older than the signatures publication record.\n");
 				} else if (possibilityToExtendTo != NULL && !x) {
-					ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion:  Try to use -x to permit automatic extending or use KSI tool extend command to re-extend the signature.\n");
+					ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion:  Try to use -x to permit automatic extending or use logksi extend command to re-extend the signature.\n");
 				}
 			}
 		} else {
