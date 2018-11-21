@@ -304,7 +304,7 @@ char *verify_help_toString(char *buf, size_t len) {
 		"             See --output-hash to see how to extract the hash imprint from the previous\n"
 		"             log signature. When used together with --, only the first log file is\n"
 		"             verified against specified value.\n"
-		" --output-hash <hash>\n"
+		" --output-hash <file>\n"
 		"           - Output the last leaf from the log signature into file. Use '-' as\n"
 		"             file name to redirect hash imprint to stdout. See --input-hash to\n"
 		"             see how to verify that log signature is bound with this log signature\n"
