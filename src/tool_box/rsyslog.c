@@ -1996,7 +1996,7 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 
 		int logStdin = files->internal.inLog == NULL;
 		const char *currentLogFile =  IO_FILES_getCurrentLogFilePrintRepresentation(files);
-		char *previousLogFile = files->previousLogFile;
+		const char *previousLogFile = files->previousLogFile;
 
 		/* When sigTime is 0 it is the first signature and there is nothing to check. */
 		if (*sigTime > 0) {
@@ -2885,7 +2885,7 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_DataHa
 									char buf_exp_imp[1024];
 									char buf_fname[4096];
 									char *prevBlockSource = "Unexpected and not initialized previous block source.";
-									const char *firstBlockSource = IO_FILES_getCurrentLogFilePrintRepresentation(files);;
+									const char *firstBlockSource = IO_FILES_getCurrentLogFilePrintRepresentation(files);
 
 									res = KT_VERIFICATION_FAILURE;
 
@@ -3061,8 +3061,7 @@ void IO_FILES_StorePreviousFileNames(IO_FILES *files) {
 const char *IO_FILES_getCurrentLogFilePrintRepresentation(IO_FILES *files) {
 	if (files == NULL) return NULL;
 	int logStdin = files->internal.inLog == NULL;
-	char *currentLogFile = logStdin ? "stdin" : files->internal.inLog;
-	return currentLogFile;
+	return logStdin ? "stdin" : files->internal.inLog;
 }
 
 
