@@ -42,6 +42,8 @@
 
 #define SOF_ARRAY(x) (sizeof(x) / sizeof((x)[0]))
 
+const char *IO_FILES_getCurrentLogFilePrintRepresentation(IO_FILES *files);
+
 int calculate_new_tree_hash(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *leftHash, KSI_DataHash *rightHash, unsigned char level, KSI_DataHash **nodeHash) {
 	int res;
 	KSI_DataHash *tmp = NULL;
@@ -1993,8 +1995,8 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 		ERR_CATCH_MSG(err, res, NULL);
 
 		int logStdin = files->internal.inLog == NULL;
-		char *currentLogFile = logStdin ? "stdin" : files->internal.inLog;
-		char *previousLogFile = files->previousLogFile;
+		const char *currentLogFile =  IO_FILES_getCurrentLogFilePrintRepresentation(files);
+		const char *previousLogFile = files->previousLogFile;
 
 		/* When sigTime is 0 it is the first signature and there is nothing to check. */
 		if (*sigTime > 0) {
@@ -2881,11 +2883,25 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_DataHa
 								if (!KSI_DataHash_equals(firstLink, blocks.prevLeaf)) {
 									char buf_imp[1024];
 									char buf_exp_imp[1024];
+									char buf_fname[4096];
+									char *prevBlockSource = "Unexpected and not initialized previous block source.";
+									const char *firstBlockSource = IO_FILES_getCurrentLogFilePrintRepresentation(files);
 
 									res = KT_VERIFICATION_FAILURE;
-									ERR_TRCKR_ADD(err, res, "Error: Block no. %zu: The last leaf from the previous block does not match with the current first block. Expecting '%s', but got '%s'.", blocks.blockNo, LOGKSI_DataHash_toString(firstLink, buf_exp_imp, sizeof(buf_exp_imp)), LOGKSI_DataHash_toString(blocks.prevLeaf, buf_imp, sizeof(buf_imp)));
 
+									if (PARAM_SET_isSetByName(set, "input-hash") && files->previousLogFile[0] == '\0') {
+										char *fname = NULL;
+										PARAM_SET_getStr(set, "input-hash", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &fname);
+
+										PST_snprintf(buf_fname, sizeof(buf_fname), "from --input-hash %s", fname);
+										prevBlockSource = buf_fname;
+									} else {
+										prevBlockSource = files->previousLogFile;
+									}
+
+									ERR_TRCKR_ADD(err, res, "Error: Block no. %zu: The last leaf from the previous block (%s) does not match with the current first block (%s). Expecting '%s', but got '%s'.", blocks.blockNo, prevBlockSource, firstBlockSource, LOGKSI_DataHash_toString(firstLink, buf_exp_imp, sizeof(buf_exp_imp)), LOGKSI_DataHash_toString(blocks.prevLeaf, buf_imp, sizeof(buf_imp)));
 									goto cleanup;
+									
 								}
 								print_progressResult(res);
 							}
@@ -3040,6 +3056,15 @@ void IO_FILES_StorePreviousFileNames(IO_FILES *files) {
 	} else {
 		PST_strncpy(files->previousSigFile, files->internal.inSig, sizeof(files->previousSigFile));
 	}
+}
+
+const char *IO_FILES_getCurrentLogFilePrintRepresentation(IO_FILES *files) {
+	int logStdin = 0;
+
+	if (files == NULL) return NULL;
+
+	logStdin = files->internal.inLog == NULL;
+	return logStdin ? "stdin" : files->internal.inLog;
 }
 
 
