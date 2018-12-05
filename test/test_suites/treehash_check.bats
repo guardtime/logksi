@@ -174,13 +174,13 @@ cp -r test/resource/logfiles/treehash? test/out
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
 	run ./src/logksi verify test/out/treehash5 test/out/tree_5.logsig -dd
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ " Error: Could not find file" ]]
+	[[ "$output" =~ "File does not exist." ]]
 	run ./src/logksi verify test/out/treehash6 test/out/tree_6.logsig -dd
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ " Error: Could not find file" ]]
+	[[ "$output" =~ "File does not exist." ]]
 	run ./src/logksi verify test/out/treehash7 test/out/tree_7.logsig -dd
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ " Error: Could not find file" ]]
+	[[ "$output" =~ "File does not exist." ]]
 	run ./src/logksi verify test/out/treehash8 test/out/tree_8.logsig -dd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
@@ -238,13 +238,13 @@ cp -r test/resource/logfiles/treehash? test/out
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
 	run ./src/logksi verify test/out/treehash5 test/out/tree_5.logsig -dd
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ " Error: Could not find file" ]]
+	[[ "$output" =~ "File does not exist." ]]
 	run ./src/logksi verify test/out/treehash6 test/out/tree_6.logsig -dd
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ " Error: Could not find file" ]]
+	[[ "$output" =~ "File does not exist." ]]
 	run ./src/logksi verify test/out/treehash7 test/out/tree_7.logsig -dd
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ " Error: Could not find file" ]]
+	[[ "$output" =~ "File does not exist." ]]
 	run ./src/logksi verify test/out/treehash8 test/out/tree_8.logsig -dd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
@@ -302,13 +302,13 @@ cp -r test/resource/logfiles/treehash? test/out
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
 	run ./src/logksi verify test/out/treehash5 test/out/final_tree_5.logsig -dd
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ " Error: Could not find file" ]]
+	[[ "$output" =~ "File does not exist." ]]
 	run ./src/logksi verify test/out/treehash6 test/out/final_tree_6.logsig -dd
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ " Error: Could not find file" ]]
+	[[ "$output" =~ "File does not exist." ]]
 	run ./src/logksi verify test/out/treehash7 test/out/final_tree_7.logsig -dd
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ " Error: Could not find file" ]]
+	[[ "$output" =~ "File does not exist." ]]
 	run ./src/logksi verify test/out/treehash8 test/out/final_tree_8.logsig -dd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]

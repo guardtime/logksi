@@ -63,6 +63,7 @@ enum {
 };
 
 static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
+static int check_io_naming_and_type_errors(PARAM_SET *set, ERR_TRCKR *err);
 static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err);
 
 static int signature_verify_general(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
@@ -132,6 +133,9 @@ int verify_run(int argc, char **argv, char **envp) {
 
 
 	res = check_pipe_errors(set, err);
+	if (res != KT_OK) goto cleanup;
+
+	res = check_io_naming_and_type_errors(set, err);
 	if (res != KT_OK) goto cleanup;
 
 	switch(TASK_getID(task)) {
@@ -378,7 +382,7 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 
 	PARAM_SET_addControl(set, "{conf}", isFormatOk_inputFile, isContentOk_inputFileRestrictPipe, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{log}{output-hash}", isFormatOk_path, NULL, convertRepair_path, NULL);
-	PARAM_SET_addControl(set, "{input}{multiple_logs}", isFormatOk_path, NULL, convertRepair_path, NULL);
+	PARAM_SET_addControl(set, "{input}{multiple_logs}", isFormatOk_inputFile, isContentOk_inputFileWithPipe, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{input-hash}", isFormatOk_inputHash, isContentOk_inputHash, convertRepair_path, extract_inputHashFromImprintOrImprintInFile);
 	PARAM_SET_addControl(set, "{log-from-stdin}{d}{x}{ver-int}{ver-cal}{ver-key}{ver-pub}{use-computed-hash-on-fail}{use-stored-hash-on-fail}", isFormatOk_flag, NULL, NULL, NULL);
 	PARAM_SET_addControl(set, "{pub-str}", isFormatOk_pubString, NULL, NULL, extract_pubString);
@@ -906,6 +910,48 @@ cleanup:
 	return res;
 }
 
+static int check_io_naming_and_type_errors(PARAM_SET *set, ERR_TRCKR *err) {
+	int res;
+	int in_count = 0;
+	int isMultipleLogFiles = 0;
+	int isLogFromStdin = 0;
+
+	if (set == NULL || err == NULL) {
+		ERR_TRCKR_ADD(err, res = KT_INVALID_ARGUMENT, NULL);
+		goto cleanup;
+	}
+
+	/**
+	 * Get the count of inputs and outputs for error handling.
+	 */
+	res = PARAM_SET_getValueCount(set, "input", NULL, PST_PRIORITY_NONE, &in_count);
+	if (res != PST_OK) goto cleanup;
+
+	isMultipleLogFiles = PARAM_SET_isSetByName(set, "multiple_logs");
+	isLogFromStdin = PARAM_SET_isSetByName(set, "log-from-stdin");
+
+	if (isMultipleLogFiles) {
+		if (isLogFromStdin) {
+			ERR_TRCKR_ADD(err, res = KT_INVALID_CMD_PARAM, "Error: It is not possible to verify both log file from stdin (--log-from-stdin) and log file(s) specified after --!");
+		}
+	} else {
+		if (isLogFromStdin && in_count > 1) ERR_TRCKR_ADD(err, res = KT_INVALID_CMD_PARAM, "Error: Log file from stdin (--log-from-stdin) needs only ONE explicitly specified log signature file, but there are %i!", in_count);
+		else if (in_count > 2) {
+			 ERR_TRCKR_ADD(err, res = KT_INVALID_CMD_PARAM, "Error: Only two inputs (log and log signature file) are required, but there are %i!", in_count);
+			 ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion:  To verify multiple log files see parameter --.\n");
+		}
+	}
+
+	if (res != KT_OK) goto cleanup;
+
+
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
+
 static int getLogFiles(PARAM_SET *set, ERR_TRCKR *err, int i, IO_FILES *files) {
 	int res = KT_UNKNOWN_ERROR;
 	int log_from_stdin = 0;
@@ -920,10 +966,6 @@ static int getLogFiles(PARAM_SET *set, ERR_TRCKR *err, int i, IO_FILES *files) {
 	log_from_stdin = PARAM_SET_isSetByName(set, "log-from-stdin") ? 1 : 0;
 
 	if (PARAM_SET_isSetByName(set, "multiple_logs")) {
-		if (log_from_stdin) {
-			ERR_TRCKR_ADD(err, res = KT_INVALID_CMD_PARAM, "Error: When specifying multiple log files, option --log-from-stdin can not be used.");
-			goto cleanup;
-		}
 		res = PARAM_SET_getStr(set, "multiple_logs", NULL, PST_PRIORITY_NONE, i, &files->user.inLog);
 		if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
 
