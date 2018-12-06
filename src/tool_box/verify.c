@@ -305,7 +305,7 @@ char *verify_help_toString(char *buf, size_t len) {
 		"             See --output-hash to see how to extract the hash imprint from the previous\n"
 		"             log signature. When used together with --, only the first log file is\n"
 		"             verified against specified value.\n"
-		" --output-hash <hash>\n"
+		" --output-hash <file>\n"
 		"           - Output the last leaf from the log signature into file. Use '-' as\n"
 		"             file name to redirect hash imprint to stdout. See --input-hash to\n"
 		"             see how to verify that log signature is bound with this log signature\n"
@@ -489,11 +489,11 @@ static void signature_set_suggestions_for_publication_based_verification(PARAM_S
 
 	if (!isExtendedToPublication && usePubfile) {
 		if (possibilityToExtendTo != NULL && !x) {
-			ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion:  Use -x to permit automatic extending or use KSI tool extend command to extend the signature.\n");
+			ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion:  Use -x to permit automatic extending or use logksi extend command to extend the signature.\n");
 		} else if (possibilityToExtendTo == NULL) {
 			ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion:  Check if publications file is up-to-date as there is not (yet) a publication record in the publications file specified to extend the signature to.\n");
 			ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion:  Wait until next publication and try again.\n");
-			if (!x) ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion:  When a suitable publication is available use -x to permit automatic extending or use KSI tool extend command to extend the signature.\n");
+			if (!x) ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion:  When a suitable publication is available use -x to permit automatic extending or use logksi extend command to extend the signature.\n");
 		}
 
 		/* Note that signature extended to some random time does not count as it is beyond normal usage. */
@@ -525,7 +525,7 @@ static void signature_set_suggestions_for_publication_based_verification(PARAM_S
 				if (possibilityToExtendTo == NULL && isPubfileOlderThanSig) {
 					ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion:  Check if publications file is up-to-date as the latest publication in the publications file is older than the signatures publication record.\n");
 				} else if (possibilityToExtendTo != NULL && !x) {
-					ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion:  Try to use -x to permit automatic extending or use KSI tool extend command to re-extend the signature.\n");
+					ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion:  Try to use -x to permit automatic extending or use logksi extend command to re-extend the signature.\n");
 				}
 			}
 		} else {

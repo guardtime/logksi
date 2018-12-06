@@ -7,6 +7,7 @@
 * IMPROVEMENT: Debug output (-dd) shows inter-linking input and output hash for each block.
 * IMPROVEMENT: Debug output with single -d option is more compact.
 * FEATURE: By specifying multiple -d options (-d -d or -dd) debug output will be more verbose.
+* IMPROVEMENT: Some suggestion messages pointing to KSI tool instead of logksi fixed.
 * FEATURE: New option --ignore-desc-block-time to skip signing time verification where more recent log blocks must have more recent signing time.
 * FEATURE: New option -- for verify task that enables user to list multiple log files for verification.
 * FEATURE: New option --input-hash to specify inter-linking hash as input for verification.
