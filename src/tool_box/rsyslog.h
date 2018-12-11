@@ -159,8 +159,8 @@ typedef struct {
 	char warningSignatureSameTime;
 	char errSignTime;
 	size_t nofHashFails;
-	uint64_t sigTime_0;
-	uint64_t sigTime_1;
+	size_t sigTime_0;
+	size_t sigTime_1;
 	char errorBuf[2048];
 	char warnBuf[2048];
 } BLOCK_INFO;
