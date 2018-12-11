@@ -5,7 +5,7 @@ export KSI_CONF=test/test.cfg
 cp -r test/resource/logsignatures/signed.logsig.parts test/out
 
 @test "integrate signed.parts" {
-	run ./src/logksi integrate test/out/signed -d
+	run ./src/logksi integrate test/out/signed -dd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	run test -f test/out/signed.logsig
@@ -13,7 +13,7 @@ cp -r test/resource/logsignatures/signed.logsig.parts test/out
 }
 
 @test "integrate signed.parts to output signed2.logsig" {
-	run ./src/logksi integrate test/out/signed -o test/out/signed2.logsig -d
+	run ./src/logksi integrate test/out/signed -o test/out/signed2.logsig -dd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	run test -f test/out/signed2.logsig
@@ -21,7 +21,7 @@ cp -r test/resource/logsignatures/signed.logsig.parts test/out
 }
 
 @test "integrate signed.parts to output signed_all_final_hashes.logsig" {
-	run ./src/logksi integrate test/out/signed -o test/out/signed_all_final_hashes.logsig -d --insert-missing-hashes
+	run ./src/logksi integrate test/out/signed -o test/out/signed_all_final_hashes.logsig -dd --insert-missing-hashes
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	run test -f test/out/signed_all_final_hashes.logsig
@@ -30,7 +30,7 @@ cp -r test/resource/logsignatures/signed.logsig.parts test/out
 
 @test "try integrating signed.parts again" {
 	run chmod 0444 test/out/signed.logsig
-	run ./src/logksi integrate test/out/signed -d
+	run ./src/logksi integrate test/out/signed -dd
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ " Error: Overwriting of existing log signature" ]]
 	run test -f test/out/signed.logsig
@@ -41,7 +41,7 @@ cp -r test/resource/logsignatures/signed.logsig.parts test/out
 }
 
 @test "integrate signed.parts to output overwritten.logsig" {
-	run ./src/logksi integrate test/out/signed -o test/out/overwritten.logsig -d
+	run ./src/logksi integrate test/out/signed -o test/out/overwritten.logsig -dd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	run test -f test/out/overwritten.logsig
@@ -49,7 +49,7 @@ cp -r test/resource/logsignatures/signed.logsig.parts test/out
 }
 
 @test "integrate signed.parts to output overwritten.logsig, force overwriting and insert missing hashes" {
-	run ./src/logksi integrate test/out/signed -o test/out/overwritten.logsig -d --force-overwrite --insert-missing-hashes
+	run ./src/logksi integrate test/out/signed -o test/out/overwritten.logsig -dd --force-overwrite --insert-missing-hashes
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	run test -f test/out/overwritten.logsig
@@ -57,7 +57,7 @@ cp -r test/resource/logsignatures/signed.logsig.parts test/out
 }
 
 @test "integrate signed.parts (again) to stdout" {
-	run bash -c "./src/logksi integrate test/out/signed -d -o - > test/out/integrated_stdout.logsig"
+	run bash -c "./src/logksi integrate test/out/signed -dd -o - > test/out/integrated_stdout.logsig"
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	run test -f test/out/integrated_stdout.logsig
@@ -69,7 +69,7 @@ cp -r test/resource/logsignatures/signed.logsig.parts test/out
 cp -r test/resource/logsignatures/unsigned.logsig.parts test/out
 
 @test "integrate unsigned.parts" {
-	run ./src/logksi integrate test/out/unsigned -d
+	run ./src/logksi integrate test/out/unsigned -dd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	run test -f test/out/unsigned.logsig
@@ -77,7 +77,7 @@ cp -r test/resource/logsignatures/unsigned.logsig.parts test/out
 }
 
 @test "integrate unsigned.parts to output unsigned_all_final_hashes.logsig" {
-	run ./src/logksi integrate test/out/unsigned -o test/out/unsigned_all_final_hashes.logsig -d --insert-missing-hashes
+	run ./src/logksi integrate test/out/unsigned -o test/out/unsigned_all_final_hashes.logsig -dd --insert-missing-hashes
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	run test -f test/out/unsigned_all_final_hashes.logsig
@@ -88,7 +88,7 @@ cp test/resource/logsignatures/synchronous.logsig test/out
 
 @test "integrate synchronous.logsig" {
 	run chmod 0444 test/out/synchronous.logsig
-	run ./src/logksi integrate test/out/synchronous -d
+	run ./src/logksi integrate test/out/synchronous -dd
 	[ "$status" -eq 0 ]
 	run test -f test/out/synchronous.logsig.bak
 	[ "$status" -ne 0 ]

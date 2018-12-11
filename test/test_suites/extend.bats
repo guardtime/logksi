@@ -5,7 +5,7 @@ export KSI_CONF=test/test.cfg
 @test "extend signed.logsig to earliest publication" {
 	run ./src/logksi extend test/out/signed \
 	-P file://test/resource/publication/dummy-publications.bin \
-	-V test/resource/certificates/dummy-cert.pem -d
+	-V test/resource/certificates/dummy-cert.pem -dd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 }
@@ -16,7 +16,7 @@ export KSI_CONF=test/test.cfg
 	run ./src/logksi extend test/out/signed2 \
 	--pub-str AAAAAA-C2PMAF-IAISKD-4JLNKD-ZFCF5L-4OWMS5-DMJLTC-DCJ6SS-QDFBC4-ELLWTM-5BO7WF-I7W2JK \
 	-P file://test/resource/publication/dummy-publications.bin \
-	-V test/resource/certificates/dummy-cert.pem -d
+	-V test/resource/certificates/dummy-cert.pem -dd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	run test -f test/out/signed2.logsig.bak
@@ -27,7 +27,7 @@ export KSI_CONF=test/test.cfg
 	run bash -c "cat test/out/signed3.logsig | ./src/logksi extend --sig-from-stdin -o test/out/extended_from_stdin.logsig \
 	--pub-str AAAAAA-C2PMAF-IAISKD-4JLNKD-ZFCF5L-4OWMS5-DMJLTC-DCJ6SS-QDFBC4-ELLWTM-5BO7WF-I7W2JK \
 	-P file://test/resource/publication/dummy-publications.bin \
-	-V test/resource/certificates/dummy-cert.pem -d"
+	-V test/resource/certificates/dummy-cert.pem -dd"
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	run test -f test/out/extended_from_stdin.logsig
@@ -39,7 +39,7 @@ export KSI_CONF=test/test.cfg
 	run ./src/logksi extend test/out/signed3 -o test/out/signed4.logsig \
 	--pub-str AAAAAA-C2PMAF-IAISKD-4JLNKD-ZFCF5L-4OWMS5-DMJLTC-DCJ6SS-QDFBC4-ELLWTM-5BO7WF-I7W2JK \
 	-P file://test/resource/publication/dummy-publications.bin \
-	-V test/resource/certificates/dummy-cert.pem -d
+	-V test/resource/certificates/dummy-cert.pem -dd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	run test -f test/out/signed4.logsig
@@ -52,7 +52,7 @@ export KSI_CONF=test/test.cfg
 	run bash -c "./src/logksi extend test/out/signed3 -o - > test/out/extended_stdout.logsig \
 	--pub-str AAAAAA-C2PMAF-IAISKD-4JLNKD-ZFCF5L-4OWMS5-DMJLTC-DCJ6SS-QDFBC4-ELLWTM-5BO7WF-I7W2JK \
 	-P file://test/resource/publication/dummy-publications.bin \
-	-V test/resource/certificates/dummy-cert.pem -d"
+	-V test/resource/certificates/dummy-cert.pem -dd"
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	run test -f test/out/extended_stdout.logsig
