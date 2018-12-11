@@ -93,9 +93,7 @@ void print_progressResult(int res) {
 	}
 }
 
-void print_progressDescExtended(PARAM_SET *set, int showTiming, int debugLvl, const char *msg, ...) {
-	va_list va;
-	char buf[1024];
+static int is_print_enabled(PARAM_SET *set, int debugLvl) {
 	int currenDebugLvl = 0;
 	int print = 0;
 	int debugLevel = debugLvl & DEBUG_LEVEL_MASK;
@@ -110,7 +108,14 @@ void print_progressDescExtended(PARAM_SET *set, int showTiming, int debugLvl, co
 
 	if (!print && debugOpt & DEBUG_EQUAL) print = currenDebugLvl == debugLevel;
 
-	if (print) {
+	return print;
+}
+
+void print_progressDescExtended(PARAM_SET *set, int showTiming, int debugLvl, const char *msg, ...) {
+	va_list va;
+	char buf[1024];
+
+	if (is_print_enabled(set, debugLvl)) {
 		va_start(va, msg);
 		KSI_vsnprintf(buf, sizeof(buf), msg, va);
 		buf[sizeof(buf) - 1] = 0;
@@ -121,21 +126,7 @@ void print_progressDescExtended(PARAM_SET *set, int showTiming, int debugLvl, co
 }
 
 void print_progressResultExtended(PARAM_SET *set, int debugLvl, int res) {
-	int currenDebugLvl = 0;
-	int print = 0;
-	int debugLevel = debugLvl & DEBUG_LEVEL_MASK;
-	int debugOpt = debugLvl & DEBUG_OPT_MASK;
-
-	if (debugOpt == 0) debugOpt = DEBUG_GREATER | DEBUG_EQUAL;
-
-	PARAM_SET_getValueCount(set, "d", NULL, PST_PRIORITY_HIGHEST, &currenDebugLvl);
-
-	if (debugOpt & DEBUG_GREATER) print = currenDebugLvl > debugLevel;
-	else if (debugOpt & DEBUG_SMALLER) print = currenDebugLvl < debugLevel;
-
-	if (!print && debugOpt & DEBUG_EQUAL) print = currenDebugLvl == debugLevel;
-
-	if (print) {
+	if (is_print_enabled(set, debugLvl)) {
 		print_progressResult(res);
 	}
 }
@@ -143,21 +134,8 @@ void print_progressResultExtended(PARAM_SET *set, int debugLvl, int res) {
 void print_debugExtended(PARAM_SET *set, int debugLvl, const char *msg, ...) {
 	va_list va;
 	char buf[1024];
-	int currenDebugLvl = 0;
-	int print = 0;
-	int debugLevel = debugLvl & DEBUG_LEVEL_MASK;
-	int debugOpt = debugLvl & DEBUG_OPT_MASK;
 
-	if (debugOpt == 0) debugOpt = DEBUG_GREATER | DEBUG_EQUAL;
-
-	PARAM_SET_getValueCount(set, "d", NULL, PST_PRIORITY_HIGHEST, &currenDebugLvl);
-
-	if (debugOpt & DEBUG_GREATER) print = currenDebugLvl > debugLevel;
-	else if (debugOpt & DEBUG_SMALLER) print = currenDebugLvl < debugLevel;
-
-	if (!print && debugOpt & DEBUG_EQUAL) print = currenDebugLvl == debugLevel;
-
-	if (print) {
+	if (is_print_enabled(set, debugLvl)) {
 		va_start(va, msg);
 		KSI_vsnprintf(buf, sizeof(buf), msg, va);
 		buf[sizeof(buf) - 1] = 0;
