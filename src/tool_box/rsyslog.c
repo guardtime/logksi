@@ -1194,8 +1194,8 @@ static int finalize_block(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_IN
 
 				KSI_Integer_new(ksi, blocks->sigTime_0, &t0);
 				KSI_Integer_new(ksi, blocks->sigTime_1, &t1);
-				PST_snprintf(strT0, sizeof(strT0), "(%zu) %s+00:00", blocks->sigTime_0, KSI_Integer_toDateString(t0, buf, sizeof(buf)));
-				PST_snprintf(strT1, sizeof(strT1), "(%zu) %s+00:00", blocks->sigTime_1, KSI_Integer_toDateString(t1, buf, sizeof(buf)));
+				PST_snprintf(strT0, sizeof(strT0), "(%llu) %s+00:00", (unsigned long long)blocks->sigTime_0, KSI_Integer_toDateString(t0, buf, sizeof(buf)));
+				PST_snprintf(strT1, sizeof(strT1), "(%llu) %s+00:00", (unsigned long long)blocks->sigTime_1, KSI_Integer_toDateString(t1, buf, sizeof(buf)));
 
 				if (blocks->blockNo == 1) {
 					PST_snprintf(blocks->errorBuf, sizeof(blocks->errorBuf), "Error: Last block  %s from file '%s' is more recent than\n"
@@ -1212,7 +1212,7 @@ static int finalize_block(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_IN
 			if (blocks->sigTime_0 == blocks->sigTime_1 && PARAM_SET_isSetByName(set, "warn-same-block-time")) {
 				KSI_Integer_new(ksi, blocks->sigTime_1, &t1);
 				blocks->warningSignatureSameTime = 1;
-				PST_snprintf(strT1, sizeof(strT1), "(%zu) %s+00:00", blocks->sigTime_1, KSI_Integer_toDateString(t1, buf, sizeof(buf)));
+				PST_snprintf(strT1, sizeof(strT1), "(%llu) %s+00:00", (unsigned long long)blocks->sigTime_1, KSI_Integer_toDateString(t1, buf, sizeof(buf)));
 
 				if (blocks->blockNo == 1) {
 					PST_snprintf(blocks->warnBuf, sizeof(blocks->warnBuf), "Warning: Last block from file      '%s'\n"
