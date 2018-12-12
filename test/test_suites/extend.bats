@@ -2,6 +2,11 @@
 
 export KSI_CONF=test/test.cfg
 
+cp test/resource/logfiles/signed test/out/signed2
+cp test/resource/logfiles/signed test/out/signed3
+cp test/resource/logfiles/signed test/out/signed4
+
+
 @test "extend signed.logsig to earliest publication" {
 	run ./src/logksi extend test/out/signed \
 	-P file://test/resource/publication/dummy-publications.bin \

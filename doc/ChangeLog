@@ -15,6 +15,8 @@
 * FEATURE: New option --warn-same-block-time that prints a warning when two consecutive blocks has same signing time.
 * BUGFIX: Verifying: help function fixed, help text now available.
 * BUGFIX: Verification error message fixed and improved in case where publication record is not available in publications file.
+* BUGFIX: When extending log signature thats name is derived from log files name, the log file existence is checked.
+* BUGFIX: When extending and only one log file is required, but there are more, error message is displayed.
 
 Version 1.3
 
