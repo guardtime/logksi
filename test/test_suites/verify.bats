@@ -26,11 +26,11 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 }
 
-@test "verify unsigned-repared.logsig WITHOUT --ignore-desc-block-time" {
-	run ./src/logksi verify test/resource/logfiles/unsigned test/resource/logsignatures/unsigned-repared.logsig
+@test "verify log_repaired.logsig WITHOUT --ignore-desc-block-time" {
+	run ./src/logksi verify test/resource/logs_and_signatures/log_repaired
 	[ "$status" -eq 6 ]
-	[[ "$output" =~ .*(Error).*(Block no).*(17).*(1540303365).*(in file).*(unsigned).*(is more recent than).*(block no).*(18).*(1517928940).* ]]
-	[[ "$output" =~ .*(Error).*(Block no).*(25).*(1540303366).*(in file).*(unsigned).*(is more recent than).*(block no).*(26).*(1517928947).* ]]
+	[[ "$output" =~ .*(Error).*(Block no).*(17).*(1540303365).*(in file).*(log_repaired).*(is more recent than).*(block no).*(18).*(1517928940).* ]]
+	[[ "$output" =~ .*(Error).*(Block no).*(25).*(1540303366).*(in file).*(log_repaired).*(is more recent than).*(block no).*(26).*(1517928947).* ]]
 }
 
 @test "try verifying unsigned.logsig against signed logfile" {
