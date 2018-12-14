@@ -66,3 +66,22 @@ cp test/resource/logfiles/signed test/out/signed4
 	[ "$status" -eq 0 ]
 }
 
+@test "extend log_repaired.logsig to earliest publication. Check if more recent signatures has more recent publications. " {
+	run src/logksi extend test/resource/logs_and_signatures/log_repaired -dd -o test/out/delme.logsig
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ (Block no.   [1-4]: extending KSI signature to the earliest available publication: 2018.02.15 00:00:00 UTC.*){4} ]]
+	[[ "$output" =~ (Block no.   [5-9]: extending KSI signature to the earliest available publication: 2018.11.15 00:00:00 UTC.*){5} ]]
+	[[ "$output" =~ (Block no.  1[0-7]: extending KSI signature to the earliest available publication: 2018.11.15 00:00:00 UTC.*){8} ]]
+	[[ "$output" =~ (Block no.  1[8-9]: extending KSI signature to the earliest available publication: 2018.02.15 00:00:00 UTC.*){2} ]]
+	[[ "$output" =~ (Block no.  2[0-4]: extending KSI signature to the earliest available publication: 2018.02.15 00:00:00 UTC.*){5} ]]
+	[[ "$output" =~ (Block no.  25: extending KSI signature to the earliest available publication: 2018.11.15 00:00:00 UTC.*) ]]
+	[[ "$output" =~ (Block no.  2[6-9]: extending KSI signature to the earliest available publication: 2018.02.15 00:00:00 UTC.*){4} ]]
+	[[ "$output" =~ (Block no.  30: extending KSI signature to the earliest available publication: 2018.02.15 00:00:00 UTC.*) ]]
+}
+
+@test "extend log_repaired.logsig to specified publication. Check if every signatures has the same publication. " {
+	run src/logksi extend test/resource/logs_and_signatures/log_repaired -dd --pub-str AAAAAA-C35S3Q-AAJAEO-LVGZFW-DI5Q5A-6KQFIK-C62UVK-TX7ULN-6GZQNY-TXIPP3-MQNLJD-SUWGVT -o test/out/delme.logsig
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ (Block no.   [1-9]: extending KSI signature to the specified publication: 2018.11.15 00:00:00 UTC.*){9} ]]
+	[[ "$output" =~ (Block no.  [1-3][0-9]: extending KSI signature to the specified publication: 2018.11.15 00:00:00 UTC.*){21} ]]
+}

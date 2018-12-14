@@ -1877,7 +1877,7 @@ cleanup:
 	return res;
 }
 
-static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, SIGNATURE_PROCESSORS *processors, BLOCK_INFO *blocks, IO_FILES *files) {
+static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_PublicationsFile *pubFile, SIGNATURE_PROCESSORS *processors, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	KSI_Signature *sig = NULL;
 	KSI_Signature *ext = NULL;
@@ -1998,7 +1998,7 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 		res = LOGKSI_Signature_parseWithPolicy(err, ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_EMPTY, NULL, &sig);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse KSI signature.", blocks->blockNo);
 
-		res = processors->verify_signature(set, err, ksi, sig, (KSI_DataHash*)context.documentHash, context.docAggrLevel, &verificationResult);
+		res = processors->verify_signature(set, err, ksi, blocks, files, sig, (KSI_DataHash*)context.documentHash, context.docAggrLevel, &verificationResult);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: KSI signature verification failed.", blocks->blockNo);
 		/* TODO: add dumping of verification results. */
 		KSI_PolicyVerificationResult_free(verificationResult);
@@ -2009,9 +2009,8 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse KSI signature.", blocks->blockNo);
 
 		print_progressResultExtended(set, DEBUG_LEVEL_2, res);
-		print_progressDescExtended(set, 1, DEBUG_LEVEL_2, "Block no. %3zu: extending KSI signature... ", blocks->blockNo);
 
-		res = processors->extend_signature(set, err, ksi, sig, &context, &ext);
+		res = processors->extend_signature(set, err, ksi, blocks, files, sig, pubFile, &context, &ext);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to extend KSI signature.", blocks->blockNo);
 
 		res = tlv_element_set_signature(tlv, ksi, 0x905, ext);
@@ -2169,7 +2168,7 @@ static int process_ksi_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, S
 		res = LOGKSI_Signature_parseWithPolicy(err, ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_EMPTY, NULL, &sig);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse KSI signature.", blocks->blockNo);
 
-		res = processors->verify_signature(set, err, ksi, sig, NULL, 0, &verificationResult);
+		res = processors->verify_signature(set, err, ksi, blocks, files, sig, NULL, 0, &verificationResult);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: KSI signature verification failed.", blocks->blockNo);
 		/* TODO: add dumping of verification results. */
 		KSI_PolicyVerificationResult_free(verificationResult);
@@ -2555,7 +2554,7 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 			}
 			print_progressDescExtended(set, 1, DEBUG_LEVEL_2, "Block no. %3zu: creating missing KSI signature... ", blocks->blockNo);
 
-			res = processors->create_signature(err, ksi, hash, get_aggregation_level(blocks), &sig);
+			res = processors->create_signature(err, ksi, blocks, files, hash, get_aggregation_level(blocks), &sig);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to sign root hash.", blocks->blockNo);
 
 			res = KSI_TlvElement_new(&tlvSig);
@@ -2839,7 +2838,7 @@ void BLOCK_INFO_reset(BLOCK_INFO *block) {
 	}
 }
 
-static int process_log_signature_general_components_(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, int withBlockSignature, BLOCK_INFO *blocks, IO_FILES *files, SIGNATURE_PROCESSORS *processors) {
+static int process_log_signature_general_components_(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_PublicationsFile *pubFile, int withBlockSignature, BLOCK_INFO *blocks, IO_FILES *files, SIGNATURE_PROCESSORS *processors) {
 	int res = KT_UNKNOWN_ERROR;
 
 	if (set == NULL || err == NULL || ksi == NULL || blocks == NULL || files == NULL || (withBlockSignature && processors == NULL)) {
@@ -2876,7 +2875,7 @@ static int process_log_signature_general_components_(PARAM_SET *set, ERR_TRCKR *
 
 		default:
 			if (withBlockSignature && blocks->ftlv.tag) {
-				res = process_block_signature(set, err, ksi, processors, blocks, files);
+				res = process_block_signature(set, err, ksi, pubFile, processors, blocks, files);
 				if (res != KT_OK) goto cleanup;
 			} else {
 				res = KT_INVALID_INPUT_FORMAT;
@@ -2893,14 +2892,14 @@ cleanup:
 }
 
 static int process_log_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
-	return process_log_signature_general_components_(set, err, ksi, 0, blocks, files, NULL);
+	return process_log_signature_general_components_(set, err, ksi, NULL, 0, blocks, files, NULL);
 }
 
-static int process_log_signature_with_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, SIGNATURE_PROCESSORS *processors) {
-	return process_log_signature_general_components_(set, err, ksi, 1, blocks, files, processors);
+static int process_log_signature_with_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_PublicationsFile *pubFile, BLOCK_INFO *blocks, IO_FILES *files, SIGNATURE_PROCESSORS *processors) {
+	return process_log_signature_general_components_(set, err, ksi, pubFile, 1, blocks, files, processors);
 }
 
-int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_FUNCTION extend_signature, IO_FILES *files) {
+int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_PublicationsFile* pubFile, EXTENDING_FUNCTION extend_signature, IO_FILES *files) {
 	int res;
 	BLOCK_INFO blocks;
 	unsigned char ftlv_raw[SOF_FTLV_BUFFER];
@@ -2929,7 +2928,7 @@ int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTENDING_
 				case 0x903:
 				case 0x911:
 				case 0x904:
-					res = process_log_signature_with_block_signature(set, err, ksi, &blocks, files, &processors);
+					res = process_log_signature_with_block_signature(set, err, ksi, pubFile, &blocks, files, &processors);
 					if (res != KT_OK) goto cleanup;
 				break;
 
@@ -2995,7 +2994,7 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO
 						case 0x903:
 						case 0x911:
 						case 0x904:
-							res = process_log_signature_with_block_signature(set, err, ksi, blocks, files, &processors);
+							res = process_log_signature_with_block_signature(set, err, ksi, NULL, blocks, files, &processors);
 							if (res != KT_OK) goto cleanup;
 						break;
 
@@ -3217,7 +3216,7 @@ int logsignature_extract(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES 
 				case 0x903:
 				case 0x911:
 				case 0x904:
-					res = process_log_signature_with_block_signature(set, err, ksi, &blocks, files, &processors);
+					res = process_log_signature_with_block_signature(set, err, ksi, NULL, &blocks, files, &processors);
 					if (res != KT_OK) goto cleanup;
 				break;
 
@@ -3336,6 +3335,10 @@ cleanup:
 	return res;
 }
 
+static int wrapper_LOGKSI_createSignature(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_DataHash *hash, KSI_uint64_t rootLevel, KSI_Signature **sig) {
+	return LOGKSI_createSignature(err, ksi, hash, rootLevel, sig);
+}
+
 int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files) {
 	int res;
 	int progress;
@@ -3351,7 +3354,7 @@ int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *fi
 	BLOCK_INFO_reset(&blocks);
 	blocks.ftlv_raw = ftlv_raw;
 	memset(&processors, 0, sizeof(processors));
-	processors.create_signature = LOGKSI_createSignature;
+	processors.create_signature = wrapper_LOGKSI_createSignature;
 
 	res = process_magic_number(set, err, &blocks, files);
 	if (res != KT_OK) goto cleanup;
