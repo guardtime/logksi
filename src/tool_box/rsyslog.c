@@ -1251,6 +1251,10 @@ static int finalize_block(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_IN
 		print_debugExtended(set, DEBUG_LEVEL_2, "Block no. %3zu: output hash: %s.\n", blocks->blockNo, buf);
 	}
 
+	if (blocks->unsignedRootHash) {
+		print_debugExtended(set, DEBUG_LEVEL_2, "Warning: Block no. %3zu: unsigned root hash found.\n", blocks->blockNo);
+	}
+
 	if (blocks->finalTreeHashesNone) {
 		print_debugExtended(set, DEBUG_LEVEL_2, "Warning: Block no. %3zu: all final tree hashes are missing.\n", blocks->blockNo);
 		blocks->warningTreeHashes = 1;
@@ -2594,17 +2598,7 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 cleanup:
 
 	print_progressResultExtended(set, DEBUG_LEVEL_2, res);
-	if (blocks) {
-		if (blocks->finalTreeHashesNone) {
-			print_debug("Warning: Block no. %3zu: all final tree hashes are missing. Run 'logksi sign' with '--insert-missing-hashes' to repair the log signature.\n", blocks->blockNo);
-			blocks->warningTreeHashes = 1;
-		} else if (blocks->finalTreeHashesAll) {
-			print_debug("Block no. %3zu: all final tree hashes are present.\n", blocks->blockNo);
-		}
-		if (blocks->unsignedRootHash) {
-			print_debug("Warning: Block no. %3zu: unsigned root hash found.\n", blocks->blockNo);
-		}
-	}
+
 	KSI_Signature_free(sig);
 	KSI_DataHash_free(hash);
 	KSI_DataHash_free(rootHash);
@@ -2682,12 +2676,12 @@ cleanup:
 
 	if (check_warnings(blocks)) {
 		print_warnings("\n");
-		if (blocks && blocks->warningTreeHashes) {
-			print_warnings("Warning: Some tree hashes are missing from the log signature file.\n         Run 'logksi sign' with '--insert-missing-hashes' to repair the log signature.\n");
+		if (blocks && blocks->warningSignatures) {
+			print_warnings("Warning: Unsigned root hashes found.\n         Run 'logksi sign' to perform signing recovery.\n");
 		}
 
-		if (blocks && blocks->warningSignatures) {
-			print_warnings("Warning: Unsigned root hashes found. Run 'logksi sign' to perform signing recovery.\n");
+		if (blocks && blocks->warningTreeHashes) {
+			print_warnings("Warning: Some tree hashes are missing from the log signature file.\n         Run 'logksi sign' with '--insert-missing-hashes' to repair the log signature.\n");
 		}
 
 		if (blocks && blocks->warningLegacy) {
@@ -3015,6 +3009,7 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO
 						print_debugExtended(set, DEBUG_LEVEL_2, "Block no. %3zu: input hash: %s.\n", blocks->blockNo, buf);
 						print_progressDescExtended(set, 0, DEBUG_EQUAL | DEBUG_LEVEL_1 , "Verifying block no. %3zu... ", blocks->blockNo);
 
+
 						/* Check if the last leaf from the previous block matches with the current first block. */
 						if (isFirst == 1 && firstLink != NULL) {
 							print_progressDescExtended(set, 0, DEBUG_LEVEL_2, "Block no. %3zu: verifying inter-linking input hash... ", blocks->blockNo);
@@ -3282,6 +3277,8 @@ int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILE
 
 				case 0x904:
 				{
+					print_progressDescExtended(set, 0, DEBUG_EQUAL | DEBUG_LEVEL_1, "Integrating block no. %3zu: into log signature... ", blocks.blockNo);
+
 					res = process_partial_block(set, err, ksi, &blocks, files);
 					if (res != KT_OK) goto cleanup;
 
@@ -3302,6 +3299,7 @@ int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILE
 
 					res = process_partial_signature(set, err, ksi, &processors, &blocks, files, 0);
 					if (res != KT_OK) goto cleanup;
+					print_progressResultExtended(set, DEBUG_EQUAL | DEBUG_LEVEL_1, res);
 				}
 				break;
 
@@ -3329,7 +3327,7 @@ int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILE
 	res = KT_OK;
 
 cleanup:
-
+	print_progressResultExtended(set, DEBUG_EQUAL | DEBUG_LEVEL_1, res);
 	BLOCK_INFO_freeAndClearInternals(&blocks);
 
 	return res;
