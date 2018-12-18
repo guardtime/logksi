@@ -2,8 +2,6 @@
 
 export KSI_CONF=test/test.cfg
 
-#
-
 
 @test "Extend CMD test: try to extend signature from stdin and from command line simultaneously" {
 	run src/logksi extend test/resource/logs_and_signatures/signed -o test/out/dummy.ksig -d --sig-from-stdin

@@ -9,6 +9,8 @@ test/test_suites/integrate_cmd.bats \
 test/test_suites/integrate_debug_output.bats \
 test/test_suites/verify_after_integrate.bats \
 test/test_suites/sign.bats \
+test/test_suites/sign_debug_output.bats \
+test/test_suites/sign_cmd.bats \
 test/test_suites/verify_after_sign.bats \
 test/test_suites/verify.bats \
 test/test_suites/extend.bats \

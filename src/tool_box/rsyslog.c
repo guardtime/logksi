@@ -2558,7 +2558,7 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 			}
 			print_progressDescExtended(set, 1, DEBUG_LEVEL_2, "Block no. %3zu: creating missing KSI signature... ", blocks->blockNo);
 
-			res = processors->create_signature(err, ksi, blocks, files, hash, get_aggregation_level(blocks), &sig);
+			res = processors->create_signature(set, err, ksi, blocks, files, hash, get_aggregation_level(blocks), &sig);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to sign root hash.", blocks->blockNo);
 
 			res = KSI_TlvElement_new(&tlvSig);
@@ -3333,8 +3333,18 @@ cleanup:
 	return res;
 }
 
-static int wrapper_LOGKSI_createSignature(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_DataHash *hash, KSI_uint64_t rootLevel, KSI_Signature **sig) {
-	return LOGKSI_createSignature(err, ksi, hash, rootLevel, sig);
+static int wrapper_LOGKSI_createSignature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_DataHash *hash, KSI_uint64_t rootLevel, KSI_Signature **sig) {
+	int res = KT_UNKNOWN_ERROR;
+
+	if (set == NULL || err == NULL || ksi == NULL || blocks == NULL || files == NULL || hash == NULL || sig == NULL) {
+		return KT_INVALID_ARGUMENT;
+	}
+
+	print_progressDescExtended(set, 1, DEBUG_EQUAL | DEBUG_LEVEL_1, "Signing Block no. %3zu... ", blocks->blockNo);
+	res = LOGKSI_createSignature(err, ksi, hash, rootLevel, sig);
+	print_progressResultExtended(set, DEBUG_EQUAL | DEBUG_LEVEL_1, res);
+
+	return res;
 }
 
 int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files) {
@@ -3413,7 +3423,7 @@ int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *fi
 	res = KT_OK;
 
 cleanup:
-
+	print_progressResultExtended(set, DEBUG_EQUAL | DEBUG_LEVEL_1, res);
 	BLOCK_INFO_freeAndClearInternals(&blocks);
 
 	return res;
