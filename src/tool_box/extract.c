@@ -41,6 +41,7 @@
 #include "rsyslog.h"
 
 static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
+static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err);
 
 static int generate_filenames(ERR_TRCKR *err, IO_FILES *files);
 static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files);
@@ -87,6 +88,9 @@ int extract_run(int argc, char **argv, char **envp) {
 	if (res != KT_OK) goto cleanup;
 
 	d = PARAM_SET_isSetByName(set, "d");
+
+	res = check_pipe_errors(set, err);
+	if (res != KT_OK) goto cleanup;
 
 	files.user.bStdinLog = PARAM_SET_isSetByName(set, "log-from-stdin");
 	files.user.bStdinSig = PARAM_SET_isSetByName(set, "sig-from-stdin");
@@ -244,6 +248,19 @@ cleanup:
 	return res;
 }
 
+static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err) {
+	int res;
+
+	res = get_pipe_out_error(set, err, NULL, "log,out-log,out-proof", NULL);
+	if (res != KT_OK) goto cleanup;
+
+	res = get_pipe_in_error(set, err, NULL, NULL, "log-from-stdin,sig-from-stdin");
+	if (res != KT_OK) goto cleanup;
+
+cleanup:
+	return res;
+}
+
 static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 	int res;
 	IO_FILES tmp;
@@ -291,7 +308,9 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 	} else if (files->user.outBase) {
 		if (!strcmp(files->user.outBase, "-")) {
 			res = KT_INVALID_CMD_PARAM;
-			ERR_CATCH_MSG(err, res, "Error: Both output files cannot be redirected to stdout.");
+			ERR_TRCKR_ADD(err, res, "Error: Both output files cannot be redirected to stdout.");
+			ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion:  Use ONLY '--out-log -' OR '--out-proof -' to redirect desired output to stdout.\n");
+			goto cleanup;
 		} else {
 			res = concat_names(files->user.outBase, ".excerpt", &tmp.internal.outLog);
 			ERR_CATCH_MSG(err, res, "Error: Could not generate output log records file name.");
@@ -314,13 +333,8 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 			ERR_CATCH_MSG(err, res, "Error: Could not duplicate output integrity proof file name.");
 		}
 	} else if (files->user.outBase) {
-		if (!strcmp(files->user.outBase, "-")) {
-			res = KT_INVALID_CMD_PARAM;
-			ERR_CATCH_MSG(err, res, "Error: Both output files cannot be redirected to stdout.");
-		} else {
-			res = concat_names(files->user.outBase, ".excerpt.logsig", &tmp.internal.outProof);
-			ERR_CATCH_MSG(err, res, "Error: Could not generate output log records file name.");
-		}
+		res = concat_names(files->user.outBase, ".excerpt.logsig", &tmp.internal.outProof);
+		ERR_CATCH_MSG(err, res, "Error: Could not generate output log records file name.");
 	} else {
 		if (files->user.inLog) {
 			res = concat_names(files->user.inLog, ".excerpt.logsig", &tmp.internal.outProof);
@@ -329,11 +343,6 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 			res = KT_INVALID_CMD_PARAM;
 			ERR_CATCH_MSG(err, res, "Error: Output integrity proof file name must be specified if log file is read from stdin.");
 		}
-	}
-
-	if (tmp.internal.bStdoutLog && tmp.internal.bStdoutProof) {
-		res = KT_INVALID_CMD_PARAM;
-		ERR_CATCH_MSG(err, res, "Error: Both output files cannot be redirected to stdout.");
 	}
 
 	if(!tmp.internal.bStdoutLog) {

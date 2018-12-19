@@ -2051,8 +2051,6 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 			}
 		}
 
-		print_progressResultExtended(set, DEBUG_LEVEL_2, res);
-		print_progressDescExtended(set, 0, DEBUG_LEVEL_2, "Block no. %3zu: extracting log records... ", blocks->blockNo);
 
 		for (j = 0; j < blocks->nofExtractPositionsInBlock; j++) {
 			unsigned char buf[0xFFFF + 4];
@@ -2060,6 +2058,12 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 			size_t i;
 
 			if (blocks->extractInfo[j].extractOffset && blocks->extractInfo[j].extractOffset <= blocks->nofRecordHashes) {
+				size_t rowNumber = blocks->nofTotalRecordHashes - blocks->nofRecordHashes + blocks->extractInfo[j].extractOffset;
+
+				print_progressResultExtended(set, DEBUG_LEVEL_1, res);
+				print_progressDescExtended(set, 0, DEBUG_LEVEL_2, "Block no. %3zu: extracting log records (line %3zu)... ", blocks->blockNo, rowNumber);
+				print_progressDescExtended(set, 0, DEBUG_EQUAL | DEBUG_LEVEL_1, "Extracting log record from block %3zu (line %3zu)... ", blocks->blockNo, rowNumber);
+
 				res = KSI_TlvElement_new(&recChain);
 				ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to create record chain.", blocks->extractInfo[j].extractPos);
 				recChain->ftlv.tag = 0x0907;
@@ -2110,7 +2114,10 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 				KSI_TlvElement_free(recChain);
 				recChain = NULL;
 			}
+
 		}
+
+		print_progressResultExtended(set, DEBUG_EQUAL | DEBUG_LEVEL_1, res);
 	}
 
 	{
@@ -2126,7 +2133,7 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 	res = KT_OK;
 
 cleanup:
-
+	if (processors->extract_signature) print_progressResultExtended(set, DEBUG_EQUAL | DEBUG_LEVEL_1, res);
 	print_progressResultExtended(set, DEBUG_LEVEL_2, res);
 
 	KSI_Signature_free(sig);
