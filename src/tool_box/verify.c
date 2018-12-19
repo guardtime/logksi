@@ -553,7 +553,7 @@ static void handle_verification_result(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *
 				OBJPRINT_getVerificationErrorDescription(verificationResult->errorCode), task_desc);
 	}
 }
-typedef int (*VERIFYING_FUNCTION)(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_DataHash *hash, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **verificationResult);
+
 static int signature_verify_general(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files,
 									KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out) {
 	int res;
