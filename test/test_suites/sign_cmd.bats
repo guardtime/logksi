@@ -2,15 +2,6 @@
 
 export KSI_CONF=test/test.cfg
 
-
-#@test "extend CMD test: try to extend signature from stdin and from command line simultaneously" {
-#	run src/logksi extend test/resource/logs_and_signatures/signed -o test/out/dummy.ksig -d --sig-from-stdin
-#	[ "$status" -eq 3 ]
-#	[[ "$output" =~ "Maybe you want to: Extend, from file, to the earliest available publication. --input -X -P" ]]
-#	[[ "$output" =~ "Maybe you want to: Extend, from standard input, to the earliest available publication. --sig-from-stdin -X -P" ]]
-#	[[ "$output" =~ "Maybe you want to: Extend, from file, to time specified in publications string. --input -X -P --pub-str" ]]
-#}
-
 @test "sign CMD test: try to use invalid stdout combination" {
 	run src/logksi sign test/resource/logs_and_signatures/unsigned -o - -d --log -
 	[ "$status" -eq 3 ]

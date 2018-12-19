@@ -2,11 +2,6 @@
 
 export KSI_CONF=test/test.cfg
 
-#
-
-#src/logksi extend test/resource/logs_and_signatures/signed -o test/out/dummy.ksig -d
-#src/logksi extend test/resource/logs_and_signatures/signed -o test/out/dummy.ksig --pub-str AAAAAA-C3JKHI-AAKZ7D-HQQZU2-AF2ZKN-ZNXY5B-LMWRIN-DI37WF-PETGGY-YWWEA7-3MRG3N-V4WO2F -d
-
 @test "extend output with debug level 1" {
 	run src/logksi extend test/resource/logs_and_signatures/signed -o test/out/dummy.ksig -d
 	[ "$status" -eq 0 ]
