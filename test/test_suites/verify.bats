@@ -51,15 +51,3 @@ export KSI_CONF=test/test.cfg
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ .*(Warning).*(Block).*(1).*(and).*(2).*(in file).*(unsigned).*(has same signing time).*(1540389597).* ]]
 }
-
-@test "CDM test: use invalid stdin combination" {
-	run src/logksi verify --log-from-stdin --input-hash - test/resource/interlink/ok-testlog-interlink-1.logsig
-	[ "$status" -eq 3 ]
-	[[ "$output" =~ "Error: Multiple different simultaneous inputs from stdin (--input-hash -, --log-from-stdin)" ]]
-}
-
-@test "CDM test: use invalid stdout combination" {
-	run src/logksi verify  test/resource/interlink/ok-testlog-interlink-1 --log - --output-hash -
-	[ "$status" -eq 3 ]
-	[[ "$output" =~ "Error: Multiple different simultaneous outputs to stdout (--log -, --output-hash -)." ]]
-}

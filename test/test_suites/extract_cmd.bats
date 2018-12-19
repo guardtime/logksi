@@ -42,7 +42,7 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ (Task).*(Extract records and hash chains, log from file, signature from stdin).*(is invalid).* ]]
 }
 
-@test "extract CMD: attemp to read log file from stdin without specifying the output file" {
+@test "extract CMD: attempt to read log file from stdin without specifying the output file" {
 	run ./src/logksi extract --log-from-stdin test/resource/logsignatures/extract.base.logsig -r 1 -d
 	[ "$status" -eq 3 ]
 	[[ "$output" =~ "Error: Output log records file name must be specified if log file is read from stdin." ]]
@@ -51,25 +51,25 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ "Error: Output integrity proof file name must be specified if log file is read from stdin." ]]
 }
 
-@test "extract CMD: attemp to extract a range given in descending order" {
+@test "extract CMD: attempt to extract a range given in descending order" {
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r 7-3
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: List of positions must be given in strictly ascending order." ]]
 }
 
-@test "extract CMD: attemp to extract a list that contains duplicates" {
+@test "extract CMD: attempt to extract a list that contains duplicates" {
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r 3,4,5-7,7
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: List of positions must be given in strictly ascending order." ]]
 }
 
-@test "extract CMD: attemp to extract a list of ranges given in descending order" {
+@test "extract CMD: attempt to extract a list of ranges given in descending order" {
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r 6-7,3-5
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: List of positions must be given in strictly ascending order." ]]
 }
 
-@test "extract CMD: attemp to extract a list that contains non-positive numbers" {
+@test "extract CMD: attempt to extract a list that contains non-positive numbers" {
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r 6,-7
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
@@ -90,7 +90,7 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
 }
 
-@test "extract CMD: attemp to extract a list that contains syntax errors" {
+@test "extract CMD: attempt to extract a list that contains syntax errors" {
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r ,
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
@@ -111,7 +111,7 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
 }
 
-@test "extract CMD: attemp to extract a list that contains whitepace" {
+@test "extract CMD: attempt to extract a list that contains whitepace" {
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r "5 6"
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
@@ -150,7 +150,7 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ "Error: List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
 }
 
-@test "extract CMD: attemp to extract a list that contains non-decimal integers" {
+@test "extract CMD: attempt to extract a list that contains non-decimal integers" {
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r 0x5
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
@@ -165,7 +165,7 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
 }
 
-@test "extract CMD: attemp to extract a list that contains illegal characters" {
+@test "extract CMD: attempt to extract a list that contains illegal characters" {
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r a
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
