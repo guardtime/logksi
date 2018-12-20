@@ -54,6 +54,15 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files);
 static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files);
 static void close_input_and_output_files(ERR_TRCKR *err, int res, IO_FILES *files);
 
+enum {
+	EXT_TO_EAV_PUBLICATION_FROM_FILE = 0x00,
+	EXT_TO_EAV_PUBLICATION_FROM_STDIN = 0x01,
+	EXT_TO_TIME_FROM_FILE = 0x02,
+	EXT_TO_TIME_FROM_STDIN = 0x03,
+	EXT_TO_SPEC_PUBLICATION_FROM_FILE = 0x04,
+	EXT_TO_SPEC_PUBLICATION_FROM_STDIN = 0x05,
+};
+
 int extend_run(int argc, char** argv, char **envp) {
 	int res;
 	TASK *task = NULL;
@@ -108,10 +117,10 @@ int extend_run(int argc, char** argv, char **envp) {
 	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
 
 	switch(TASK_getID(task)) {
-		case 0:
-		case 1:
-		case 4:
-		case 5:
+		case EXT_TO_EAV_PUBLICATION_FROM_FILE:
+		case EXT_TO_EAV_PUBLICATION_FROM_STDIN:
+		case EXT_TO_SPEC_PUBLICATION_FROM_FILE:
+		case EXT_TO_SPEC_PUBLICATION_FROM_STDIN:
 				print_progressDesc(d, "%s", getPublicationsFileRetrieveDescriptionString(set));
 				res = LOGKSI_receivePublicationsFile(err, ksi, &pubFile);
 				ERR_CATCH_MSG(err, res, "Error: Unable to receive publications file.");
@@ -127,18 +136,18 @@ int extend_run(int argc, char** argv, char **envp) {
 	}
 
 	switch(TASK_getID(task)) {
-		case 0:
-		case 1:
+		case EXT_TO_EAV_PUBLICATION_FROM_FILE:
+		case EXT_TO_EAV_PUBLICATION_FROM_STDIN:
 			extend_signature = extend_to_nearest_publication;
 		break;
 
-		case 2:
-		case 3:
+		case EXT_TO_TIME_FROM_FILE:
+		case EXT_TO_TIME_FROM_STDIN:
 			extend_signature = extend_to_specified_time;
 		break;
 
-		case 4:
-		case 5:
+		case EXT_TO_SPEC_PUBLICATION_FROM_FILE:
+		case EXT_TO_SPEC_PUBLICATION_FROM_STDIN:
 			extend_signature = extend_to_specified_publication;
 		break;
 
@@ -252,7 +261,7 @@ const char *extend_get_desc(void) {
 static int extend_to_nearest_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_PublicationsFile *pubFile, KSI_VerificationContext *context, KSI_Signature **ext) {
 	int res;
 	KSI_Signature *tmp = NULL;
-	KSI_Integer *sigTie = NULL;
+	KSI_Integer *sigTime = NULL;
 	KSI_PublicationRecord *pubRec = NULL;
 	char buf[256];
 
@@ -261,10 +270,10 @@ static int extend_to_nearest_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX
 		goto cleanup;
 	}
 
-	res = KSI_Signature_getSigningTime(sig, &sigTie);
+	res = KSI_Signature_getSigningTime(sig, &sigTime);
 	ERR_CATCH_MSG(err, res, "Error: Unable to get signing time.");
 
-	res = KSI_PublicationsFile_getNearestPublication(pubFile, sigTie, &pubRec);
+	res = KSI_PublicationsFile_getNearestPublication(pubFile, sigTime, &pubRec);
 	ERR_CATCH_MSG(err, res, "Error: Unable to get earliest available publication from publications file.");
 
 
@@ -273,7 +282,7 @@ static int extend_to_nearest_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX
 		print_progressDescExtended(set, 1, DEBUG_LEVEL_2, "Block no. %3zu: extending KSI signature to the earliest available publication (na)... ", blocks->blockNo);
 		print_progressDescExtended(set, 1, DEBUG_EQUAL | DEBUG_LEVEL_1, "Extending Block no. %3zu to the earliest available publication... ", blocks->blockNo);
 		res = KSI_EXTEND_NO_SUITABLE_PUBLICATION;
-		ERR_TRCKR_ADD(err, res, "No suitable publication found from publications file to extend the signature to (signing time %s (%llu)).", KSI_Integer_toDateString(sigTie, buf, sizeof(buf)), (unsigned long long)KSI_Integer_getUInt64(sigTie));
+		ERR_TRCKR_ADD(err, res, "No suitable publication found from publications file to extend the signature to (signing time %s (%llu)).", KSI_Integer_toDateString(sigTime, buf, sizeof(buf)), (unsigned long long)KSI_Integer_getUInt64(sigTime));
 	} else {
 		KSI_PublicationData *pubData = NULL;
 		KSI_Integer *pubTime = NULL;
@@ -282,7 +291,7 @@ static int extend_to_nearest_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX
 		ERR_CATCH_MSG(err, res, "Error: Unable to get publication data.");
 
 		res = KSI_PublicationData_getTime(pubData, &pubTime);
-		ERR_CATCH_MSG(err, res, "Error: Unable to get publication data.");
+		ERR_CATCH_MSG(err, res, "Error: Unable to get publication time.");
 
 		print_progressDescExtended(set, 1, DEBUG_LEVEL_2, "Block no. %3zu: extending KSI signature to the earliest available publication: %s (%llu)... ", blocks->blockNo, KSI_Integer_toDateString(pubTime, buf, sizeof(buf)), (unsigned long long)KSI_Integer_getUInt64(pubTime));
 		print_progressDescExtended(set, 1, DEBUG_EQUAL | DEBUG_LEVEL_1, "Extending Block no. %3zu to the earliest available publication... ", blocks->blockNo);
@@ -440,22 +449,28 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	 * Define possible tasks.
 	 */
 	/*					  ID	DESC												MAN						ATL		FORBIDDEN			IGN	*/
-	TASK_SET_add(task_set, 0,	"Extend, "
+	TASK_SET_add(task_set, EXT_TO_EAV_PUBLICATION_FROM_FILE,
+								"Extend, "
 								"from file, "
 								"to the earliest available publication.",			"input,X,P",					NULL,	"sig-from-stdin,T,pub-str",	NULL);
-	TASK_SET_add(task_set, 1,	"Extend, "
+	TASK_SET_add(task_set, EXT_TO_EAV_PUBLICATION_FROM_STDIN,
+								"Extend, "
 								"from standard input, "
 								"to the earliest available publication.",			"sig-from-stdin,X,P",			NULL,	"input,T,pub-str",			NULL);
-	TASK_SET_add(task_set, 2,	"Extend, "
+	TASK_SET_add(task_set, EXT_TO_TIME_FROM_FILE,
+								"Extend, "
 								"from file, "
 								"to the specified time.",							"input,X,T",					NULL,	"sig-from-stdin,pub-str",	NULL);
-	TASK_SET_add(task_set, 3,	"Extend, "
+	TASK_SET_add(task_set, EXT_TO_TIME_FROM_STDIN,
+								"Extend, "
 								"from standard input, "
 								"to the specified time.",							"sig-from-stdin,X,T",			NULL,	"input,pub-str",			NULL);
-	TASK_SET_add(task_set, 4,	"Extend, "
+	TASK_SET_add(task_set, EXT_TO_SPEC_PUBLICATION_FROM_FILE,
+								"Extend, "
 								"from file, "
 								"to time specified in publications string.",		"input,X,P,pub-str",			NULL,	"sig-from-stdin,T",			NULL);
-	TASK_SET_add(task_set, 5,	"Extend, "
+	TASK_SET_add(task_set, EXT_TO_SPEC_PUBLICATION_FROM_STDIN,
+								"Extend, "
 								"from standard input, "
 								"to time specified in publications string.",		"sig-from-stdin,X,P,pub-str",	NULL,	"input,T",					NULL);
 
