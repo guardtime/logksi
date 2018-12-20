@@ -16,9 +16,7 @@ Finds the log signature file (\fI<logfile>.logsig\fR or \fI<logfile>.gtsig\fR) b
 .LP
 After the signatures are extended and the corresponding publication records are attached, the log signatures can be verified using publication-based verification where only trusted publications file or a publication string in printed media is needed to perform the verification. See \fBlogksi-verify\fR(1) for details.
 .LP
-User must have access to KSI extending service and a trusted KSI publications file. By default the KSI signatures are extended to the earliest available publication. Use the option \fB--pub-str\fR to extend signatures to the publication denoted by the given publication string.
-.LP
-Note that all KSI signatures present in the log signature file will be attempted to extend to the same publication. If for some reason the extending of at least one signature fails, none of the signatures are extended.
+User must have access to KSI extending service and a trusted KSI publications file. By default the KSI signatures are extended to the earliest available publication. Use the option \fB--pub-str\fR to extend signatures to the publication denoted by the given publication string. Note that all KSI signatures present in the log signature file will be attempted to extend to the same publication. If for some reason the extending of at least one signature fails, none of the signatures are extended.
 .\"
 .SH OPTIONS
 .TP

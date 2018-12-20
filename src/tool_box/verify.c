@@ -66,12 +66,12 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
 static int check_io_naming_and_type_errors(PARAM_SET *set, ERR_TRCKR *err);
 static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err);
 
-static int signature_verify_general(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
-static int signature_verify_internally(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
-static int signature_verify_key_based(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
-static int signature_verify_publication_based_with_user_pub(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
-static int signature_verify_publication_based_with_pubfile(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,  KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
-static int signature_verify_calendar_based(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
+static int signature_verify_general(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
+static int signature_verify_internally(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
+static int signature_verify_key_based(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
+static int signature_verify_publication_based_with_user_pub(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
+static int signature_verify_publication_based_with_pubfile(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,  BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
+static int signature_verify_calendar_based(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
 static int generate_filenames(ERR_TRCKR *err, IO_FILES *files);
 static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files);
 static void close_log_and_signature_files(IO_FILES *files);
@@ -554,7 +554,7 @@ static void handle_verification_result(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *
 	}
 }
 
-static int signature_verify_general(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
+static int signature_verify_general(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files,
 									KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out) {
 	int res;
 	int d = PARAM_SET_isSetByName(set, "d");
@@ -598,8 +598,8 @@ cleanup:
 	return res;
 }
 
-static int signature_verify_internally(PARAM_SET *set, ERR_TRCKR *err,
-									   KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
+static int signature_verify_internally(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files,
+									   KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
 									   KSI_PolicyVerificationResult **out) {
 	int res;
 	int d;
@@ -626,8 +626,8 @@ cleanup:
 }
 
 
-static int signature_verify_key_based(PARAM_SET *set, ERR_TRCKR *err,
-									  KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
+static int signature_verify_key_based(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files,
+									  KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
 									  KSI_PolicyVerificationResult **out) {
 	int res;
 	int d = PARAM_SET_isSetByName(set, "d");
@@ -654,7 +654,7 @@ cleanup:
 	return res;
 }
 
-static int signature_verify_publication_based_with_user_pub(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
+static int signature_verify_publication_based_with_user_pub(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files,
 															KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out) {
 	int res;
 	int d = PARAM_SET_isSetByName(set, "d");
@@ -696,8 +696,8 @@ cleanup:
 	return res;
 }
 
-static int signature_verify_publication_based_with_pubfile(PARAM_SET *set, ERR_TRCKR *err,
-														   KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
+static int signature_verify_publication_based_with_pubfile(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files,
+														   KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
 														   KSI_PolicyVerificationResult **out) {
 	int res;
 	int d = PARAM_SET_isSetByName(set, "d");
@@ -725,8 +725,8 @@ cleanup:
 	return res;
 }
 
-static int signature_verify_calendar_based(PARAM_SET *set, ERR_TRCKR *err,
-										   KSI_CTX *ksi, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
+static int signature_verify_calendar_based(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files,
+										   KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
 										   KSI_PolicyVerificationResult **out) {
 	int res;
 	int d = PARAM_SET_isSetByName(set, "d");

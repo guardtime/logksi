@@ -42,6 +42,7 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files, int forc
 static int acquire_file_locks(ERR_TRCKR *err, IO_FILES *files);
 static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files);
 static void close_input_and_output_files(ERR_TRCKR *err, int res, IO_FILES *files);
+static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err);
 
 int integrate_run(int argc, char **argv, char **envp) {
 	int res;
@@ -82,6 +83,9 @@ int integrate_run(int argc, char **argv, char **envp) {
 	if (res != KT_OK) goto cleanup;
 
 	d = PARAM_SET_isSetByName(set, "d");
+
+	res = check_pipe_errors(set, err);
+	if (res != KT_OK) goto cleanup;
 
 	res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.user.inLog);
 	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
@@ -179,8 +183,8 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	/**
 	 * Configure parameter set, control, repair and object extractor function.
 	 */
-	PARAM_SET_addControl(set, "{input}", isFormatOk_path, NULL, convertRepair_path, NULL);
-	PARAM_SET_addControl(set, "{log}{o}", isFormatOk_inputFile, NULL, convertRepair_path, NULL);
+	PARAM_SET_addControl(set, "{input}", isFormatOk_inputFile, NULL, convertRepair_path, NULL);
+	PARAM_SET_addControl(set, "{log}{o}", isFormatOk_path, NULL, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{insert-missing-hashes}{force-overwrite}{use-computed-hash-on-fail}{use-stored-hash-on-fail}{d}", isFormatOk_flag, NULL, NULL, NULL);
 
 	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
@@ -198,6 +202,16 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 
 cleanup:
 
+	return res;
+}
+
+static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err) {
+	int res;
+
+	res = get_pipe_out_error(set, err, NULL, "o,log", NULL);
+	if (res != KT_OK) goto cleanup;
+
+cleanup:
 	return res;
 }
 
