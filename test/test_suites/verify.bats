@@ -3,25 +3,25 @@
 export KSI_CONF=test/test.cfg
 
 @test "verify log_repaired.logsig" {
-	run ./src/logksi verify test/resource/logs_and_signatures/log_repaired -dd --ignore-desc-block-time
+	run ./src/logksi verify test/resource/logs_and_signatures/log_repaired -ddd --ignore-desc-block-time
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 }
 
 @test "verify log_repaired.logsig internally" {
-	run ./src/logksi verify --ver-int test/resource/logs_and_signatures/log_repaired -dd --ignore-desc-block-time
+	run ./src/logksi verify --ver-int test/resource/logs_and_signatures/log_repaired -ddd --ignore-desc-block-time
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 }
 
 @test "verify log_repaired.logsig against calendar" {
-	run ./src/logksi verify --ver-cal test/resource/logs_and_signatures/log_repaired -dd --ignore-desc-block-time
+	run ./src/logksi verify --ver-cal test/resource/logs_and_signatures/log_repaired -ddd --ignore-desc-block-time
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 }
 
 @test "verify log_repaired.logsig against key" {
-	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/log_repaired -dd --ignore-desc-block-time
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/log_repaired -ddd --ignore-desc-block-time
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 }
@@ -34,14 +34,14 @@ export KSI_CONF=test/test.cfg
 }
 
 @test "try verifying log_repaired.logsig against signed logfile" {
-	run ./src/logksi verify test/resource/logs_and_signatures/signed test/resource/logs_and_signatures/log_repaired.logsig -dd
+	run ./src/logksi verify test/resource/logs_and_signatures/signed test/resource/logs_and_signatures/log_repaired.logsig -ddd
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Failed to verify logline no. 1:" ]]
 	[[ "$output" =~ "Log signature verification failed." ]]
 }
 
 @test "verify compressed log from stdin" {
-	run bash -c "zcat < test/resource/logfiles/secure.gz | ./src/logksi verify test/resource/logsignatures/secure.logsig --log-from-stdin -dd"
+	run bash -c "zcat < test/resource/logfiles/secure.gz | ./src/logksi verify test/resource/logsignatures/secure.logsig --log-from-stdin -ddd"
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 }

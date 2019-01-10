@@ -59,13 +59,13 @@ export KSI_CONF=test/test.cfg
 }
 
 @test "verify CMD test: Try to verify log file from stdin and specify multiple input files" {
-	run bash -c "echo dummy signature | ./src/logksi verify --log-from-stdin -dd test/resource/logfiles/unsigned test/resource/logfiles/unsigned"
+	run bash -c "echo dummy signature | ./src/logksi verify --log-from-stdin -ddd test/resource/logfiles/unsigned test/resource/logfiles/unsigned"
 	[ "$status" -eq 3 ]
 	[[ "$output" =~ (Error).*(Log file from stdin [(]--log-from-stdin[)] needs only ONE explicitly specified log signature file, but there are 2)  ]]
 }
 
 @test "verify CMD test: Try to verify log file from stdin and from input after --" {
-	run bash -c "echo dummy signature | ./src/logksi verify --log-from-stdin -dd -- test/resource/logfiles/unsigned"
+	run bash -c "echo dummy signature | ./src/logksi verify --log-from-stdin -ddd -- test/resource/logfiles/unsigned"
 	[ "$status" -eq 3 ]
 	[[ "$output" =~ (Error).*(It is not possible to verify both log file from stdin [(]--log-from-stdin[)] and log file[(]s[)] specified after [-][-])  ]]
 }
@@ -83,7 +83,7 @@ export KSI_CONF=test/test.cfg
 }
 
 @test "verify CMD test: Try to use invalid certificate constraints: Invalid constraints format" {
-	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/log_repaired -dd --ignore-desc-block-time --cnstr = --cnstr =A --cnstr B=
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/log_repaired -ddd --ignore-desc-block-time --cnstr = --cnstr =A --cnstr B=
 	[ "$status" -eq 3 ]
 	[[ "$output" =~ (Parameter is invalid).*(Parameter).*(--cnstr).*(=) ]]
 	[[ "$output" =~ (Parameter is invalid).*(Parameter).*(--cnstr).*(=A) ]]
@@ -91,7 +91,7 @@ export KSI_CONF=test/test.cfg
 }
 
 @test "verify CMD test: Try to use invalid certificate constraints: Invalid constraints OID" {
-	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/log_repaired -dd --ignore-desc-block-time --cnstr dummy=nothing
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/log_repaired -ddd --ignore-desc-block-time --cnstr dummy=nothing
 	[ "$status" -eq 3 ]
 	[[ "$output" =~ (OID is invalid).*(Parameter).*(--cnstr).*(dummy=nothing) ]]
 }

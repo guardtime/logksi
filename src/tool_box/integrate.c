@@ -107,6 +107,8 @@ int integrate_run(int argc, char **argv, char **envp) {
 		goto cleanup;
 	} else if (res != KT_OK) goto cleanup;
 
+	print_progressDescExtended(set, 0, DEBUG_EQUAL | DEBUG_LEVEL_1, "Integrating... ");
+
 	res = logsignature_integrate(set, err, ksi, &files);
 	if (res != KT_OK) goto cleanup;
 

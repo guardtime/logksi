@@ -106,6 +106,8 @@ int sign_run(int argc, char** argv, char **envp) {
 	res = open_input_and_output_files(err, &files);
 	if (res != KT_OK) goto cleanup;
 
+	print_progressDescExtended(set, 0, DEBUG_EQUAL | DEBUG_LEVEL_1, "Signing... ");
+
 	res = logsignature_sign(set, err, ksi, &files);
 	if (res != KT_OK) goto cleanup;
 
