@@ -242,6 +242,7 @@ char *extend_help_toString(char*buf, size_t len) {
 		"             with '-o' to avoid overwriting of the original log signature file.\n"
 		" -d\n"
 		"           - Print detailed information about processes and errors to stderr.\n"
+		"             to make output more verbose use -dd or -ddd.\n"
 		" --conf <file>\n"
 		"             Read configuration options from the given file.\n"
 		"             Configuration options given explicitly on command line will\n"

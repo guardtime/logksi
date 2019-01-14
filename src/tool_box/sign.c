@@ -170,6 +170,7 @@ char *sign_help_toString(char*buf, size_t len) {
 		"             towards KSI aggregator. If not set, default algorithm is used.\n"
 		" -d\n"
 		"           - Print detailed information about processes and errors to stderr.\n"
+		"             to make output more verbose use -dd or -ddd.\n"
 		" --show-progress\n"
 		"           - Print signing progress. Only valid with '-d'.\n"
 		" --conf <file>\n"
