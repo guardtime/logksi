@@ -64,7 +64,7 @@ cp -r test/resource/logsignatures/legacy_with_missing_tree_hashes.gtsig test/out
 @test "insert missing tree hashes into extended legacy.gtsig" {
 	run ./src/logksi extend test/out/legacy_with_missing_tree_hashes_1 --enable-rfc3161-conversion -ddd
 	[ "$status" -eq 0 ]
-	[[ "$output" =~ "Warning: Block no.   1: all final tree hashes are missing." ]]
+	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	run ./src/logksi sign test/out/legacy_with_missing_tree_hashes_1 --insert-missing-hashes -ddd
 	[ "$status" -eq 0 ]
@@ -80,7 +80,7 @@ cp -r test/resource/logsignatures/legacy_with_missing_tree_hashes.gtsig test/out
 	run ./src/logksi verify test/out/legacy_with_missing_tree_hashes_2 -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Warning: RFC3161 timestamp(s) found in log signature." ]]
-	[[ "$output" =~ "Warning: Block no.   1: all final tree hashes are missing." ]]
+	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	run ./src/logksi sign test/out/legacy_with_missing_tree_hashes_2 --insert-missing-hashes -ddd
 	[ "$status" -eq 0 ]

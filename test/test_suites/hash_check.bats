@@ -35,7 +35,7 @@ cp -r test/resource/logsignatures/tree_hashes_final_all_present.logsig test/out
 	run ./src/logksi verify test/out/all_hashes -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	[[ "$output" =~ "Warning: Block no.   1: all final tree hashes are missing." ]]
+	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
 }
 
 @test "insert missing hashes" {

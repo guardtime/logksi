@@ -127,15 +127,15 @@ cp -r test/resource/logfiles/treehash? test/out
 	run ./src/logksi integrate test/out/tree_1 -ddd --force-overwrite
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	[[ "$output" =~ "Warning: Block no.   1: all final tree hashes are missing." ]]
+	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
 	run ./src/logksi integrate test/out/tree_2 -ddd --force-overwrite
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	[[ "$output" =~ "Warning: Block no.   1: all final tree hashes are missing." ]]
+	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
 	run ./src/logksi integrate test/out/tree_3 -ddd --force-overwrite
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	[[ "$output" =~ "Warning: Block no.   1: all final tree hashes are missing." ]]
+	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
 	run ./src/logksi integrate test/out/tree_4 -ddd --force-overwrite
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
@@ -159,15 +159,15 @@ cp -r test/resource/logfiles/treehash? test/out
 	run ./src/logksi verify test/out/treehash1 test/out/tree_1.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	[[ "$output" =~ "Warning: Block no.   1: all final tree hashes are missing." ]]
+	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
 	run ./src/logksi verify test/out/treehash2 test/out/tree_2.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	[[ "$output" =~ "Warning: Block no.   1: all final tree hashes are missing." ]]
+	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
 	run ./src/logksi verify test/out/treehash3 test/out/tree_3.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	[[ "$output" =~ "Warning: Block no.   1: all final tree hashes are missing." ]]
+	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
 	run ./src/logksi verify test/out/treehash4 test/out/tree_4.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
@@ -319,15 +319,15 @@ cp -r test/resource/logfiles/treehash? test/out
 	run ./src/logksi integrate test/out/rec_tree_1 -ddd --force-overwrite
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	[[ "$output" =~ "Warning: Block no.   1: all final tree hashes are missing." ]]
+	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
 	run ./src/logksi integrate test/out/rec_tree_2 -ddd --force-overwrite
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	[[ "$output" =~ "Warning: Block no.   1: all final tree hashes are missing." ]]
+	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
 	run ./src/logksi integrate test/out/rec_tree_3 -ddd --force-overwrite
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	[[ "$output" =~ "Warning: Block no.   1: all final tree hashes are missing." ]]
+	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
 	run ./src/logksi integrate test/out/rec_tree_4 -ddd --force-overwrite
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
@@ -335,15 +335,15 @@ cp -r test/resource/logfiles/treehash? test/out
 	run ./src/logksi integrate test/out/rec_tree_5 -ddd --force-overwrite
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	[[ "$output" =~ "Warning: Block no.   1: all final tree hashes are missing." ]]
+	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
 	run ./src/logksi integrate test/out/rec_tree_6 -ddd --force-overwrite
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	[[ "$output" =~ "Warning: Block no.   1: all final tree hashes are missing." ]]
+	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
 	run ./src/logksi integrate test/out/rec_tree_7 -ddd --force-overwrite
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	[[ "$output" =~ "Warning: Block no.   1: all final tree hashes are missing." ]]
+	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
 	run ./src/logksi integrate test/out/rec_tree_8 -ddd --force-overwrite
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
@@ -354,15 +354,15 @@ cp -r test/resource/logfiles/treehash? test/out
 	run ./src/logksi verify test/out/treehash1 test/out/rec_tree_1.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	[[ "$output" =~ "Warning: Block no.   1: all final tree hashes are missing." ]]
+	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
 	run ./src/logksi verify test/out/treehash2 test/out/rec_tree_2.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	[[ "$output" =~ "Warning: Block no.   1: all final tree hashes are missing." ]]
+	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
 	run ./src/logksi verify test/out/treehash3 test/out/rec_tree_3.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	[[ "$output" =~ "Warning: Block no.   1: all final tree hashes are missing." ]]
+	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
 	run ./src/logksi verify test/out/treehash4 test/out/rec_tree_4.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
@@ -370,15 +370,15 @@ cp -r test/resource/logfiles/treehash? test/out
 	run ./src/logksi verify test/out/treehash5 test/out/rec_tree_5.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	[[ "$output" =~ "Warning: Block no.   1: all final tree hashes are missing." ]]
+	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
 	run ./src/logksi verify test/out/treehash6 test/out/rec_tree_6.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	[[ "$output" =~ "Warning: Block no.   1: all final tree hashes are missing." ]]
+	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
 	run ./src/logksi verify test/out/treehash7 test/out/rec_tree_7.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	[[ "$output" =~ "Warning: Block no.   1: all final tree hashes are missing." ]]
+	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
 	run ./src/logksi verify test/out/treehash8 test/out/rec_tree_8.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]

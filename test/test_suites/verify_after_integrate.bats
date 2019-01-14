@@ -7,7 +7,7 @@ cp -r test/resource/logfiles/signed test/out
 @test "verify integrated signed.logsig" {
 	run ./src/logksi verify test/out/signed -ddd
 	[ "$status" -eq 0 ]
-	[[ "$output" =~ "Block no.   1: all final tree hashes are missing." ]]
+	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 }
 
@@ -30,7 +30,7 @@ cp -r test/resource/logfiles/unsigned test/out
 @test "try verifying integrated unsigned.logsig" {
 	run ./src/logksi verify test/out/unsigned -ddd
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Block no.   1: all final tree hashes are missing." ]]
+	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
 	[[ "$output" =~ "missing KSI signature in block signature." ]]
 }
 
