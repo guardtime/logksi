@@ -2093,13 +2093,13 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 	blocks->nofTotalRecordHashes += blocks->nofRecordHashes;
 
 	if (blocks->firstLineInBlock < blocks->nofTotalRecordHashes) {
-		print_debugExtended(set, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Lines processed %zu - %zu (%zu)\n", blocks->blockNo, blocks->firstLineInBlock, blocks->nofTotalRecordHashes, blocks->recordCount - blocks->nofMetaRecords);
+		print_debugExtended(set, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: lines processed %zu - %zu (%zu)\n", blocks->blockNo, blocks->firstLineInBlock, blocks->nofTotalRecordHashes, blocks->recordCount - blocks->nofMetaRecords);
 	} else if (blocks->recordCount == 1 && blocks->nofMetaRecords == 1) {
-		print_debugExtended(set, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Line processed n/a\n", blocks->blockNo);
+		print_debugExtended(set, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: line processed n/a\n", blocks->blockNo);
 	} else if (blocks->firstLineInBlock == blocks->nofTotalRecordHashes) {
-		print_debugExtended(set, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Line processed %zu\n", blocks->blockNo,  blocks->firstLineInBlock);
+		print_debugExtended(set, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: line processed %zu\n", blocks->blockNo,  blocks->firstLineInBlock);
 	} else {
-		print_debugExtended(set, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Line processed <unknown>\n", blocks->blockNo);
+		print_debugExtended(set, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: line processed <unknown>\n", blocks->blockNo);
 	}
 
 
@@ -2253,7 +2253,7 @@ static int process_block_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,
 
 		blocks->sigTime_1 = KSI_Integer_getUInt64(t1);
 
-		print_debugExtended(set, DEBUG_LEVEL_3, "Block no. %3zu: Signing time: (%llu) %s\n", blocks->blockNo, blocks->sigTime_1, ksi_signature_sigTimeToString(sig, sigTimeStr, sizeof(sigTimeStr)));
+		print_debugExtended(set, DEBUG_LEVEL_3, "Block no. %3zu: signing time: (%llu) %s\n", blocks->blockNo, blocks->sigTime_1, ksi_signature_sigTimeToString(sig, sigTimeStr, sizeof(sigTimeStr)));
 	}
 
 
@@ -2722,11 +2722,14 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 
 	if (sig != NULL){
 		KSI_Integer *t1 = NULL;
+		char sigTimeStr[256];
 
 		res = KSI_Signature_getSigningTime(sig, &t1);
 		ERR_CATCH_MSG(err, res, NULL);
 
 		blocks->sigTime_1 = KSI_Integer_getUInt64(t1);
+		print_progressResultExtended(set, DEBUG_EQUAL | DEBUG_LEVEL_3, res);
+		print_debugExtended(set, DEBUG_LEVEL_3, "Block no. %3zu: signing time: (%llu) %s\n", blocks->blockNo, blocks->sigTime_1, ksi_signature_sigTimeToString(sig, sigTimeStr, sizeof(sigTimeStr)));
 	} else {
 		blocks->curBlockNotSigned = 1;
 	}
@@ -2740,8 +2743,18 @@ static int process_partial_signature(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ks
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to write signature data log signature file.", blocks->blockNo);
 		}
 	}
-
+	print_progressResultExtended(set, DEBUG_LEVEL_3, res);
 	blocks->nofTotalRecordHashes += blocks->nofRecordHashes;
+
+	if (blocks->firstLineInBlock < blocks->nofTotalRecordHashes) {
+		print_debugExtended(set, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: lines processed %zu - %zu (%zu)\n", blocks->blockNo, blocks->firstLineInBlock, blocks->nofTotalRecordHashes, blocks->recordCount - blocks->nofMetaRecords);
+	} else if (blocks->recordCount == 1 && blocks->nofMetaRecords == 1) {
+		print_debugExtended(set, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: line processed n/a\n", blocks->blockNo);
+	} else if (blocks->firstLineInBlock == blocks->nofTotalRecordHashes) {
+		print_debugExtended(set, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: line processed %zu\n", blocks->blockNo,  blocks->firstLineInBlock);
+	} else {
+		print_debugExtended(set, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: line processed <unknown>\n", blocks->blockNo);
+	}
 
 	res = KT_OK;
 

@@ -17,13 +17,13 @@ export KSI_CONF=test/test.cfg
 @test "verify output with debug level 3. Multiple blocks. Missing hshes" {
 	run src/logksi verify test/resource/logs_and_signatures/log_repaired --ignore-desc-block-time -ddd
 	[ "$status" -eq 0 ]
-	[[ "$output" =~ (Processing magic number... ok.).(Block no.   1: processing block header... ok.).(Block no.   1: input hash: SHA-512:dd4e87.*2b137.).(Block no.   1: .r.r..r..).(Block no.   1: processing block signature data... ok.).(Block no.   1: Lines processed 1 . 3 .3.).(Block no.   1: verifying KSI signature... ok.*ms.).(Block no.   1: Signing time: .1517928936.*).(Block no.   1: output hash: SHA-512:18708a.*eeeb7.).(Block no.   1: Warning: all final tree hashes are missing.).*(Block no.  30: all final tree hashes are present.).(Finalizing log signature... ok.) ]]
+	[[ "$output" =~ (Processing magic number... ok.).(Block no.   1: processing block header... ok.).(Block no.   1: input hash: SHA-512:dd4e87.*2b137.).(Block no.   1: .r.r..r..).(Block no.   1: processing block signature data... ok.).(Block no.   1: lines processed 1 . 3 .3.).(Block no.   1: verifying KSI signature... ok.*ms.).(Block no.   1: signing time: .1517928936.*).(Block no.   1: output hash: SHA-512:18708a.*eeeb7.).(Block no.   1: Warning: all final tree hashes are missing.).*(Block no.  30: all final tree hashes are present.).(Finalizing log signature... ok.) ]]
 }
 
 @test "verify output with debug level 3. Single block with Metarecord" {
 	run src/logksi verify test/resource/interlink/ok-testlog-interlink-1 -ddd
 	[ "$status" -eq 0 ]
-	[[ "$output" =~ (Processing magic number... ok.).(Block no.   1: processing block header... ok.).(Block no.   1: input hash: SHA-256:a55829.*a5fc9.).(Block no.   1: .rrrrrrrrrrrrMr.).(Block no.   1: processing block signature data... ok.).(Block no.   1: Lines processed 1 . 12 .12.).(Block no.   1: verifying KSI signature... ok.*ms.).(Block no.   1: Signing time: .1539771487.) ]]
+	[[ "$output" =~ (Processing magic number... ok.).(Block no.   1: processing block header... ok.).(Block no.   1: input hash: SHA-256:a55829.*a5fc9.).(Block no.   1: .rrrrrrrrrrrrMr.).(Block no.   1: processing block signature data... ok.).(Block no.   1: lines processed 1 . 12 .12.).(Block no.   1: verifying KSI signature... ok.*ms.).(Block no.   1: signing time: .1539771487.) ]]
 }
 
 @test "previous block is more recent than next block with debug level 2" {
@@ -35,5 +35,5 @@ export KSI_CONF=test/test.cfg
 @test "previous block is more recent than next block with debug level 3" {
 	run ./src/logksi verify -ddd test/resource/logs_and_signatures/log_repaired
 	[ "$status" -eq 6 ]
-	[[ "$output" =~ (Block no.  18: verifying KSI signature... ok.*ms.).(Block no.  18: Signing time: .1517928940.).*(Block no.  18: checking signing time with previous block... failed.)..(Error: Block no.  17 .*is more recent than).(       block no.  18 .1517928940. 2018.02.06 14.55.40 UTC.00.00)..(Block no.  18: output hash.*SHA-512:907899.*d2be10) ]]
+	[[ "$output" =~ (Block no.  18: verifying KSI signature... ok.*ms.).(Block no.  18: signing time: .1517928940.).*(Block no.  18: checking signing time with previous block... failed.)..(Error: Block no.  17 .*is more recent than).(       block no.  18 .1517928940. 2018.02.06 14.55.40 UTC.00.00)..(Block no.  18: output hash.*SHA-512:907899.*d2be10) ]]
 }

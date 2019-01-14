@@ -1,8 +1,14 @@
-* FEATURE: Signing time of a block is verified to have more recent signing time than previous block.
 * IMPROVEMENT: Verification error handling improved.
-* IMPROVEMENT: Debug output (-dd) shows inter-linking input and output hash for each block.
-* IMPROVEMENT: Debug output with single -d option is more compact.
-* FEATURE: By specifying multiple -d options (-d -d or -dd) debug output will be more verbose.
+* IMPROVEMENT: Debug output with -d option is more compact.
+* IMPROVEMENT: Option --show-progress works only with debug level 1 (just one -d).
+* FEATURE: By specifying -d options only once will display summary of the log file.
+* FEATURE: By specifying multiple -d options (-d -d or -dd) will display summary of each block.
+* FEATURE: By specifying multiple -d options (-d -d -d or -ddd) debug output will be more verbose.
+* FEATURE: Debug output (-d, -dd and -ddd) of verify shows inter-linking input and output hash for each block and log file.
+* FEATURE: Debug output (-dd and -ddd) shows block signing time.
+* FEATURE: Debug output (-dd and -ddd) of extend shows time where signature was extended.
+* FEATURE: Debug output (-dd and -ddd) shows block line numbers.
+* FEATURE: Signing time of a block is verified to have more recent signing time than previous block.
 * FEATURE: New option --ignore-desc-block-time to skip signing time verification where more recent log blocks must have more recent signing time.
 * FEATURE: New option -- for verify task that enables user to list multiple log files for verification.
 * FEATURE: New option --input-hash to specify inter-linking hash as input for verification.
