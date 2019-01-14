@@ -58,6 +58,22 @@ static char* ksi_signature_sigTimeToString(const KSI_Signature* sig, char *buf, 
 	return KSI_Integer_toDateString(sigTime, buf, buf_len);;
 }
 
+static char* uint64_toDateString(uint64_t time, char *buf, size_t buf_len) {
+	int res = KT_UNKNOWN_ERROR;
+	KSI_Integer *t = NULL;
+	char tmp[256];
+
+	if (buf == NULL || buf_len == 0) return NULL;
+
+	res = KSI_Integer_new(NULL, time, &t);
+	if (res != KSI_OK) return NULL;
+
+	PST_snprintf(buf, buf_len, "(%llu) %s+00:00", (unsigned long long)time, KSI_Integer_toDateString(t, tmp, sizeof(tmp)));
+
+	KSI_Integer_free(t);
+	return buf;
+}
+
 enum {
 	TASK_NONE = 0x00,
 	TASK_VERIFY,
@@ -1206,9 +1222,9 @@ static int finalize_block(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_IN
 
 		/* When sigTime is 0 it is the first signature and there is nothing to check. */
 		if (blocks->sigTime_0 > 0) {
-			KSI_Integer *t0 = NULL;
-			KSI_Integer *t1 = NULL;
 
+			uint64_toDateString(blocks->sigTime_0, strT0, sizeof(strT0));
+			uint64_toDateString(blocks->sigTime_1, strT1, sizeof(strT1));
 
 			print_progressDescExtended(set, 0, DEBUG_LEVEL_3, "Block no. %3zu: checking signing time with previous block... ", blocks->blockNo);
 
@@ -1216,11 +1232,6 @@ static int finalize_block(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_IN
 				print_progressResultExtended(set, DEBUG_EQUAL | DEBUG_LEVEL_2, 1);
 				print_progressResultExtended(set, DEBUG_EQUAL | DEBUG_LEVEL_1, 1);
 				blocks->errSignTime = 1;
-
-				KSI_Integer_new(ksi, blocks->sigTime_0, &t0);
-				KSI_Integer_new(ksi, blocks->sigTime_1, &t1);
-				PST_snprintf(strT0, sizeof(strT0), "(%llu) %s+00:00", (unsigned long long)blocks->sigTime_0, KSI_Integer_toDateString(t0, buf, sizeof(buf)));
-				PST_snprintf(strT1, sizeof(strT1), "(%llu) %s+00:00", (unsigned long long)blocks->sigTime_1, KSI_Integer_toDateString(t1, buf, sizeof(buf)));
 
 				if (blocks->blockNo == 1) {
 					PST_snprintf(blocks->errorBuf, sizeof(blocks->errorBuf), "Error: Last block  %s from file '%s' is more recent than\n"
@@ -1235,21 +1246,16 @@ static int finalize_block(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_IN
 			}
 
 			if (blocks->sigTime_0 == blocks->sigTime_1 && PARAM_SET_isSetByName(set, "warn-same-block-time")) {
-				KSI_Integer_new(ksi, blocks->sigTime_1, &t1);
 				blocks->warningSignatureSameTime = 1;
-				PST_snprintf(strT1, sizeof(strT1), "(%llu) %s+00:00", (unsigned long long)blocks->sigTime_1, KSI_Integer_toDateString(t1, buf, sizeof(buf)));
 
 				if (blocks->blockNo == 1) {
 					PST_snprintf(blocks->warnBuf, sizeof(blocks->warnBuf), "Warning: Last block from file      '%s'\n"
 						                                                   "         and first block from file '%s'\n"
-																		   "         has same signing time %s.\n", previousLogFile, currentLogFile, strT1);
+																		   "         has same signing time %s.\n", previousLogFile, currentLogFile, uint64_toDateString(blocks->sigTime_1, buf, sizeof(buf)));
 				} else {
 					PST_snprintf(blocks->warnBuf, sizeof(blocks->warnBuf), "Warning: Block no. %3zu and %3zu in %s '%s' has same signing time %s.\n" , blocks->blockNo - 1, blocks->blockNo, (logStdin ? "log from" : "file"), currentLogFile, strT1);
 				}
 			}
-
-			KSI_Integer_free(t0);
-			KSI_Integer_free(t1);
 		}
 
 		print_progressResultExtended(set, DEBUG_LEVEL_2, 0);
@@ -1271,8 +1277,6 @@ static int finalize_block(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_IN
 	print_progressResultExtended(set, DEBUG_LEVEL_2, 0);
 
 	if (blocks->blockNo > 0) {
-		KSI_Integer *t1 = NULL;
-		char buf[256];
 		char strT1[256] = "<not signed>";
 		char strExtTo[256] = "<null>";
 		char inHash[256] = "<null>";
@@ -1284,16 +1288,11 @@ static int finalize_block(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_IN
 		int longIndentation = 29;
 
 		if (blocks->sigTime_1 > 0) {
-			KSI_Integer_new(ksi, blocks->sigTime_1, &t1);
-			PST_snprintf(strT1, sizeof(strT1), "(%llu) %s+00:00", (unsigned long long)blocks->sigTime_1, KSI_Integer_toDateString(t1, buf, sizeof(buf)));
-			KSI_Integer_free(t1);
-
+			uint64_toDateString(blocks->sigTime_1, strT1, sizeof(strT1));
 		}
 
 		if (blocks->extendedToTime > 0) {
-			KSI_Integer_new(ksi, blocks->extendedToTime, &t1);
-			PST_snprintf(strExtTo, sizeof(strExtTo), "(%llu) %s+00:00", (unsigned long long)blocks->extendedToTime, KSI_Integer_toDateString(t1, buf, sizeof(buf)));
-			KSI_Integer_free(t1);
+			uint64_toDateString(blocks->extendedToTime, strExtTo, sizeof(strExtTo));
 		}
 
 		LOGKSI_DataHash_toString(blocks->inputHash, inHash, sizeof(inHash));
