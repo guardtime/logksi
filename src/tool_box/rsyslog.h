@@ -107,17 +107,24 @@ typedef struct {
 	unsigned char *ftlv_raw;
 	size_t ftlv_len;
 	size_t blockCount;
+	size_t noSigCreated;			/* Count of signatures created for unsigned blocks. */
 	size_t noSigCount;
 	size_t blockNo;
-	size_t partNo;
-	size_t sigNo;
-	size_t noSigNo;
-	size_t recordCount;
+	size_t partNo;					/* Count (or index) of partial blocks. */
+	size_t sigNo;					/* Count (or index) of block-signatures + ksi signatures + partial signatures. */
+	size_t noSigNo;					/* Count of not signed blocks. */
+	size_t recordCount;				/* Number of all records that are aggregated into a tree. */
 	size_t nofRecordHashes;
-	size_t nofTotalRecordHashes;
+	size_t nofMetaRecords;
+	size_t nofTotalRecordHashes;	/* All record hashes over all blocks. Metarecord hashes are not included! */
+	size_t nofTotalMetarecors;		/* All meta-record over all blocks. */
 	size_t nofTreeHashes;
+	size_t firstLineInBlock;		/* First line in current block. */
+	size_t currentLine;				/* Current line number in current block. */
+	size_t nofTotalFailedBlocks;
 	KSI_HashAlgorithm hashAlgo;
 	KSI_OctetString *randomSeed;
+	KSI_DataHash *inputHash;		/* Just a reference for the input hash of a block. */
 	KSI_DataHash *prevLeaf;
 	KSI_DataHash *MerkleTree[MAX_TREE_HEIGHT];
 	KSI_DataHash *notVerified[MAX_TREE_HEIGHT];
@@ -148,11 +155,15 @@ typedef struct {
 	char warningSignatures;
 	char warningSignatureSameTime;
 	char errSignTime;
+	char curBlockNotSigned;
+	char curBlockJustReSigned;
 	size_t nofHashFails;
 	uint64_t sigTime_0;
 	uint64_t sigTime_1;
+	uint64_t extendedToTime;
 	char errorBuf[2048];
 	char warnBuf[2048];
+	int taskId;
 } BLOCK_INFO;
 
 typedef int (*EXTENDING_FUNCTION)(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig,  KSI_PublicationsFile *pubFile, KSI_VerificationContext *context, KSI_Signature **ext);

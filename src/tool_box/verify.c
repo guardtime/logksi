@@ -205,8 +205,11 @@ int verify_run(int argc, char **argv, char **envp) {
 			print_debug("%sLog file '%s'.\n", (i == 0 ? "" : "\n"), files.internal.inLog);
 		}
 
+		print_progressDescExtended(set, 0, DEBUG_EQUAL | DEBUG_LEVEL_1, "Verifying... ");
+
 		res = logsignature_verify(set, err, ksi, &blocks, inputHash, verify_signature, &files, &outputHash);
 		if (res != KT_OK) goto cleanup;
+
 
 		KSI_DataHash_free(inputHash);
 		inputHash = outputHash;
@@ -342,7 +345,7 @@ char *verify_help_toString(char *buf, size_t len) {
 		"             All values from lower priority sources are ignored.\n"
 		" -d\n"
 		"           - Print detailed information about processes and errors to stderr.\n"
-		"			  to make output more verbose use -dd."
+		"             To make output more verbose use -dd or -ddd.\n"
 		" --conf <file>\n"
 		"             Read configuration options from the given file.\n"
 		"             Configuration options given explicitly on command line will\n"
@@ -578,7 +581,7 @@ static int signature_verify_general(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi
 	/**
 	 * Verify signature.
 	 */
-	print_progressDescExtended(set, d, DEBUG_LEVEL_2, "%s... ", task);
+	print_progressDescExtended(set, d, DEBUG_LEVEL_3, "%s... ", task);
 	res = LOGKSI_SignatureVerify_general(err, sig, ksi, hsh, rootLevel, pub_data, x, out);
 	if (res != KSI_OK && *out != NULL) {
 		handle_verification_result(set, err, ksi, sig, pub_data, res, task, *out);
@@ -591,7 +594,7 @@ static int signature_verify_general(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi
 
 cleanup:
 
-	print_progressResultExtended(set, DEBUG_LEVEL_2, res);
+	print_progressResultExtended(set, DEBUG_LEVEL_3, res);
 
 	KSI_PublicationData_free(pub_data);
 
@@ -607,7 +610,7 @@ static int signature_verify_internally(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *
 
 	d = PARAM_SET_isSetByName(set, "d");
 
-	print_progressDescExtended(set, d, DEBUG_LEVEL_2, "%s... ", task);
+	print_progressDescExtended(set, d, DEBUG_LEVEL_3, "%s... ", task);
 	res = LOGKSI_SignatureVerify_internally(err, sig, ksi, hsh, rootLevel, out);
 	if (res != KSI_OK && *out != NULL) {
 		handle_verification_result(set, err, ksi, sig, NULL, res, task, *out);
@@ -620,7 +623,7 @@ static int signature_verify_internally(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *
 
 cleanup:
 
-	print_progressResultExtended(set, DEBUG_LEVEL_2, res);
+	print_progressResultExtended(set, DEBUG_LEVEL_3, res);
 
 	return res;
 }
@@ -636,7 +639,7 @@ static int signature_verify_key_based(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *k
 	/**
 	 * Verify signature.
 	 */
-	print_progressDescExtended(set, d, DEBUG_LEVEL_2, "%s... ", task);
+	print_progressDescExtended(set, d, DEBUG_LEVEL_3, "%s... ", task);
 	res = LOGKSI_SignatureVerify_keyBased(err, sig, ksi, hsh, rootLevel, out);
 	if (res != KSI_OK && *out != NULL) {
 		handle_verification_result(set, err, ksi, sig, NULL, res, task, *out);
@@ -649,7 +652,7 @@ static int signature_verify_key_based(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *k
 
 cleanup:
 
-	print_progressResultExtended(set, DEBUG_LEVEL_2, res);
+	print_progressResultExtended(set, DEBUG_LEVEL_3, res);
 
 	return res;
 }
@@ -676,7 +679,7 @@ static int signature_verify_publication_based_with_user_pub(PARAM_SET *set, ERR_
 	/**
 	 * Verify signature.
 	 */
-	print_progressDescExtended(set, d, DEBUG_LEVEL_2, "%s... ", task);
+	print_progressDescExtended(set, d, DEBUG_LEVEL_3, "%s... ", task);
 	res = LOGKSI_SignatureVerify_userProvidedPublicationBased(err, sig, ksi, hsh, rootLevel, pub_data, x, out);
 	if (res != KSI_OK && *out != NULL) {
 		handle_verification_result(set, err, ksi, sig, pub_data, res, task, *out);
@@ -689,7 +692,7 @@ static int signature_verify_publication_based_with_user_pub(PARAM_SET *set, ERR_
 
 cleanup:
 
-	print_progressResultExtended(set, DEBUG_LEVEL_2, res);
+	print_progressResultExtended(set, DEBUG_LEVEL_3, res);
 
 	KSI_PublicationData_free(pub_data);
 
@@ -707,7 +710,7 @@ static int signature_verify_publication_based_with_pubfile(PARAM_SET *set, ERR_T
 	/**
 	 * Verify signature.
 	 */
-	print_progressDescExtended(set, d, DEBUG_LEVEL_2, "%s... ", task);
+	print_progressDescExtended(set, d, DEBUG_LEVEL_3, "%s... ", task);
 	res = LOGKSI_SignatureVerify_publicationsFileBased(err, sig, ksi, hsh, rootLevel, x, out);
 	if (res != KSI_OK && *out != NULL) {
 		handle_verification_result(set, err, ksi, sig, NULL, res, task, *out);
@@ -720,7 +723,7 @@ static int signature_verify_publication_based_with_pubfile(PARAM_SET *set, ERR_T
 
 cleanup:
 
-	print_progressResultExtended(set, DEBUG_LEVEL_2, res);
+	print_progressResultExtended(set, DEBUG_LEVEL_3, res);
 
 	return res;
 }
@@ -736,7 +739,7 @@ static int signature_verify_calendar_based(PARAM_SET *set, ERR_TRCKR *err, KSI_C
 	/**
 	 * Verify signature.
 	 */
-	print_progressDescExtended(set, d, DEBUG_LEVEL_2, "%s... ", task);
+	print_progressDescExtended(set, d, DEBUG_LEVEL_3, "%s... ", task);
 	res = LOGKSI_SignatureVerify_calendarBased(err, sig, ksi, hsh, rootLevel, out);
 	if (res != KSI_OK && *out != NULL) {
 		handle_verification_result(set, err, ksi, sig, NULL, res, task, *out);
@@ -749,7 +752,7 @@ static int signature_verify_calendar_based(PARAM_SET *set, ERR_TRCKR *err, KSI_C
 
 cleanup:
 
-	print_progressResultExtended(set, DEBUG_LEVEL_2, res);
+	print_progressResultExtended(set, DEBUG_LEVEL_3, res);
 
 	KSI_Integer_free(pubTime);
 

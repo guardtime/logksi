@@ -163,6 +163,7 @@ int extend_run(int argc, char** argv, char **envp) {
 	res = open_input_and_output_files(err, &files);
 	if (res != KT_OK) goto cleanup;
 
+	print_progressDescExtended(set, 0, DEBUG_EQUAL | DEBUG_LEVEL_1, "Extending... ");
 	res = logsignature_extend(set, err, ksi, pubFile, extend_signature, &files);
 	if (res != KT_OK) goto cleanup;
 
@@ -241,6 +242,7 @@ char *extend_help_toString(char*buf, size_t len) {
 		"             with '-o' to avoid overwriting of the original log signature file.\n"
 		" -d\n"
 		"           - Print detailed information about processes and errors to stderr.\n"
+		"             To make output more verbose use -dd or -ddd.\n"
 		" --conf <file>\n"
 		"             Read configuration options from the given file.\n"
 		"             Configuration options given explicitly on command line will\n"
@@ -279,8 +281,8 @@ static int extend_to_nearest_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX
 
 
 	if (pubRec == NULL) {
-		print_progressDescExtended(set, 1, DEBUG_LEVEL_2, "Block no. %3zu: extending KSI signature to the earliest available publication (na)... ", blocks->blockNo);
-		print_progressDescExtended(set, 1, DEBUG_EQUAL | DEBUG_LEVEL_1, "Extending Block no. %3zu to the earliest available publication... ", blocks->blockNo);
+		print_progressDescExtended(set, 1, DEBUG_LEVEL_3, "Block no. %3zu: extending KSI signature to the earliest available publication (na)... ", blocks->blockNo);
+		print_progressDescExtended(set, 1, DEBUG_EQUAL | DEBUG_LEVEL_2, "Extending Block no. %3zu to the earliest available publication... ", blocks->blockNo);
 		res = KSI_EXTEND_NO_SUITABLE_PUBLICATION;
 		ERR_TRCKR_ADD(err, res, "No suitable publication found from publications file to extend the signature to (signing time %s (%llu)).", KSI_Integer_toDateString(sigTime, buf, sizeof(buf)), (unsigned long long)KSI_Integer_getUInt64(sigTime));
 	} else {
@@ -293,8 +295,8 @@ static int extend_to_nearest_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX
 		res = KSI_PublicationData_getTime(pubData, &pubTime);
 		ERR_CATCH_MSG(err, res, "Error: Unable to get publication time.");
 
-		print_progressDescExtended(set, 1, DEBUG_LEVEL_2, "Block no. %3zu: extending KSI signature to the earliest available publication: %s (%llu)... ", blocks->blockNo, KSI_Integer_toDateString(pubTime, buf, sizeof(buf)), (unsigned long long)KSI_Integer_getUInt64(pubTime));
-		print_progressDescExtended(set, 1, DEBUG_EQUAL | DEBUG_LEVEL_1, "Extending Block no. %3zu to the earliest available publication... ", blocks->blockNo);
+		print_progressDescExtended(set, 1, DEBUG_LEVEL_3, "Block no. %3zu: extending KSI signature to the earliest available publication: %s (%llu)... ", blocks->blockNo, KSI_Integer_toDateString(pubTime, buf, sizeof(buf)), (unsigned long long)KSI_Integer_getUInt64(pubTime));
+		print_progressDescExtended(set, 1, DEBUG_EQUAL | DEBUG_LEVEL_2, "Extending Block no. %3zu to the earliest available publication... ", blocks->blockNo);
 	}
 
 
@@ -340,12 +342,12 @@ static int extend_to_specified_time(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi
 	}
 
 	/* Extend the signature. */
-	print_progressDescExtended(set, 1, DEBUG_LEVEL_2, "Block no. %3zu: extending KSI signature to time %s (%llu)... ",
+	print_progressDescExtended(set, 1, DEBUG_LEVEL_3, "Block no. %3zu: extending KSI signature to time %s (%llu)... ",
 		blocks->blockNo,
 		KSI_Integer_toDateString(pubTime, buf, sizeof(buf)),
 		(unsigned long long)KSI_Integer_getUInt64(pubTime));
 
-	print_progressDescExtended(set, 1, DEBUG_EQUAL | DEBUG_LEVEL_1, "Extending Block no. %3zu to time %s (%llu)... ",
+	print_progressDescExtended(set, 1, DEBUG_EQUAL | DEBUG_LEVEL_2, "Extending Block no. %3zu to time %s (%llu)... ",
 		blocks->blockNo,
 		KSI_Integer_toDateString(pubTime, buf, sizeof(buf)),
 		(unsigned long long)KSI_Integer_getUInt64(pubTime));
@@ -384,7 +386,7 @@ static int extend_to_specified_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_C
 	res = PARAM_SET_getStr(set, "pub-str", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &pubs_str);
 	ERR_CATCH_MSG(err, res, "Error: Unable get publication string.");
 
-	print_progressDescExtended(set, 0, DEBUG_LEVEL_2, "Block no. %3zu: Searching for a publication record from publications file... ", blocks->blockNo);
+	print_progressDescExtended(set, 0, DEBUG_LEVEL_3, "Block no. %3zu: Searching for a publication record from publications file... ", blocks->blockNo);
 	res = KSI_PublicationsFile_getPublicationDataByPublicationString(pubFile, pubs_str, &pub_rec);
 	ERR_CATCH_MSG(err, res, "Error: Unable get publication record from publications file.");
 	if (pub_rec == NULL) {
@@ -399,8 +401,8 @@ static int extend_to_specified_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_C
 	res = KSI_PublicationData_getTime(pubData, &pubTime);
 	ERR_CATCH_MSG(err, res, "Error: Unable to get publication time.");
 
-	print_progressDescExtended(set, 1, DEBUG_LEVEL_2, "Block no. %3zu: extending KSI signature to the specified publication: %s (%llu)... ", blocks->blockNo, KSI_Integer_toDateString(pubTime, buf, sizeof(buf)), (unsigned long long)KSI_Integer_getUInt64(pubTime));
-	print_progressDescExtended(set, 1, DEBUG_EQUAL | DEBUG_LEVEL_1, "Extending Block no. %3zu to the specified publication... ", blocks->blockNo);
+	print_progressDescExtended(set, 1, DEBUG_LEVEL_3, "Block no. %3zu: extending KSI signature to the specified publication: %s (%llu)... ", blocks->blockNo, KSI_Integer_toDateString(pubTime, buf, sizeof(buf)), (unsigned long long)KSI_Integer_getUInt64(pubTime));
+	print_progressDescExtended(set, 1, DEBUG_EQUAL | DEBUG_LEVEL_2, "Extending Block no. %3zu to the specified publication... ", blocks->blockNo);
 	res = LOGKSI_Signature_extend(err, sig, ksi, pub_rec, context, &tmp);
 	ERR_CATCH_MSG(err, res, "Error: Unable to extend signature.");
 	print_progressResult(res);
