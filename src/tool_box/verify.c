@@ -345,7 +345,7 @@ char *verify_help_toString(char *buf, size_t len) {
 		"             All values from lower priority sources are ignored.\n"
 		" -d\n"
 		"           - Print detailed information about processes and errors to stderr.\n"
-		"             to make output more verbose use -dd or -ddd.\n"
+		"             To make output more verbose use -dd or -ddd.\n"
 		" --conf <file>\n"
 		"             Read configuration options from the given file.\n"
 		"             Configuration options given explicitly on command line will\n"

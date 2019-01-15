@@ -161,7 +161,7 @@ char *integrate_help_toString(char *buf, size_t len) {
 		"           - Force overwriting of existing log signature file.\n"
 		" -d\n"
 		"           - Print detailed information about processes and errors to stderr.\n"
-		"             to make output more verbose use -dd or -ddd.\n"
+		"             To make output more verbose use -dd or -ddd.\n"
 		" --log <file>\n"
 		"           - Write libksi log to the given file. Use '-' as file name to redirect the log to stdout.\n",
 		TOOL_getName()

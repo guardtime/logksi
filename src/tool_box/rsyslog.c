@@ -3233,7 +3233,6 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO
 						LOGKSI_DataHash_toString(blocks->prevLeaf, buf, sizeof(buf));
 						print_progressResultExtended(set, DEBUG_EQUAL | DEBUG_LEVEL_2, res);
 
-						/* Free previous reference to the input hash and make a new reference. */
 						if (theFirstInputHashInFile == NULL) theFirstInputHashInFile = KSI_DataHash_ref(blocks->prevLeaf);
 						print_debugExtended(set, DEBUG_LEVEL_3, "Block no. %3zu: input hash: %s.\n", blocks->blockNo, buf);
 						print_progressDescExtended(set, 0, DEBUG_EQUAL | DEBUG_LEVEL_2 , "Verifying block no. %3zu... ", blocks->blockNo);
@@ -3334,6 +3333,7 @@ int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO
 cleanup:
 
 	print_progressResultExtended(set, DEBUG_EQUAL | DEBUG_LEVEL_2, res);
+	print_progressResultExtended(set, DEBUG_EQUAL | DEBUG_LEVEL_3, res);
 	KSI_DataHash_free(theFirstInputHashInFile);
 	BLOCK_INFO_freeAndClearInternals(blocks);
 
