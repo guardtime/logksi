@@ -3490,7 +3490,6 @@ int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILE
 	unsigned char ftlv_raw[SOF_FTLV_BUFFER];
 	SIGNATURE_PROCESSORS processors;
 	KSI_DataHash *theFirstInputHashInFile = NULL;
-	int signature_parse_failure = 0;
 
 
 	if (err == NULL || ksi == NULL || files == NULL) {
@@ -3528,22 +3527,21 @@ int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILE
 
 					res = KSI_FTLV_fileRead(files->files.partsSig, blocks.ftlv_raw, SOF_FTLV_BUFFER, &blocks.ftlv_len, &blocks.ftlv);
 
-					if (res != KT_OK || blocks.ftlv.tag != 0x904) {
-						signature_parse_failure = 1;
-					}
-
 					if (res != KT_OK) {
 						if (blocks.ftlv_len > 0) {
 							res = KT_INVALID_INPUT_FORMAT;
-							ERR_CATCH_MSG(err, res, "Error: Block no. %zu: incomplete data found in signatures file.", blocks.blockNo);
+							ERR_TRCKR_ADD(err, res, "Error: Block no. %zu: incomplete data found in signatures file.", blocks.blockNo);
+							ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse KSI signature in signatures file.", blocks.blockNo);
 						} else {
 							res = KT_INVALID_INPUT_FORMAT;
-							ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unexpected end of signatures file.", blocks.blockNo);
+							ERR_TRCKR_ADD(err, res, "Error: Block no. %zu: unexpected end of signatures file.", blocks.blockNo);
+							ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse KSI signature in signatures file.", blocks.blockNo);
 						}
 					}
 					if (blocks.ftlv.tag != 0x904) {
 						res = KT_INVALID_INPUT_FORMAT;
-						ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unexpected TLV %04X read from block-signatures file.", blocks.blockNo, blocks.ftlv.tag);
+						ERR_TRCKR_ADD(err, res, "Error: Block no. %zu: unexpected TLV %04X read from block-signatures file.", blocks.blockNo, blocks.ftlv.tag);
+						ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse KSI signature in signatures file.", blocks.blockNo);
 					}
 
 					res = process_partial_signature(set, err, ksi, &processors, &blocks, files, 0);
@@ -3576,7 +3574,6 @@ int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILE
 	res = KT_OK;
 
 cleanup:
-	if (signature_parse_failure) ERR_TRCKR_ADD(err, KT_INVALID_INPUT_FORMAT, "Error: Block no. %zu: unable to parse KSI signature in signatures file.", blocks.blockNo);
 
 	print_progressResultExtended(set, DEBUG_EQUAL | DEBUG_LEVEL_2, res);
 	BLOCK_INFO_freeAndClearInternals(&blocks);
