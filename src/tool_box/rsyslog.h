@@ -113,9 +113,9 @@ typedef struct {
 	size_t partNo;					/* Count (or index) of partial blocks. */
 	size_t sigNo;					/* Count (or index) of block-signatures + ksi signatures + partial signatures. */
 	size_t noSigNo;					/* Count of not signed blocks. */
-	size_t recordCount;				/* Number of all records that are aggregated into a tree. */
-	size_t nofRecordHashes;
-	size_t nofMetaRecords;
+	size_t recordCount;				/* Record count read from block signature, partial block or partial block signature. It is just a number and may differ from the real count! */
+	size_t nofRecordHashes;			/* Number of all records that are aggregated into a tree (no tree_hash included, but metarecord record hash is counted. */
+	size_t nofMetaRecords;			/* Number of metarecords inside a block. */
 	size_t nofTotalRecordHashes;	/* All record hashes over all blocks. Metarecord hashes are not included! */
 	size_t nofTotalMetarecors;		/* All meta-record over all blocks. */
 	size_t nofTreeHashes;
@@ -144,7 +144,7 @@ typedef struct {
 	unsigned char balanced;
 	LOGSIG_VERSION version;
 	char warningLegacy;
-	char keepRecordHashes;
+	char keepRecordHashes;			/* This is set to 1, when (meta-)record is read from file. */
 	char keepTreeHashes;
 	char finalTreeHashesSome;
 	char finalTreeHashesNone;

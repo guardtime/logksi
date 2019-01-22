@@ -1919,10 +1919,21 @@ int is_block_signature_expected(ERR_TRCKR *err, BLOCK_INFO *blocks) {
 			res = KT_VERIFICATION_FAILURE;
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing record hash for metarecord with index %zu.", blocks->blockNo, blocks->nofRecordHashes);
 		}
+
 		/* Check if all record hashes are present in the current block. */
 		if (blocks->nofRecordHashes < blocks->recordCount) {
 			res = KT_VERIFICATION_FAILURE;
+
+			ERR_TRCKR_ADD(err, res, "Error: Block no. %zu: expected %zu record hashes, but found %zu.", blocks->blockNo, blocks->recordCount, blocks->nofRecordHashes);
+			ERR_TRCKR_ADD(err, res, "Error: Block no. %zu: there are too few record hashes for this block.", blocks->blockNo);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing record hash for logline no. %zu.", blocks->blockNo, get_nof_lines(blocks) + 1);
+		}
+
+		if (blocks->nofRecordHashes > blocks->recordCount) {
+			res = KT_VERIFICATION_FAILURE;
+
+			ERR_TRCKR_ADD(err, res, "Error: Block no. %zu: expected %zu record hashes, but found %zu.", blocks->blockNo, blocks->recordCount, blocks->nofRecordHashes);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: there are too many record hashes for this block.", blocks->blockNo);
 		}
 	}
 
