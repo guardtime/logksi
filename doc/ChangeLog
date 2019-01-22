@@ -1,3 +1,7 @@
+(LOGKSI-63) * IMPROVEMENT: Improved error messages when integrating invalid or broken log signature files.
+
+----------- remove this line when release is made -----------
+
 * IMPROVEMENT: Verification error handling improved.
 * IMPROVEMENT: Debug output with -d option is more compact.
 * IMPROVEMENT: Option --show-progress works only with debug level 1 (just one -d).

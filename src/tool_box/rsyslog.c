@@ -1124,16 +1124,19 @@ static int process_magic_number(PARAM_SET* set, ERR_TRCKR *err, BLOCK_INFO *bloc
 
 	if (files->files.partsBlk) {
 		if (find_header_in_file(files->files.partsBlk, blocksFileHeaders, SOF_ARRAY(blocksFileHeaders)) == SOF_ARRAY(blocksFileHeaders)) {
-			ERR_CATCH_MSG(err, res, "Error: Unable to parse blocks file %s, magic number not found.", files->internal.partsBlk);
+			ERR_TRCKR_ADD(err, res, "Error: Log signature blocks file identification magic number not found.");
+			ERR_CATCH_MSG(err, res, "Error: Unable to parse blocks file '%s'.", files->internal.partsBlk);
 		}
 		if (find_header_in_file(files->files.partsSig, signaturesFileHeaders, SOF_ARRAY(signaturesFileHeaders)) == SOF_ARRAY(signaturesFileHeaders)) {
-			ERR_CATCH_MSG(err, res, "Error: Unable to parse signature file %s, magic number not found.", files->internal.partsSig);
+			ERR_TRCKR_ADD(err, res, "Error: Log signature file identification magic number not found.");
+			ERR_CATCH_MSG(err, res, "Error: Unable to parse signature file '%s'.", files->internal.partsSig);
 		}
 		blocks->version = LOGSIG12;
 	} else {
 		blocks->version = find_header_in_file(files->files.inSig, logSignatureHeaders, SOF_ARRAY(logSignatureHeaders));
 		if (blocks->version == SOF_ARRAY(logSignatureHeaders)) {
-			ERR_CATCH_MSG(err, res, "Error: Unable to parse signature file %s, magic number not found.", files->internal.inSig);
+			ERR_TRCKR_ADD(err, res, "Error: Log signature file identification magic number not found.");
+			ERR_CATCH_MSG(err, res, "Error: Unable to parse signature file '%s'.", files->internal.inSig);
 		}
 	}
 
@@ -3488,6 +3491,7 @@ int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILE
 	SIGNATURE_PROCESSORS processors;
 	KSI_DataHash *theFirstInputHashInFile = NULL;
 
+
 	if (err == NULL || ksi == NULL || files == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
@@ -3522,18 +3526,22 @@ int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILE
 					if (res != KT_OK) goto cleanup;
 
 					res = KSI_FTLV_fileRead(files->files.partsSig, blocks.ftlv_raw, SOF_FTLV_BUFFER, &blocks.ftlv_len, &blocks.ftlv);
+
 					if (res != KT_OK) {
 						if (blocks.ftlv_len > 0) {
 							res = KT_INVALID_INPUT_FORMAT;
-							ERR_CATCH_MSG(err, res, "Error: Block no. %zu: incomplete data found in signatures file.", blocks.blockNo);
+							ERR_TRCKR_ADD(err, res, "Error: Block no. %zu: incomplete data found in signatures file.", blocks.blockNo);
+							ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse KSI signature in signatures file.", blocks.blockNo);
 						} else {
-							res = KT_VERIFICATION_FAILURE;
-							ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unexpected end of signatures file.", blocks.blockNo);
+							res = KT_INVALID_INPUT_FORMAT;
+							ERR_TRCKR_ADD(err, res, "Error: Block no. %zu: unexpected end of signatures file.", blocks.blockNo);
+							ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse KSI signature in signatures file.", blocks.blockNo);
 						}
 					}
 					if (blocks.ftlv.tag != 0x904) {
 						res = KT_INVALID_INPUT_FORMAT;
-						ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unexpected TLV %04X read from block-signatures file.", blocks.blockNo, blocks.ftlv.tag);
+						ERR_TRCKR_ADD(err, res, "Error: Block no. %zu: unexpected TLV %04X read from block-signatures file.", blocks.blockNo, blocks.ftlv.tag);
+						ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse KSI signature in signatures file.", blocks.blockNo);
 					}
 
 					res = process_partial_signature(set, err, ksi, &processors, &blocks, files, 0);
@@ -3566,6 +3574,7 @@ int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILE
 	res = KT_OK;
 
 cleanup:
+
 	print_progressResultExtended(set, DEBUG_EQUAL | DEBUG_LEVEL_2, res);
 	BLOCK_INFO_freeAndClearInternals(&blocks);
 	KSI_DataHash_free(theFirstInputHashInFile);

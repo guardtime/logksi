@@ -95,3 +95,32 @@ cp test/resource/logsignatures/synchronous.logsig test/out
 	run chmod 0777 test/out/synchronous.logsig
 }
 
+@test "integrate invalid log signature file that contains only magic byte" {
+	run ./src/logksi integrate test/resource/logsignatures/nok-logsig-only-magick --force-overwrite -o test/out/dummy.logsig -d
+	[[ "$output" =~ (Error).*(Block no).*(1).*(unable to parse KSI signature in signatures file).*(Error).*(Block no).*(1).*(unexpected end of signatures file) ]]
+	[ "$status" -eq 4 ]
+}
+
+@test "integrate invalid log signature file that is empty" {
+	run ./src/logksi integrate test/resource/logsignatures/nok-logsig-empty-file --force-overwrite -o test/out/dummy.logsig -d
+		[[ "$output" =~ (Error).*(Unable to parse signature file).*(Error).*(Log signature file identification magic number not found) ]]
+	[ "$status" -eq 4 ]
+}
+
+@test "integrate invalid log signature file that has a missing mandatory TLV" {
+	run ./src/logksi integrate test/resource/logsignatures/nok-logsig-missing-mandatory-tlv --force-overwrite -o test/out/dummy.logsig -d
+		[[ "$output" =~ (Error).*(unable to parse KSI signature in signatures file).*(Error).*(Mandatory element missing).*(0x800).*(0x801).*(0x3) ]]
+	[ "$status" -eq 4 ]
+}
+
+@test "integrate invalid log signature file that has corrupted TLV structure 1" {
+	run src/logksi integrate test/resource/logsignatures/nok-logsig-invalid-tlv-encoding-1 --force-overwrite -o test/out/dummy.ksig -d
+		[[ "$output" =~ (Error).*(unable to parse KSI signature in signatures file).*(Error).*(Failed to read nested TLV) ]]
+	[ "$status" -eq 4 ]
+}
+
+@test "integrate invalid log signature file that has corrupted TLV structure 2" {
+	run src/logksi integrate test/resource/logsignatures/nok-logsig-invalid-tlv-encoding-2 --force-overwrite -o test/out/dummy.ksig -d
+		[[ "$output" =~ (Error).*(unable to parse KSI signature in signatures file).*(Error).*(incomplete data found in signatures file) ]]
+	[ "$status" -eq 4 ]
+}
