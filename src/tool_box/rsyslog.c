@@ -1689,7 +1689,7 @@ cleanup:
 	return res;
 }
 
-static int process_tree_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
+static int process_tree_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, int *finalHash) {
 	int res;
 	KSI_DataHash *treeHash = NULL;
 	KSI_DataHash *recordHash = NULL;
@@ -1786,7 +1786,8 @@ static int process_tree_hash(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK
 		}
 	} else {
 		if (blocks->nofRecordHashes) {
-			print_progressResultExtended(set, DEBUG_LEVEL_3, res);
+			if (finalHash != NULL) *finalHash = 1;
+			print_debugExtended(set, DEBUG_LEVEL_3, "}\n");
 			print_progressDescExtended(set, 0, DEBUG_LEVEL_3, "Block no. %3zu: interpreting tree hash no. %3zu as a final hash... ", blocks->blockNo, blocks->nofTreeHashes);
 			/* Find the corresponding tree hash from the Merkle tree. */
 			i = 0;
@@ -3038,7 +3039,9 @@ void BLOCK_INFO_reset(BLOCK_INFO *block) {
 
 static int process_log_signature_general_components_(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_PublicationsFile *pubFile, int withBlockSignature, BLOCK_INFO *blocks, IO_FILES *files, SIGNATURE_PROCESSORS *processors) {
 	int res = KT_UNKNOWN_ERROR;
+	int isFinalHash = 0;
 	static int printHeader = 0;
+	static int printFooter = 0;
 
 	if (set == NULL || err == NULL || ksi == NULL || blocks == NULL || files == NULL || (withBlockSignature && processors == NULL)) {
 		res = KT_INVALID_ARGUMENT;
@@ -3057,7 +3060,7 @@ static int process_log_signature_general_components_(PARAM_SET *set, ERR_TRCKR *
 			if (res != KT_OK) goto cleanup;
 
 			printHeader = 1;
-
+			printFooter = 1;
 		break;
 
 		case 0x902:
@@ -3074,8 +3077,12 @@ static int process_log_signature_general_components_(PARAM_SET *set, ERR_TRCKR *
 			print_debugExtended(set, DEBUG_LEVEL_3, ".");
 			printHeader = 0;
 
-			res = process_tree_hash(set, err, ksi, blocks, files);
+			res = process_tree_hash(set, err, ksi, blocks, files, &isFinalHash);
 			if (res != KT_OK) goto cleanup;
+
+			/* In one case, when last tree hash was the final hash, footer is already printed
+			   as some additional debug output was needed. */
+			printFooter = !isFinalHash;
 		break;
 
 		case 0x911:
@@ -3089,7 +3096,7 @@ static int process_log_signature_general_components_(PARAM_SET *set, ERR_TRCKR *
 
 		default:
 			if (withBlockSignature && blocks->ftlv.tag) {
-				print_debugExtended(set, DEBUG_LEVEL_3, "}\n");
+				if (printFooter) print_debugExtended(set, DEBUG_LEVEL_3, "}\n");
 				res = process_block_signature(set, err, ksi, pubFile, processors, blocks, files);
 				if (res != KT_OK) goto cleanup;
 			} else {
