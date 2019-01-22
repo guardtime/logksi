@@ -124,3 +124,15 @@ cp test/resource/logsignatures/synchronous.logsig test/out
 		[[ "$output" =~ (Error).*(unable to parse KSI signature in signatures file).*(Error).*(incomplete data found in signatures file) ]]
 	[ "$status" -eq 4 ]
 }
+
+@test "integrate invalid log signature file that expects to have more record hashes than there is" {
+	run src/logksi integrate test/resource/logsignatures/too-few-record-hashes --force-overwrite -o test/out/dummy.ksig -d
+		[[ "$output" =~ (Error).*(there are too few record hashes for this block).*(Error).*(expected 5 record hashes, but found 3) ]]
+	[ "$status" -eq 6 ]
+}
+
+@test "integrate invalid log signature file that expects to have less record hashes than there is" {
+	run src/logksi integrate test/resource/logsignatures/too-many-record-hashes --force-overwrite -o test/out/dummy.ksig -d
+		[[ "$output" =~ (Error).*(there are too many record hashes for this block).*(Error).*(expected 2 record hashes, but found 3) ]]
+	[ "$status" -eq 6 ]
+}
