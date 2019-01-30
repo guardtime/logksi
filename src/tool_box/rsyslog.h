@@ -153,7 +153,6 @@ typedef struct {
 	char warningTreeHashes;
 	char unsignedRootHash;
 	char warningSignatures;
-	char warningSignatureSameTime;
 	char errSignTime;
 	char curBlockNotSigned;
 	char curBlockJustReSigned;
@@ -161,14 +160,12 @@ typedef struct {
 	uint64_t sigTime_0;
 	uint64_t sigTime_1;
 	uint64_t extendedToTime;
-	char errorBuf[2048];
-	char warnBuf[2048];
 	int taskId;
 } BLOCK_INFO;
 
-typedef int (*EXTENDING_FUNCTION)(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig,  KSI_PublicationsFile *pubFile, KSI_VerificationContext *context, KSI_Signature **ext);
-typedef int (*VERIFYING_FUNCTION)(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_DataHash *hash, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **verificationResult);
-typedef int (*SIGNING_FUNCTION)(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_DataHash *hash, KSI_uint64_t rootLevel, KSI_Signature **sig);
+typedef int (*EXTENDING_FUNCTION)(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig,  KSI_PublicationsFile *pubFile, KSI_VerificationContext *context, KSI_Signature **ext);
+typedef int (*VERIFYING_FUNCTION)(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_DataHash *hash, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **verificationResult);
+typedef int (*SIGNING_FUNCTION)(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_DataHash *hash, KSI_uint64_t rootLevel, KSI_Signature **sig);
 
 typedef struct {
 	VERIFYING_FUNCTION verify_signature;
@@ -177,12 +174,12 @@ typedef struct {
 	int extract_signature;
 } SIGNATURE_PROCESSORS;
 
-int logsignature_extend(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_PublicationsFile* pubFile, EXTENDING_FUNCTION extend_signature, IO_FILES *files);
-int logsignature_verify(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *firstLink, VERIFYING_FUNCTION verify_signature, IO_FILES *files, KSI_DataHash **lastLeaf);
-int logsignature_extract(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files);
-int logsignature_integrate(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files);
-int logsignature_sign(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files);
-int get_file_read_lock(FILE *in);
+int logsignature_extend(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, KSI_PublicationsFile* pubFile, EXTENDING_FUNCTION extend_signature, IO_FILES *files);
+int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *firstLink, VERIFYING_FUNCTION verify_signature, IO_FILES *files, KSI_DataHash **lastLeaf);
+int logsignature_extract(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files);
+int logsignature_integrate(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files);
+int logsignature_sign(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files);
+
 int concat_names(char *org, const char *extension, char **derived);
 int duplicate_name(char *in, char **out);
 int temp_name(char *org, char **derived);

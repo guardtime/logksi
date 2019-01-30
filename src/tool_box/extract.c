@@ -61,6 +61,7 @@ int extract_run(int argc, char **argv, char **envp) {
 	KSI_Signature *sig = NULL;
 	IO_FILES files;
 	int count = 0;
+	MULTI_PRINTER *mp = NULL;
 
 	IO_FILES_init(&files);
 
@@ -83,6 +84,9 @@ int extract_run(int argc, char **argv, char **envp) {
 
 	res = TASK_INITIALIZER_check_analyze_report(set, task_set, 0.2, 0.1, &task);
 	if (res != KT_OK) goto cleanup;
+
+	res = TASK_INITIALIZER_getPrinter(set, &mp);
+	ERR_CATCH_MSG(err, res, "Error: Unable to create Multi printer!");
 
 	res = TOOL_init_ksi(set, &ksi, &err, &logfile);
 	if (res != KT_OK) goto cleanup;
@@ -129,9 +133,10 @@ int extract_run(int argc, char **argv, char **envp) {
 	res = open_log_and_signature_files(err, &files);
 	if (res != KT_OK) goto cleanup;
 
-	print_progressDescExtended(set, 0, DEBUG_EQUAL | DEBUG_LEVEL_1, "Extracting records... ");
 
-	res = logsignature_extract(set, err, ksi, &files);
+	multi_print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_EQUAL | DEBUG_LEVEL_1, "Extracting records... ");
+	res = logsignature_extract(set, mp, err, ksi, &files);
+	multi_print_progressResult(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_1, res);
 	if (res != KT_OK) goto cleanup;
 
 	res = rename_temporary_and_backup_files(err, &files);
@@ -141,7 +146,11 @@ cleanup:
 
 	close_log_and_signature_files(err, res, &files);
 
-	print_progressResult(res);
+	MULTI_PRINTER_print(mp);
+	if (MULTI_PRINTER_hasDataByID(mp, MP_ID_LOGFILE_WARNINGS)) {
+		print_debug("\n");
+		MULTI_PRINTER_printByID(mp, MP_ID_LOGFILE_WARNINGS);
+	}
 	LOGKSI_KSI_ERRTrace_save(ksi);
 
 	if (res != KT_OK) {
@@ -158,6 +167,7 @@ cleanup:
 	KSI_Signature_free(sig);
 	ERR_TRCKR_free(err);
 	KSI_CTX_free(ksi);
+	MULTI_PRINTER_free(mp);
 
 	return LOGKSI_errToExitCode(res);
 }

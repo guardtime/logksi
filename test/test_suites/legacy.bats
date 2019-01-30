@@ -93,4 +93,3 @@ cp -r test/resource/logsignatures/legacy_with_missing_tree_hashes.gtsig test/out
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 }
-

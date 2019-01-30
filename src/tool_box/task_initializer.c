@@ -30,6 +30,7 @@
 #include "tool_box/param_control.h"
 #include "tool_box.h"
 #include "printer.h"
+#include "debug_print.h"
 #include "conf_file.h"
 #include "logksi_err.h"
 
@@ -294,6 +295,58 @@ static int extract_user_info_from_url_if_needed(PARAM_SET *set, const char *flag
 	res = KT_OK;
 
 cleanup:
+
+	return res;
+}
+
+int TASK_INITIALIZER_getPrinter(PARAM_SET *set, MULTI_PRINTER **mp) {
+	int res = KT_UNKNOWN_ERROR;
+	int debugLevel = 0;
+	MULTI_PRINTER *tmp = NULL;
+
+
+	if (set == NULL || mp == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	/* Create multi-printer. */
+	res = PARAM_SET_getValueCount(set, "d", NULL, PST_PRIORITY_HIGHEST, &debugLevel);
+	if (res != KT_OK) goto cleanup;
+
+	res = MULTI_PRINTER_new(debugLevel, 100000, &tmp);
+	if (res != KT_OK) goto cleanup;
+
+
+	/* Create initial channels. */
+	res = MULTI_PRINTER_openChannel(tmp, MP_ID_BLOCK, 0, 0, print_debug);
+	if (res != KT_OK) goto cleanup;
+
+	res = MULTI_PRINTER_openChannel(tmp, MP_ID_BLOCK_ERRORS, 0, 0, print_errors);
+	if (res != KT_OK) goto cleanup;
+
+	res = MULTI_PRINTER_openChannel(tmp, MP_ID_BLOCK_WARNINGS, 0, 0, print_debug);
+	if (res != KT_OK) goto cleanup;
+
+	res = MULTI_PRINTER_openChannel(tmp, MP_ID_LOGFILE_WARNINGS, 0, 0, print_debug);
+	if (res != KT_OK) goto cleanup;
+
+	res = MULTI_PRINTER_openChannel(tmp, MP_ID_BLOCK_PARSING_TREE_NODES, 0, 0, print_debug);
+	if (res != KT_OK) goto cleanup;
+
+	res = MULTI_PRINTER_openChannel(tmp, MP_ID_BLOCK_SUMMARY, 0, 1024, print_debug);
+	if (res != KT_OK) goto cleanup;
+
+	res = MULTI_PRINTER_openChannel(tmp, MP_ID_LOGFILE_SUMMARY, 0, 1024, print_debug);
+	if (res != KT_OK) goto cleanup;
+
+	*mp = tmp;
+	tmp = NULL;
+	res = KT_OK;
+
+cleanup:
+
+	MULTI_PRINTER_free(tmp);
 
 	return res;
 }
