@@ -214,7 +214,7 @@ int verify_run(int argc, char **argv, char **envp) {
 		multi_print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 		if (res != KT_OK) goto cleanup;
 
-		MULTI_PRINTER_print(mp);
+		MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
 		if (MULTI_PRINTER_hasDataByID(mp, MP_ID_LOGFILE_WARNINGS)) {
 			print_debug("\n");
 			MULTI_PRINTER_printByID(mp, MP_ID_LOGFILE_WARNINGS);
@@ -239,7 +239,7 @@ cleanup:
 
 	close_log_and_signature_files(&files);
 
-	MULTI_PRINTER_print(mp);
+	MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
 	if (MULTI_PRINTER_hasDataByID(mp, MP_ID_LOGFILE_WARNINGS)) {
 		print_debug("\n");
 		MULTI_PRINTER_printByID(mp, MP_ID_LOGFILE_WARNINGS);

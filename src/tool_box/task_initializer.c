@@ -319,25 +319,25 @@ int TASK_INITIALIZER_getPrinter(PARAM_SET *set, MULTI_PRINTER **mp) {
 
 
 	/* Create initial channels. */
-	res = MULTI_PRINTER_openChannel(tmp, MP_ID_BLOCK, 0, 0, print_debug);
+	res = MULTI_PRINTER_openChannel(tmp, MP_ID_BLOCK, 0, print_debug);
 	if (res != KT_OK) goto cleanup;
 
-	res = MULTI_PRINTER_openChannel(tmp, MP_ID_BLOCK_ERRORS, 0, 0, print_errors);
+	res = MULTI_PRINTER_openChannel(tmp, MP_ID_BLOCK_ERRORS, 0, print_errors);
 	if (res != KT_OK) goto cleanup;
 
-	res = MULTI_PRINTER_openChannel(tmp, MP_ID_BLOCK_WARNINGS, 0, 0, print_debug);
+	res = MULTI_PRINTER_openChannel(tmp, MP_ID_BLOCK_WARNINGS, 0, print_debug);
 	if (res != KT_OK) goto cleanup;
 
-	res = MULTI_PRINTER_openChannel(tmp, MP_ID_LOGFILE_WARNINGS, 0, 0, print_debug);
+	res = MULTI_PRINTER_openChannel(tmp, MP_ID_LOGFILE_WARNINGS, 0, print_debug);
 	if (res != KT_OK) goto cleanup;
 
-	res = MULTI_PRINTER_openChannel(tmp, MP_ID_BLOCK_PARSING_TREE_NODES, 0, 0, print_debug);
+	res = MULTI_PRINTER_openChannel(tmp, MP_ID_BLOCK_PARSING_TREE_NODES, 0, print_debug);
 	if (res != KT_OK) goto cleanup;
 
-	res = MULTI_PRINTER_openChannel(tmp, MP_ID_BLOCK_SUMMARY, 0, 1024, print_debug);
+	res = MULTI_PRINTER_openChannel(tmp, MP_ID_BLOCK_SUMMARY, 1024, print_debug);
 	if (res != KT_OK) goto cleanup;
 
-	res = MULTI_PRINTER_openChannel(tmp, MP_ID_LOGFILE_SUMMARY, 0, 1024, print_debug);
+	res = MULTI_PRINTER_openChannel(tmp, MP_ID_LOGFILE_SUMMARY, 1024, print_debug);
 	if (res != KT_OK) goto cleanup;
 
 	*mp = tmp;

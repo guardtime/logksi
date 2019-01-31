@@ -1003,7 +1003,7 @@ static int logksi_datahash_compare(ERR_TRCKR *err, MULTI_PRINTER *mp, KSI_DataHa
 	if (!KSI_DataHash_equals(left, right)) {
 		res = KT_VERIFICATION_FAILURE;
 		multi_print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
-		MULTI_PRINTER_print(mp);
+		MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
 		if (KSI_DataHash_getHashAlg(left, &leftId) == KSI_OK &&
 			KSI_DataHash_getHashAlg(right, &rightId) == KSI_OK &&
 			leftId != rightId) {
@@ -2866,7 +2866,7 @@ cleanup:
 		}
 	}
 
-	MULTI_PRINTER_print(mp);
+	MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
 	MULTI_PRINTER_printByID(mp, MP_ID_LOGFILE_SUMMARY);
 
 	return res;
@@ -3089,7 +3089,7 @@ cleanup:
 	if (res != KT_OK) {
 		if (MULTI_PRINTER_hasDataByID(mp, MP_ID_BLOCK_PARSING_TREE_NODES)) {
 			multi_print_debug(mp, MP_ID_BLOCK_PARSING_TREE_NODES, DEBUG_LEVEL_3, " X\n");
-			MULTI_PRINTER_print(mp);
+			MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
 			MULTI_PRINTER_printByID(mp, MP_ID_BLOCK_PARSING_TREE_NODES);
 		}
 	}
@@ -3128,7 +3128,7 @@ int logsignature_extend(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 	if (res != KT_OK) goto cleanup;
 
 	while (!feof(files->files.inSig)) {
-		MULTI_PRINTER_print(mp);
+		MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
 
 		res = KSI_FTLV_fileRead(files->files.inSig, blocks.ftlv_raw, SOF_FTLV_BUFFER, &blocks.ftlv_len, &blocks.ftlv);
 		if (res == KSI_OK) {
@@ -3196,7 +3196,7 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 	if (res != KT_OK) goto cleanup;
 
 	while (!feof(files->files.inSig)) {
-		MULTI_PRINTER_print(mp);
+		MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
 
 		res = KSI_FTLV_fileRead(files->files.inSig, blocks->ftlv_raw, SOF_FTLV_BUFFER, &blocks->ftlv_len, &blocks->ftlv);
 		if (res == KSI_OK) {
@@ -3435,7 +3435,7 @@ int logsignature_extract(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_
 	if (res != KT_OK) goto cleanup;
 
 	while (!feof(files->files.inSig)) {
-		MULTI_PRINTER_print(mp);
+		MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
 
 		res = KSI_FTLV_fileRead(files->files.inSig, blocks.ftlv_raw, SOF_FTLV_BUFFER, &blocks.ftlv_len, &blocks.ftlv);
 		if (res == KSI_OK) {
@@ -3502,7 +3502,7 @@ int logsignature_integrate(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KS
 	if (res != KT_OK) goto cleanup;
 
 	while (!feof(files->files.partsBlk)) {
-		MULTI_PRINTER_print(mp);
+		MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
 
 		res = KSI_FTLV_fileRead(files->files.partsBlk, blocks.ftlv_raw, SOF_FTLV_BUFFER, &blocks.ftlv_len, &blocks.ftlv);
 		if (res == KSI_OK) {
@@ -3625,7 +3625,7 @@ int logsignature_sign(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX
 	}
 
 	while (!feof(files->files.inSig)) {
-		MULTI_PRINTER_print(mp);
+		MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
 
 		res = KSI_FTLV_fileRead(files->files.inSig, blocks.ftlv_raw, SOF_FTLV_BUFFER, &blocks.ftlv_len, &blocks.ftlv);
 		if (res == KSI_OK) {

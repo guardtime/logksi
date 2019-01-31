@@ -54,14 +54,10 @@ enum MP_ID_enum {
 	MP_ID_BLOCK_PARSING_TREE_NODES = 0x05,
 
 	MP_ID_LOGFILE_WARNINGS = 0x06,
-	MP_ID_LOGFILE_SUMMARY = 0x07
+	MP_ID_LOGFILE_SUMMARY = 0x07,
+	MP_ID_COUNT
 };
 
-enum MULTI_PRINTER_SIGNAL_enum {
-	MULTI_PRINTER_SIGNAL_NONE = 0x00,
-	MULTI_PRINTER_SIGNAL_CLOSE_AND_PRINT = 0x01,
-	MULTI_PRINTER_SIGNAL_CLOSE_WITHOUT_PRINT = 0x02,
-};
 
 void multi_print_progressDesc(MULTI_PRINTER *mp, int ID, int showTiming, int debugLvl, const char *msg, ...);
 void multi_print_progressResult(MULTI_PRINTER *mp, int ID,  int debugLvl, int res);
@@ -72,9 +68,9 @@ int MULTI_PRINTER_new(int dbglvl, size_t bufferSize, MULTI_PRINTER **mp);
 void MULTI_PRINTER_free(MULTI_PRINTER *mp);
 int MULTI_PRINTER_print(MULTI_PRINTER *mp);
 int MULTI_PRINTER_printByID(MULTI_PRINTER *mp, int ID);
-int MULTI_PRINTER_openChannel(MULTI_PRINTER *mp, int ID, int options, size_t buf_size, int (*print_func)(const char*, ...));
-int MULTI_PRINTER_writeChannel(MULTI_PRINTER *mp, int ID, int signal, int options, const char *format, ...);
-int MULTI_PRINTER_vaWriteChannel(MULTI_PRINTER *mp, int ID, int signal, int options, const char *format, va_list va);
+int MULTI_PRINTER_openChannel(MULTI_PRINTER *mp, int ID, size_t buf_size, int (*print_func)(const char*, ...));
+int MULTI_PRINTER_writeChannel(MULTI_PRINTER *mp, int ID, const char *format, ...);
+int MULTI_PRINTER_vaWriteChannel(MULTI_PRINTER *mp, int ID, const char *format, va_list va);
 int MULTI_PRINTER_getCharCountByID(MULTI_PRINTER *mp, int ID, size_t *count);
 int MULTI_PRINTER_hasDataByID(MULTI_PRINTER *mp, int ID);
 

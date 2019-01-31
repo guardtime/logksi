@@ -146,7 +146,7 @@ cleanup:
 
 	close_log_and_signature_files(err, res, &files);
 
-	MULTI_PRINTER_print(mp);
+	MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
 	if (MULTI_PRINTER_hasDataByID(mp, MP_ID_LOGFILE_WARNINGS)) {
 		print_debug("\n");
 		MULTI_PRINTER_printByID(mp, MP_ID_LOGFILE_WARNINGS);
