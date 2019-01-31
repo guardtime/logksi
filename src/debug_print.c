@@ -91,7 +91,7 @@ static int is_print_enabled(int currenDebugLvl, int debugLvl) {
 	return print;
 }
 
-void multi_print_progressDesc(MULTI_PRINTER *mp, int ID, int showTiming, int debugLvl, const char *msg, ...) {
+void print_progressDesc(MULTI_PRINTER *mp, int ID, int showTiming, int debugLvl, const char *msg, ...) {
 	va_list va;
 	MULTI_PRINTER_CHANNEL *chn = NULL;
 
@@ -116,7 +116,7 @@ void multi_print_progressDesc(MULTI_PRINTER *mp, int ID, int showTiming, int deb
 	}
 }
 
-void multi_print_progressResult(MULTI_PRINTER *mp, int ID,  int debugLvl, int res) {
+void print_progressResult(MULTI_PRINTER *mp, int ID,  int debugLvl, int res) {
 	static char time_str[32];
 	MULTI_PRINTER_CHANNEL *chn = NULL;
 
@@ -146,7 +146,7 @@ void multi_print_progressResult(MULTI_PRINTER *mp, int ID,  int debugLvl, int re
 	}
 }
 
-void multi_print_debug(MULTI_PRINTER *mp, int ID,  int debugLvl, const char *msg, ...) {
+void print_debug_mp(MULTI_PRINTER *mp, int ID,  int debugLvl, const char *msg, ...) {
 	va_list va;
 
 	if (mp == NULL) return;

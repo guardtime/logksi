@@ -205,13 +205,13 @@ int verify_run(int argc, char **argv, char **envp) {
 		if (res != KT_OK) goto cleanup;
 
 		if (isMultipleLog) {
-			multi_print_debug(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, "%sLog file '%s'.\n", (i == 0 ? "" : "\n"), files.internal.inLog);
+			print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, "%sLog file '%s'.\n", (i == 0 ? "" : "\n"), files.internal.inLog);
 		}
 
 
-		multi_print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_EQUAL | DEBUG_LEVEL_1, "Verifying... ");
+		print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_EQUAL | DEBUG_LEVEL_1, "Verifying... ");
 		res = logsignature_verify(set, mp, err, ksi, &blocks, inputHash, verify_signature, &files, &outputHash);
-		multi_print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
+		print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 		if (res != KT_OK) goto cleanup;
 
 		MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
@@ -597,7 +597,7 @@ static int signature_verify_general(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR
 	/**
 	 * Verify signature.
 	 */
-	multi_print_progressDesc(mp, MP_ID_BLOCK, d, DEBUG_LEVEL_3, "%s... ", task);
+	print_progressDesc(mp, MP_ID_BLOCK, d, DEBUG_LEVEL_3, "%s... ", task);
 	res = LOGKSI_SignatureVerify_general(err, sig, ksi, hsh, rootLevel, pub_data, x, out);
 	if (res != KSI_OK && *out != NULL) {
 		handle_verification_result(set, err, ksi, sig, pub_data, res, task, *out);
@@ -610,7 +610,7 @@ static int signature_verify_general(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR
 
 cleanup:
 
-	multi_print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
+	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
 
 	KSI_PublicationData_free(pub_data);
 
@@ -626,7 +626,7 @@ static int signature_verify_internally(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TR
 
 	d = PARAM_SET_isSetByName(set, "d");
 
-	multi_print_progressDesc(mp, MP_ID_BLOCK, d, DEBUG_LEVEL_3, "%s... ", task);
+	print_progressDesc(mp, MP_ID_BLOCK, d, DEBUG_LEVEL_3, "%s... ", task);
 	res = LOGKSI_SignatureVerify_internally(err, sig, ksi, hsh, rootLevel, out);
 	if (res != KSI_OK && *out != NULL) {
 		handle_verification_result(set, err, ksi, sig, NULL, res, task, *out);
@@ -639,7 +639,7 @@ static int signature_verify_internally(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TR
 
 cleanup:
 
-	multi_print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
+	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
 
 	return res;
 }
@@ -655,7 +655,7 @@ static int signature_verify_key_based(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRC
 	/**
 	 * Verify signature.
 	 */
-	multi_print_progressDesc(mp, MP_ID_BLOCK, d, DEBUG_LEVEL_3, "%s... ", task);
+	print_progressDesc(mp, MP_ID_BLOCK, d, DEBUG_LEVEL_3, "%s... ", task);
 	res = LOGKSI_SignatureVerify_keyBased(err, sig, ksi, hsh, rootLevel, out);
 	if (res != KSI_OK && *out != NULL) {
 		handle_verification_result(set, err, ksi, sig, NULL, res, task, *out);
@@ -668,7 +668,7 @@ static int signature_verify_key_based(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRC
 
 cleanup:
 
-	multi_print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
+	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
 
 	return res;
 }
@@ -695,7 +695,7 @@ static int signature_verify_publication_based_with_user_pub(PARAM_SET *set, MULT
 	/**
 	 * Verify signature.
 	 */
-	multi_print_progressDesc(mp, MP_ID_BLOCK, d, DEBUG_LEVEL_3, "%s... ", task);
+	print_progressDesc(mp, MP_ID_BLOCK, d, DEBUG_LEVEL_3, "%s... ", task);
 	res = LOGKSI_SignatureVerify_userProvidedPublicationBased(err, sig, ksi, hsh, rootLevel, pub_data, x, out);
 	if (res != KSI_OK && *out != NULL) {
 		handle_verification_result(set, err, ksi, sig, pub_data, res, task, *out);
@@ -708,7 +708,7 @@ static int signature_verify_publication_based_with_user_pub(PARAM_SET *set, MULT
 
 cleanup:
 
-	multi_print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
+	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
 
 	KSI_PublicationData_free(pub_data);
 
@@ -726,7 +726,7 @@ static int signature_verify_publication_based_with_pubfile(PARAM_SET *set, MULTI
 	/**
 	 * Verify signature.
 	 */
-	multi_print_progressDesc(mp, MP_ID_BLOCK, d, DEBUG_LEVEL_3, "%s... ", task);
+	print_progressDesc(mp, MP_ID_BLOCK, d, DEBUG_LEVEL_3, "%s... ", task);
 	res = LOGKSI_SignatureVerify_publicationsFileBased(err, sig, ksi, hsh, rootLevel, x, out);
 	if (res != KSI_OK && *out != NULL) {
 		handle_verification_result(set, err, ksi, sig, NULL, res, task, *out);
@@ -739,7 +739,7 @@ static int signature_verify_publication_based_with_pubfile(PARAM_SET *set, MULTI
 
 cleanup:
 
-	multi_print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
+	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
 
 	return res;
 }
@@ -755,7 +755,7 @@ static int signature_verify_calendar_based(PARAM_SET *set, MULTI_PRINTER *mp, ER
 	/**
 	 * Verify signature.
 	 */
-	multi_print_progressDesc(mp, MP_ID_BLOCK, d, DEBUG_LEVEL_3, "%s... ", task);
+	print_progressDesc(mp, MP_ID_BLOCK, d, DEBUG_LEVEL_3, "%s... ", task);
 	res = LOGKSI_SignatureVerify_calendarBased(err, sig, ksi, hsh, rootLevel, out);
 	if (res != KSI_OK && *out != NULL) {
 		handle_verification_result(set, err, ksi, sig, NULL, res, task, *out);
@@ -768,7 +768,7 @@ static int signature_verify_calendar_based(PARAM_SET *set, MULTI_PRINTER *mp, ER
 
 cleanup:
 
-	multi_print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
+	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
 
 	KSI_Integer_free(pubTime);
 

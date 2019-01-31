@@ -59,9 +59,9 @@ enum MP_ID_enum {
 };
 
 
-void multi_print_progressDesc(MULTI_PRINTER *mp, int ID, int showTiming, int debugLvl, const char *msg, ...);
-void multi_print_progressResult(MULTI_PRINTER *mp, int ID,  int debugLvl, int res);
-void multi_print_debug(MULTI_PRINTER *mp, int ID,  int debugLvl, const char *msg, ...);
+void print_progressDesc(MULTI_PRINTER *mp, int ID, int showTiming, int debugLvl, const char *msg, ...);
+void print_progressResult(MULTI_PRINTER *mp, int ID,  int debugLvl, int res);
+void print_debug_mp(MULTI_PRINTER *mp, int ID,  int debugLvl, const char *msg, ...);
 
 
 int MULTI_PRINTER_new(int dbglvl, size_t bufferSize, MULTI_PRINTER **mp);

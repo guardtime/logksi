@@ -113,9 +113,9 @@ int integrate_run(int argc, char **argv, char **envp) {
 	} else if (res != KT_OK) goto cleanup;
 
 
-	multi_print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_EQUAL | DEBUG_LEVEL_1, "Integrating... ");
+	print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_EQUAL | DEBUG_LEVEL_1, "Integrating... ");
 	res = logsignature_integrate(set, mp, err, ksi, &files);
-	multi_print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
+	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 	if (res != KT_OK) goto cleanup;
 
 	res = rename_temporary_and_backup_files(err, &files);
@@ -359,10 +359,10 @@ static int get_file_read_lock(FILE *in, MULTI_PRINTER *mp) {
 	fres = fcntl(fileno(in), F_SETLK, &lock);
 	if (fres != 0) {
 		if (errno == EAGAIN || errno == EACCES) {
-			multi_print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_LEVEL_0, "Waiting to acquire read lock... ");
+			print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_LEVEL_0, "Waiting to acquire read lock... ");
 			MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
 			fres = fcntl(fileno(in), F_SETLKW, &lock);
-			multi_print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_0, fres);
+			print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_0, fres);
 			MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
 		}
 	}

@@ -115,9 +115,9 @@ int sign_run(int argc, char** argv, char **envp) {
 	noProgress = !PARAM_SET_isSetByName(set, "show-progress");
 
 
-	if (noProgress) multi_print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_EQUAL | DEBUG_LEVEL_1, "Signing... ");
+	if (noProgress) print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_EQUAL | DEBUG_LEVEL_1, "Signing... ");
 	res = logsignature_sign(set, mp, err, ksi, &files);
-	if (noProgress) multi_print_progressResult(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_1, res);
+	if (noProgress) print_progressResult(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_1, res);
 	if (res != KT_OK) goto cleanup;
 
 	res = rename_temporary_and_backup_files(err, &files);
