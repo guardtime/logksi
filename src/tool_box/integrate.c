@@ -19,6 +19,7 @@
 
 #include <string.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <ksi/ksi.h>
 #include <ksi/compatibility.h>
 #include "param_set/param_set.h"
@@ -39,7 +40,7 @@
 static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
 static int generate_filenames(ERR_TRCKR *err, IO_FILES *files);
 static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files, int forceOverwrite);
-static int acquire_file_locks(ERR_TRCKR *err, IO_FILES *files);
+static int acquire_file_locks(ERR_TRCKR *err, MULTI_PRINTER *mp, IO_FILES *files);
 static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files);
 static void close_input_and_output_files(ERR_TRCKR *err, int res, IO_FILES *files);
 static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err);
@@ -56,6 +57,7 @@ int integrate_run(int argc, char **argv, char **envp) {
 	int d = 0;
 	int forceOverwrite = 0;
 	IO_FILES files;
+	MULTI_PRINTER *mp = NULL;
 
 	IO_FILES_init(&files);
 
@@ -79,6 +81,9 @@ int integrate_run(int argc, char **argv, char **envp) {
 	res = TASK_INITIALIZER_check_analyze_report(set, task_set, 0.5, 0.1, &task);
 	if (res != KT_OK) goto cleanup;
 
+	res = TASK_INITIALIZER_getPrinter(set, &mp);
+	ERR_CATCH_MSG(err, res, "Error: Unable to create Multi printer!");
+
 	res = TOOL_init_ksi(set, &ksi, &err, &logfile);
 	if (res != KT_OK) goto cleanup;
 
@@ -101,15 +106,16 @@ int integrate_run(int argc, char **argv, char **envp) {
 	res = open_input_and_output_files(err, &files, forceOverwrite);
 	if (res != KT_OK) goto cleanup;
 
-	res = acquire_file_locks(err, &files);
+	res = acquire_file_locks(err, mp, &files);
 	if (res == KT_VERIFICATION_SKIPPED) {
 		res = KT_OK;
 		goto cleanup;
 	} else if (res != KT_OK) goto cleanup;
 
-	print_progressDescExtended(set, 0, DEBUG_EQUAL | DEBUG_LEVEL_1, "Integrating... ");
 
-	res = logsignature_integrate(set, err, ksi, &files);
+	print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_EQUAL | DEBUG_LEVEL_1, "Integrating... ");
+	res = logsignature_integrate(set, mp, err, ksi, &files);
+	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 	if (res != KT_OK) goto cleanup;
 
 	res = rename_temporary_and_backup_files(err, &files);
@@ -120,7 +126,12 @@ int integrate_run(int argc, char **argv, char **envp) {
 cleanup:
 
 	close_input_and_output_files(err, res, &files);
-	print_progressResult(res);
+
+	MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
+	if (MULTI_PRINTER_hasDataByID(mp, MP_ID_LOGFILE_WARNINGS)) {
+		print_debug("\n");
+		MULTI_PRINTER_printByID(mp, MP_ID_LOGFILE_WARNINGS);
+	}
 
 	LOGKSI_KSI_ERRTrace_save(ksi);
 
@@ -137,6 +148,7 @@ cleanup:
 	TASK_SET_free(task_set);
 	ERR_TRCKR_free(err);
 	KSI_CTX_free(ksi);
+	MULTI_PRINTER_free(mp);
 
 	return LOGKSI_errToExitCode(res);
 }
@@ -334,7 +346,35 @@ cleanup:
 	return res;
 }
 
-static int acquire_file_locks(ERR_TRCKR *err, IO_FILES *files) {
+static int get_file_read_lock(FILE *in, MULTI_PRINTER *mp) {
+	struct flock lock;
+	int fres;
+
+	if (in == NULL || mp == NULL) return KT_INVALID_ARGUMENT;
+
+	lock.l_type = F_RDLCK;
+	lock.l_whence = SEEK_SET;
+	lock.l_start = 0;
+	lock.l_len = 0;
+	fres = fcntl(fileno(in), F_SETLK, &lock);
+	if (fres != 0) {
+		if (errno == EAGAIN || errno == EACCES) {
+			print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_LEVEL_0, "Waiting to acquire read lock... ");
+			MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
+			fres = fcntl(fileno(in), F_SETLKW, &lock);
+			print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_0, fres);
+			MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
+		}
+	}
+
+	if (fres != 0) {
+		return KT_IO_ERROR;
+	} else {
+		return KT_OK;
+	}
+}
+
+static int acquire_file_locks(ERR_TRCKR *err, MULTI_PRINTER *mp, IO_FILES *files) {
 	int res = KT_UNKNOWN_ERROR;
 
 	if (err == NULL || files == NULL) {
@@ -344,13 +384,13 @@ static int acquire_file_locks(ERR_TRCKR *err, IO_FILES *files) {
 
 	if (files->files.partsBlk && files->files.partsSig) {
 		/* Check that the asynchronous signing process has completed writing to blocks and signatures files. */
-		res = get_file_read_lock(files->files.partsBlk);
+		res = get_file_read_lock(files->files.partsBlk, mp);
 		ERR_CATCH_MSG(err, res, "Error: Could not acquire read lock for input blocks file %s.", files->internal.partsBlk);
-		res = get_file_read_lock(files->files.partsSig);
+		res = get_file_read_lock(files->files.partsSig, mp);
 		ERR_CATCH_MSG(err, res, "Error: Could not acquire read lock for input signatures file %s.", files->internal.partsSig);
 		res = KT_OK;
 	} else if (files->files.partsBlk == NULL && files->files.partsSig == NULL) {
-		res = get_file_read_lock(files->files.inSig);
+		res = get_file_read_lock(files->files.inSig, mp);
 		ERR_CATCH_MSG(err, res, "Error: Could not acquire read lock for output log signature file %s.", files->internal.inSig);
 		res = KT_VERIFICATION_SKIPPED;
 	}

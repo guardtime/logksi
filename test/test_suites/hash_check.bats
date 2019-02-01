@@ -47,7 +47,7 @@ cp -r test/resource/logsignatures/tree_hashes_final_all_present.logsig test/out
 @test "verify no missing hashes" {
 	run ./src/logksi verify test/out/all_hashes test/out/no_missing_hashes.logsig -ddd
 	[ "$status" -eq 0 ]
-	[[ "$output" =~ "Block no.   1: interpreting tree hash no.   5 as a final hash... ok." ]]
+	[[ "$output" =~ "Block no.   1: {r.r..r.:}" ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 }
@@ -196,7 +196,7 @@ cp -r test/resource/logsignatures/tree_hashes_final_all_present.logsig test/out
 @test "verify tree hash final" {
 	run ./src/logksi verify test/out/all_hashes test/out/tree_hash_final.logsig -ddd
 	[ "$status" -eq 0 ]
-	[[ "$output" =~ "Block no.   1: interpreting tree hash no.   5 as a final hash... ok." ]]
+	[[ "$output" =~ "Block no.   1: {r.r..r.:}" ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 }
@@ -204,7 +204,7 @@ cp -r test/resource/logsignatures/tree_hashes_final_all_present.logsig test/out
 @test "verify tree hash final wrong" {
 	run ./src/logksi verify test/out/all_hashes test/out/tree_hash_final_wrong.logsig -ddd
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Block no.   1: interpreting tree hash no.   5 as a final hash." ]]
+	[[ "$output" =~ "Block no.   1: {r.r..r.: X" ]]
 	[[ "$output" =~ "Log signature verification failed." ]]
 }
 
@@ -212,6 +212,7 @@ cp -r test/resource/logsignatures/tree_hashes_final_all_present.logsig test/out
 	run ./src/logksi verify test/out/all_hashes test/out/tree_hashes_final_too_many.logsig -ddd
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Block no.   1: interpreting tree hash no.   5 as a final hash... ok." ]]
+	[[ "$output" =~ "Block no.   1: {r.r..r.:. X" ]]
 	[[ "$output" =~ "Error: Block no. 1: unexpected final tree hash no. 6." ]]
 	[[ "$output" =~ "Log signature verification failed." ]]
 }
