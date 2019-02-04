@@ -1802,11 +1802,15 @@ cleanup:
 	return res;
 }
 
-static int process_metarecord(PARAM_SET* set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
+static int process_metarecord(PARAM_SET* set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	KSI_DataHash *hash = NULL;
 	KSI_TlvElement *tlv = NULL;
+	KSI_TlvElement *meta_record_pair = NULL;
+	KSI_Utf8String *meta_key = NULL;
+	KSI_OctetString *meta_value = NULL;
 	size_t metarecord_index = 0;
+	char buf[0xffff];
 
 	if (err == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -1819,6 +1823,20 @@ static int process_metarecord(PARAM_SET* set, ERR_TRCKR *err, KSI_CTX *ksi, BLOC
 
 	res = tlv_element_get_uint(tlv, ksi, 0x01, &metarecord_index);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing metarecord index.", blocks->blockNo);
+
+
+	res = KSI_TlvElement_getElement(tlv, 0x02, &meta_record_pair);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: Mandatory TLV 911.02 (Meta record pair) is missing.", blocks->blockNo);
+
+	res = KSI_TlvElement_getUtf8String(meta_record_pair, ksi, 0x01, &meta_key);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: Unable to get TLV 911.02.01 (Meta record key).", blocks->blockNo);
+
+	res = KSI_TlvElement_getOctetString(meta_record_pair, ksi, 0x02, &meta_value);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: Unable to get TLV 911.02.02 (Meta record value).", blocks->blockNo);
+
+	print_debug_mp(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Meta-record key  : '%s'.\n", blocks->blockNo, KSI_Utf8String_cstr(meta_key));
+	print_debug_mp(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Meta-record value: %s.\n", blocks->blockNo, KSI_OctetString_toString(meta_value, 0, buf, sizeof(buf)));
+
 
 	if (files->files.inLog) {
 		/* If the block contains metarecords but not the corresponding record hashes:
@@ -1863,6 +1881,9 @@ static int process_metarecord(PARAM_SET* set, ERR_TRCKR *err, KSI_CTX *ksi, BLOC
 cleanup:
 
 	KSI_DataHash_free(hash);
+	KSI_TlvElement_free(meta_record_pair);
+	KSI_Utf8String_free(meta_key);
+	KSI_OctetString_free(meta_value);
 	KSI_TlvElement_free(tlv);
 	return res;
 }
@@ -3067,7 +3088,7 @@ static int process_log_signature_general_components_(PARAM_SET *set, MULTI_PRINT
 			if (printHeader == 0) print_debug_mp(mp, MP_ID_BLOCK_PARSING_TREE_NODES, DEBUG_LEVEL_3, "Block no. %3zu: {", blocks->blockNo);
 			print_debug_mp(mp, MP_ID_BLOCK_PARSING_TREE_NODES, DEBUG_LEVEL_3, "M");
 
-			res = process_metarecord(set, err, ksi, blocks, files);
+			res = process_metarecord(set, mp, err, ksi, blocks, files);
 			if (res != KT_OK) goto cleanup;
 		break;
 
