@@ -13,6 +13,7 @@
 * FEATURE: Debug output (-dd and -ddd) shows block signing time.
 * FEATURE: Debug output (-dd and -ddd) of extend shows time where signature was extended.
 * FEATURE: Debug output (-dd and -ddd) shows block line numbers.
+* FEATURE: Debug output (-ddd) shows meta-record key and value.
 * FEATURE: Signing time of a block is verified to have more recent signing time than previous block.
 * FEATURE: New option --ignore-desc-block-time to skip signing time verification where more recent log blocks must have more recent signing time.
 * FEATURE: New option -- for verify task that enables user to list multiple log files for verification.
@@ -24,6 +25,7 @@
 * BUGFIX: Verification error message fixed and improved in case where publication record is not available in publications file.
 * BUGFIX: When extending log signature thats name is derived from log files name, the log file existence is checked.
 * BUGFIX: When extending and only one log file is required, but there are more, error message is displayed.
+* BUGFIX: When parsing signatures, meta-record internal structure is parsed.
 
 Version 1.3
 

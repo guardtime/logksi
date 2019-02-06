@@ -66,12 +66,12 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
 static int check_io_naming_and_type_errors(PARAM_SET *set, ERR_TRCKR *err);
 static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err);
 
-static int signature_verify_general(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
-static int signature_verify_internally(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
-static int signature_verify_key_based(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
-static int signature_verify_publication_based_with_user_pub(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
-static int signature_verify_publication_based_with_pubfile(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi,  BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
-static int signature_verify_calendar_based(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
+static int signature_verify_general(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
+static int signature_verify_internally(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
+static int signature_verify_key_based(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
+static int signature_verify_publication_based_with_user_pub(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
+static int signature_verify_publication_based_with_pubfile(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi,  BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
+static int signature_verify_calendar_based(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
 static int generate_filenames(ERR_TRCKR *err, IO_FILES *files);
 static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files);
 static void close_log_and_signature_files(IO_FILES *files);
@@ -100,10 +100,10 @@ int verify_run(int argc, char **argv, char **envp) {
 	char *logFileNameCpy = NULL;
 	char *sigFileNameCpy = NULL;
 	BLOCK_INFO blocks;
-
 	BLOCK_INFO_reset(&blocks);
-	IO_FILES_init(&files);
+	MULTI_PRINTER *mp = NULL;
 
+	IO_FILES_init(&files);
 	/**
 	 * Extract command line parameters and also add configuration specific parameters.
 	 */
@@ -123,6 +123,9 @@ int verify_run(int argc, char **argv, char **envp) {
 
 	res = TASK_INITIALIZER_check_analyze_report(set, task_set, 0.2, 0.1, &task);
 	if (res != KT_OK) goto cleanup;
+
+	res = TASK_INITIALIZER_getPrinter(set, &mp);
+	ERR_CATCH_MSG(err, res, "Error: Unable to create Multi printer!");
 
 	res = TOOL_init_ksi(set, &ksi, &err, &logfile);
 	if (res != KT_OK) goto cleanup;
@@ -202,14 +205,20 @@ int verify_run(int argc, char **argv, char **envp) {
 		if (res != KT_OK) goto cleanup;
 
 		if (isMultipleLog) {
-			print_debug("%sLog file '%s'.\n", (i == 0 ? "" : "\n"), files.internal.inLog);
+			print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, "%sLog file '%s'.\n", (i == 0 ? "" : "\n"), files.internal.inLog);
 		}
 
-		print_progressDescExtended(set, 0, DEBUG_EQUAL | DEBUG_LEVEL_1, "Verifying... ");
 
-		res = logsignature_verify(set, err, ksi, &blocks, inputHash, verify_signature, &files, &outputHash);
+		print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_EQUAL | DEBUG_LEVEL_1, "Verifying... ");
+		res = logsignature_verify(set, mp, err, ksi, &blocks, inputHash, verify_signature, &files, &outputHash);
+		print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 		if (res != KT_OK) goto cleanup;
 
+		MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
+		if (MULTI_PRINTER_hasDataByID(mp, MP_ID_LOGFILE_WARNINGS)) {
+			print_debug("\n");
+			MULTI_PRINTER_printByID(mp, MP_ID_LOGFILE_WARNINGS);
+		}
 
 		KSI_DataHash_free(inputHash);
 		inputHash = outputHash;
@@ -227,9 +236,15 @@ int verify_run(int argc, char **argv, char **envp) {
 
 cleanup:
 
+
 	close_log_and_signature_files(&files);
 
-	print_progressResult(res);
+	MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
+	if (MULTI_PRINTER_hasDataByID(mp, MP_ID_LOGFILE_WARNINGS)) {
+		print_debug("\n");
+		MULTI_PRINTER_printByID(mp, MP_ID_LOGFILE_WARNINGS);
+	}
+
 	LOGKSI_KSI_ERRTrace_save(ksi);
 
 	if (res != KT_OK) {
@@ -250,6 +265,7 @@ cleanup:
 	KSI_Signature_free(sig);
 	ERR_TRCKR_free(err);
 	KSI_CTX_free(ksi);
+	MULTI_PRINTER_free(mp);
 
 	return LOGKSI_errToExitCode(res);
 }
@@ -557,7 +573,7 @@ static void handle_verification_result(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *
 	}
 }
 
-static int signature_verify_general(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files,
+static int signature_verify_general(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files,
 									KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out) {
 	int res;
 	int d = PARAM_SET_isSetByName(set, "d");
@@ -581,7 +597,7 @@ static int signature_verify_general(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi
 	/**
 	 * Verify signature.
 	 */
-	print_progressDescExtended(set, d, DEBUG_LEVEL_3, "%s... ", task);
+	print_progressDesc(mp, MP_ID_BLOCK, d, DEBUG_LEVEL_3, "%s... ", task);
 	res = LOGKSI_SignatureVerify_general(err, sig, ksi, hsh, rootLevel, pub_data, x, out);
 	if (res != KSI_OK && *out != NULL) {
 		handle_verification_result(set, err, ksi, sig, pub_data, res, task, *out);
@@ -594,14 +610,14 @@ static int signature_verify_general(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi
 
 cleanup:
 
-	print_progressResultExtended(set, DEBUG_LEVEL_3, res);
+	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
 
 	KSI_PublicationData_free(pub_data);
 
 	return res;
 }
 
-static int signature_verify_internally(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files,
+static int signature_verify_internally(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files,
 									   KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
 									   KSI_PolicyVerificationResult **out) {
 	int res;
@@ -610,7 +626,7 @@ static int signature_verify_internally(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *
 
 	d = PARAM_SET_isSetByName(set, "d");
 
-	print_progressDescExtended(set, d, DEBUG_LEVEL_3, "%s... ", task);
+	print_progressDesc(mp, MP_ID_BLOCK, d, DEBUG_LEVEL_3, "%s... ", task);
 	res = LOGKSI_SignatureVerify_internally(err, sig, ksi, hsh, rootLevel, out);
 	if (res != KSI_OK && *out != NULL) {
 		handle_verification_result(set, err, ksi, sig, NULL, res, task, *out);
@@ -623,13 +639,13 @@ static int signature_verify_internally(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *
 
 cleanup:
 
-	print_progressResultExtended(set, DEBUG_LEVEL_3, res);
+	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
 
 	return res;
 }
 
 
-static int signature_verify_key_based(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files,
+static int signature_verify_key_based(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files,
 									  KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
 									  KSI_PolicyVerificationResult **out) {
 	int res;
@@ -639,7 +655,7 @@ static int signature_verify_key_based(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *k
 	/**
 	 * Verify signature.
 	 */
-	print_progressDescExtended(set, d, DEBUG_LEVEL_3, "%s... ", task);
+	print_progressDesc(mp, MP_ID_BLOCK, d, DEBUG_LEVEL_3, "%s... ", task);
 	res = LOGKSI_SignatureVerify_keyBased(err, sig, ksi, hsh, rootLevel, out);
 	if (res != KSI_OK && *out != NULL) {
 		handle_verification_result(set, err, ksi, sig, NULL, res, task, *out);
@@ -652,12 +668,12 @@ static int signature_verify_key_based(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *k
 
 cleanup:
 
-	print_progressResultExtended(set, DEBUG_LEVEL_3, res);
+	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
 
 	return res;
 }
 
-static int signature_verify_publication_based_with_user_pub(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files,
+static int signature_verify_publication_based_with_user_pub(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files,
 															KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out) {
 	int res;
 	int d = PARAM_SET_isSetByName(set, "d");
@@ -679,7 +695,7 @@ static int signature_verify_publication_based_with_user_pub(PARAM_SET *set, ERR_
 	/**
 	 * Verify signature.
 	 */
-	print_progressDescExtended(set, d, DEBUG_LEVEL_3, "%s... ", task);
+	print_progressDesc(mp, MP_ID_BLOCK, d, DEBUG_LEVEL_3, "%s... ", task);
 	res = LOGKSI_SignatureVerify_userProvidedPublicationBased(err, sig, ksi, hsh, rootLevel, pub_data, x, out);
 	if (res != KSI_OK && *out != NULL) {
 		handle_verification_result(set, err, ksi, sig, pub_data, res, task, *out);
@@ -692,14 +708,14 @@ static int signature_verify_publication_based_with_user_pub(PARAM_SET *set, ERR_
 
 cleanup:
 
-	print_progressResultExtended(set, DEBUG_LEVEL_3, res);
+	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
 
 	KSI_PublicationData_free(pub_data);
 
 	return res;
 }
 
-static int signature_verify_publication_based_with_pubfile(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files,
+static int signature_verify_publication_based_with_pubfile(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files,
 														   KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
 														   KSI_PolicyVerificationResult **out) {
 	int res;
@@ -710,7 +726,7 @@ static int signature_verify_publication_based_with_pubfile(PARAM_SET *set, ERR_T
 	/**
 	 * Verify signature.
 	 */
-	print_progressDescExtended(set, d, DEBUG_LEVEL_3, "%s... ", task);
+	print_progressDesc(mp, MP_ID_BLOCK, d, DEBUG_LEVEL_3, "%s... ", task);
 	res = LOGKSI_SignatureVerify_publicationsFileBased(err, sig, ksi, hsh, rootLevel, x, out);
 	if (res != KSI_OK && *out != NULL) {
 		handle_verification_result(set, err, ksi, sig, NULL, res, task, *out);
@@ -723,12 +739,12 @@ static int signature_verify_publication_based_with_pubfile(PARAM_SET *set, ERR_T
 
 cleanup:
 
-	print_progressResultExtended(set, DEBUG_LEVEL_3, res);
+	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
 
 	return res;
 }
 
-static int signature_verify_calendar_based(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files,
+static int signature_verify_calendar_based(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files,
 										   KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
 										   KSI_PolicyVerificationResult **out) {
 	int res;
@@ -739,7 +755,7 @@ static int signature_verify_calendar_based(PARAM_SET *set, ERR_TRCKR *err, KSI_C
 	/**
 	 * Verify signature.
 	 */
-	print_progressDescExtended(set, d, DEBUG_LEVEL_3, "%s... ", task);
+	print_progressDesc(mp, MP_ID_BLOCK, d, DEBUG_LEVEL_3, "%s... ", task);
 	res = LOGKSI_SignatureVerify_calendarBased(err, sig, ksi, hsh, rootLevel, out);
 	if (res != KSI_OK && *out != NULL) {
 		handle_verification_result(set, err, ksi, sig, NULL, res, task, *out);
@@ -752,7 +768,7 @@ static int signature_verify_calendar_based(PARAM_SET *set, ERR_TRCKR *err, KSI_C
 
 cleanup:
 
-	print_progressResultExtended(set, DEBUG_LEVEL_3, res);
+	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
 
 	KSI_Integer_free(pubTime);
 

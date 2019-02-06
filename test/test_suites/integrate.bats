@@ -95,6 +95,12 @@ cp test/resource/logsignatures/synchronous.logsig test/out
 	run chmod 0777 test/out/synchronous.logsig
 }
 
+@test "integrate log signature where blocks.dat contains corrupted meta-data record" {
+	run src/logksi integrate test/resource/logsignatures/nok-corrupted-metadata -o test/out/dummy.logsig --force-overwrite -d
+	[ "$status" -eq 4 ]
+	[[ "$output" =~ (Error:).*(Block no. 4).*(Unable to get TLV 911.02.01).*(Meta record key) ]]
+}
+
 @test "integrate invalid log signature file that contains only magic byte" {
 	run ./src/logksi integrate test/resource/logsignatures/nok-logsig-only-magick --force-overwrite -o test/out/dummy.logsig -d
 	[[ "$output" =~ (Error).*(Block no).*(1).*(unable to parse KSI signature in signatures file).*(Error).*(Block no).*(1).*(unexpected end of signatures file) ]]
