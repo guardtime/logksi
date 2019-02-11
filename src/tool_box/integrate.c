@@ -225,7 +225,7 @@ cleanup:
 static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err) {
 	int res;
 
-	res = get_pipe_out_error(set, err, NULL, "o,log", NULL);
+	res = get_pipe_out_error(set, err, NULL, "o,log,out-log", NULL);
 	if (res != KT_OK) goto cleanup;
 
 cleanup:
@@ -376,6 +376,11 @@ static int open_input_and_output_files(PARAM_SET *set, ERR_TRCKR *err, IO_FILES 
 			if (tmp.files.outSig != NULL) {
 				res = KT_IO_ERROR;
 				ERR_CATCH_MSG(err, res, "Error: Overwriting of existing log signature file %s not allowed. Run 'logksi integrate' with '--force-overwrite' to force overwriting.", files->internal.outSig);
+			}
+
+			if (SMART_FILE_doFileExist(files->internal.outLog)) {
+				res = KT_IO_ERROR;
+				ERR_CATCH_MSG(err, res, "Error: Overwriting of existing log file %s not allowed. Run 'logksi integrate' with '--force-overwrite' to force overwriting.", files->internal.outLog);
 			}
 		}
 		res = logksi_file_create_temporary(files->internal.tempSig, &tmp.files.outSig, files->internal.bStdout);
