@@ -527,7 +527,10 @@ static int recover_procedure(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, 
 
 		/* Delete the end of the file if it is corrupted. */
 		fseeko(files->files.outSig, files->files.outSigPos, SEEK_SET);
-		ftruncate(fileno(files->files.outSig), files->files.outSigPos);
+		if(ftruncate(fileno(files->files.outSig), files->files.outSigPos) != 0) {
+			ERR_TRCKR_ADD(err, resIn, "Error: Unable to remove corrupted data from output logfile '%s'.", files->internal.outLog);
+			goto cleanup;
+		}
 
 		print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, 0);
 		print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_LEVEL_1, "Copying valid log lines into recovered log file... ");

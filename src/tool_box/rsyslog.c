@@ -1415,7 +1415,7 @@ static int process_block_header(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *er
 	}
 
 	if (files->files.outSig) {
-		/* Set the offset at the beginning of new block, so it is possible to apply recovery procedurs if there is a failure. */
+		/* Set the offset at the beginning of new block, so it is possible to apply recovery procedures if there is a failure. */
 		files->files.outSigPos = ftello(files->files.outSig);
 		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->files.outSig) != blocks->ftlv_len) {
 			res = KT_IO_ERROR;
