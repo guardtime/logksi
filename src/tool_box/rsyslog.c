@@ -1415,6 +1415,8 @@ static int process_block_header(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *er
 	}
 
 	if (files->files.outSig) {
+		/* Set the offset at the beginning of new block, so it is possible to apply recovery procedures if there is a failure. */
+		files->files.outSigPos = ftello(files->files.outSig);
 		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->files.outSig) != blocks->ftlv_len) {
 			res = KT_IO_ERROR;
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to copy block header.", blocks->blockNo);
@@ -2757,6 +2759,10 @@ static int process_partial_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCK
 			res = KT_IO_ERROR;
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to write signature data log signature file.", blocks->blockNo);
 		}
+
+		/* Move signature file offset value at the end of the files as complete signature is written to the file. */
+		files->files.outSigPos = ftello(files->files.outSig);
+
 	}
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
 	blocks->nofTotalRecordHashes += blocks->nofRecordHashes;
@@ -2907,7 +2913,7 @@ cleanup:
 	return res;
 }
 
-static void BLOCK_INFO_freeAndClearInternals(BLOCK_INFO *blocks) {
+void BLOCK_INFO_freeAndClearInternals(BLOCK_INFO *blocks) {
 	unsigned char i = 0;
 	size_t j;
 
@@ -3516,9 +3522,8 @@ cleanup:
 	return res;
 }
 
-int logsignature_integrate(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files) {
+int logsignature_integrate(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO* blocks, IO_FILES *files) {
 	int res;
-	BLOCK_INFO blocks;
 	unsigned char ftlv_raw[SOF_FTLV_BUFFER];
 	SIGNATURE_PROCESSORS processors;
 	KSI_DataHash *theFirstInputHashInFile = NULL;
@@ -3529,55 +3534,54 @@ int logsignature_integrate(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KS
 		goto cleanup;
 	}
 
-	BLOCK_INFO_reset(&blocks);
-	blocks.ftlv_raw = ftlv_raw;
-	blocks.taskId = TASK_INTEGRATE;
+	blocks->ftlv_raw = ftlv_raw;
+	blocks->taskId = TASK_INTEGRATE;
 	memset(&processors, 0, sizeof(processors));
 
-	res = process_magic_number(set, mp, err, &blocks, files);
+	res = process_magic_number(set, mp, err, blocks, files);
 	if (res != KT_OK) goto cleanup;
 
 	while (!feof(files->files.partsBlk)) {
 		MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
 
-		res = KSI_FTLV_fileRead(files->files.partsBlk, blocks.ftlv_raw, SOF_FTLV_BUFFER, &blocks.ftlv_len, &blocks.ftlv);
+		res = KSI_FTLV_fileRead(files->files.partsBlk, blocks->ftlv_raw, SOF_FTLV_BUFFER, &blocks->ftlv_len, &blocks->ftlv);
 		if (res == KSI_OK) {
-			switch (blocks.ftlv.tag) {
+			switch (blocks->ftlv.tag) {
 				case 0x901:
-					if (theFirstInputHashInFile == NULL) theFirstInputHashInFile = KSI_DataHash_ref(blocks.inputHash);
+					if (theFirstInputHashInFile == NULL) theFirstInputHashInFile = KSI_DataHash_ref(blocks->inputHash);
 				case 0x902:
 				case 0x903:
 				case 0x911:
-					res = process_log_signature(set, mp, err, ksi, &blocks, files);
+					res = process_log_signature(set, mp, err, ksi, blocks, files);
 					if (res != KT_OK) goto cleanup;
 				break;
 				case 0x904:
 				{
-					print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_EQUAL | DEBUG_LEVEL_2, "Integrating block no. %3zu: into log signature... ", blocks.blockNo);
+					print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_EQUAL | DEBUG_LEVEL_2, "Integrating block no. %3zu: into log signature... ", blocks->blockNo);
 
-					res = process_partial_block(set, err, ksi, &blocks, files, mp);
+					res = process_partial_block(set, err, ksi, blocks, files, mp);
 					if (res != KT_OK) goto cleanup;
 
-					res = KSI_FTLV_fileRead(files->files.partsSig, blocks.ftlv_raw, SOF_FTLV_BUFFER, &blocks.ftlv_len, &blocks.ftlv);
+					res = KSI_FTLV_fileRead(files->files.partsSig, blocks->ftlv_raw, SOF_FTLV_BUFFER, &blocks->ftlv_len, &blocks->ftlv);
 
 					if (res != KT_OK) {
-						if (blocks.ftlv_len > 0) {
+						if (blocks->ftlv_len > 0) {
 							res = KT_INVALID_INPUT_FORMAT;
-							ERR_TRCKR_ADD(err, res, "Error: Block no. %zu: incomplete data found in signatures file.", blocks.blockNo);
-							ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse KSI signature in signatures file.", blocks.blockNo);
+							ERR_TRCKR_ADD(err, res, "Error: Block no. %zu: incomplete data found in signatures file.", blocks->blockNo);
+							ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse KSI signature in signatures file.", blocks->blockNo);
 						} else {
 							res = KT_INVALID_INPUT_FORMAT;
-							ERR_TRCKR_ADD(err, res, "Error: Block no. %zu: unexpected end of signatures file.", blocks.blockNo);
-							ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse KSI signature in signatures file.", blocks.blockNo);
+							ERR_TRCKR_ADD(err, res, "Error: Block no. %zu: unexpected end of signatures file.", blocks->blockNo);
+							ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse KSI signature in signatures file.", blocks->blockNo);
 						}
 					}
-					if (blocks.ftlv.tag != 0x904) {
+					if (blocks->ftlv.tag != 0x904) {
 						res = KT_INVALID_INPUT_FORMAT;
-						ERR_TRCKR_ADD(err, res, "Error: Block no. %zu: unexpected TLV %04X read from block-signatures file.", blocks.blockNo, blocks.ftlv.tag);
-						ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse KSI signature in signatures file.", blocks.blockNo);
+						ERR_TRCKR_ADD(err, res, "Error: Block no. %zu: unexpected TLV %04X read from block-signatures file.", blocks->blockNo, blocks->ftlv.tag);
+						ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse KSI signature in signatures file.", blocks->blockNo);
 					}
 
-					res = process_partial_signature(set, mp, err, ksi, &processors, &blocks, files, 0);
+					res = process_partial_signature(set, mp, err, ksi, &processors, blocks, files, 0);
 					if (res != KT_OK) goto cleanup;
 					print_progressResult(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_2, res);
 				}
@@ -3592,16 +3596,16 @@ int logsignature_integrate(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KS
 				break;
 			}
 		} else {
-			if (blocks.ftlv_len > 0) {
+			if (blocks->ftlv_len > 0) {
 				res = KT_INVALID_INPUT_FORMAT;
-				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: incomplete data found in blocks file.", blocks.blockNo);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: incomplete data found in blocks file.", blocks->blockNo);
 			} else {
 				break;
 			}
 		}
 	}
 
-	res = finalize_log_signature(set, mp, err, ksi, theFirstInputHashInFile, &blocks, files);
+	res = finalize_log_signature(set, mp, err, ksi, theFirstInputHashInFile, blocks, files);
 	if (res != KT_OK) goto cleanup;
 
 	res = KT_OK;
@@ -3609,7 +3613,6 @@ int logsignature_integrate(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KS
 cleanup:
 
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_2, res);
-	BLOCK_INFO_freeAndClearInternals(&blocks);
 	KSI_DataHash_free(theFirstInputHashInFile);
 
 	return res;

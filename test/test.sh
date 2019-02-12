@@ -5,6 +5,7 @@ mkdir -p test/out
 
 bats \
 test/test_suites/integrate.bats \
+test/test_suites/integrate_recover.bats \
 test/test_suites/integrate_cmd.bats \
 test/test_suites/integrate_debug_output.bats \
 test/test_suites/verify_after_integrate.bats \

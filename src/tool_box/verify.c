@@ -100,10 +100,12 @@ int verify_run(int argc, char **argv, char **envp) {
 	char *logFileNameCpy = NULL;
 	char *sigFileNameCpy = NULL;
 	BLOCK_INFO blocks;
-	BLOCK_INFO_reset(&blocks);
 	MULTI_PRINTER *mp = NULL;
 
+
+	BLOCK_INFO_reset(&blocks);
 	IO_FILES_init(&files);
+
 	/**
 	 * Extract command line parameters and also add configuration specific parameters.
 	 */

@@ -31,6 +31,7 @@ typedef struct {
 	char *inLog;
 	char *inSig;
 	char *outLog;
+	char *outSig;
 	char *outProof;
 	char *outBase;
 	char bStdinLog;
@@ -63,6 +64,8 @@ typedef struct {
 	FILE *outLog;
 	FILE *partsBlk;
 	FILE *partsSig;
+
+	off_t outSigPos;
 } INTERNAL_FILE_HANDLES;
 
 typedef struct {
@@ -106,17 +109,19 @@ typedef struct {
 	KSI_FTLV ftlv;
 	unsigned char *ftlv_raw;
 	size_t ftlv_len;
-	size_t blockCount;
+
+	size_t blockCount;				/* Count of blocks counted in the beginning of the sign task. */
+	size_t noSigCount;				/* Count of not signed blocks counted in the beginning of the sign task. */
+
 	size_t noSigCreated;			/* Count of signatures created for unsigned blocks. */
-	size_t noSigCount;
-	size_t blockNo;
-	size_t partNo;					/* Count (or index) of partial blocks. */
-	size_t sigNo;					/* Count (or index) of block-signatures + ksi signatures + partial signatures. */
+	size_t blockNo;					/* Index of current block (incremented if block header is processed). */
+	size_t partNo;					/* Index of partial blocks (incremented if partial block is processed). */
+	size_t sigNo;					/* Index of block-signatures + ksi signatures + partial signatures. */
 	size_t noSigNo;					/* Count of not signed blocks. */
 	size_t recordCount;				/* Record count read from block signature, partial block or partial block signature. It is just a number and may differ from the real count! */
 	size_t nofRecordHashes;			/* Number of all records that are aggregated into a tree (no tree_hash included, but metarecord record hash is counted. */
-	size_t nofMetaRecords;			/* Number of metarecords inside a block. */
-	size_t nofTotalRecordHashes;	/* All record hashes over all blocks. Metarecord hashes are not included! */
+	size_t nofMetaRecords;			/* Number of meta-records inside a block. */
+	size_t nofTotalRecordHashes;	/* All record hashes over all blocks. Meta-record hashes are not included! */
 	size_t nofTotalMetarecors;		/* All meta-record over all blocks. */
 	size_t nofTreeHashes;
 	size_t firstLineInBlock;		/* First line in current block. */
@@ -177,7 +182,7 @@ typedef struct {
 int logsignature_extend(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, KSI_PublicationsFile* pubFile, EXTENDING_FUNCTION extend_signature, IO_FILES *files);
 int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *firstLink, VERIFYING_FUNCTION verify_signature, IO_FILES *files, KSI_DataHash **lastLeaf);
 int logsignature_extract(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files);
-int logsignature_integrate(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files);
+int logsignature_integrate(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO* blocks, IO_FILES *files);
 int logsignature_sign(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files);
 
 int concat_names(char *org, const char *extension, char **derived);
@@ -198,3 +203,4 @@ void IO_FILES_init(IO_FILES *files);
 void IO_FILES_StorePreviousFileNames(IO_FILES *files);
 
 void BLOCK_INFO_reset(BLOCK_INFO *block);
+void BLOCK_INFO_freeAndClearInternals(BLOCK_INFO *blocks);
