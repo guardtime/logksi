@@ -159,6 +159,7 @@ char *integrate_help_toString(char *buf, size_t len) {
 	KSI_snprintf(buf, len,
 		"Usage:\n"
 		" %s integrate <logfile> [-o <out.logsig>]\n"
+		" %s integrate <logfile> --recover [-o <out.logsig>] [--out-log <out.recovered.logsig>]\n"
 		"\n"
 		" <logfile>\n"
 		"           - Name of the log file whose temporary files are to be integrated.\n"
@@ -170,7 +171,19 @@ char *integrate_help_toString(char *buf, size_t len) {
 		"           - Name of the integrated output log signature file. If not specified,\n"
 		"             the log signature file is saved as '<logfile>.logsig' in the same folder where\n"
 		"             the '<logfile>' is located. An attempt to overwrite an existing log signature file will\n"
-		"             result in an error. Use '-' to redirect the integrated log signature binary stream to stdout.\n"
+		" --out-log <out.logsig>\n"
+		"           - Specify the name of recovered log file (only valid with --recover). If not specified,\n"
+		"             the log signature file is saved as <logfile>.recovered in the same folder where the\n"
+		"             <logfile> is located. An attempt to overwrite an existing log file will result in an\n"
+		"             error. Use '-' as file name to redirect the output as a binary stream to stdout\n"
+		"             result in an error. Use '-' to redirect the integrated log signature binary stream to\n"
+		"             stdout.\n"
+		" --recover - Tries to recover as many blocks as possible from corrupted log and log signature\n"
+		"             temporary files. For example if block no. 6 is corrupted it is possible to recover log\n"
+		"             records and log signatures until the end of the block no. 5. By default output\n"
+		"             file names are derived from the log file name: <logfile>.recovered and\n"
+		"             <logfile>.recovered.logsig for log and log signature file accordingly. If the files\n"
+		"             already exist, error is returned (see --force-overwrite).\n"
 		" --force-overwrite\n"
 		"           - Force overwriting of existing log signature file.\n"
 		" -d\n"
@@ -178,6 +191,7 @@ char *integrate_help_toString(char *buf, size_t len) {
 		"             To make output more verbose use -dd or -ddd.\n"
 		" --log <file>\n"
 		"           - Write libksi log to the given file. Use '-' as file name to redirect the log to stdout.\n",
+		TOOL_getName(),
 		TOOL_getName()
 	);
 
