@@ -33,7 +33,10 @@
 #include <sys/stat.h>
 
 struct SMART_FILE_st {
-	char fname[1024];
+	char fname[1024];	/* Original file name. */
+	char tmp_fname[1024];	/* Temporary file name derived from initial file name. */
+	char bak_fname[1024];	/* Backup file name derived from initial file name. */
+
 	void *file;
 
 	int (*file_open)(const char *fname, const char *mode, void **file);
@@ -46,6 +49,13 @@ struct SMART_FILE_st {
 	int isEOF;
 	int isOpen;
 	int mustBeFreed;
+
+	int is_B;
+	int is_T;
+
+	int isConsistent;
+	int isTempCreated;
+	int isBackupCreated;
 };
 
 static int smart_file_open(const char *fname, const char *mode, void **file);
@@ -253,6 +263,7 @@ static int smart_file_get_stream(const char *mode, void **stream, int *is_close_
 	int res;
 	int is_r = 0;
 	int is_w = 0;
+	int is_e = 0;
 	FILE *fp = NULL;
 
 	if (mode == NULL || stream == NULL) {
@@ -262,12 +273,13 @@ static int smart_file_get_stream(const char *mode, void **stream, int *is_close_
 
 	is_r = strchr(mode, 'r') == NULL ? 0 : 1;
 	is_w = strchr(mode, 'w') == NULL ? 0 : 1;
+	is_e = strchr(mode, 'e') == NULL ? 0 : 1;
 
 
 	if (is_r) {
 		fp = stdin;
 	} else if (is_w) {
-		fp = stdout;
+		fp = is_e ? stderr : stdout;
 	} else {
 		res = SMART_FILE_INVALID_MODE;
 		goto cleanup;
@@ -421,11 +433,18 @@ int SMART_FILE_open(const char *fname, const char *mode, SMART_FILE **file) {
 	int must_free = 0;
 	int isStream = 0;
 	const char *pFname = fname;
+	const char *pBackupFname = NULL;
+	const char *pTemporaryFname = NULL;
 	char buf[2048];
+	char backupName[2048];
+	char temporaryName[2048];
 
 	int is_w;
 	int is_f;
 	int is_i;
+	int is_B;
+	int is_T;
+
 
 	if (fname == NULL || mode == NULL || file == NULL) {
 		res = SMART_FILE_INVALID_ARG;
@@ -437,18 +456,47 @@ int SMART_FILE_open(const char *fname, const char *mode, SMART_FILE **file) {
 	is_w = strchr(mode, 'w') == NULL ? 0 : 1;
 	is_f = strchr(mode, 'f') == NULL ? 0 : 1;
 	is_i = strchr(mode, 'i') == NULL ? 0 : 1;
+	is_B = strchr(mode, 'B') == NULL ? 0 : 1;
+	is_T = strchr(mode, 'T') == NULL ? 0 : 1;
 
 	/**
 	 * Some special flags that should be checked before going ahead.
 	 */
 	if (!isStream) {
-		if (is_w && is_f && SMART_FILE_doFileExist(fname)) {
-			res = SMART_FILE_OVERWRITE_RESTRICTED;
-			goto cleanup;
+		/* If file already exists try to resolve the case.
+		   By default file is overwritten! */
+		if (is_w && SMART_FILE_doFileExist(fname)) {
+			/* If overwrite is strictly restricted, raise the error! */
+			if (is_f) {
+				res = SMART_FILE_OVERWRITE_RESTRICTED;
+				goto cleanup;
+			/* If a backup is required, resolve its name. */
+			} else if (is_B) {
+				/* With i combination, there can be multiple backups. Otherwise last backup is replaced with new one. */
+				if (is_i) {
+					char initial_backup_file_name[2048];
+					KSI_snprintf(initial_backup_file_name, sizeof(initial_backup_file_name), "%s.bak", fname);
+
+					if (SMART_FILE_doFileExist(initial_backup_file_name)) {
+						pBackupFname = generate_not_existing_file_name(initial_backup_file_name, backupName, sizeof(backupName), 1);
+					} else {
+						KSI_strncpy(backupName, initial_backup_file_name, sizeof(backupName));
+						pBackupFname = backupName;
+					}
+				} else {
+					KSI_snprintf(backupName, sizeof(backupName), "%s.bak", fname);
+					pBackupFname = backupName;
+				}
+			/* With i all files are kept and index number is applied. */
+			} else if (is_i) {
+				pFname = generate_not_existing_file_name(fname, buf, sizeof(buf), 1);
+			}
 		}
 
-		if (is_w && is_i && SMART_FILE_doFileExist(fname)) {
-			pFname = generate_not_existing_file_name(fname, buf, sizeof(buf), 1);
+		/* Generate tmp file name. */
+		if (is_T) {
+			KSI_snprintf(temporaryName, sizeof(temporaryName), "%sXXXXXX", fname);
+			pTemporaryFname = mktemp(temporaryName);
 		}
 	}
 
@@ -459,23 +507,41 @@ int SMART_FILE_open(const char *fname, const char *mode, SMART_FILE **file) {
 		goto cleanup;
 	}
 
-		/**
+	/**
 	 * Initialize smart file.
 	 */
 	tmp->file = NULL;
 	tmp->fname[0] = '\0';
+	tmp->bak_fname[0] = '\0';
+	tmp->tmp_fname[0] = '\0';
 	tmp->isEOF = 0;
 	tmp->isOpen = 0;
 	tmp->mustBeFreed = 0;
+	tmp->isConsistent = 0;
+	tmp->isTempCreated = 0;
+	tmp->isBackupCreated = 0;
 
-	KSI_snprintf(tmp->fname, sizeof(tmp->fname), "%s", pFname);
+	tmp->is_B = is_B;
+	tmp->is_T = is_T;
 
+	/* Make a copy from the file names. */
+	KSI_strncpy(tmp->fname, pFname, sizeof(tmp->fname));
+	if (is_B && pBackupFname) KSI_strncpy(tmp->bak_fname, pBackupFname, sizeof(tmp->bak_fname));
+	if (is_T && pTemporaryFname) KSI_strncpy(tmp->tmp_fname, pTemporaryFname, sizeof(tmp->tmp_fname));
 
 	/**
 	 * Initialize implementations.
 	 */
 	res = smart_file_init(tmp);
 	if (res != SMART_FILE_OK) goto cleanup;
+
+	/* If there is a need to create a backup IMMEDIATELY (no tmp file is used) do it NOW! */
+	if (is_B && !is_T && tmp->bak_fname[0] != '\0') {
+		res = SMART_FILE_rename(tmp->fname, tmp->bak_fname);
+		if (res != SMART_FILE_OK) goto cleanup;
+
+		tmp->isBackupCreated = 1;
+	}
 
 	/**
 	 * If standard strem is wanted, extract the stream object. Otherwise use
@@ -485,6 +551,11 @@ int SMART_FILE_open(const char *fname, const char *mode, SMART_FILE **file) {
 		res = tmp->file_get_stream(mode, &(tmp->file), &must_free);
 		if (res != SMART_FILE_OK) goto cleanup;
 		tmp->mustBeFreed = must_free;
+	} else if (is_T) {
+		res = tmp->file_open(pTemporaryFname, mode, &(tmp->file));
+		if (res != SMART_FILE_OK) goto cleanup;
+		tmp->mustBeFreed = 1;
+		tmp->isTempCreated = 1;
 	} else {
 		res = tmp->file_open(pFname, mode, &(tmp->file));
 		if (res != SMART_FILE_OK) goto cleanup;
@@ -504,19 +575,77 @@ int SMART_FILE_open(const char *fname, const char *mode, SMART_FILE **file) {
 
 cleanup:
 
+	/* In case of a failure rename the original file back. */
+	if (tmp != NULL && tmp->isBackupCreated && res != SMART_FILE_OK) {
+		// TODOD: Somehow make sure that original file is not corrupted!
+		SMART_FILE_rename(tmp->bak_fname, tmp->fname);
+	}
+
 	SMART_FILE_close(tmp);
 
 	return res;
 }
 
-void SMART_FILE_close(SMART_FILE *file) {
+int SMART_FILE_close(SMART_FILE *file) {
+	int res = SMART_FILE_UNKNOWN_ERROR;
+
 	if (file != NULL) {
 		if (file->mustBeFreed && file->file != NULL && file->file_close != NULL) {
 			file->file_close(file->file);
 		}
 
+		/* If file is not marked as consistent, there may be some extra cleanup to do. */
+		if (file->isConsistent) {
+			if (file->is_T && file->isTempCreated) {
+				/* Make original file backup (if there is a need to backup anything) and tmp file persistent. */
+				if (file->is_B && !file->isBackupCreated && file->bak_fname[0] != '\0') {
+					res = SMART_FILE_rename(file->fname, file->bak_fname);
+					if (res != SMART_FILE_OK) goto cleanup;
+					file->isBackupCreated = 1;
+				/* Make temporary file persistent, remove existing file. */
+				} else if (!file->is_B) {
+					if (SMART_FILE_doFileExist(file->fname)) {
+						res = SMART_FILE_remove(file->fname);
+						if (res != SMART_FILE_OK) goto cleanup;
+					}
+				}
+
+				res = SMART_FILE_rename(file->tmp_fname, file->fname);
+				if (res != SMART_FILE_OK) goto cleanup;
+			}
+		} else {
+			/* A backup was created, remove inconsistent file and rename original file back. */
+			if (file->isBackupCreated) {
+				// TODOD: Somehow make sure that original file is not corrupted!
+
+				res = SMART_FILE_remove(file->fname);
+				if (res != SMART_FILE_OK) goto cleanup;
+
+				res = SMART_FILE_rename(file->bak_fname, file->fname);
+				if (res != SMART_FILE_OK) goto cleanup;
+			}
+
+			/* A temporary file was created, remove it as it is not used. */
+			if (file->isTempCreated && file->tmp_fname[0] != '\0') {
+				res = SMART_FILE_remove(file->tmp_fname);
+				if (res != SMART_FILE_OK) goto cleanup;
+			}
+		}
+
 		free(file);
 	}
+
+	res = SMART_FILE_OK;
+
+cleanup:
+
+	return res;
+}
+
+int SMART_FILE_markConsistent(SMART_FILE *file) {
+	if (file == NULL) return SMART_FILE_INVALID_ARG;
+	file->isConsistent = 1;
+	return SMART_FILE_OK;
 }
 
 int SMART_FILE_write(SMART_FILE *file, char *raw, size_t raw_len, size_t *count) {
@@ -682,6 +811,28 @@ int SMART_FILE_hasFileExtension(const char *path, const char *ext) {
 	} else {
 		return 0;
 	}
+}
+
+int SMART_FILE_rename(const char *old_path, const char *new_path) {
+	int res;
+
+	if (old_path == NULL || new_path == NULL) return SMART_FILE_INVALID_ARG;
+
+	res = rename(old_path, new_path);
+	res = (res != 0) ? smart_file_get_error() : SMART_FILE_OK;
+
+	return res;
+}
+
+int SMART_FILE_remove(const char *fname) {
+	int res;
+
+	if (fname == NULL) return SMART_FILE_INVALID_ARG;
+
+	res = remove(fname);
+	res = (res != 0) ? smart_file_get_error() : SMART_FILE_OK;
+
+	return res;
 }
 
 const char* SMART_FILE_errorToString(int error_code) {

@@ -58,14 +58,42 @@ typedef struct SMART_FILE_st SMART_FILE;
  * wants to read from stdin or write to stdout, file name '-' must be used with mode
  * r or w accordingly together with s.
  *
- * Possible file open modes:
- * r - for reading.
- * w - for writing.
- * wf - fail if exists.
- * wi - generate new file name as name[num++].ext
- * rs - enable operations on stdin.
- * ws - enable operations on stdout.
+ * Smart file can handle backup and temporary files. Backup files can be used to create
+ * a backup file (keep old file) and in case of failure restore the original file
+ * automatically on file close. Temporary file can be used to buffer the working file
+ * without touching already existing files until the file is closed. In case of failure
+ * temporary file is discarded. A backup file gains a file extension '.bak' and temporary
+ * file gains 6 random characters at the end of the files name.
  *
+ * What is the difference between i and B? Mode i is meant to be used to save and keep
+ * multiple file without overwriting the others and without RENAMING original file.
+ * Also it needs no original file restoring as it creates a new file with incremented
+ * file name. B is meant to be used to replace existing file with the most recent
+ * one and rename the old one to backup. Note that mode B only stores on backup, but
+ * nevertheless it can be combined with i to store multiple backups.
+ *
+ * Note that just mode B is not safe as the backup file may be corrupted thus it
+ * is not allowed. B can be used together with T and i (it guarantees that backup file
+ * is buffered and is only replaced or created on success).
+ *
+ * Success is marked with function #SMART_FILE_markConsistent. If it is not called
+ * before #SMART_FILE_close
+ *
+ * Possible file open modes:
+ * r   - for reading.
+ * w   - for writing.
+ * wf  - fail if exists.
+ * wi  - generate new file name as name[num++].ext
+ * rs  - enable operations on stdin.
+ * ws  - enable operations on stdout.
+ * wse - enable operations on stderr.
+ * wBi, wBT[i]
+ *     - Original file is kept as backup file and can be restored. Note that when
+ *       a backup already exists with just T it is overwritten or with i multiple
+ *       backups are kept.
+ * WT[i]
+ *     - Temporary file is used until file close. In case of success temporary
+ *       file is renamed.
  * \param fname file name to be used.
  * \param mode	file open mode.
  * \param file	smart file return pointer.
@@ -73,11 +101,12 @@ typedef struct SMART_FILE_st SMART_FILE;
  */
 int SMART_FILE_open(const char *fname, const char *mode, SMART_FILE **file);
 
-void SMART_FILE_close(SMART_FILE *file);
+int SMART_FILE_close(SMART_FILE *file);
 int SMART_FILE_write(SMART_FILE *file, char *raw, size_t raw_len, size_t *count);
 int SMART_FILE_read(SMART_FILE *file, char *raw, size_t raw_len, size_t *count);
 int SMART_FILE_readLine(SMART_FILE *file, char *raw, size_t raw_len, size_t *row_pointer, size_t *count);
 const char *SMART_FILE_getFname(SMART_FILE *file);
+int SMART_FILE_markConsistent(SMART_FILE *file);
 /**
  *
  * @param file
@@ -91,6 +120,8 @@ int SMART_FILE_isWriteAccess(const char *path);
 int SMART_FILE_isReadAccess(const char *path);
 int SMART_FILE_hasFileExtension(const char *path, const char *ext);
 int SMART_FILE_isFileType(const char *path, int ftype);
+int SMART_FILE_rename(const char *old_path, const char *new_path);
+int SMART_FILE_remove(const char *fname);
 
 const char* SMART_FILE_errorToString(int error_code);
 
