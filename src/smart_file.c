@@ -36,10 +36,12 @@ struct SMART_FILE_st {
 	char fname[1024];	/* Original file name. */
 	char tmp_fname[1024];	/* Temporary file name derived from initial file name. */
 	char bak_fname[1024];	/* Backup file name derived from initial file name. */
+	char mode[256];
 
 	void *file;
 
-	int (*file_open)(const char *fname, const char *mode, void **file);
+	int (*file_open)(const char *fname, const char *mode, char* fname_out_buf, size_t fname_out_buf_len, void **file);
+	int (*file_reposition)(void *file, size_t offset);
 	int (*file_write)(void *file, char *raw, size_t raw_len, size_t *count);
 	int (*file_read)(void *file, char *raw, size_t raw_len, size_t *count);
 	int (*file_read_line)(void *file, char *raw, size_t raw_len, size_t *row_pointer, size_t *count);
@@ -50,22 +52,21 @@ struct SMART_FILE_st {
 	int isOpen;
 	int mustBeFreed;
 
-	int is_B;
-	int is_T;
-
 	int isConsistent;
 	int isTempCreated;
 	int isBackupCreated;
+	int isTmpStreamBuffer;
 };
 
-static int smart_file_open(const char *fname, const char *mode, void **file);
+static int smart_file_open(const char *fname, const char *mode, char* fname_out_buf, size_t fname_out_buf_len, void **file);
 static void smart_file_close(void *file);
+static int smart_file_reposition(void *file, size_t offset);
 static int smart_file_read(void *file, char *raw, size_t raw_len, size_t *count);
 static int smart_file_read_line(void *file, char *buf, size_t len, size_t *row_pointer, size_t *count);
 static int smart_file_write(void *file, char *raw, size_t raw_len, size_t *count);
 static int smart_file_get_stream(const char *mode, void **stream, int *is_close_mandatory);
 static int smart_file_get_error(void);
-
+static char* get_pure_mode(const char *mode, char *buf, size_t buf_len);
 
 static int is_access(const char *path, int mode) {
 	int res;
@@ -89,6 +90,7 @@ static int smart_file_init(SMART_FILE *file) {
 	file->file_read_line = smart_file_read_line;
 	file->file_write = smart_file_write;
 	file->file_get_stream = smart_file_get_stream;
+	file->file_reposition = smart_file_reposition;
 
 	res = SMART_FILE_OK;
 
@@ -97,22 +99,93 @@ cleanup:
 	return res;
 }
 
-static int smart_file_open(const char *fname, const char *mode, void **file) {
+static int smart_file_redirect_to_stream(void *from, void *to) {
+	int res;
+	char buf[0xffff];
+	size_t readCount = 0;
+	size_t writeCount = 0;
+
+	if (from == NULL || to == NULL) {
+		res = SMART_FILE_INVALID_ARG;
+		goto cleanup;
+	}
+
+	do {
+		res = smart_file_read(from, buf, sizeof(buf), &readCount);
+		if (res != SMART_FILE_OK) goto cleanup;
+
+		if (res == SMART_FILE_OK && readCount == 0) {
+			break;
+		}
+
+		res = smart_file_write(to, buf, readCount, &writeCount);
+		if (res != SMART_FILE_OK) goto cleanup;
+
+		if (writeCount != readCount) {
+			res = SMART_FILE_UNABLE_TO_WRITE;
+			goto cleanup;
+		}
+
+	} while (readCount > 0);
+
+	res = SMART_FILE_OK;
+
+cleanup:
+
+	return res;
+}
+
+static int smart_file_open(const char *fname, const char *mode, char* fname_out_buf, size_t fname_out_buf_len, void **file) {
 	int res;
 	FILE *tmp = NULL;
+	char pure_mode[32];
+	int is_T = 0;
+	int fd = -1;
 
-	if (fname == NULL || mode == NULL) {
+	if (mode != NULL) {
+		is_T = strchr(mode, 'T') == NULL ? 0 : 1;
+	}
+
+	if ((fname == NULL && !is_T) || mode == NULL) {
 		res = SMART_FILE_INVALID_ARG;
 		goto cleanup;
 	}
 
-
-	if (fname == NULL || mode == NULL) {
-		res = SMART_FILE_INVALID_ARG;
-		goto cleanup;
+	if (fname_out_buf != NULL) {
+		fname_out_buf[0] = '\0';
 	}
 
-	tmp = fopen(fname, mode);
+	/* Open nameless temporary file. */
+	if (fname == NULL && is_T) {
+		tmp = tmpfile();
+	/* Open temporary file with name. */
+	} else if (is_T){
+		char temporaryName[2048];
+		mode_t prev;
+
+		KSI_snprintf(temporaryName, sizeof(temporaryName), "%sXXXXXX", fname);
+
+		prev = umask(077);
+		fd = mkstemp(temporaryName);
+		umask(prev);
+
+		if (fd == -1) {
+			res = SMART_FILE_UNABLE_TO_OPEN;
+			goto cleanup;
+		}
+
+		close(fd);
+		fd = -1;
+		if (fname_out_buf != NULL) {
+			KSI_strncpy(fname_out_buf, temporaryName, fname_out_buf_len);
+		}
+
+		tmp = fopen(temporaryName, get_pure_mode(mode, pure_mode, sizeof(pure_mode)));
+	/* Open File with name. */
+	} else {
+		tmp = fopen(fname, get_pure_mode(mode, pure_mode, sizeof(pure_mode)));
+	}
+
 	if (tmp == NULL) {
 		res = smart_file_get_error();
 		res = (res == SMART_FILE_UNKNOWN_ERROR) ? SMART_FILE_UNABLE_TO_OPEN : res;
@@ -125,6 +198,7 @@ static int smart_file_open(const char *fname, const char *mode, void **file) {
 
 cleanup:
 
+	close(fd);
 	smart_file_close(tmp);
 
 	return res;
@@ -134,6 +208,28 @@ static void smart_file_close(void *file) {
 	FILE *tmp = file;
 	if (file == NULL) return;
 	fclose(tmp);
+}
+
+static int smart_file_reposition(void *file, size_t offset) {
+	int res;
+	FILE *fp = NULL;
+
+	if (file == NULL) {
+		res = SMART_FILE_INVALID_ARG;
+		goto cleanup;
+	}
+
+	fp = file;
+	res = fseek(fp, (long int)offset, SEEK_SET);
+	if (res != 0) {
+		res = SMART_FILE_UNABLE_TO_REPOSITION;
+		goto cleanup;
+	}
+
+cleanup:
+
+
+	return res;
 }
 
 static int smart_file_read(void *file, char *raw, size_t raw_len, size_t *count) {
@@ -427,6 +523,25 @@ const char *generate_not_existing_file_name(const char *fname, char *buf, size_t
 }
 
 
+static char* get_pure_mode(const char *mode, char *buf, size_t buf_len) {
+	size_t i = 0;
+	size_t n = 0;
+
+	if (mode == NULL || buf == NULL || buf_len == 0) return NULL;
+
+	buf[0] = '\0';
+	for (i = 0; mode[i] != '\0' && n < (buf_len - 1); i++) {
+		char m = mode[i];
+
+		if (m == 'w' || m == 'r' || m == '+' || m == 'a' || m == 'b') {
+			buf[n++] = m;
+		}
+	}
+	buf[n] = '\0';
+
+	return buf;
+}
+
 int SMART_FILE_open(const char *fname, const char *mode, SMART_FILE **file) {
 	int res;
 	SMART_FILE *tmp = NULL;
@@ -434,11 +549,10 @@ int SMART_FILE_open(const char *fname, const char *mode, SMART_FILE **file) {
 	int isStream = 0;
 	const char *pFname = fname;
 	const char *pBackupFname = NULL;
-	const char *pTemporaryFname = NULL;
 	char buf[2048];
 	char backupName[2048];
-	char temporaryName[2048];
 
+	int is_e;
 	int is_w;
 	int is_f;
 	int is_i;
@@ -453,11 +567,24 @@ int SMART_FILE_open(const char *fname, const char *mode, SMART_FILE **file) {
 
 
 	isStream = (strcmp(fname, "-") == 0 && strchr(mode, 's') != NULL) ? 1 : 0;
+	is_e = strchr(mode, 'e') == NULL ? 0 : 1;
 	is_w = strchr(mode, 'w') == NULL ? 0 : 1;
 	is_f = strchr(mode, 'f') == NULL ? 0 : 1;
 	is_i = strchr(mode, 'i') == NULL ? 0 : 1;
 	is_B = strchr(mode, 'B') == NULL ? 0 : 1;
 	is_T = strchr(mode, 'T') == NULL ? 0 : 1;
+
+
+	/* Reject bad combinations. */
+	if (   (is_B && !(is_i || is_T)) /* Backup without temporary files or backup file indexing. */
+		|| (is_B && isStream) /* Stream with backup file. */
+		|| (!is_w && is_T && isStream) /* Read mode stream with output temporary file buffer. */
+		|| (!is_w && (is_B || is_T || is_i || is_f)) /* Read mode with backups and temporary files is not logical. */
+		|| (!is_w && is_e) /* Read mode from stderr does not work. */
+		) {
+		res = SMART_FILE_INVALID_MODE;
+		goto cleanup;
+	}
 
 	/**
 	 * Some special flags that should be checked before going ahead.
@@ -492,12 +619,6 @@ int SMART_FILE_open(const char *fname, const char *mode, SMART_FILE **file) {
 				pFname = generate_not_existing_file_name(fname, buf, sizeof(buf), 1);
 			}
 		}
-
-		/* Generate tmp file name. */
-		if (is_T) {
-			KSI_snprintf(temporaryName, sizeof(temporaryName), "%sXXXXXX", fname);
-			pTemporaryFname = mktemp(temporaryName);
-		}
 	}
 
 
@@ -520,14 +641,12 @@ int SMART_FILE_open(const char *fname, const char *mode, SMART_FILE **file) {
 	tmp->isConsistent = 0;
 	tmp->isTempCreated = 0;
 	tmp->isBackupCreated = 0;
-
-	tmp->is_B = is_B;
-	tmp->is_T = is_T;
+	tmp->isTmpStreamBuffer = isStream && is_T;
 
 	/* Make a copy from the file names. */
 	KSI_strncpy(tmp->fname, pFname, sizeof(tmp->fname));
+	KSI_strncpy(tmp->mode, mode, sizeof(tmp->mode));
 	if (is_B && pBackupFname) KSI_strncpy(tmp->bak_fname, pBackupFname, sizeof(tmp->bak_fname));
-	if (is_T && pTemporaryFname) KSI_strncpy(tmp->tmp_fname, pTemporaryFname, sizeof(tmp->tmp_fname));
 
 	/**
 	 * Initialize implementations.
@@ -547,17 +666,22 @@ int SMART_FILE_open(const char *fname, const char *mode, SMART_FILE **file) {
 	 * If standard strem is wanted, extract the stream object. Otherwise use
 	 * smart file opener function.
 	 */
-	if (isStream) {
+	if (isStream && !is_T) {
 		res = tmp->file_get_stream(mode, &(tmp->file), &must_free);
 		if (res != SMART_FILE_OK) goto cleanup;
 		tmp->mustBeFreed = must_free;
+	} else if (tmp->isTmpStreamBuffer) {
+		res = tmp->file_open(NULL, mode, NULL, 0, &(tmp->file));
+		if (res != SMART_FILE_OK) goto cleanup;
+		tmp->mustBeFreed = 1;
+		tmp->isTempCreated = 1;
 	} else if (is_T) {
-		res = tmp->file_open(pTemporaryFname, mode, &(tmp->file));
+		res = tmp->file_open(pFname, mode, tmp->tmp_fname, sizeof(tmp->tmp_fname), &(tmp->file));
 		if (res != SMART_FILE_OK) goto cleanup;
 		tmp->mustBeFreed = 1;
 		tmp->isTempCreated = 1;
 	} else {
-		res = tmp->file_open(pFname, mode, &(tmp->file));
+		res = tmp->file_open(pFname, mode, NULL, 0, &(tmp->file));
 		if (res != SMART_FILE_OK) goto cleanup;
 		tmp->mustBeFreed = 1;
 	}
@@ -588,22 +712,57 @@ cleanup:
 
 int SMART_FILE_close(SMART_FILE *file) {
 	int res = SMART_FILE_UNKNOWN_ERROR;
+	int is_B = 0;
+	int is_T = 0;
+	void *stream = NULL;
+	int is_stream_close_mandatory = 0;
 
 	if (file != NULL) {
+		is_B = strchr(file->mode, 'B') == NULL ? 0 : 1;
+		is_T = strchr(file->mode, 'T') == NULL ? 0 : 1;
+
+		/* Handle a stream that is buffered in nameless temporary file.
+		   Get stream, rewind temporary file to beginning, redirect entire file to stream. */
+		if (is_T && file->isTmpStreamBuffer && file->isConsistent) {
+			/* Sanity check. */
+			if (file->file == NULL || !file->isTempCreated) {
+				res = SMART_FILE_UNKNOWN_ERROR;
+				goto cleanup;
+			}
+
+			/* Get stream. */
+			res = file->file_get_stream(file->mode, &stream, &is_stream_close_mandatory);
+			if (res != SMART_FILE_OK) goto cleanup;
+
+			/* Rewind temporary file. */
+			res = file->file_reposition(file->file, 0);
+			if (res != SMART_FILE_OK) goto cleanup;
+
+			/* Print tmp file into stream. */
+			res = smart_file_redirect_to_stream(file->file, stream);
+			if (res != SMART_FILE_OK) goto cleanup;
+		}
+
 		if (file->mustBeFreed && file->file != NULL && file->file_close != NULL) {
 			file->file_close(file->file);
 		}
 
+		/* After temporary nameless file is used and closed (also deleted) goto cleanup. */
+		if (file->isTmpStreamBuffer) {
+			res = SMART_FILE_OK;
+			goto cleanup;
+		}
+
 		/* If file is not marked as consistent, there may be some extra cleanup to do. */
 		if (file->isConsistent) {
-			if (file->is_T && file->isTempCreated) {
+			if (is_T && file->isTempCreated) {
 				/* Make original file backup (if there is a need to backup anything) and tmp file persistent. */
-				if (file->is_B && !file->isBackupCreated && file->bak_fname[0] != '\0') {
+				if (is_B && !file->isBackupCreated && file->bak_fname[0] != '\0') {
 					res = SMART_FILE_rename(file->fname, file->bak_fname);
 					if (res != SMART_FILE_OK) goto cleanup;
 					file->isBackupCreated = 1;
 				/* Make temporary file persistent, remove existing file. */
-				} else if (!file->is_B) {
+				} else if (!is_B) {
 					if (SMART_FILE_doFileExist(file->fname)) {
 						res = SMART_FILE_remove(file->fname);
 						if (res != SMART_FILE_OK) goto cleanup;
@@ -631,13 +790,16 @@ int SMART_FILE_close(SMART_FILE *file) {
 				if (res != SMART_FILE_OK) goto cleanup;
 			}
 		}
-
-		free(file);
 	}
 
 	res = SMART_FILE_OK;
 
 cleanup:
+	if (file != NULL) free(file);
+
+	if (is_stream_close_mandatory && stream != NULL && file != NULL && file->file_close != NULL) {
+		file->file_close(stream);
+	}
 
 	return res;
 }
@@ -851,6 +1013,8 @@ const char* SMART_FILE_errorToString(int error_code) {
 			return "Unable to read from file.";
 		case SMART_FILE_UNABLE_TO_WRITE:
 			return "Unable to write to file.";
+		case SMART_FILE_UNABLE_TO_REPOSITION:
+			return "Unable to reposition file internal pointer.";
 		case SMART_FILE_BUFFER_TOO_SMALL:
 			return "Insufficient buffer size.";
 		case SMART_FILE_NOT_OPEND:

@@ -31,6 +31,7 @@ enum smart_file_enum {
 	SMART_FILE_UNABLE_TO_OPEN,
 	SMART_FILE_UNABLE_TO_READ,
 	SMART_FILE_UNABLE_TO_WRITE,
+	SMART_FILE_UNABLE_TO_REPOSITION,
 	SMART_FILE_BUFFER_TOO_SMALL,
 	SMART_FILE_NOT_OPEND,
 	SMART_FILE_DOES_NOT_EXIST,
@@ -87,6 +88,10 @@ typedef struct SMART_FILE_st SMART_FILE;
  * rs  - enable operations on stdin.
  * ws  - enable operations on stdout.
  * wse - enable operations on stderr.
+ * wsT[e]
+ *     - Use nameless temporary file to store all the data before redirecting it
+ *       to stdout or stderr. In case of success data is redirected to stream and
+ *       temporary file is removed. In case of failure data is discarded.
  * wBi, wBT[i]
  *     - Original file is kept as backup file and can be restored. Note that when
  *       a backup already exists with just T it is overwritten or with i multiple
