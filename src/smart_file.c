@@ -31,6 +31,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 
 struct SMART_FILE_st {
 	char fname[1024];	/* Original file name. */
@@ -48,6 +49,7 @@ struct SMART_FILE_st {
 	int (*file_write)(void *file, char *raw, size_t raw_len, size_t *count);
 	int (*file_read)(void *file, char *raw, size_t raw_len, size_t *count);
 	int (*file_read_line)(void *file, char *raw, size_t raw_len, size_t *row_pointer, size_t *count);
+	int (*file_set_lock)(void *file, int lockType);
 	int (*file_get_stream)(const char *mode, void **stream, int *is_close_mandatory);
 	void (*file_close)(void *file);
 
@@ -74,6 +76,7 @@ static int smart_file_get_error(void);
 static char* get_pure_mode(const char *mode, char *buf, size_t buf_len);
 static int smart_file_get_current_position(void *file, size_t *pos);
 static int smart_file_flush_after_position(void *file, size_t pos);
+static int smart_file_set_lock(void *file, int lockType);
 
 static int is_access(const char *path, int mode) {
 	int res;
@@ -100,6 +103,7 @@ static int smart_file_init(SMART_FILE *file) {
 	file->file_reposition = smart_file_reposition;
 	file->file_get_current_position = smart_file_get_current_position;
 	file->file_flush_after_position = smart_file_flush_after_position;
+	file->file_set_lock = smart_file_set_lock;
 
 	res = SMART_FILE_OK;
 
@@ -285,6 +289,34 @@ static int smart_file_flush_after_position(void *file, size_t pos) {
 
 	if(ftruncate(fileno(fp), position) != 0) {
 		res = SMART_FILE_UNABLE_TO_TRUNCATE;
+		goto cleanup;
+	}
+
+	res = SMART_FILE_OK;
+
+cleanup:
+
+	return res;
+}
+
+static int smart_file_set_lock(void *file, int lockType) {
+	int res;
+	FILE *fp = file;
+	struct flock lock;
+
+	if (file == NULL) {
+		res = SMART_FILE_INVALID_ARG;
+		goto cleanup;
+	}
+
+	lock.l_type = (lockType == SMART_FILE_READ_LOCK) ? F_RDLCK : F_WRLCK;;
+	lock.l_whence = SEEK_SET;
+	lock.l_start = 0; /* From the beginning of the file. */
+	lock.l_len = 0;	/* To the end of the file. */
+
+	res = fcntl(fileno(fp), F_SETLK, &lock);
+	if (res != -1) {
+		res = SMART_FILE_UNABLE_TO_LOCK;
 		goto cleanup;
 	}
 
@@ -623,6 +655,7 @@ int SMART_FILE_open(const char *fname, const char *mode, SMART_FILE **file) {
 	int is_i;
 	int is_B;
 	int is_T;
+	int is_X;
 
 
 	if (fname == NULL || mode == NULL || file == NULL) {
@@ -638,11 +671,13 @@ int SMART_FILE_open(const char *fname, const char *mode, SMART_FILE **file) {
 	is_i = strchr(mode, 'i') == NULL ? 0 : 1;
 	is_B = strchr(mode, 'B') == NULL ? 0 : 1;
 	is_T = strchr(mode, 'T') == NULL ? 0 : 1;
+	is_X = strchr(mode, 'X') == NULL ? 0 : 1;
 
 
 	/* Reject bad combinations. */
 	if (   (is_B && !(is_i || is_T)) /* Backup without temporary files or backup file indexing. */
 		|| (is_B && isStream) /* Stream with backup file. */
+		|| (!is_w && is_X) /* Read mode with X - it only works in write mode. */
 		|| (!is_w && is_T && isStream) /* Read mode stream with output temporary file buffer. */
 		|| (!is_w && (is_B || is_T || is_i || is_f)) /* Read mode with backups and temporary files is not logical. */
 		|| (!is_w && is_e) /* Read mode from stderr does not work. */
@@ -1003,6 +1038,28 @@ cleanup:
 	return res;
 }
 
+int SMART_FILE_lock(SMART_FILE *file, int lock) {
+	int res;
+
+	if (file == NULL || (lock != SMART_FILE_READ_LOCK && lock != SMART_FILE_WRITE_LOCK)) {
+		res = SMART_FILE_INVALID_ARG;
+		goto cleanup;
+	}
+
+	if (file->file != NULL && file->isOpen) {
+		res = file->file_set_lock(file->file, lock);
+		if (res != SMART_FILE_OK) goto cleanup;
+	} else {
+		return SMART_FILE_NOT_OPEND;
+	}
+
+	res = SMART_FILE_OK;
+
+cleanup:
+
+	return res;
+}
+
 const char *SMART_FILE_getFname(SMART_FILE *file) {
 	if (file == NULL) return NULL;
 	if (file->isOpen == 0) return NULL;
@@ -1109,8 +1166,14 @@ const char* SMART_FILE_errorToString(int error_code) {
 			return "Unable to read from file.";
 		case SMART_FILE_UNABLE_TO_WRITE:
 			return "Unable to write to file.";
+		case SMART_FILE_UNABLE_TO_GET_POSITION:
+			return "Unable to get file internal pointer.";
 		case SMART_FILE_UNABLE_TO_REPOSITION:
 			return "Unable to reposition file internal pointer.";
+		case SMART_FILE_UNABLE_TO_TRUNCATE:
+			return "Unable truncate file.";
+		case SMART_FILE_UNABLE_TO_LOCK:
+			return "Unable set file lock.";
 		case SMART_FILE_BUFFER_TOO_SMALL:
 			return "Insufficient buffer size.";
 		case SMART_FILE_NOT_OPEND:

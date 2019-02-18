@@ -34,6 +34,7 @@ enum smart_file_enum {
 	SMART_FILE_UNABLE_TO_GET_POSITION,
 	SMART_FILE_UNABLE_TO_REPOSITION,
 	SMART_FILE_UNABLE_TO_TRUNCATE,
+	SMART_FILE_UNABLE_TO_LOCK,
 	SMART_FILE_BUFFER_TOO_SMALL,
 	SMART_FILE_NOT_OPEND,
 	SMART_FILE_DOES_NOT_EXIST,
@@ -48,6 +49,11 @@ enum {
 	SMART_FILE_TYPE_REGULAR = 0x01,
 	SMART_FILE_TYPE_DIR,
 	SMART_FILE_TYPE_UNKNOWN,
+};
+
+enum {
+	SMART_FILE_READ_LOCK = 0x01,
+	SMART_FILE_WRITE_LOCK = 0x02
 };
 
 #ifdef	__cplusplus
@@ -108,7 +114,7 @@ typedef struct SMART_FILE_st SMART_FILE;
  *     - Original file is kept as backup file and can be restored. Note that when
  *       a backup already exists with just T it is overwritten or with i multiple
  *       backups are kept.
- * WT[i]
+ * wT[i]
  *     - Temporary file is used until file close. In case of success temporary
  *       file is renamed.
  * wX[T]
@@ -126,8 +132,12 @@ int SMART_FILE_close(SMART_FILE *file);
 int SMART_FILE_write(SMART_FILE *file, char *raw, size_t raw_len, size_t *count);
 int SMART_FILE_read(SMART_FILE *file, char *raw, size_t raw_len, size_t *count);
 int SMART_FILE_readLine(SMART_FILE *file, char *raw, size_t raw_len, size_t *row_pointer, size_t *count);
-const char *SMART_FILE_getFname(SMART_FILE *file);
+int SMART_FILE_lock(SMART_FILE *file, int lock);
 int SMART_FILE_markConsistent(SMART_FILE *file);
+
+const char *SMART_FILE_getFname(SMART_FILE *file);
+
+
 /**
  *
  * @param file
