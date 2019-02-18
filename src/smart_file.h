@@ -31,7 +31,9 @@ enum smart_file_enum {
 	SMART_FILE_UNABLE_TO_OPEN,
 	SMART_FILE_UNABLE_TO_READ,
 	SMART_FILE_UNABLE_TO_WRITE,
+	SMART_FILE_UNABLE_TO_GET_POSITION,
 	SMART_FILE_UNABLE_TO_REPOSITION,
+	SMART_FILE_UNABLE_TO_TRUNCATE,
 	SMART_FILE_BUFFER_TOO_SMALL,
 	SMART_FILE_NOT_OPEND,
 	SMART_FILE_DOES_NOT_EXIST,
@@ -79,9 +81,16 @@ typedef struct SMART_FILE_st SMART_FILE;
  * is not allowed. B can be used together with T and i (it guarantees that backup file
  * is buffered and is only replaced or created on success).
  *
+ * Mode X can be used to to clear not consistent end of the file on close. It may be useful
+ * when writing some larger data structure into a file in multiple write cycles. Using
+ * #SMART_FILE_markConsistent a consistent point in file marked. If something happens
+ * and there is corrupted or not complete data at the end of the file, closing file
+ * will drop the data.
+ *
  * Success is marked with function #SMART_FILE_markConsistent. If it is not called
  * before #SMART_FILE_close, original file is restored from backup, temporary files
- * are discarded, stream buffered with temporary file is "flushed".
+ * are discarded, stream buffered with temporary file is "flushed". With X this
+ * marks that up to this position content of the file is consistent.
  *
  * Possible file open modes:
  * r   - for reading.
@@ -102,6 +111,10 @@ typedef struct SMART_FILE_st SMART_FILE;
  * WT[i]
  *     - Temporary file is used until file close. In case of success temporary
  *       file is renamed.
+ * wX[T]
+ *     - Possibility to clear not consistent end of the file. Can be combined
+ *       with modes where output is directly written to a file (yes it works with
+ *       wsT combination). Suggest to use with T.
  * \param fname file name to be used.
  * \param mode	file open mode.
  * \param file	smart file return pointer.

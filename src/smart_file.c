@@ -37,11 +37,14 @@ struct SMART_FILE_st {
 	char tmp_fname[1024];	/* Temporary file name derived from initial file name. */
 	char bak_fname[1024];	/* Backup file name derived from initial file name. */
 	char mode[256];
+	size_t consistent_position;
 
 	void *file;
 
 	int (*file_open)(const char *fname, const char *mode, char* fname_out_buf, size_t fname_out_buf_len, void **file);
 	int (*file_reposition)(void *file, size_t offset);
+	int (*file_get_current_position)(void *file, size_t *pos);
+	int (*file_flush_after_position)(void *file, size_t pos);
 	int (*file_write)(void *file, char *raw, size_t raw_len, size_t *count);
 	int (*file_read)(void *file, char *raw, size_t raw_len, size_t *count);
 	int (*file_read_line)(void *file, char *raw, size_t raw_len, size_t *row_pointer, size_t *count);
@@ -51,11 +54,13 @@ struct SMART_FILE_st {
 	int isEOF;
 	int isOpen;
 	int mustBeFreed;
+	int isStream;
 
 	int isConsistent;
 	int isTempCreated;
 	int isBackupCreated;
 	int isTmpStreamBuffer;
+
 };
 
 static int smart_file_open(const char *fname, const char *mode, char* fname_out_buf, size_t fname_out_buf_len, void **file);
@@ -67,6 +72,8 @@ static int smart_file_write(void *file, char *raw, size_t raw_len, size_t *count
 static int smart_file_get_stream(const char *mode, void **stream, int *is_close_mandatory);
 static int smart_file_get_error(void);
 static char* get_pure_mode(const char *mode, char *buf, size_t buf_len);
+static int smart_file_get_current_position(void *file, size_t *pos);
+static int smart_file_flush_after_position(void *file, size_t pos);
 
 static int is_access(const char *path, int mode) {
 	int res;
@@ -91,6 +98,8 @@ static int smart_file_init(SMART_FILE *file) {
 	file->file_write = smart_file_write;
 	file->file_get_stream = smart_file_get_stream;
 	file->file_reposition = smart_file_reposition;
+	file->file_get_current_position = smart_file_get_current_position;
+	file->file_flush_after_position = smart_file_flush_after_position;
 
 	res = SMART_FILE_OK;
 
@@ -220,14 +229,68 @@ static int smart_file_reposition(void *file, size_t offset) {
 	}
 
 	fp = file;
-	res = fseek(fp, (long int)offset, SEEK_SET);
+	res = fseeko(fp, (off_t)offset, SEEK_SET);
 	if (res != 0) {
 		res = SMART_FILE_UNABLE_TO_REPOSITION;
 		goto cleanup;
 	}
 
+	res = SMART_FILE_OK;
+
 cleanup:
 
+
+	return res;
+}
+
+static int smart_file_get_current_position(void *file, size_t *pos) {
+	int res;
+	FILE *fp = NULL;
+	off_t tmp;
+
+	if (file == NULL || pos == NULL) {
+		res = SMART_FILE_INVALID_ARG;
+		goto cleanup;
+	}
+
+	fp = file;
+	tmp = ftello(fp);
+
+	if (tmp == -1) {
+		res = SMART_FILE_UNABLE_TO_GET_POSITION;
+		goto cleanup;
+	}
+
+	*pos = (size_t)tmp;
+
+	res = SMART_FILE_OK;
+
+cleanup:
+
+	return res;
+}
+
+static int smart_file_flush_after_position(void *file, size_t pos) {
+	int res;
+	FILE *fp = file;
+	off_t position = pos;
+
+	if (file == NULL) {
+		res = SMART_FILE_INVALID_ARG;
+		goto cleanup;
+	}
+
+	res = smart_file_reposition(file, pos);
+	if (res != SMART_FILE_OK) goto cleanup;
+
+	if(ftruncate(fileno(fp), position) != 0) {
+		res = SMART_FILE_UNABLE_TO_TRUNCATE;
+		goto cleanup;
+	}
+
+	res = SMART_FILE_OK;
+
+cleanup:
 
 	return res;
 }
@@ -643,7 +706,9 @@ int SMART_FILE_open(const char *fname, const char *mode, SMART_FILE **file) {
 	tmp->isConsistent = 0;
 	tmp->isTempCreated = 0;
 	tmp->isBackupCreated = 0;
+	tmp->isStream = isStream;
 	tmp->isTmpStreamBuffer = isStream && is_T;
+	tmp->consistent_position = 0;
 
 	/* Make a copy from the file names. */
 	KSI_strncpy(tmp->fname, pFname, sizeof(tmp->fname));
@@ -716,12 +781,18 @@ int SMART_FILE_close(SMART_FILE *file) {
 	int res = SMART_FILE_UNKNOWN_ERROR;
 	int is_B = 0;
 	int is_T = 0;
+	int is_X = 0;
 	void *stream = NULL;
 	int is_stream_close_mandatory = 0;
+	int need_to_close_the_file = 0;
+
 
 	if (file != NULL) {
 		is_B = strchr(file->mode, 'B') == NULL ? 0 : 1;
 		is_T = strchr(file->mode, 'T') == NULL ? 0 : 1;
+		is_X = strchr(file->mode, 'X') == NULL ? 0 : 1;
+
+		need_to_close_the_file = file->mustBeFreed && file->file != NULL && file->file_close != NULL;
 
 		/* Handle a stream that is buffered in nameless temporary file.
 		   Get stream, rewind temporary file to beginning, redirect entire file to stream. */
@@ -745,8 +816,15 @@ int SMART_FILE_close(SMART_FILE *file) {
 			if (res != SMART_FILE_OK) goto cleanup;
 		}
 
-		if (file->mustBeFreed && file->file != NULL && file->file_close != NULL) {
+		if (need_to_close_the_file) {
+			/* If there is a request and possibility to flush the not consistent end of the file, do it before close. */
+			if (is_X && (!file->isStream || file->isTmpStreamBuffer)) {
+				res = file->file_flush_after_position(file->file, file->consistent_position);
+				if (res != SMART_FILE_OK) goto cleanup;
+			}
+
 			file->file_close(file->file);
+			need_to_close_the_file = 0;
 		}
 
 		/* After temporary nameless file is used and closed (also deleted) goto cleanup. */
@@ -797,6 +875,7 @@ int SMART_FILE_close(SMART_FILE *file) {
 	res = SMART_FILE_OK;
 
 cleanup:
+	if (need_to_close_the_file) file->file_close(file->file);
 	if (file != NULL) free(file);
 
 	if (is_stream_close_mandatory && stream != NULL && file != NULL && file->file_close != NULL) {
@@ -807,8 +886,23 @@ cleanup:
 }
 
 int SMART_FILE_markConsistent(SMART_FILE *file) {
+	int res;
+	size_t tmp = 0;
+	int is_X = 0;
+
 	if (file == NULL) return SMART_FILE_INVALID_ARG;
+	if (!file->isOpen) return SMART_FILE_NOT_OPEND;
 	file->isConsistent = 1;
+
+	is_X = strchr(file->mode, 'X') == NULL ? 0 : 1;
+
+	if (is_X && (!file->isStream || file->isTmpStreamBuffer)) {
+		res = file->file_get_current_position(file->file, &tmp);
+		if (res != SMART_FILE_OK) return res;
+
+		file->consistent_position = tmp;
+	}
+
 	return SMART_FILE_OK;
 }
 
