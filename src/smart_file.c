@@ -198,7 +198,7 @@ static int smart_file_open(const char *fname, const char *mode, char* fname_out_
 
 cleanup:
 
-	close(fd);
+	if (fd != -1) close(fd);
 	smart_file_close(tmp);
 
 	return res;
@@ -449,6 +449,7 @@ char *generate_file_name(const char *fname, int count, char *buf, size_t buf_len
 	char root[1024] = "";
 	int is_extension = 0;
 	int root_offset = 0;
+	int correction = 1;
 
 	/**
 	 * Extract the files extension.
@@ -458,9 +459,10 @@ char *generate_file_name(const char *fname, int count, char *buf, size_t buf_len
 
 	if (is_extension) {
 		root_offset += (int)strlen(ext);
+		correction = 0;
 	}
 
-	KSI_strncpy(root, fname, strlen(fname) - root_offset);
+	KSI_strncpy(root, fname, strlen(fname) - root_offset + correction);
 
 	KSI_snprintf(buf, buf_len, "%s_%i%s%s", root, count,
 		is_extension ? "." : "",

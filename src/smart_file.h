@@ -55,9 +55,11 @@ extern "C" {
 typedef struct SMART_FILE_st SMART_FILE;
 
 /**
- * Smart file object that is used to open read and write files and streams. If user
+ * Smart file object that is used to open, read and write files and streams. If user
  * wants to read from stdin or write to stdout, file name '-' must be used with mode
- * r or w accordingly together with s.
+ * r or w accordingly together with s. Output stream is stdout by default but can be
+ * changed to stderr with e. If output stream is combined with T a nameless temporary
+ * file is created and in case of success it is redirected to output steam.
  *
  * Smart file can handle backup and temporary files. Backup files can be used to create
  * a backup file (keep old file) and in case of failure restore the original file
@@ -78,7 +80,8 @@ typedef struct SMART_FILE_st SMART_FILE;
  * is buffered and is only replaced or created on success).
  *
  * Success is marked with function #SMART_FILE_markConsistent. If it is not called
- * before #SMART_FILE_close
+ * before #SMART_FILE_close, original file is restored from backup, temporary files
+ * are discarded, stream buffered with temporary file is "flushed".
  *
  * Possible file open modes:
  * r   - for reading.
