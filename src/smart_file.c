@@ -45,7 +45,7 @@ struct SMART_FILE_st {
 	int (*file_open)(const char *fname, const char *mode, char* fname_out_buf, size_t fname_out_buf_len, void **file);
 	int (*file_reposition)(void *file, size_t offset);
 	int (*file_get_current_position)(void *file, size_t *pos);
-	int (*file_flush_after_position)(void *file, size_t pos);
+	int (*file_truncate)(void *file, size_t pos);
 	int (*file_write)(void *file, char *raw, size_t raw_len, size_t *count);
 	int (*file_read)(void *file, char *raw, size_t raw_len, size_t *count);
 	int (*file_read_line)(void *file, char *raw, size_t raw_len, size_t *row_pointer, size_t *count);
@@ -77,7 +77,7 @@ static int smart_file_get_stream(const char *mode, void **stream, int *is_close_
 static int smart_file_get_error(void);
 static char* get_pure_mode(const char *mode, char *buf, size_t buf_len);
 static int smart_file_get_current_position(void *file, size_t *pos);
-static int smart_file_flush_after_position(void *file, size_t pos);
+static int smart_file_truncate(void *file, size_t pos);
 static int smart_file_set_lock(void *file, int lockType);
 
 static int is_access(const char *path, int mode) {
@@ -105,7 +105,7 @@ static int smart_file_init(SMART_FILE *file) {
 	file->file_get_stream = smart_file_get_stream;
 	file->file_reposition = smart_file_reposition;
 	file->file_get_current_position = smart_file_get_current_position;
-	file->file_flush_after_position = smart_file_flush_after_position;
+	file->file_truncate = smart_file_truncate;
 	file->file_set_lock = smart_file_set_lock;
 
 	res = SMART_FILE_OK;
@@ -277,7 +277,7 @@ cleanup:
 	return res;
 }
 
-static int smart_file_flush_after_position(void *file, size_t pos) {
+static int smart_file_truncate(void *file, size_t pos) {
 	int res;
 	FILE *fp = file;
 	off_t position = pos;
@@ -886,7 +886,7 @@ int SMART_FILE_close(SMART_FILE *file) {
 		if (need_to_close_the_file) {
 			/* If there is a request and possibility to flush the not consistent end of the file, do it before close. */
 			if (is_X && (!file->isStream || file->isTmpStreamBuffer)) {
-				res = file->file_flush_after_position(file->file, file->consistent_position);
+				res = file->file_truncate(file->file, file->consistent_position);
 				if (res != SMART_FILE_OK) goto cleanup;
 			}
 
