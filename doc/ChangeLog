@@ -2,6 +2,7 @@
 (LOGKSI-99) * FEATURE: New option --recover for integrate, to recover useful amount of data from partially corrupted log signatures.
 (LOGKSI-99) * FEATURE: New option --out-log for integrate, to output recovered log lines.
 (LOGKSI-80) * BUGFIX: When integrating not suitable log signature that expects to have different count of record hashes, a meaningful error message is displayed.
+(LOGKSI-110) *IMPROVEMENT: Internal file handling refactored.
 
 ----------- remove this line when release is made -----------
 

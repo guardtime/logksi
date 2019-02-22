@@ -45,6 +45,35 @@
 
 const char *IO_FILES_getCurrentLogFilePrintRepresentation(IO_FILES *files);
 
+typedef int (*reader_t)(void *, unsigned char *, size_t, size_t *);
+int readData(void *fd, unsigned char *buf, size_t len, size_t *consumed, struct fast_tlv_s *t, reader_t read_fn);
+
+int SMART_FILE_readFile(SMART_FILE *sf, void *buf, size_t size, size_t *count) {
+	int res = SMART_FILE_UNKNOWN_ERROR;
+	size_t rd = 0;
+
+	if (sf == NULL || buf == NULL || size == 0) {
+		res = SMART_FILE_INVALID_ARG;
+		goto cleanup;
+	}
+
+	res = SMART_FILE_read(sf, (char*)buf, size, &rd);
+	if (res != SMART_FILE_OK) goto cleanup;
+
+	res = KSI_OK;
+
+cleanup:
+
+	if (count != NULL) *count = rd;
+
+	return res;
+
+}
+
+int LOGKSI_FTLV_smartFileRead(SMART_FILE *sf, unsigned char *buf, size_t len, size_t *consumed, struct fast_tlv_s *t) {
+	return readData(sf, buf, len, consumed, t, (reader_t) SMART_FILE_readFile);
+}
+
 static char* ksi_signature_sigTimeToString(const KSI_Signature* sig, char *buf, size_t buf_len) {
 	int res = KT_UNKNOWN_ERROR;
 	KSI_Integer *sigTime = NULL;
@@ -682,10 +711,9 @@ int get_hash_of_logline(BLOCK_INFO *blocks, IO_FILES *files, KSI_DataHash **hash
 	}
 
 	if (files->files.inLog) {
-		if (fgets(buf, sizeof(buf), files->files.inLog) == NULL) {
-			res = KT_IO_ERROR;
-			goto cleanup;
-		}
+		res = SMART_FILE_gets(files->files.inLog, buf, sizeof(buf), NULL);
+		if (res != SMART_FILE_OK) goto cleanup;
+
 		res = KSI_DataHasher_reset(blocks->hasher);
 		if (res != KSI_OK) goto cleanup;
 
@@ -956,7 +984,7 @@ cleanup:
 	return res;
 }
 
-int tlv_element_write_hash(KSI_DataHash *hash, unsigned tag, FILE *out) {
+int tlv_element_write_hash(KSI_DataHash *hash, unsigned tag, SMART_FILE *out) {
 	int res;
 	KSI_TlvElement *tlv = NULL;
 	unsigned char buf[0xffff + 4];
@@ -976,10 +1004,8 @@ int tlv_element_write_hash(KSI_DataHash *hash, unsigned tag, FILE *out) {
 
 	ptr = buf + sizeof(buf) - len;
 
-	if (fwrite(ptr, 1, len, out) != len) {
-		res = KT_IO_ERROR;
-		goto cleanup;
-	}
+	res = SMART_FILE_write(out, (char*)ptr, len, NULL);
+	if (res != SMART_FILE_OK) goto cleanup;
 
 	res = KT_OK;
 
@@ -1049,16 +1075,19 @@ cleanup:
 	return res;
 }
 
-static size_t find_header_in_file(FILE *in, char **headers, size_t len) {
+static size_t find_header_in_file(SMART_FILE *in, char **headers, size_t len) {
 	size_t res = len;
 	size_t i;
 	size_t count;
 	char buf[32];
+	int smart_file_res;
 
 	if (in == NULL || headers == NULL)
 		return len;
 
-	count = fread(buf, 1, strlen(headers[0]), in);
+	smart_file_res = SMART_FILE_read(in, buf, strlen(headers[0]), &count);
+	if (smart_file_res != SMART_FILE_OK) return res;
+
 	if (count == strlen(headers[0])) {
 		for (i = 0; i < len; i++) {
 			if (strncmp(buf, headers[i], strlen(headers[i])) == 0) {
@@ -1077,7 +1106,7 @@ static int process_magic_number(PARAM_SET* set, MULTI_PRINTER* mp, ERR_TRCKR *er
 	char *blocksFileHeaders[] = {"LOG12BLK"};
 	char *signaturesFileHeaders[] = {"LOG12SIG"};
 	char *proofFileHeaders[] = {"RECSIG11", "RECSIG12"};
-	FILE *in = NULL;
+	SMART_FILE *in = NULL;
 
 	if (err == NULL || files == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -1113,17 +1142,11 @@ static int process_magic_number(PARAM_SET* set, MULTI_PRINTER* mp, ERR_TRCKR *er
 	}
 
 	if (files->files.outSig) {
-		count = fwrite(logSignatureHeaders[blocks->version], 1, strlen(logSignatureHeaders[blocks->version]), files->files.outSig);
-		if (count != strlen(logSignatureHeaders[blocks->version])) {
-			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: Could not copy magic number to log signature file.");
-		}
+		res = SMART_FILE_write(files->files.outSig, logSignatureHeaders[blocks->version], strlen(logSignatureHeaders[blocks->version]), &count);
+		ERR_CATCH_MSG(err, res, "Error: Could not copy magic number to log signature file.");
 	} else if (files->files.outProof) {
-		count = fwrite(proofFileHeaders[blocks->version], 1, strlen(proofFileHeaders[blocks->version]), files->files.outProof);
-		if (count != strlen(proofFileHeaders[blocks->version])) {
-			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: Could not write magic number to integrity proof file.");
-		}
+		res = SMART_FILE_write(files->files.outProof, proofFileHeaders[blocks->version], strlen(proofFileHeaders[blocks->version]), &count);
+		ERR_CATCH_MSG(err, res, "Error: Could not write magic number to integrity proof file.");
 	}
 
 	res = KT_OK;
@@ -1416,11 +1439,11 @@ static int process_block_header(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *er
 
 	if (files->files.outSig) {
 		/* Set the offset at the beginning of new block, so it is possible to apply recovery procedures if there is a failure. */
-		files->files.outSigPos = ftello(files->files.outSig);
-		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->files.outSig) != blocks->ftlv_len) {
-			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to copy block header.", blocks->blockNo);
-		}
+		res = SMART_FILE_markConsistent(files->files.outSig);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: Unable to mark output log signature file consistent.", blocks->blockNo);
+
+		res = SMART_FILE_write(files->files.outSig, (char*)blocks->ftlv_raw, blocks->ftlv_len, NULL);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to copy block header.", blocks->blockNo);
 	}
 
 	blocks->hashAlgo = algo;
@@ -1566,10 +1589,8 @@ static int process_record_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err
 	}
 
 	if (files->files.outSig) {
-		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->files.outSig) != blocks->ftlv_len) {
-			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to copy record hash.", blocks->blockNo);
-		}
+		res = SMART_FILE_write(files->files.outSig, (char*)blocks->ftlv_raw, blocks->ftlv_len, NULL);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to copy record hash.", blocks->blockNo);
 	}
 	res = KT_OK;
 
@@ -1689,10 +1710,8 @@ static int process_tree_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, 
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse tree hash.", blocks->blockNo);
 
 	if (files->files.outSig) {
-		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->files.outSig) != blocks->ftlv_len) {
-			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to copy tree hash.", blocks->blockNo);
-		}
+		res = SMART_FILE_write(files->files.outSig, (char*)blocks->ftlv_raw, blocks->ftlv_len, NULL);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to copy tree hash.", blocks->blockNo);
 	}
 
 	if (!blocks->finalTreeHashesSome) {
@@ -1875,10 +1894,8 @@ static int process_metarecord(PARAM_SET* set, MULTI_PRINTER *mp, ERR_TRCKR *err,
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate metarecord hash with index %zu.", blocks->blockNo, metarecord_index);
 
 	if (files->files.outSig) {
-		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->files.outSig) != blocks->ftlv_len) {
-			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to copy metarecord hash.", blocks->blockNo);
-		}
+		res = SMART_FILE_write(files->files.outSig, (char*)blocks->ftlv_raw, blocks->ftlv_len, NULL);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to copy metarecord hash.", blocks->blockNo);
 	}
 
 	res = KT_OK;
@@ -2168,10 +2185,9 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 			}
 			blocks->warningLegacy = 0;
 		}
-		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->files.outSig) != blocks->ftlv_len) {
-			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to write extended signature to extended log signature file.", blocks->blockNo);
-		}
+
+		res = SMART_FILE_write(files->files.outSig, (char*)blocks->ftlv_raw, blocks->ftlv_len, NULL);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to write extended signature to extended log signature file.", blocks->blockNo);
 
 		KSI_DataHash_free((KSI_DataHash*)context.documentHash);
 		context.documentHash = NULL;
@@ -2181,10 +2197,8 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse KSI signature.", blocks->blockNo);
 
 		if (blocks->nofExtractPositionsInBlock) {
-			if (fwrite(tlvSig->ptr, 1, tlvSig->ftlv.dat_len + tlvSig->ftlv.hdr_len, files->files.outProof) != tlvSig->ftlv.dat_len + tlvSig->ftlv.hdr_len) {
-				res = KT_IO_ERROR;
-				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to write KSI signature to integrity proof file.", blocks->blockNo);
-			}
+			res = SMART_FILE_write(files->files.outProof, (char*)tlvSig->ptr, tlvSig->ftlv.dat_len + tlvSig->ftlv.hdr_len, NULL);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to write KSI signature to integrity proof file.", blocks->blockNo);
 		}
 
 
@@ -2205,10 +2219,8 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 				recChain->ftlv.tag = 0x0907;
 
 				if (blocks->extractInfo[j].logLine) {
-					if (fwrite(blocks->extractInfo[j].logLine, 1, strlen(blocks->extractInfo[j].logLine), files->files.outLog) != strlen(blocks->extractInfo[j].logLine)) {
-						res = KT_IO_ERROR;
-						ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to write log record to log records file.", blocks->extractInfo[j].extractPos);
-					}
+					res = SMART_FILE_write(files->files.outLog, (char*)blocks->extractInfo[j].logLine, strlen(blocks->extractInfo[j].logLine), NULL);
+					ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to write log record to log records file.", blocks->extractInfo[j].extractPos);
 				} else if (blocks->extractInfo[j].metaRecord){
 					res = KSI_TlvElement_setElement(recChain, blocks->extractInfo[j].metaRecord);
 					ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to add metarecord to record chain.", blocks->extractInfo[j].extractPos);
@@ -2243,10 +2255,9 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 				res = KSI_TlvElement_serialize(recChain, buf, sizeof(buf), &len, 0);
 				ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to serialize record chain.", blocks->extractInfo[j].extractPos);
 
-				if (fwrite(buf, 1, len, files->files.outProof) != len) {
-					res = KT_IO_ERROR;
-					ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to write record chain to integrity proof file.", blocks->extractInfo[j].extractPos);
-				}
+				res = SMART_FILE_write(files->files.outProof, (char*)buf, len, NULL);
+				ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to write record chain to integrity proof file.", blocks->extractInfo[j].extractPos);
+
 				KSI_TlvElement_free(recChain);
 				recChain = NULL;
 			}
@@ -2755,14 +2766,12 @@ static int process_partial_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCK
 		print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
 		print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_LEVEL_3, "Block no. %3zu: writing block signature to file... ", blocks->blockNo);
 
-		if (fwrite(blocks->ftlv_raw, 1, blocks->ftlv_len, files->files.outSig) != blocks->ftlv_len) {
-			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to write signature data log signature file.", blocks->blockNo);
-		}
+		res = SMART_FILE_write(files->files.outSig, (char*)blocks->ftlv_raw, blocks->ftlv_len, NULL);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to write signature data log signature file.", blocks->blockNo);
 
 		/* Move signature file offset value at the end of the files as complete signature is written to the file. */
-		files->files.outSigPos = ftello(files->files.outSig);
-
+		res = SMART_FILE_markConsistent(files->files.outSig);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: Unable to mark output log signature file consistent.", blocks->blockNo);
 	}
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
 	blocks->nofTotalRecordHashes += blocks->nofRecordHashes;
@@ -2834,7 +2843,9 @@ static int finalize_log_signature(PARAM_SET* set, MULTI_PRINTER* mp, ERR_TRCKR *
 
 	/* Log file must not contain more records than log signature file. */
 	if (files->files.inLog) {
-		if (fread(buf, 1, 1, files->files.inLog) > 0) {
+		size_t count = 0;
+		SMART_FILE_read(files->files.inLog, buf, 1, &count);
+		if (count > 0) {
 			res = KT_VERIFICATION_FAILURE;
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: end of log file contains unexpected records.", blocks->blockNo);
 		}
@@ -2842,7 +2853,9 @@ static int finalize_log_signature(PARAM_SET* set, MULTI_PRINTER* mp, ERR_TRCKR *
 
 	/* Signatures file must not contain more blocks than blocks file. */
 	if (files->files.partsSig) {
-		if (fread(buf, 1, 1, files->files.partsSig) > 0) {
+		size_t count = 0;
+		SMART_FILE_read(files->files.partsSig, buf, 1, &count);
+		if (count > 0) {
 			res = KT_VERIFICATION_FAILURE;
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: end of signatures file contains unexpected data.", blocks->blockNo);
 		}
@@ -2858,7 +2871,11 @@ static int finalize_log_signature(PARAM_SET* set, MULTI_PRINTER* mp, ERR_TRCKR *
 		ERR_CATCH_MSG(err, res, "Error: Extract position %zu out of range - not enough loglines.", blocks->extractPositions[blocks->nofExtractPositionsFound]);
 	}
 
-
+	/* Mark output signature file consistent. */
+	if (files->files.outSig != NULL) {
+		res = SMART_FILE_markConsistent(files->files.outSig);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: Unable to mark output log signature file consistent.", blocks->blockNo);
+	}
 
 	res = KT_OK;
 
@@ -2969,9 +2986,8 @@ void BLOCK_INFO_freeAndClearInternals(BLOCK_INFO *blocks) {
 	}
 }
 
-static int count_blocks(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, FILE *in) {
+static int count_blocks(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, SMART_FILE *in) {
 	int res;
-	long int pos = -1;
 	KSI_TlvElement *tlv = NULL;
 	KSI_TlvElement *tlvNoSig = NULL;
 
@@ -2981,7 +2997,7 @@ static int count_blocks(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, FILE *
 	}
 
 	/* Do not count records, if input comes from stdin. */
-	if (in == stdin) {
+	if (SMART_FILE_isStream(in)) {
 		res = KT_OK;
 		goto cleanup;
 	}
@@ -2989,14 +3005,9 @@ static int count_blocks(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, FILE *
 	blocks->blockCount = 0;
 	blocks->noSigCount = 0;
 	blocks->noSigNo = 0;
-	pos = ftell(in);
-	if (pos == -1) {
-		res = KT_IO_ERROR;
-		ERR_CATCH_MSG(err, res, "Error: Unable to get file handle position.");
-	}
 
-	while (!feof(in)) {
-		res = KSI_FTLV_fileRead(in, blocks->ftlv_raw, SOF_FTLV_BUFFER, &blocks->ftlv_len, &blocks->ftlv);
+	while (!SMART_FILE_isEof(in)) {
+		res = LOGKSI_FTLV_smartFileRead(in, blocks->ftlv_raw, SOF_FTLV_BUFFER, &blocks->ftlv_len, &blocks->ftlv);
 		if (res == KSI_OK) {
 			switch (blocks->ftlv.tag) {
 				case 0x901:
@@ -3035,15 +3046,8 @@ static int count_blocks(ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, FILE *
 
 cleanup:
 
-	/* Rewind input stream. */
-	if (pos != -1) {
-		if (fseek(in, pos, SEEK_SET) != 0) {
-			if (res == KT_OK) {
-				res = KT_IO_ERROR;
-				if (err) ERR_TRCKR_ADD(err, res, "Error: Could not rewind input stream.");
-			}
-		}
-	}
+	if (in != NULL) SMART_FILE_rewind(in);
+
 	KSI_TlvElement_free(tlvNoSig);
 	KSI_TlvElement_free(tlv);
 
@@ -3168,10 +3172,10 @@ int logsignature_extend(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 
 	if (res != KT_OK) goto cleanup;
 
-	while (!feof(files->files.inSig)) {
+	while (!SMART_FILE_isEof(files->files.inSig)) {
 		MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
 
-		res = KSI_FTLV_fileRead(files->files.inSig, blocks.ftlv_raw, SOF_FTLV_BUFFER, &blocks.ftlv_len, &blocks.ftlv);
+		res = LOGKSI_FTLV_smartFileRead(files->files.inSig, blocks.ftlv_raw, SOF_FTLV_BUFFER, &blocks.ftlv_len, &blocks.ftlv);
 		if (res == KSI_OK) {
 			switch (blocks.ftlv.tag) {
 				case 0x901:
@@ -3236,10 +3240,10 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 	res = process_magic_number(set, mp, err, blocks, files);
 	if (res != KT_OK) goto cleanup;
 
-	while (!feof(files->files.inSig)) {
+	while (!SMART_FILE_isEof(files->files.inSig)) {
 		MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
 
-		res = KSI_FTLV_fileRead(files->files.inSig, blocks->ftlv_raw, SOF_FTLV_BUFFER, &blocks->ftlv_len, &blocks->ftlv);
+		res = LOGKSI_FTLV_smartFileRead(files->files.inSig, blocks->ftlv_raw, SOF_FTLV_BUFFER, &blocks->ftlv_len, &blocks->ftlv);
 		if (res == KSI_OK) {
 			switch (blocks->version) {
 				case LOGSIG11:
@@ -3475,10 +3479,10 @@ int logsignature_extract(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_
 	res = process_magic_number(set, mp, err, &blocks, files);
 	if (res != KT_OK) goto cleanup;
 
-	while (!feof(files->files.inSig)) {
+	while (!SMART_FILE_isEof(files->files.inSig)) {
 		MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
 
-		res = KSI_FTLV_fileRead(files->files.inSig, blocks.ftlv_raw, SOF_FTLV_BUFFER, &blocks.ftlv_len, &blocks.ftlv);
+		res = LOGKSI_FTLV_smartFileRead(files->files.inSig, blocks.ftlv_raw, SOF_FTLV_BUFFER, &blocks.ftlv_len, &blocks.ftlv);
 		if (res == KSI_OK) {
 			switch (blocks.ftlv.tag) {
 				case 0x901:
@@ -3541,10 +3545,10 @@ int logsignature_integrate(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KS
 	res = process_magic_number(set, mp, err, blocks, files);
 	if (res != KT_OK) goto cleanup;
 
-	while (!feof(files->files.partsBlk)) {
+	while (!SMART_FILE_isEof(files->files.partsBlk)) {
 		MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
 
-		res = KSI_FTLV_fileRead(files->files.partsBlk, blocks->ftlv_raw, SOF_FTLV_BUFFER, &blocks->ftlv_len, &blocks->ftlv);
+		res = LOGKSI_FTLV_smartFileRead(files->files.partsBlk, blocks->ftlv_raw, SOF_FTLV_BUFFER, &blocks->ftlv_len, &blocks->ftlv);
 		if (res == KSI_OK) {
 			switch (blocks->ftlv.tag) {
 				case 0x901:
@@ -3562,7 +3566,7 @@ int logsignature_integrate(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KS
 					res = process_partial_block(set, err, ksi, blocks, files, mp);
 					if (res != KT_OK) goto cleanup;
 
-					res = KSI_FTLV_fileRead(files->files.partsSig, blocks->ftlv_raw, SOF_FTLV_BUFFER, &blocks->ftlv_len, &blocks->ftlv);
+					res = LOGKSI_FTLV_smartFileRead(files->files.partsSig, blocks->ftlv_raw, SOF_FTLV_BUFFER, &blocks->ftlv_len, &blocks->ftlv);
 
 					if (res != KT_OK) {
 						if (blocks->ftlv_len > 0) {
@@ -3654,7 +3658,7 @@ int logsignature_sign(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX
 	res = process_magic_number(set, mp, err, &blocks, files);
 	if (res != KT_OK) goto cleanup;
 
-	if (files->files.inSig != stdin) {
+	if (SMART_FILE_isStream(files->files.inSig)) {
 		progress = (PARAM_SET_isSetByName(set, "d")&& PARAM_SET_isSetByName(set, "show-progress"));
 	} else {
 		/* Impossible to estimate signing progress if input is from stdin. */
@@ -3667,10 +3671,10 @@ int logsignature_sign(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX
 		print_debug("Progress: %3zu of %3zu blocks need signing. Estimated signing time: %3zu seconds.\n", blocks.noSigCount, blocks.blockCount, blocks.noSigCount);
 	}
 
-	while (!feof(files->files.inSig)) {
+	while (!SMART_FILE_isEof(files->files.inSig)) {
 		MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
 
-		res = KSI_FTLV_fileRead(files->files.inSig, blocks.ftlv_raw, SOF_FTLV_BUFFER, &blocks.ftlv_len, &blocks.ftlv);
+		res = LOGKSI_FTLV_smartFileRead(files->files.inSig, blocks.ftlv_raw, SOF_FTLV_BUFFER, &blocks.ftlv_len, &blocks.ftlv);
 		if (res == KSI_OK) {
 			switch (blocks.ftlv.tag) {
 				case 0x901:
@@ -3765,143 +3769,6 @@ cleanup:
 	return res;
 }
 
-int temp_name(char *org, char **derived) {
-	int res;
-	int fd = -1;
-	char *tmp = NULL;
-	mode_t prev;
-
-	if (org == NULL || derived == NULL) {
-		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
-
-	res = concat_names(org, "XXXXXX", &tmp);
-	if (res != KT_OK) goto cleanup;
-
-	prev = umask(077);
-	fd = mkstemp(tmp);
-	umask(prev);
-
-	if (fd == -1) {
-		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
-
-	*derived = tmp;
-	tmp = NULL;
-	res = KT_OK;
-
-cleanup:
-
-	close(fd);
-	KSI_free(tmp);
-	return res;
-}
-
-int logksi_file_check_and_open(ERR_TRCKR *err, char *name, FILE **out) {
-	int res;
-	FILE *tmp = NULL;
-
-	if (name == NULL || out == NULL) {
-		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
-
-	tmp = fopen(name, "rb");
-	if (tmp == NULL) {
-		if (errno == ENOENT) {
-			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: Could not find file %s.", name);
-		} else {
-			res = KT_IO_ERROR;
-			ERR_CATCH_MSG(err, res, "Error: Could not open file %s.", name);
-		}
-	}
-
-	*out = tmp;
-	res = KT_OK;
-
-cleanup:
-	return res;
-}
-
-int logksi_file_create(char *name, FILE **out) {
-	int res;
-	FILE *tmp = NULL;
-
-	if (name == NULL  || out == NULL) {
-		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
-
-	tmp = fopen(name, "wb");
-	if (tmp == NULL) {
-		res = KT_IO_ERROR;
-		goto cleanup;
-	}
-	*out = tmp;
-	res = KT_OK;
-
-cleanup:
-	return res;
-}
-
-int logksi_file_create_temporary(char *name, FILE **out, char bStdout) {
-	int res;
-	FILE *tmp = NULL;
-
-	if ((name == NULL && bStdout == 0) || out == NULL) {
-		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
-
-	/* Output goes either to a named or nameless temporary file. */
-	if (bStdout) {
-		tmp = tmpfile();
-	} else {
-		tmp = fopen(name, "wb");
-	}
-	if (tmp == NULL) {
-		res = KT_IO_ERROR;
-		goto cleanup;
-	}
-	*out = tmp;
-	res = KT_OK;
-
-cleanup:
-	return res;
-}
-
-int logksi_file_redirect_to_stdout(FILE *in) {
-	int res;
-	char buf[1024];
-	size_t count = 0;
-
-	if (in == NULL) {
-		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
-
-	if (fseek(in, 0, SEEK_SET) != 0) {
-		res = KT_IO_ERROR;
-		goto cleanup;
-	}
-
-	while(!feof(in)) {
-		count = fread(buf, 1, sizeof(buf), in);
-		if (fwrite(buf, 1, count, stdout) != count) {
-			res = KT_IO_ERROR;
-			goto cleanup;
-		}
-	}
-	res = KT_OK;
-
-cleanup:
-
-	return res;
-}
-
 void logksi_filename_free(char **ptr) {
 	if (ptr != NULL && *ptr != NULL) {
 		KSI_free(*ptr);
@@ -3916,73 +3783,27 @@ void logksi_internal_filenames_free(INTERNAL_FILE_NAMES *internal) {
 		logksi_filename_free(&internal->outSig);
 		logksi_filename_free(&internal->outProof);
 		logksi_filename_free(&internal->outLog);
-		logksi_filename_free(&internal->tempSig);
-		logksi_filename_free(&internal->tempProof);
-		logksi_filename_free(&internal->tempLog);
-		logksi_filename_free(&internal->backupSig);
 		logksi_filename_free(&internal->partsBlk);
 		logksi_filename_free(&internal->partsSig);
 	}
 }
 
-void logksi_file_close(FILE **ptr) {
+void logksi_file_close(SMART_FILE **ptr) {
 	if (ptr != NULL && *ptr != NULL) {
-		fclose(*ptr);
+		SMART_FILE_close(*ptr);
 		*ptr = NULL;
 	}
 }
 
 void logksi_files_close(INTERNAL_FILE_HANDLES *files) {
 	if (files != NULL) {
-		if (files->inLog == stdin) files->inLog = NULL;
+
 		logksi_file_close(&files->inLog);
-		if (files->inSig == stdin) files->inSig = NULL;
 		logksi_file_close(&files->inSig);
-		if (files->outSig == stdout) files->outSig = NULL;
 		logksi_file_close(&files->outSig);
 		logksi_file_close(&files->outProof);
 		logksi_file_close(&files->outLog);
 		logksi_file_close(&files->partsBlk);
 		logksi_file_close(&files->partsSig);
 	}
-}
-
-int logksi_file_remove(char *name) {
-	int res;
-	if (name == NULL) {
-		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
-
-	if (unlink(name) != 0) {
-		if (errno != ENOENT) {
-			res = KT_IO_ERROR;
-			goto cleanup;
-		}
-	}
-
-	res = KT_OK;
-
-cleanup:
-
-	return res;
-}
-
-int logksi_file_rename(char *from, char *to) {
-	int res;
-
-	if (from == NULL || to == NULL) {
-		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
-
-	if (rename(from, to) != 0) {
-		res = KT_IO_ERROR;
-		goto cleanup;
-	}
-	res = KT_OK;
-
-cleanup:
-
-	return res;
 }

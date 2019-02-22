@@ -19,6 +19,7 @@
 
 #include <ksi/tlv_element.h>
 #include <ksi/publicationsfile.h>
+#include "smart_file.h"
 
 typedef enum {
 	LOGSIG11 = 0,
@@ -44,10 +45,6 @@ typedef struct {
 	char *outSig;
 	char *outProof;
 	char *outLog;
-	char *tempSig;
-	char *tempProof;
-	char *tempLog;
-	char *backupSig;
 	char *partsBlk;
 	char *partsSig;
 	char bStdout;
@@ -57,15 +54,13 @@ typedef struct {
 } INTERNAL_FILE_NAMES;
 
 typedef struct {
-	FILE *inLog;
-	FILE *inSig;
-	FILE *outSig;
-	FILE *outProof;
-	FILE *outLog;
-	FILE *partsBlk;
-	FILE *partsSig;
-
-	off_t outSigPos;
+	SMART_FILE *inLog;
+	SMART_FILE *inSig;
+	SMART_FILE *outSig;
+	SMART_FILE *outProof;
+	SMART_FILE *outLog;
+	SMART_FILE *partsBlk;
+	SMART_FILE *partsSig;
 } INTERNAL_FILE_HANDLES;
 
 typedef struct {
@@ -188,16 +183,10 @@ int logsignature_sign(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX
 int concat_names(char *org, const char *extension, char **derived);
 int duplicate_name(char *in, char **out);
 int temp_name(char *org, char **derived);
-int logksi_file_check_and_open(ERR_TRCKR *err, char *name, FILE **out);
-int logksi_file_create(char *name, FILE **out);
-int logksi_file_create_temporary(char *name, FILE **out, char bStdout);
-int logksi_file_redirect_to_stdout(FILE *in);
 void logksi_filename_free(char **ptr);
 void logksi_internal_filenames_free(INTERNAL_FILE_NAMES *internal);
-void logksi_file_close(FILE **ptr);
+void logksi_file_close(SMART_FILE **ptr);
 void logksi_files_close(INTERNAL_FILE_HANDLES *files);
-int logksi_file_remove(char *name);
-int logksi_file_rename(char *from, char *to);
 
 void IO_FILES_init(IO_FILES *files);
 void IO_FILES_StorePreviousFileNames(IO_FILES *files);
