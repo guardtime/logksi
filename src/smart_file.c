@@ -49,6 +49,7 @@ struct SMART_FILE_st {
 	int (*file_write)(void *file, char *raw, size_t raw_len, size_t *count);
 	int (*file_read)(void *file, char *raw, size_t raw_len, size_t *count);
 	int (*file_read_line)(void *file, char *raw, size_t raw_len, size_t *row_pointer, size_t *count);
+	int (*file_gets)(void *file, char *raw, size_t raw_len, int *eof);
 	int (*file_set_lock)(void *file, int lockType);
 	int (*file_get_stream)(const char *mode, void **stream, int *is_close_mandatory);
 	void (*file_close)(void *file);
@@ -70,6 +71,7 @@ static void smart_file_close(void *file);
 static int smart_file_reposition(void *file, size_t offset);
 static int smart_file_read(void *file, char *raw, size_t raw_len, size_t *count);
 static int smart_file_read_line(void *file, char *buf, size_t len, size_t *row_pointer, size_t *count);
+static int smart_file_gets(void *file, char *raw, size_t raw_len, int *eof);
 static int smart_file_write(void *file, char *raw, size_t raw_len, size_t *count);
 static int smart_file_get_stream(const char *mode, void **stream, int *is_close_mandatory);
 static int smart_file_get_error(void);
@@ -98,6 +100,7 @@ static int smart_file_init(SMART_FILE *file) {
 	file->file_close = smart_file_close;
 	file->file_read = smart_file_read;
 	file->file_read_line = smart_file_read_line;
+	file->file_gets = smart_file_gets;
 	file->file_write = smart_file_write;
 	file->file_get_stream = smart_file_get_stream;
 	file->file_reposition = smart_file_reposition;
@@ -315,7 +318,7 @@ static int smart_file_set_lock(void *file, int lockType) {
 	lock.l_len = 0;	/* To the end of the file. */
 
 	res = fcntl(fileno(fp), F_SETLK, &lock);
-	if (res != -1) {
+	if (res != 0) {
 		res = SMART_FILE_UNABLE_TO_LOCK;
 		goto cleanup;
 	}
@@ -441,6 +444,35 @@ static int smart_file_write(void *file, char *raw, size_t raw_len, size_t *count
 
 	if (count != NULL) {
 		*count = (size_t)write_count;
+	}
+
+	res = SMART_FILE_OK;
+
+cleanup:
+
+	return res;
+}
+
+
+static int smart_file_gets(void *file, char *raw, size_t raw_len, int *eof) {
+	int res;
+	FILE *fp = file;
+	char *ret = NULL;
+
+	if (file == NULL || raw == NULL || raw_len == 0 || eof == NULL) {
+		res = SMART_FILE_INVALID_ARG;
+		goto cleanup;
+	}
+
+	*eof = 0;
+
+	ret = fgets(raw, (int)raw_len, fp);
+	if (ret == NULL && !feof(fp)) {
+		res = SMART_FILE_UNABLE_TO_READ;
+		goto cleanup;
+	} else if (ret == NULL && feof(fp)) {
+		res = SMART_FILE_OK;
+		*eof = 1;
 	}
 
 	res = SMART_FILE_OK;
@@ -941,6 +973,13 @@ int SMART_FILE_markConsistent(SMART_FILE *file) {
 	return SMART_FILE_OK;
 }
 
+int SMART_FILE_markInconsistent(SMART_FILE *file) {
+	if (file == NULL) return SMART_FILE_INVALID_ARG;
+	if (!file->isOpen) return SMART_FILE_NOT_OPEND;
+	file->isConsistent = 0;
+	return SMART_FILE_OK;
+}
+
 int SMART_FILE_write(SMART_FILE *file, char *raw, size_t raw_len, size_t *count) {
 	int res;
 	size_t c = 0;
@@ -1005,6 +1044,7 @@ cleanup:
 
 	return res;
 }
+
 int SMART_FILE_readLine(SMART_FILE *file, char *raw, size_t raw_len, size_t *row_pointer, size_t *count) {
 	int res;
 	size_t c = 0;
@@ -1038,6 +1078,35 @@ cleanup:
 	return res;
 }
 
+int SMART_FILE_gets(SMART_FILE *file, char *raw, size_t raw_len, size_t *count) {
+	int res;
+	int isEof = 0;
+
+	if (file == NULL || raw == NULL || raw_len == 0) {
+		res = SMART_FILE_INVALID_ARG;
+		goto cleanup;
+	}
+
+	if (file->file != NULL && file->isOpen) {
+		res = file->file_gets(file->file, raw, raw_len, &isEof);
+		if (res != SMART_FILE_OK) goto cleanup;
+
+		file->isEOF = isEof;
+	} else {
+		return SMART_FILE_NOT_OPEND;
+	}
+
+	if (count != NULL) {
+		*count = strlen(raw);
+	}
+
+	res = SMART_FILE_OK;
+
+cleanup:
+
+	return res;
+}
+
 int SMART_FILE_lock(SMART_FILE *file, int lock) {
 	int res;
 
@@ -1060,16 +1129,51 @@ cleanup:
 	return res;
 }
 
+int SMART_FILE_rewind(SMART_FILE *file) {
+	int res;
+
+	if (file == NULL) {
+		res = SMART_FILE_INVALID_ARG;
+		goto cleanup;
+	}
+
+	if (file->file != NULL && file->isOpen) {
+		res = file->file_reposition(file->file, 0);
+		if (res != SMART_FILE_OK) goto cleanup;
+	} else {
+		return SMART_FILE_NOT_OPEND;
+	}
+
+	res = SMART_FILE_OK;
+
+cleanup:
+
+	return res;
+}
+
 const char *SMART_FILE_getFname(SMART_FILE *file) {
 	if (file == NULL) return NULL;
 	if (file->isOpen == 0) return NULL;
 	return file->fname;
 }
 
+const char *SMART_FILE_getTmpFname(SMART_FILE *file) {
+	if (file == NULL) return NULL;
+	if (file->isOpen == 0 || file->isTempCreated == 0) return NULL;
+
+	return file->tmp_fname;
+}
+
 int SMART_FILE_isEof(SMART_FILE *file) {
 	if (file == NULL) return 0;
 	if (file->isOpen == 0) return 0;
 	return file->isEOF;
+}
+
+int SMART_FILE_isStream(SMART_FILE *file) {
+	if (file == NULL) return 0;
+	if (file->isOpen == 0) return 0;
+	return file->isStream;
 }
 
 int SMART_FILE_doFileExist(const char *path) {
