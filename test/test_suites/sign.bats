@@ -48,3 +48,18 @@ export KSI_CONF=test/test.cfg
 	[ "$status" -eq 0 ]
 }
 
+@test "sign and check if backup is really backup" {
+	run cp  test/resource/logs_and_signatures/only-1-unsigned test/out/
+	run cp  test/resource/logs_and_signatures/only-1-unsigned.logsig test/out/
+	run ./src/logksi sign test/out/only-1-unsigned -dd
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Count of resigned blocks:    1" ]]
+	run test -f test/out/only-1-unsigned.logsig
+	[ "$status" -eq 0 ]
+	run test -f test/out/only-1-unsigned.logsig.bak
+	[ "$status" -eq 0 ]
+	run diff test/resource/logs_and_signatures/only-1-unsigned.logsig test/out/only-1-unsigned.logsig.bak
+	[ "$status" -eq 0 ]
+	run diff test/resource/logs_and_signatures/only-1-unsigned.logsig test/out/only-1-unsigned.logsig
+	[ "$status" -ne 0 ]
+}

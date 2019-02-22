@@ -26,10 +26,14 @@ cp -r test/resource/logsignatures/signed.logsig.parts test/out/dummy.logsig.part
 	run ./src/logksi integrate test/resource/logsignatures/signed -o test/out/dummy.logsig
 	[[ "$output" =~ (Error).*(Overwriting of existing log signature file).*(dummy.logsig).*(Run .logksi integrate. with .--force-overwrite. to force overwriting) ]]
 	[ "$status" -eq 9 ]
+	run cat test/out/dummy.logsig
+	[[ "$output" =~ "dummy string" ]]
 }
 
 @test "integrate CMD test: try to write into existing file 2" {
 	run ./src/logksi integrate test/out/dummy
 	[[ "$output" =~ (Error).*(Overwriting of existing log signature file).*(dummy.logsig).*(Run .logksi integrate. with .--force-overwrite. to force overwriting) ]]
 	[ "$status" -eq 9 ]
+	run cat test/out/dummy.logsig
+	[[ "$output" =~ "dummy string" ]]
 }
