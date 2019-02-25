@@ -42,6 +42,7 @@
 #include "tool.h"
 #include "rsyslog.h"
 #include <inttypes.h>
+#include "io_files.h"
 
 static int extend_to_nearest_publication(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_PublicationsFile *pubFile, KSI_VerificationContext *context, KSI_Signature **ext);
 static int extend_to_specified_time(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_PublicationsFile *pubFile, KSI_VerificationContext *context, KSI_Signature **ext);

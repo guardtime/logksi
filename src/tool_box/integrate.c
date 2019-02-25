@@ -37,6 +37,8 @@
 #include "debug_print.h"
 #include "tool.h"
 #include "rsyslog.h"
+#include "blocks_info.h"
+#include "io_files.h"
 
 static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
 static int generate_filenames(PARAM_SET* set, ERR_TRCKR *err, IO_FILES *files);

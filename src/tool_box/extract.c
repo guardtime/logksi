@@ -39,6 +39,7 @@
 #include "conf_file.h"
 #include "tool.h"
 #include "rsyslog.h"
+#include "io_files.h"
 
 static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
 static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err);
