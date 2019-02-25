@@ -518,7 +518,7 @@ static int recover_procedure(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, 
 				ERR_TRCKR_ADD(err, resIn, "Error: Unable read logline nr %3zu!", i);
 				goto cleanup;
 			}
-			res = SMART_FILE_write(files->files.outLog, buf, count, NULL);
+			res = SMART_FILE_write(files->files.outLog, (unsigned char*)buf, count, NULL);
 			if (res != SMART_FILE_OK) {
 				ERR_TRCKR_ADD(err, resIn, "Error: Unable write logline nr %3zu into recovered log file!", i);
 				goto cleanup;

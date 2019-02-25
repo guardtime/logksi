@@ -49,7 +49,7 @@ typedef int (*reader_t)(void *, unsigned char *, size_t, size_t *);
 int readData(void *fd, unsigned char *buf, size_t len, size_t *consumed, struct fast_tlv_s *t, reader_t read_fn);
 
 static int smart_file_read_wrapper(void *sf, unsigned char *buf, size_t size, size_t *count) {
-	return SMART_FILE_read((void*)sf, (char*)buf, size, count);
+	return SMART_FILE_read((void*)sf, buf, size, count);
 }
 
 int LOGKSI_FTLV_smartFileRead(SMART_FILE *sf, unsigned char *buf, size_t len, size_t *consumed, struct fast_tlv_s *t) {
@@ -986,7 +986,7 @@ int tlv_element_write_hash(KSI_DataHash *hash, unsigned tag, SMART_FILE *out) {
 
 	ptr = buf + sizeof(buf) - len;
 
-	res = SMART_FILE_write(out, (char*)ptr, len, NULL);
+	res = SMART_FILE_write(out, ptr, len, NULL);
 	if (res != SMART_FILE_OK) goto cleanup;
 
 	res = KT_OK;
@@ -1067,7 +1067,7 @@ static size_t find_header_in_file(SMART_FILE *in, char **headers, size_t len) {
 	if (in == NULL || headers == NULL)
 		return len;
 
-	smart_file_res = SMART_FILE_read(in, buf, strlen(headers[0]), &count);
+	smart_file_res = SMART_FILE_read(in, (unsigned char*)buf, strlen(headers[0]), &count);
 	if (smart_file_res != SMART_FILE_OK) return res;
 
 	if (count == strlen(headers[0])) {
@@ -1124,10 +1124,10 @@ static int process_magic_number(PARAM_SET* set, MULTI_PRINTER* mp, ERR_TRCKR *er
 	}
 
 	if (files->files.outSig) {
-		res = SMART_FILE_write(files->files.outSig, logSignatureHeaders[blocks->version], strlen(logSignatureHeaders[blocks->version]), &count);
+		res = SMART_FILE_write(files->files.outSig, (unsigned char*)logSignatureHeaders[blocks->version], strlen(logSignatureHeaders[blocks->version]), &count);
 		ERR_CATCH_MSG(err, res, "Error: Could not copy magic number to log signature file.");
 	} else if (files->files.outProof) {
-		res = SMART_FILE_write(files->files.outProof, proofFileHeaders[blocks->version], strlen(proofFileHeaders[blocks->version]), &count);
+		res = SMART_FILE_write(files->files.outProof, (unsigned char*)proofFileHeaders[blocks->version], strlen(proofFileHeaders[blocks->version]), &count);
 		ERR_CATCH_MSG(err, res, "Error: Could not write magic number to integrity proof file.");
 	}
 
@@ -1424,7 +1424,7 @@ static int process_block_header(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *er
 		res = SMART_FILE_markConsistent(files->files.outSig);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: Unable to mark output log signature file consistent.", blocks->blockNo);
 
-		res = SMART_FILE_write(files->files.outSig, (char*)blocks->ftlv_raw, blocks->ftlv_len, NULL);
+		res = SMART_FILE_write(files->files.outSig, blocks->ftlv_raw, blocks->ftlv_len, NULL);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to copy block header.", blocks->blockNo);
 	}
 
@@ -1571,7 +1571,7 @@ static int process_record_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err
 	}
 
 	if (files->files.outSig) {
-		res = SMART_FILE_write(files->files.outSig, (char*)blocks->ftlv_raw, blocks->ftlv_len, NULL);
+		res = SMART_FILE_write(files->files.outSig, blocks->ftlv_raw, blocks->ftlv_len, NULL);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to copy record hash.", blocks->blockNo);
 	}
 	res = KT_OK;
@@ -1692,7 +1692,7 @@ static int process_tree_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, 
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse tree hash.", blocks->blockNo);
 
 	if (files->files.outSig) {
-		res = SMART_FILE_write(files->files.outSig, (char*)blocks->ftlv_raw, blocks->ftlv_len, NULL);
+		res = SMART_FILE_write(files->files.outSig, blocks->ftlv_raw, blocks->ftlv_len, NULL);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to copy tree hash.", blocks->blockNo);
 	}
 
@@ -1876,7 +1876,7 @@ static int process_metarecord(PARAM_SET* set, MULTI_PRINTER *mp, ERR_TRCKR *err,
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate metarecord hash with index %zu.", blocks->blockNo, metarecord_index);
 
 	if (files->files.outSig) {
-		res = SMART_FILE_write(files->files.outSig, (char*)blocks->ftlv_raw, blocks->ftlv_len, NULL);
+		res = SMART_FILE_write(files->files.outSig, blocks->ftlv_raw, blocks->ftlv_len, NULL);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to copy metarecord hash.", blocks->blockNo);
 	}
 
@@ -2168,7 +2168,7 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 			blocks->warningLegacy = 0;
 		}
 
-		res = SMART_FILE_write(files->files.outSig, (char*)blocks->ftlv_raw, blocks->ftlv_len, NULL);
+		res = SMART_FILE_write(files->files.outSig, blocks->ftlv_raw, blocks->ftlv_len, NULL);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to write extended signature to extended log signature file.", blocks->blockNo);
 
 		KSI_DataHash_free((KSI_DataHash*)context.documentHash);
@@ -2179,7 +2179,7 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse KSI signature.", blocks->blockNo);
 
 		if (blocks->nofExtractPositionsInBlock) {
-			res = SMART_FILE_write(files->files.outProof, (char*)tlvSig->ptr, tlvSig->ftlv.dat_len + tlvSig->ftlv.hdr_len, NULL);
+			res = SMART_FILE_write(files->files.outProof, tlvSig->ptr, tlvSig->ftlv.dat_len + tlvSig->ftlv.hdr_len, NULL);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to write KSI signature to integrity proof file.", blocks->blockNo);
 		}
 
@@ -2201,7 +2201,7 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 				recChain->ftlv.tag = 0x0907;
 
 				if (blocks->extractInfo[j].logLine) {
-					res = SMART_FILE_write(files->files.outLog, (char*)blocks->extractInfo[j].logLine, strlen(blocks->extractInfo[j].logLine), NULL);
+					res = SMART_FILE_write(files->files.outLog, (unsigned char*)blocks->extractInfo[j].logLine, strlen(blocks->extractInfo[j].logLine), NULL);
 					ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to write log record to log records file.", blocks->extractInfo[j].extractPos);
 				} else if (blocks->extractInfo[j].metaRecord){
 					res = KSI_TlvElement_setElement(recChain, blocks->extractInfo[j].metaRecord);
@@ -2237,7 +2237,7 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 				res = KSI_TlvElement_serialize(recChain, buf, sizeof(buf), &len, 0);
 				ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to serialize record chain.", blocks->extractInfo[j].extractPos);
 
-				res = SMART_FILE_write(files->files.outProof, (char*)buf, len, NULL);
+				res = SMART_FILE_write(files->files.outProof, buf, len, NULL);
 				ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to write record chain to integrity proof file.", blocks->extractInfo[j].extractPos);
 
 				KSI_TlvElement_free(recChain);
@@ -2748,7 +2748,7 @@ static int process_partial_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCK
 		print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
 		print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_LEVEL_3, "Block no. %3zu: writing block signature to file... ", blocks->blockNo);
 
-		res = SMART_FILE_write(files->files.outSig, (char*)blocks->ftlv_raw, blocks->ftlv_len, NULL);
+		res = SMART_FILE_write(files->files.outSig, blocks->ftlv_raw, blocks->ftlv_len, NULL);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to write signature data log signature file.", blocks->blockNo);
 
 		/* Move signature file offset value at the end of the files as complete signature is written to the file. */
@@ -2797,7 +2797,7 @@ static int check_warnings(BLOCK_INFO *blocks) {
 
 static int finalize_log_signature(PARAM_SET* set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, KSI_DataHash* inputHash, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
-	char buf[2];
+	unsigned char buf[2];
 	char inHash[256] = "<null>";
 	char outHash[256] = "<null>";
 	int shortIndentation = 13;
