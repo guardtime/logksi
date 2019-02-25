@@ -48,12 +48,8 @@ const char *IO_FILES_getCurrentLogFilePrintRepresentation(IO_FILES *files);
 typedef int (*reader_t)(void *, unsigned char *, size_t, size_t *);
 int readData(void *fd, unsigned char *buf, size_t len, size_t *consumed, struct fast_tlv_s *t, reader_t read_fn);
 
-static int smart_file_read_wrapper(void *sf, unsigned char *buf, size_t size, size_t *count) {
-	return SMART_FILE_read((void*)sf, buf, size, count);
-}
-
 int LOGKSI_FTLV_smartFileRead(SMART_FILE *sf, unsigned char *buf, size_t len, size_t *consumed, struct fast_tlv_s *t) {
-	return readData(sf, buf, len, consumed, t, (reader_t)smart_file_read_wrapper);
+	return readData(sf, buf, len, consumed, t, (reader_t)SMART_FILE_read);
 }
 
 static char* ksi_signature_sigTimeToString(const KSI_Signature* sig, char *buf, size_t buf_len) {
