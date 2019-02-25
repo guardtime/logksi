@@ -40,3 +40,9 @@ export KSI_CONF=test/test.cfg
 	[ "$status" -eq 6 ]
 	[[ "$output" =~ (Block no).*(1).*(KSI signature verification failed).*(GEN-02).*(Verification inconclusive).*(Signature is extended to a publication that does not exist in publications file).* ]]
 }
+
+@test "Verify ext-backup-test.logsig." {
+	run ./src/logksi verify --ver-pub test/out/ext-backup-test test/out/ext-backup-test.logsig -ddd --ignore-desc-block-time
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
+}

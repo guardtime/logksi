@@ -837,14 +837,20 @@ static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files) {
 	}
 
 	if (files->internal.inLog) {
-		res = logksi_file_check_and_open(err, files->internal.inLog, &tmp.files.inLog);
-		if (res != KT_OK) goto cleanup;
+		res = SMART_FILE_open(files->internal.inLog, "rb", &tmp.files.inLog);
+		ERR_CATCH_MSG(err, res, "Unable to open input log.")
 	} else {
-		tmp.files.inLog = stdin;
+		res = SMART_FILE_open("-", "rbs", &tmp.files.inLog);
+		ERR_CATCH_MSG(err, res, "Unable to open input log.")
 	}
 
-	res = logksi_file_check_and_open(err, files->internal.inSig, &tmp.files.inSig);
-	if (res != KT_OK) goto cleanup;
+	if (files->internal.inSig) {
+		res = SMART_FILE_open(files->internal.inSig, "rb", &tmp.files.inSig);
+		ERR_CATCH_MSG(err, res, "Unable to open input signature.")
+	} else {
+		res = SMART_FILE_open("-", "rbs", &tmp.files.inSig);
+		ERR_CATCH_MSG(err, res, "Unable to open input sig.")
+	}
 
 	files->files = tmp.files;
 	memset(&tmp.files, 0, sizeof(tmp.files));
@@ -900,7 +906,7 @@ static int save_output_hash(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *ioFiles, K
 		res = SMART_FILE_open(fname, "ws", &out);
 		ERR_CATCH_MSG(err, res, "Error: Unable to open file '%s'.", fname);
 
-		res = SMART_FILE_write(out, buf, count, &write_count);
+		res = SMART_FILE_write(out, (unsigned char*)buf, count, &write_count);
 		ERR_CATCH_MSG(err, res, "Error: Unable to write to file '%s'.", fname);
 
 		if (write_count != count) {

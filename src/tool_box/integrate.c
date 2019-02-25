@@ -43,7 +43,7 @@ static int generate_filenames(PARAM_SET* set, ERR_TRCKR *err, IO_FILES *files);
 static int open_input_and_output_files(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files, int forceOverwrite);
 static int acquire_file_locks(ERR_TRCKR *err, MULTI_PRINTER *mp, IO_FILES *files);
 static int recover_procedure(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, BLOCK_INFO* blocks, IO_FILES *files, int resIn);
-static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files);
+static int rename_temporary_and_backup_files(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files);
 static void close_input_and_output_files(ERR_TRCKR *err, int res, IO_FILES *files);
 static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err);
 
@@ -119,7 +119,7 @@ int integrate_run(int argc, char **argv, char **envp) {
 	res = recover_procedure(set, mp, err, &blocks, &files, integrate_res);
 	if (res != KT_OK) goto cleanup;
 
-	res = rename_temporary_and_backup_files(err, &files);
+	res = rename_temporary_and_backup_files(set, err, &files);
 	if (res != KT_OK) goto cleanup;
 
 	res = KT_OK;
@@ -306,15 +306,13 @@ static int generate_filenames(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files) {
 	if (files->user.outSig == NULL) {
 		res = concat_names(files->user.inLog, (isRecoveryMode ? ".recovered.logsig" : ".logsig"), &tmp.internal.outSig);
 		ERR_CATCH_MSG(err, res, "Error: Could not generate output log signature file name.");
-		res = temp_name(tmp.internal.outSig, &tmp.internal.tempSig);
-		ERR_CATCH_MSG(err, res, "Error: Could not generate temporary output log signature file name.");
-	} else if (!strcmp(files->user.outSig, "-")) {
-		/* Output must go to a nameless temporary file before redirecting it to stdout. */
-		tmp.internal.bStdout = 1;
 	} else {
 		/* Output must go to a named temporary file that is renamed appropriately on success. */
-		res = temp_name(files->user.outSig, &tmp.internal.tempSig);
-		ERR_CATCH_MSG(err, res, "Error: Could not generate temporary output log signature file name.");
+		if (!strcmp(files->user.outSig, "-")) {
+			/* Output must go to a nameless temporary file before redirecting it to stdout. */
+			tmp.internal.bStdout = 1;
+		}
+
 		res = duplicate_name(files->user.outSig, &tmp.internal.outSig);
 		ERR_CATCH_MSG(err, res, "Error: Could not duplicate output log signature file name.");
 	}
@@ -327,15 +325,13 @@ static int generate_filenames(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files) {
 		if (files->user.outLog == NULL) {
 			res = concat_names(files->user.inLog, (isRecoveryMode ? ".recovered" : ""), &tmp.internal.outLog);
 			ERR_CATCH_MSG(err, res, "Error: Could not generate output log file name.");
-			res = temp_name(tmp.internal.outLog, &tmp.internal.tempLog);
-			ERR_CATCH_MSG(err, res, "Error: Could not generate temporary output log file name.");
-		} else if (!strcmp(files->user.outLog, "-")) {
-			/* Output must go to a nameless temporary file before redirecting it to stdout. */
-			tmp.internal.bStdoutLog = 1;
 		} else {
 			/* Output must go to a named temporary file that is renamed appropriately on success. */
-			res = temp_name(files->user.outLog, &tmp.internal.tempLog);
-			ERR_CATCH_MSG(err, res, "Error: Could not generate temporary output log file name.");
+			if (!strcmp(files->user.outLog, "-")) {
+				/* Output must go to a nameless temporary file before redirecting it to stdout. */
+				tmp.internal.bStdoutLog = 1;
+			}
+
 			res = duplicate_name(files->user.outLog, &tmp.internal.outLog);
 			ERR_CATCH_MSG(err, res, "Error: Could not duplicate output log file name.");
 		}
@@ -369,25 +365,16 @@ static int open_input_and_output_files(PARAM_SET *set, ERR_TRCKR *err, IO_FILES 
 
 	isRecoveryMode = PARAM_SET_isSetByName(set, "recover");
 
-	tmp.files.partsBlk = fopen(files->internal.partsBlk, "rb");
-	if (tmp.files.partsBlk == NULL) partsBlkErr = errno;
+	partsBlkErr = SMART_FILE_open(files->internal.partsBlk, "rb", &tmp.files.partsBlk);
+	partsSigErr = SMART_FILE_open(files->internal.partsSig, "rb", &tmp.files.partsSig);
 
-	tmp.files.partsSig = fopen(files->internal.partsSig, "rb");
-	if (tmp.files.partsSig == NULL) partsSigErr = errno;
 
-	/* Open output log file. */
-	if (isRecoveryMode) {
-		res = logksi_file_create_temporary(files->internal.tempLog, &tmp.files.outLog, files->internal.bStdoutLog);
-		ERR_CATCH_MSG(err, res, "Error: Could not create temporary output log file.");
-	}
-
-	if (partsBlkErr == 0 && partsSigErr == 0) {
+	if (partsBlkErr == SMART_FILE_OK && partsSigErr == SMART_FILE_OK) {
 		/* If both of the input files exist and the output log signature file also exists,
 		 * the output log signature file must not be overwritten because it may contain KSI signatures
 		 * obtained by sign recovery but not present in the input signatures file. */
 		if (!forceOverwrite) {
-			tmp.files.outSig = fopen(files->internal.outSig, "rb");
-			if (tmp.files.outSig != NULL) {
+			if (SMART_FILE_doFileExist(files->internal.outSig)) {
 				res = KT_IO_ERROR;
 				ERR_CATCH_MSG(err, res, "Error: Overwriting of existing log signature file %s not allowed. Run 'logksi integrate' with '--force-overwrite' to force overwriting.", files->internal.outSig);
 			}
@@ -397,19 +384,26 @@ static int open_input_and_output_files(PARAM_SET *set, ERR_TRCKR *err, IO_FILES 
 				ERR_CATCH_MSG(err, res, "Error: Overwriting of existing log file %s not allowed. Run 'logksi integrate' with '--force-overwrite' to force overwriting.", files->internal.outLog);
 			}
 		}
-		res = logksi_file_create_temporary(files->internal.tempSig, &tmp.files.outSig, files->internal.bStdout);
+
+		/* Open output log file. */
+		if (isRecoveryMode) {
+			res = SMART_FILE_open(files->internal.outLog, (forceOverwrite ? "wbTX" : "wbTXf"), &tmp.files.outLog);
+			ERR_CATCH_MSG(err, res, "Error: Could not create temporary output log file.");
+		}
+
+		res = SMART_FILE_open(files->internal.outSig, (forceOverwrite ? "wbTXs" : "wbTfXs"), &tmp.files.outSig);
 		ERR_CATCH_MSG(err, res, "Error: Could not create temporary output log signature file.");
-	} else if (partsBlkErr == ENOENT && partsSigErr == ENOENT) {
+	} else if (partsBlkErr == SMART_FILE_DOES_NOT_EXIST && partsSigErr == SMART_FILE_DOES_NOT_EXIST) {
 		/* If none of the input files exist, but the output log signature file exists,
 		 * the output log signature file is the result of the synchronous signing process
 		 * and must not be overwritten. A read mode file handle is needed for acquiring a file lock. */
-		tmp.files.inSig = fopen(files->internal.outSig, "rb");
-		if (tmp.files.inSig != NULL) {
+		res = SMART_FILE_open(files->internal.outSig, "rb", &tmp.files.inSig);
+		if (res == SMART_FILE_OK) {
 			/* Reassign ouput file name as input file name to avoid potential removal as an incomplete output file. */
 			files->internal.inSig = files->internal.outSig;
 			files->internal.outSig = NULL;
 		} else {
-			if (errno == ENOENT) {
+			if (res == SMART_FILE_DOES_NOT_EXIST) {
 				res = KT_KSI_SIG_VER_IMPOSSIBLE;
 				ERR_CATCH_MSG(err, res, "Error: Unable to find input blocks file %s.", files->internal.partsBlk);
 			} else {
@@ -419,7 +413,7 @@ static int open_input_and_output_files(PARAM_SET *set, ERR_TRCKR *err, IO_FILES 
 		}
 	} else {
 		res = KT_KSI_SIG_VER_IMPOSSIBLE;
-		if (partsBlkErr != 0) {
+		if (!SMART_FILE_doFileExist(files->internal.partsBlk)) {
 			ERR_CATCH_MSG(err, res, "Error: Unable to %s blocks file %s.", partsBlkErr == ENOENT ? "find ": "open", files->internal.partsBlk);
 		} else {
 			ERR_CATCH_MSG(err, res, "Error: Unable to %s signatures file %s.", partsSigErr == ENOENT ? "find ": "open", files->internal.partsSig);
@@ -437,34 +431,6 @@ cleanup:
 	return res;
 }
 
-static int get_file_read_lock(FILE *in, MULTI_PRINTER *mp) {
-	struct flock lock;
-	int fres;
-
-	if (in == NULL || mp == NULL) return KT_INVALID_ARGUMENT;
-
-	lock.l_type = F_RDLCK;
-	lock.l_whence = SEEK_SET;
-	lock.l_start = 0;
-	lock.l_len = 0;
-	fres = fcntl(fileno(in), F_SETLK, &lock);
-	if (fres != 0) {
-		if (errno == EAGAIN || errno == EACCES) {
-			print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_LEVEL_0, "Waiting to acquire read lock... ");
-			MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
-			fres = fcntl(fileno(in), F_SETLKW, &lock);
-			print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_0, fres);
-			MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
-		}
-	}
-
-	if (fres != 0) {
-		return KT_IO_ERROR;
-	} else {
-		return KT_OK;
-	}
-}
-
 static int acquire_file_locks(ERR_TRCKR *err, MULTI_PRINTER *mp, IO_FILES *files) {
 	int res = KT_UNKNOWN_ERROR;
 
@@ -475,13 +441,14 @@ static int acquire_file_locks(ERR_TRCKR *err, MULTI_PRINTER *mp, IO_FILES *files
 
 	if (files->files.partsBlk && files->files.partsSig) {
 		/* Check that the asynchronous signing process has completed writing to blocks and signatures files. */
-		res = get_file_read_lock(files->files.partsBlk, mp);
+
+		res = SMART_FILE_lock(files->files.partsBlk, SMART_FILE_READ_LOCK);
 		ERR_CATCH_MSG(err, res, "Error: Could not acquire read lock for input blocks file %s.", files->internal.partsBlk);
-		res = get_file_read_lock(files->files.partsSig, mp);
+		res = SMART_FILE_lock(files->files.partsSig, SMART_FILE_READ_LOCK);
 		ERR_CATCH_MSG(err, res, "Error: Could not acquire read lock for input signatures file %s.", files->internal.partsSig);
 		res = KT_OK;
 	} else if (files->files.partsBlk == NULL && files->files.partsSig == NULL) {
-		res = get_file_read_lock(files->files.inSig, mp);
+		res = SMART_FILE_lock(files->files.inSig, SMART_FILE_READ_LOCK);
 		ERR_CATCH_MSG(err, res, "Error: Could not acquire read lock for output log signature file %s.", files->internal.inSig);
 		res = KT_VERIFICATION_SKIPPED;
 	}
@@ -495,7 +462,7 @@ cleanup:
 static int recover_procedure(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, BLOCK_INFO* blocks, IO_FILES *files, int resIn) {
 	int res = KT_UNKNOWN_ERROR;
 	int returnCode = resIn;
-	FILE *originalLogFile = NULL;
+	SMART_FILE *originalLogFile = NULL;
 	size_t i = 0;
 
 
@@ -525,43 +492,41 @@ static int recover_procedure(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, 
 		print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, 0);
 		print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_LEVEL_1, "Removing corrupted data from log signature... ");
 
-		/* Delete the end of the file if it is corrupted. */
-		fseeko(files->files.outSig, files->files.outSigPos, SEEK_SET);
-		if(ftruncate(fileno(files->files.outSig), files->files.outSigPos) != 0) {
-			ERR_TRCKR_ADD(err, resIn, "Error: Unable to remove corrupted data from output logfile '%s'.", files->internal.outLog);
-			goto cleanup;
-		}
-
 		print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, 0);
 		print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_LEVEL_1, "Copying valid log lines into recovered log file... ");
 
 		/* Open original log file and copy recovered log lines into recovered log file. */
-		originalLogFile = fopen(files->user.inLog, "rb");
-		if (originalLogFile == NULL) {
+		res = SMART_FILE_open(files->user.inLog, "rb", &originalLogFile);
+		if (res != SMART_FILE_OK) {
 			ERR_TRCKR_ADD(err, resIn, "Error: Unable to open input logfile '%s'!", files->user.inLog);
 			goto cleanup;
 		}
 
-		res = get_file_read_lock(originalLogFile, mp);
-		if (res !=KT_OK) {
+		res = SMART_FILE_lock(originalLogFile, SMART_FILE_READ_LOCK);
+		if (res != SMART_FILE_OK) {
 			ERR_TRCKR_ADD(err, resIn, "Error: Unable to get read lock for input logfile '%s'!", files->user.inLog);
 			goto cleanup;
 		}
 
 		for (i = 0; i < blocks->firstLineInBlock - 1; i++) {
 			/* Maximum line size is 64K characters, without newline character. */
+			size_t count = 0;
 			char buf[0x10000 + 2];
 
-			if (fgets(buf, sizeof(buf), originalLogFile) == NULL) {
+			res = SMART_FILE_gets(originalLogFile, buf, sizeof(buf), &count);
+			if (res != SMART_FILE_OK) {
 				ERR_TRCKR_ADD(err, resIn, "Error: Unable read logline nr %3zu!", i);
 				goto cleanup;
 			}
-
-			if (fputs(buf, files->files.outLog) < 0) {
+			res = SMART_FILE_write(files->files.outLog, (unsigned char*)buf, count, NULL);
+			if (res != SMART_FILE_OK) {
 				ERR_TRCKR_ADD(err, resIn, "Error: Unable write logline nr %3zu into recovered log file!", i);
 				goto cleanup;
 			}
 		}
+
+		res = SMART_FILE_markConsistent(files->files.outLog);
+		ERR_CATCH_MSG(err, res, "Error: Could not close output log file %s.", files->internal.outLog);
 
 		print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, 0);
 		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, "It was possible to recover %zu blocks (lines 1 - %zu).\n", blocks->blockNo - 1, blocks->firstLineInBlock - 1);
@@ -575,13 +540,18 @@ static int recover_procedure(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, 
 
 cleanup:
 
-	if (originalLogFile) fclose(originalLogFile);
+	if (returnCode != KT_OK) {
+		SMART_FILE_markInconsistent(files->files.outSig);
+		SMART_FILE_markInconsistent(files->files.outLog);
+	}
+
+	SMART_FILE_close(originalLogFile);
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, returnCode);
 
 	return returnCode;
 }
 
-static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files) {
+static int rename_temporary_and_backup_files(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files) {
 	int res;
 
 	if (err == NULL || files == NULL) {
@@ -589,21 +559,8 @@ static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files) {
 		goto cleanup;
 	}
 
-	if (files->internal.tempSig) {
-		/* Output must be saved in output log signature file, so the temporary file is renamed. */
-		logksi_file_close(&files->files.outSig);
-		res = logksi_file_rename(files->internal.tempSig, files->internal.outSig);
-		ERR_CATCH_MSG(err, res, "Error: Could not rename temporary file %s to output log signature file %s.", files->internal.tempSig, files->internal.outSig);
-	} else if (files->internal.bStdout) {
-		res = logksi_file_redirect_to_stdout(files->files.outSig);
-		ERR_CATCH_MSG(err, res, "Error: Could not write temporary output log signature file to stdout.");
-	}
-
-	if (files->internal.tempLog) {
-		logksi_file_close(&files->files.outLog);
-		res = logksi_file_rename(files->internal.tempLog, files->internal.outLog);
-		ERR_CATCH_MSG(err, res, "Error: Could not rename temporary file %s to output log file %s.", files->internal.tempLog, files->internal.outLog);
-	}
+	logksi_file_close(&files->files.outSig);
+	logksi_file_close(&files->files.outLog);
 
 	res = KT_OK;
 
@@ -615,20 +572,7 @@ cleanup:
 void close_input_and_output_files(ERR_TRCKR *err, int res, IO_FILES *files) {
 	if (files) {
 		logksi_files_close(&files->files);
-		if (res != KT_OK) {
-			if (files->internal.tempSig) {
-				if (remove(files->internal.tempSig) != 0) {
-					if (err) ERR_TRCKR_ADD(err, KT_IO_ERROR, "Error: Could not remove temporary output log signature %s.", files->internal.tempSig);
-				}
-			}
 
-			if (files->internal.tempLog) {
-				if (remove(files->internal.tempLog) != 0) {
-					if (err) ERR_TRCKR_ADD(err, KT_IO_ERROR, "Error: Could not remove temporary output log file %s.", files->internal.tempSig);
-				}
-			}
-
-		}
 		logksi_internal_filenames_free(&files->internal);
 	}
 }

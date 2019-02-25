@@ -21,3 +21,9 @@ cp test/resource/logfiles/signed test/out/signed4
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 }
+
+@test "Verify only-1-unsigned.logsig." {
+	run ./src/logksi verify test/out/only-1-unsigned test/out/only-1-unsigned.logsig -ddd --ignore-desc-block-time
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
+}

@@ -129,14 +129,17 @@ typedef struct SMART_FILE_st SMART_FILE;
 int SMART_FILE_open(const char *fname, const char *mode, SMART_FILE **file);
 
 int SMART_FILE_close(SMART_FILE *file);
-int SMART_FILE_write(SMART_FILE *file, char *raw, size_t raw_len, size_t *count);
-int SMART_FILE_read(SMART_FILE *file, char *raw, size_t raw_len, size_t *count);
+int SMART_FILE_write(SMART_FILE *file, unsigned char *raw, size_t raw_len, size_t *count);
+int SMART_FILE_read(SMART_FILE *file, unsigned char *raw, size_t raw_len, size_t *count);
 int SMART_FILE_readLine(SMART_FILE *file, char *raw, size_t raw_len, size_t *row_pointer, size_t *count);
+int SMART_FILE_gets(SMART_FILE *file, char *raw, size_t raw_len, size_t *count);
+int SMART_FILE_rewind(SMART_FILE *file);
 int SMART_FILE_lock(SMART_FILE *file, int lock);
 int SMART_FILE_markConsistent(SMART_FILE *file);
+int SMART_FILE_markInconsistent(SMART_FILE *file);
 
 const char *SMART_FILE_getFname(SMART_FILE *file);
-
+const char *SMART_FILE_getTmpFname(SMART_FILE *file);
 
 /**
  *
@@ -145,6 +148,7 @@ const char *SMART_FILE_getFname(SMART_FILE *file);
  * Otherwise, zero is returned.
  */
 int SMART_FILE_isEof(SMART_FILE *file);
+int SMART_FILE_isStream(SMART_FILE *file);
 
 int SMART_FILE_doFileExist(const char *path);
 int SMART_FILE_isWriteAccess(const char *path);
