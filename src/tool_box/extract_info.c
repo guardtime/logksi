@@ -33,7 +33,7 @@ static int add_hash_to_record_chain(EXTRACT_INFO *extracts, LINK_DIRECTION dir, 
 static int expand_extract_info(BLOCK_INFO *blocks);
 static int add_position(ERR_TRCKR *err, long int n, BLOCK_INFO *blocks);
 
-int update_record_chain(BLOCK_INFO *blocks, unsigned char level, int finalize, KSI_DataHash *leftLink) {
+int block_info_extract_update_record_chain(BLOCK_INFO *blocks, unsigned char level, int finalize, KSI_DataHash *leftLink) {
 	int res;
 	size_t j;
 	int condition;
@@ -68,7 +68,7 @@ cleanup:
 	return res;
 }
 
-int extract_next_position(ERR_TRCKR *err, char *range, BLOCK_INFO *blocks) {
+int block_info_extract_next_position(BLOCK_INFO *blocks, ERR_TRCKR *err, char *range) {
 	int res;
 	static long int n = 0;
 	static long int from = 0;
@@ -165,7 +165,7 @@ cleanup:
 	return res;
 }
 
-int update_extract_info(ERR_TRCKR *err, BLOCK_INFO *blocks, int isMetaRecordHash, KSI_DataHash *hash) {
+int block_info_extract_update(BLOCK_INFO *blocks, ERR_TRCKR *err, int isMetaRecordHash, KSI_DataHash *hash) {
 	int res;
 	EXTRACT_INFO *extractInfo = NULL;
 
@@ -208,7 +208,7 @@ int update_extract_info(ERR_TRCKR *err, BLOCK_INFO *blocks, int isMetaRecordHash
 	}
 
 	if (blocks->records && blocks->nofExtractPositionsFound == blocks->nofExtractPositions) {
-		res = extract_next_position(err, blocks->records, blocks);
+		res = block_info_extract_next_position(blocks, err, blocks->records);
 		if (res != KT_OK) goto cleanup;
 	}
 
@@ -219,7 +219,7 @@ cleanup:
 	return res;
 }
 
-int verify_extract_positions(ERR_TRCKR *err, char *records) {
+int block_info_extract_verify_positions(ERR_TRCKR *err, char *records) {
 	int res;
 
 	if (records == NULL || *records == 0) {

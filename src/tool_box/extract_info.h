@@ -29,10 +29,10 @@
 extern "C" {
 #endif
 
-int update_record_chain(BLOCK_INFO *blocks, unsigned char level, int finalize, KSI_DataHash *leftLink);
-int extract_next_position(ERR_TRCKR *err, char *range, BLOCK_INFO *blocks);
-int update_extract_info(ERR_TRCKR *err, BLOCK_INFO *blocks, int isMetaRecordHash, KSI_DataHash *hash);
-int verify_extract_positions(ERR_TRCKR *err, char *records);
+int block_info_extract_update_record_chain(BLOCK_INFO *blocks, unsigned char level, int finalize, KSI_DataHash *leftLink);
+int block_info_extract_next_position(BLOCK_INFO *blocks, ERR_TRCKR *err, char *range);
+int block_info_extract_update(BLOCK_INFO *blocks, ERR_TRCKR *err, int isMetaRecordHash, KSI_DataHash *hash);
+int block_info_extract_verify_positions(ERR_TRCKR *err, char *records);
 
 #ifdef	__cplusplus
 }

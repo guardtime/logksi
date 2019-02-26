@@ -580,7 +580,7 @@ static int process_record_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err
 		res = continue_on_hash_fail(res, set, blocks, blocks->metarecordHash, recordHash, &replacement);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: metarecord hashes not equal.", blocks->blockNo);
 
-		res = add_record_hash_to_merkle_tree(ksi, err, blocks, 1, replacement);
+		res = block_info_add_record_hash_to_merkle_tree(blocks, err, ksi, 1, replacement);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
 
 		KSI_DataHash_free(blocks->metarecordHash);
@@ -588,7 +588,7 @@ static int process_record_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err
 	} else {
 		/* This is a logline record hash. */
 		if (files->files.inLog) {
-			res = get_hash_of_logline(blocks, files, &hash);
+			res = block_info_calculate_hash_of_logline_and_store_logline(blocks, files, &hash);
 			if (res == KT_IO_ERROR) {
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: record hash no. %zu does not have a matching logline, end of logfile reached.", blocks->blockNo, get_nof_lines(blocks));
 			} else {
@@ -605,7 +605,7 @@ static int process_record_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err
 			replacement = KSI_DataHash_ref(recordHash);
 		}
 
-		res = add_record_hash_to_merkle_tree(ksi, err, blocks, 0, replacement);
+		res = block_info_add_record_hash_to_merkle_tree(blocks, err, ksi, 0, replacement);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add hash to Merkle tree.", blocks->blockNo);
 	}
 
@@ -748,26 +748,26 @@ static int process_tree_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, 
 			blocks->nofRecordHashes++;
 			if (files->files.inLog) {
 				if (blocks->metarecordHash) {
-					res = add_record_hash_to_merkle_tree(ksi, err, blocks, 1, blocks->metarecordHash);
+					res = block_info_add_record_hash_to_merkle_tree(blocks, err, ksi, 1, blocks->metarecordHash);
 					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
 
 					KSI_DataHash_free(blocks->metarecordHash);
 					blocks->metarecordHash = NULL;
 				} else {
-					res = get_hash_of_logline(blocks, files, &recordHash);
+					res = block_info_calculate_hash_of_logline_and_store_logline(blocks, files, &recordHash);
 					if (res == KT_IO_ERROR) {
 						ERR_CATCH_MSG(err, res, "Error: Block no. %zu: tree hash does not have a matching logline no. %zu, end of logfile reached.", blocks->blockNo, get_nof_lines(blocks));
 					} else {
 						ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate hash of logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
 					}
-					res = add_record_hash_to_merkle_tree(ksi, err, blocks, 0, recordHash);
+					res = block_info_add_record_hash_to_merkle_tree(blocks, err, ksi, 0, recordHash);
 					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add record hash to Merkle tree.", blocks->blockNo);
 					KSI_DataHash_free(recordHash);
 					recordHash = NULL;
 				}
 			} else {
 				/* No log file available so build the Merkle tree from tree hashes alone. */
-				res = add_leaf_hash_to_merkle_tree(ksi, blocks, treeHash, 0);
+				res = block_info_add_leaf_hash_to_merkle_tree(blocks, ksi, treeHash, 0);
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add leaf hash to Merkle tree.", blocks->blockNo);
 			}
 		}
@@ -814,7 +814,7 @@ static int process_tree_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, 
 					continue;
 				}
 				if (blocks->notVerified[i]) {
-					res = calculate_new_tree_hash(ksi, blocks, blocks->notVerified[i], root, i + 2, &tmpRoot);
+					res = block_info_calculate_new_tree_hash(blocks, blocks->notVerified[i], root, i + 2, &tmpRoot);
 					if (res != KT_OK) goto cleanup;
 
 					KSI_DataHash_free(blocks->notVerified[i]);
@@ -890,19 +890,19 @@ static int process_metarecord(PARAM_SET* set, MULTI_PRINTER *mp, ERR_TRCKR *err,
 		if (blocks->metarecordHash != NULL) {
 			/* Add the previous metarecord to Merkle tree. */
 			blocks->nofRecordHashes++;
-			res = add_record_hash_to_merkle_tree(ksi, err, blocks, 1, blocks->metarecordHash);
+			res = block_info_add_record_hash_to_merkle_tree(blocks, err, ksi, 1, blocks->metarecordHash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
 		}
 
 		while (blocks->nofRecordHashes < metarecord_index) {
 			blocks->nofRecordHashes++;
-			res = get_hash_of_logline(blocks, files, &hash);
+			res = block_info_calculate_hash_of_logline_and_store_logline(blocks, files, &hash);
 			if (res == KT_IO_ERROR) {
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: at least %zu loglines expected up to metarecord index %zu, end of logfile reached.", blocks->blockNo, get_nof_lines(blocks), metarecord_index);
 			} else {
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate hash of logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
 			}
-			res = add_record_hash_to_merkle_tree(ksi, err, blocks, 0, hash);
+			res = block_info_add_record_hash_to_merkle_tree(blocks, err, ksi, 0, hash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
 			KSI_DataHash_free(hash);
 			hash = NULL;
@@ -911,7 +911,7 @@ static int process_metarecord(PARAM_SET* set, MULTI_PRINTER *mp, ERR_TRCKR *err,
 
 	KSI_DataHash_free(blocks->metarecordHash);
 	blocks->metarecordHash = NULL;
-	res = get_hash_of_metarecord(blocks, tlv, &blocks->metarecordHash);
+	res = block_info_calculate_hash_of_metarecord_and_store_metarecord(blocks, tlv, &blocks->metarecordHash);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate metarecord hash with index %zu.", blocks->blockNo, metarecord_index);
 
 	if (files->files.outSig) {
@@ -1101,7 +1101,7 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 		if (blocks->metarecordHash) {
 			/* Add the previous metarecord to Merkle tree. */
 			blocks->nofRecordHashes++;
-			res = add_record_hash_to_merkle_tree(ksi, err, blocks, 1, blocks->metarecordHash);
+			res = block_info_add_record_hash_to_merkle_tree(blocks, err, ksi, 1, blocks->metarecordHash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
 		}
 
@@ -1111,13 +1111,13 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 		if (blocks->keepRecordHashes == 0 && blocks->keepTreeHashes == 0) {
 			while (blocks->nofRecordHashes < blocks->recordCount) {
 				blocks->nofRecordHashes++;
-				res = get_hash_of_logline(blocks, files, &hash);
+				res = block_info_calculate_hash_of_logline_and_store_logline(blocks, files, &hash);
 				if (res == KT_IO_ERROR) {
 					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: at least %zu loglines expected, end of logfile reached.", blocks->blockNo, get_nof_lines(blocks));
 				} else {
 					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate hash of logline no. %zu.", blocks->blockNo, blocks->nofRecordHashes);
 				}
-				res = add_record_hash_to_merkle_tree(ksi, err, blocks, 0, hash);
+				res = block_info_add_record_hash_to_merkle_tree(blocks, err, ksi, 0, hash);
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add hash to Merkle tree.", blocks->blockNo);
 				KSI_DataHash_free(hash);
 				hash = NULL;
@@ -1156,10 +1156,10 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 	print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_LEVEL_3, "Block no. %3zu: verifying KSI signature... ", blocks->blockNo);
 
 
-	res = calculate_root_hash(ksi, blocks, (KSI_DataHash**)&context.documentHash);
+	res = block_info_calculate_root_hash(blocks, ksi, (KSI_DataHash**)&context.documentHash);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to get root hash for verification.", blocks->blockNo);
 
-	context.docAggrLevel = get_aggregation_level(blocks);
+	context.docAggrLevel = block_info_get_aggregation_level(blocks);
 
 	if (processors->verify_signature) {
 		res = LOGKSI_Signature_parseWithPolicy(err, ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_EMPTY, NULL, &sig);
@@ -1411,9 +1411,9 @@ static int process_hash_step(ERR_TRCKR *err, KSI_CTX *ksi, KSI_TlvElement *tlv, 
 
 	blocks->treeHeight += correction + 1;
 	if (tlv->ftlv.tag == 0x02) {
-		res = calculate_new_tree_hash(ksi, blocks, inputHash, siblingHash, blocks->treeHeight, &tmp);
+		res = block_info_calculate_new_tree_hash(blocks, inputHash, siblingHash, blocks->treeHeight, &tmp);
 	} else if (tlv->ftlv.tag == 0x03){
-		res = calculate_new_tree_hash(ksi, blocks, siblingHash, inputHash, blocks->treeHeight, &tmp);
+		res = block_info_calculate_new_tree_hash(blocks, siblingHash, inputHash, blocks->treeHeight, &tmp);
 	} else {
 		res = KT_INVALID_INPUT_FORMAT;
 	}
@@ -1458,7 +1458,7 @@ static int process_record_chain(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *er
 	KSI_DataHash_free(blocks->metarecordHash);
 	blocks->metarecordHash = NULL;
 	if (tlvMetaRecord != NULL) {
-		res = get_hash_of_metarecord(blocks, tlvMetaRecord, &hash);
+		res = block_info_calculate_hash_of_metarecord_and_store_metarecord(blocks, tlvMetaRecord, &hash);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate metarecord hash.", blocks->blockNo);
 
 		blocks->metarecordHash = KSI_DataHash_ref(hash);
@@ -1475,7 +1475,7 @@ static int process_record_chain(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *er
 	} else {
 		/* This is a logline record hash. */
 		if (files->files.inLog) {
-			res = get_hash_of_logline(blocks, files, &hash);
+			res = block_info_calculate_hash_of_logline_and_store_logline(blocks, files, &hash);
 			if (res == KT_IO_ERROR) {
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: record hash no. %zu does not have a matching logline, end of logfile reached.", blocks->blockNo, get_nof_lines(blocks));
 			} else {
@@ -1582,7 +1582,7 @@ static int process_partial_block(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, B
 
 	/* If the blocks file contains hashes, re-compute and compare the root hash against the provided root hash. */
 	if (blocks->nofRecordHashes) {
-		res = calculate_root_hash(ksi, blocks, &rootHash);
+		res = block_info_calculate_root_hash(blocks, ksi, &rootHash);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate root hash.", blocks->blockNo);
 
 		res = logksi_datahash_compare(err, mp, rootHash, hash, "Root hash computed from record hashes: ", "Unsigned root hash stored in block data file: ");
@@ -1661,7 +1661,7 @@ static int process_partial_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCK
 		if (blocks->keepRecordHashes || (!blocks->keepRecordHashes && blocks->finalTreeHashesSome)) {
 			do {
 				missing = NULL;
-				res = merge_one_level(ksi, blocks, &missing);
+				res = block_info_merge_one_level(blocks, ksi, &missing);
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing tree hash could not be computed.", blocks->blockNo);
 				if (missing) {
 					res = tlv_element_write_hash(missing, 0x903, files->files.outSig);
@@ -1706,7 +1706,7 @@ static int process_partial_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCK
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: root hashes not equal.", blocks->blockNo);
 		} else if (blocks->nofRecordHashes) {
 			/* Compute the root hash and compare with signed root hash. */
-			res = calculate_root_hash(ksi, blocks, &rootHash);
+			res = block_info_calculate_root_hash(blocks, ksi, &rootHash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate root hash.", blocks->blockNo);
 
 			res = logksi_datahash_compare(err, mp, rootHash, docHash, "Root hash computed from record hashes: ", "Signed root hash stored in KSI signature: ");
@@ -1725,7 +1725,7 @@ static int process_partial_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCK
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: root hashes not equal.", blocks->blockNo);
 		} else if (blocks->nofRecordHashes) {
 			/* Compute the root hash and compare with unsigned root hash. */
-			res = calculate_root_hash(ksi, blocks, &rootHash);
+			res = block_info_calculate_root_hash(blocks, ksi, &rootHash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate root hash.", blocks->blockNo);
 
 			res = logksi_datahash_compare(err, mp, rootHash, hash, "Root hash computed from record hashes: ", "Unsigned root hash stored in block signature file: ");
@@ -1741,7 +1741,7 @@ static int process_partial_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCK
 			}
 			print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_LEVEL_3, "Block no. %3zu: creating missing KSI signature... ", blocks->blockNo);
 
-			res = processors->create_signature(set, mp, err, ksi, blocks, files, hash, get_aggregation_level(blocks), &sig);
+			res = processors->create_signature(set, mp, err, ksi, blocks, files, hash, block_info_get_aggregation_level(blocks), &sig);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to sign root hash.", blocks->blockNo);
 
 			blocks->noSigCreated++;
@@ -2178,6 +2178,15 @@ cleanup:
 	return res;
 }
 
+static const char *io_files_getCurrentLogFilePrintRepresentation(IO_FILES *files) {
+	int logStdin = 0;
+
+	if (files == NULL) return NULL;
+
+	logStdin = files->internal.inLog == NULL;
+	return logStdin ? "stdin" : files->internal.inLog;
+}
+
 int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *firstLink, VERIFYING_FUNCTION verify_signature, IO_FILES *files, KSI_DataHash **lastLeaf) {
 	int res;
 
@@ -2247,7 +2256,7 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 								char buf_exp_imp[1024];
 								char buf_fname[4096];
 								char *prevBlockSource = "Unexpected and not initialized previous block source.";
-								const char *firstBlockSource = IO_FILES_getCurrentLogFilePrintRepresentation(files);
+								const char *firstBlockSource = io_files_getCurrentLogFilePrintRepresentation(files);
 
 								res = KT_VERIFICATION_FAILURE;
 
@@ -2363,11 +2372,11 @@ int logsignature_extract(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_
 	res = PARAM_SET_getStr(set, "r", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &blocks.records);
 	if (res != KT_OK) goto cleanup;
 
-	res = verify_extract_positions(err, blocks.records);
+	res = block_info_extract_verify_positions(err, blocks.records);
 	if (res != KT_OK) goto cleanup;
 
 	/* Initialize the first extract position. */
-	res = extract_next_position(err, blocks.records, &blocks);
+	res = block_info_extract_next_position(&blocks, err, blocks.records);
 	if (res != KT_OK) goto cleanup;
 
 	res = process_magic_number(set, mp, err, &blocks, files);

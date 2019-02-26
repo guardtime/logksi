@@ -29,16 +29,16 @@
 extern "C" {
 #endif
 
-int merge_one_level(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash **hash);
-int calculate_root_hash(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash **hash);
-int get_aggregation_level(BLOCK_INFO *blocks);
-int add_leaf_hash_to_merkle_tree(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *hash, int isMetaRecordHash);
-int add_record_hash_to_merkle_tree(KSI_CTX *ksi, ERR_TRCKR *err, BLOCK_INFO *blocks, int isMetaRecordHash, KSI_DataHash *hash);
-int store_logline(BLOCK_INFO *blocks, char *buf);
-int get_hash_of_logline(BLOCK_INFO *blocks, IO_FILES *files, KSI_DataHash **hash);
-int store_metarecord(BLOCK_INFO *blocks, KSI_TlvElement *tlv);
-int calculate_new_tree_hash(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *leftHash, KSI_DataHash *rightHash, unsigned char level, KSI_DataHash **nodeHash);
-int get_hash_of_metarecord(BLOCK_INFO *blocks, KSI_TlvElement *tlv, KSI_DataHash **hash);
+/* Functions for "more internal" use. */
+int block_info_merge_one_level(BLOCK_INFO *blocks, KSI_CTX *ksi, KSI_DataHash **hash);
+int block_info_calculate_root_hash(BLOCK_INFO *blocks, KSI_CTX *ksi, KSI_DataHash **hash);
+int block_info_get_aggregation_level(BLOCK_INFO *blocks);
+int block_info_add_leaf_hash_to_merkle_tree(BLOCK_INFO *blocks, KSI_CTX *ksi, KSI_DataHash *hash, int isMetaRecordHash);
+int block_info_add_record_hash_to_merkle_tree(BLOCK_INFO *blocks, ERR_TRCKR *err, KSI_CTX *ksi, int isMetaRecordHash, KSI_DataHash *hash);
+int block_info_calculate_hash_of_logline_and_store_logline(BLOCK_INFO *blocks, IO_FILES *files, KSI_DataHash **hash);
+int block_info_calculate_new_tree_hash(BLOCK_INFO *blocks, KSI_DataHash *leftHash, KSI_DataHash *rightHash, unsigned char level, KSI_DataHash **nodeHash);
+int block_info_calculate_hash_of_metarecord_and_store_metarecord(BLOCK_INFO *blocks, KSI_TlvElement *tlv, KSI_DataHash **hash);
+
 void BLOCK_INFO_reset(BLOCK_INFO *block);
 void BLOCK_INFO_freeAndClearInternals(BLOCK_INFO *blocks);
 

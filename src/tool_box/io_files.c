@@ -137,12 +137,3 @@ void IO_FILES_StorePreviousFileNames(IO_FILES *files) {
 		PST_strncpy(files->previousSigFile, files->internal.inSig, sizeof(files->previousSigFile));
 	}
 }
-
-const char *IO_FILES_getCurrentLogFilePrintRepresentation(IO_FILES *files) {
-	int logStdin = 0;
-
-	if (files == NULL) return NULL;
-
-	logStdin = files->internal.inLog == NULL;
-	return logStdin ? "stdin" : files->internal.inLog;
-}

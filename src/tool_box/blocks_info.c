@@ -28,9 +28,9 @@
 #include "blocks_info_impl.h"
 #include "extract_info.h"
 
-static int calculate_new_leaf_hash(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *recordHash, int isMetaRecordHash, KSI_DataHash **leafHash);
+static int block_info_calculate_new_leaf_hash(BLOCK_INFO *blocks, KSI_CTX *ksi, KSI_DataHash *recordHash, int isMetaRecordHash, KSI_DataHash **leafHash);
 
-int merge_one_level(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash **hash) {
+int block_info_merge_one_level(BLOCK_INFO *blocks, KSI_CTX *ksi, KSI_DataHash **hash) {
 	int res;
 	unsigned char i = 0;
 	KSI_DataHash *root = NULL;
@@ -51,7 +51,7 @@ int merge_one_level(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash **hash) {
 					blocks->MerkleTree[i] = NULL;
 				}
 			} else {
-				res = calculate_new_tree_hash(ksi, blocks, blocks->MerkleTree[i], root, i + 2, &tmp);
+				res = block_info_calculate_new_tree_hash(blocks, blocks->MerkleTree[i], root, i + 2, &tmp);
 				if (res != KT_OK) goto cleanup;
 
 				KSI_DataHash_free(root);
@@ -77,7 +77,7 @@ cleanup:
 	return res;
 }
 
-int calculate_root_hash(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash **hash) {
+int block_info_calculate_root_hash(BLOCK_INFO *blocks, KSI_CTX *ksi, KSI_DataHash **hash) {
 	int res;
 	unsigned char i = 0;
 	KSI_DataHash *root = NULL;
@@ -98,10 +98,10 @@ int calculate_root_hash(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash **hash) {
 				continue;
 			}
 			if (blocks->MerkleTree[i]) {
-				res = calculate_new_tree_hash(ksi, blocks, blocks->MerkleTree[i], root, i + 2, &tmp);
+				res = block_info_calculate_new_tree_hash(blocks, blocks->MerkleTree[i], root, i + 2, &tmp);
 				if (res != KT_OK) goto cleanup;
 
-				res = update_record_chain(blocks, i, 1, root);
+				res = block_info_extract_update_record_chain(blocks, i, 1, root);
 				if (res != KT_OK) goto cleanup;
 
 				KSI_DataHash_free(root);
@@ -122,7 +122,7 @@ cleanup:
 	return res;
 }
 
-int get_aggregation_level(BLOCK_INFO *blocks) {
+int block_info_get_aggregation_level(BLOCK_INFO *blocks) {
 	int level = 0;
 	if (blocks != NULL) {
 		if (blocks->version == LOGSIG11) {
@@ -150,7 +150,7 @@ int get_aggregation_level(BLOCK_INFO *blocks) {
 	return level;
 }
 
-int add_leaf_hash_to_merkle_tree(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *hash, int isMetaRecordHash) {
+int block_info_add_leaf_hash_to_merkle_tree(BLOCK_INFO *blocks, KSI_CTX *ksi, KSI_DataHash *hash, int isMetaRecordHash) {
 	int res;
 	unsigned char i = 0;
 	KSI_DataHash *right = NULL;
@@ -166,10 +166,10 @@ int add_leaf_hash_to_merkle_tree(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash 
 	blocks->balanced = 0;
 
 	while (blocks->MerkleTree[i] != NULL) {
-		res = calculate_new_tree_hash(ksi, blocks, blocks->MerkleTree[i], right, i + 2, &tmp);
+		res = block_info_calculate_new_tree_hash(blocks, blocks->MerkleTree[i], right, i + 2, &tmp);
 		if (res != KT_OK) goto cleanup;
 
-		res = update_record_chain(blocks, i, 0, right);
+		res = block_info_extract_update_record_chain(blocks, i, 0, right);
 		if (res != KT_OK) goto cleanup;
 
 		KSI_DataHash_free(blocks->notVerified[i]);
@@ -202,7 +202,7 @@ cleanup:
 	return res;
 }
 
-int add_record_hash_to_merkle_tree(KSI_CTX *ksi, ERR_TRCKR *err, BLOCK_INFO *blocks, int isMetaRecordHash, KSI_DataHash *hash) {
+int block_info_add_record_hash_to_merkle_tree(BLOCK_INFO *blocks, ERR_TRCKR *err, KSI_CTX *ksi, int isMetaRecordHash, KSI_DataHash *hash) {
 	int res;
 	KSI_DataHash *lastHash = NULL;
 
@@ -218,13 +218,13 @@ int add_record_hash_to_merkle_tree(KSI_CTX *ksi, ERR_TRCKR *err, BLOCK_INFO *blo
 		blocks->nofTotalRecordHashes--;
 	}
 
-	res = calculate_new_leaf_hash(ksi, blocks, hash, isMetaRecordHash, &lastHash);
+	res = block_info_calculate_new_leaf_hash(blocks, ksi, hash, isMetaRecordHash, &lastHash);
 	if (res != KT_OK) goto cleanup;
 
-	res = update_extract_info(err, blocks, isMetaRecordHash, hash);
+	res = block_info_extract_update(blocks, err, isMetaRecordHash, hash);
 	if (res != KT_OK) goto cleanup;
 
-	res = add_leaf_hash_to_merkle_tree(ksi, blocks, lastHash, isMetaRecordHash);
+	res = block_info_add_leaf_hash_to_merkle_tree(blocks, ksi, lastHash, isMetaRecordHash);
 	if (res != KT_OK) goto cleanup;
 
 cleanup:
@@ -233,7 +233,7 @@ cleanup:
 	return res;
 }
 
-int store_logline(BLOCK_INFO *blocks, char *buf) {
+static int block_info_store_logline(BLOCK_INFO *blocks, char *buf) {
 	int res;
 	char *tmp = NULL;
 
@@ -261,7 +261,7 @@ cleanup:
 	return res;
 }
 
-int get_hash_of_logline(BLOCK_INFO *blocks, IO_FILES *files, KSI_DataHash **hash) {
+int block_info_calculate_hash_of_logline_and_store_logline(BLOCK_INFO *blocks, IO_FILES *files, KSI_DataHash **hash) {
 	int res;
 	KSI_DataHash *tmp = NULL;
 	/* Maximum line size is 64K characters, without newline character. */
@@ -287,7 +287,7 @@ int get_hash_of_logline(BLOCK_INFO *blocks, IO_FILES *files, KSI_DataHash **hash
 		if (res != KSI_OK) goto cleanup;
 
 		/* Store logline for extraction. */
-		res = store_logline(blocks, buf);
+		res = block_info_store_logline(blocks, buf);
 		if (res != KT_OK) goto cleanup;
 	}
 	*hash = tmp;
@@ -300,7 +300,7 @@ cleanup:
 	return res;
 }
 
-int store_metarecord(BLOCK_INFO *blocks, KSI_TlvElement *tlv) {
+static int block_info_store_metarecord(BLOCK_INFO *blocks, KSI_TlvElement *tlv) {
 	int res;
 	size_t len = 0;
 	unsigned char *buf = NULL;
@@ -334,11 +334,11 @@ cleanup:
 	return res;
 }
 
-int calculate_new_tree_hash(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *leftHash, KSI_DataHash *rightHash, unsigned char level, KSI_DataHash **nodeHash) {
+int block_info_calculate_new_tree_hash(BLOCK_INFO *blocks, KSI_DataHash *leftHash, KSI_DataHash *rightHash, unsigned char level, KSI_DataHash **nodeHash) {
 	int res;
 	KSI_DataHash *tmp = NULL;
 
-	if (ksi == NULL || blocks == NULL || leftHash == NULL || rightHash == NULL || nodeHash == NULL) {
+	if (blocks == NULL || leftHash == NULL || rightHash == NULL || nodeHash == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
@@ -364,7 +364,7 @@ cleanup:
 	return res;
 }
 
-int get_hash_of_metarecord(BLOCK_INFO *blocks, KSI_TlvElement *tlv, KSI_DataHash **hash) {
+int block_info_calculate_hash_of_metarecord_and_store_metarecord(BLOCK_INFO *blocks, KSI_TlvElement *tlv, KSI_DataHash **hash) {
 	int res;
 	KSI_DataHash *tmp = NULL;
 
@@ -384,7 +384,7 @@ int get_hash_of_metarecord(BLOCK_INFO *blocks, KSI_TlvElement *tlv, KSI_DataHash
 	if (res != KSI_OK) goto cleanup;
 
 	/* Store metarecord for extraction. */
-	res = store_metarecord(blocks, tlv);
+	res = block_info_store_metarecord(blocks, tlv);
 	if (res != KT_OK) goto cleanup;
 
 	*hash = tmp;
@@ -397,7 +397,7 @@ cleanup:
 	return res;
 }
 
-static int calculate_new_leaf_hash(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *recordHash, int isMetaRecordHash, KSI_DataHash **leafHash) {
+static int block_info_calculate_new_leaf_hash(BLOCK_INFO *blocks, KSI_CTX *ksi, KSI_DataHash *recordHash, int isMetaRecordHash, KSI_DataHash **leafHash) {
 	int res;
 	KSI_DataHash *mask = NULL;
 	KSI_DataHash *tmp = NULL;
@@ -420,10 +420,10 @@ static int calculate_new_leaf_hash(KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHas
 	blocks->extractMask = KSI_DataHash_ref(mask);
 
 	if (isMetaRecordHash) {
-		res = calculate_new_tree_hash(ksi, blocks, recordHash, mask, 1, &tmp);
+		res = block_info_calculate_new_tree_hash(blocks, recordHash, mask, 1, &tmp);
 		if (res != KT_OK) goto cleanup;
 	} else {
-		res = calculate_new_tree_hash(ksi, blocks, mask, recordHash, 1, &tmp);
+		res = block_info_calculate_new_tree_hash(blocks, mask, recordHash, 1, &tmp);
 		if (res != KT_OK) goto cleanup;
 	}
 

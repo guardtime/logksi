@@ -80,9 +80,9 @@ int duplicate_name(char *in, char **out);
 void logksi_internal_filenames_free(INTERNAL_FILE_NAMES *internal);
 void logksi_file_close(SMART_FILE **ptr);
 void logksi_files_close(INTERNAL_FILE_HANDLES *files);
+
 void IO_FILES_init(IO_FILES *files);
 void IO_FILES_StorePreviousFileNames(IO_FILES *files);
-const char *IO_FILES_getCurrentLogFilePrintRepresentation(IO_FILES *files);
 
 #ifdef	__cplusplus
 }
