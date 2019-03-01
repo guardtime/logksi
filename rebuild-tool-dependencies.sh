@@ -1,7 +1,7 @@
 #!/bin/sh
 
 #
-# Copyright 2013-2018 Guardtime, Inc.
+# Copyright 2013-2019 Guardtime, Inc.
 #
 # This file is part of the Guardtime client SDK.
 #
@@ -20,14 +20,11 @@
 
 set -e
 
-#libksi_git="https://github.com/guardtime/libksi.git"
-#libksi_version=v3.17.2693
-libksi_git="git@git.ee.guardtime.com:developers/libksi.git"
-libksi_version="develop"
-#libgtrfc3161_git="https://github.com/guardtime/signatureconverter-c.git"
-#libgtrfc3161_version=v1.0.000
-libgtrfc3161_git="git@git.ee.guardtime.com:developers/signatureconverter-c.git"
-libgtrfc3161_version="develop"
+libksi_git="https://github.com/guardtime/libksi.git"
+libksi_version=v3.19.2939
+libgtrfc3161_git="https://github.com/guardtime/libgtrfc3161.git"
+libgtrfc3161_version=master
+
 
 tmp_build_dir_name="tmp_dep_build"
 lib_out_dir="dependencies"
