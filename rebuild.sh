@@ -1,7 +1,7 @@
 #!/bin/sh
 
 #
-# Copyright 2013-2018 Guardtime, Inc.
+# Copyright 2013-2019 Guardtime, Inc.
 #
 # This file is part of the Guardtime client SDK.
 #
@@ -88,6 +88,12 @@ help_txt() {
 	echo "         It is useful when building packages with dependencies that are not"
 	echo "         installed by package manager."
 	echo ""
+	echo "  --ign-online-dep-test"
+	echo "       - This option can be combined with --get-dep-online to ignore failing"
+	echo "         tests of the dependencies built. Note that actually it ignores the exit"
+	echo "         code of the rebuild script and continues in case of error. Make sure"
+	echo "         that You really know what You are doing when using this option!"
+	echo ""
 	echo "  -v"
 	echo "       - Verbose output."
 	echo ""
@@ -154,6 +160,7 @@ extra_linker_flags=""
 extra_compiler_flags=""
 rpmbuild_flags=""
 debuild_flags=""
+rebuild_tool_dependencies_flags=""
 
 is_inc_dir_set=false
 is_lib_dir_set=false
@@ -218,6 +225,9 @@ while [ "$1" != "" ]; do
 								 rpmbuild_flags="--nodeps"
 								 debuild_flags="-d"
 								 ;;
+		--ign-online-dep-test )	 echo "Ignoring test results while building online dependencies"
+								 rebuild_tool_dependencies_flags="--ignore-test-results"
+								 ;;
 		-v )					 is_verbose=true
 								 ;;
 		--help | -h )			 show_help=true
@@ -236,7 +246,7 @@ fi
 if $do_build_dependecies ; then
 	is_inc_dir_set=true
 	is_lib_dir_set=true
-	./rebuild-tool-dependencies.sh
+	./rebuild-tool-dependencies.sh $rebuild_tool_dependencies_flags
 	include_dir="$include_dir -I$(pwd)/dependencies/include"
 	lib_dir="$lib_dir -L$(pwd)/dependencies/lib"
 	lib_path="$lib_path $(pwd)/dependencies/lib:"

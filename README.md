@@ -27,7 +27,7 @@ yum install logksi
 
 ### From Source Code
 
-If the latest version is needed or the package is not available for the platform you are using, check out source code from Github and build it using `gcc`. To build the KSI log signature command-line tool, `libksi-devel` (KSI C SDK) and `libgtrfc3161-devel` packages are needed. `libksi` is available in Guardtime repository or as source code in GitHub: [https://github.com/GuardTime/libksi](https://github.com/GuardTime/libksi).
+If the latest version is needed or the package is not available for the platform you are using, check out source code from Github and build it using `gcc`. To build the KSI log signature command-line tool, `libksi-devel` (KSI C SDK) and `libgtrfc3161-devel` packages are needed. `libksi` is available in Guardtime repository or as source code in GitHub: [https://github.com/GuardTime/libksi](https://github.com/GuardTime/libksi). `libgtrfc3161` is available in Guardtime GitHub: [https://github.com/guardtime/libgtrfc3161](https://github.com/guardtime/libgtrfc3161).
 
 Use `rebuild.sh` script to build `KSI log signature command-line tool` and see `rebuild.sh -h` for more details (use flags `--get-dep-online -s` to get `libksi` and `libgtrfc3161` from GitHub automatically without installing the libraries).
 
