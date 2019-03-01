@@ -15,6 +15,7 @@
 * FEATURE: New option --input-hash to specify inter-linking hash as input for verification.
 * FEATURE: New option --output-hash to output the last leaf hash for inter-linking.
 * FEATURE: New option --warn-same-block-time that prints a warning when two consecutive blocks has same signing time.
+* BUGFIX: Scripts rebuild.sh option --get-dep-online fixed, where dependencies are downloaded properly from github.
 * BUGFIX: Some suggestion messages pointing to KSI tool instead of logksi fixed.
 * BUGFIX: Verifying: help function fixed, help text now available.
 * BUGFIX: Verification error message fixed and improved in case where publication record is not available in publications file.
