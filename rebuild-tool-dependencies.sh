@@ -23,7 +23,7 @@ set -e
 libksi_git="https://github.com/guardtime/libksi.git"
 libksi_version=v3.19.2939
 libgtrfc3161_git="https://github.com/guardtime/libgtrfc3161.git"
-libgtrfc3161_version=master
+libgtrfc3161_version=4def4646c17939c049a1da550e50c49fbf5b7f75
 
 
 tmp_build_dir_name="tmp_dep_build"
