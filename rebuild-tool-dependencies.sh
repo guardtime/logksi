@@ -31,6 +31,19 @@ lib_out_dir="dependencies"
 libksi_dir_name="libksi"
 libgtrfc3161_dir_name="libgtrfc3161"
 
+ignore_exit_code=false
+
+while [ "$1" != "" ]; do
+	case $1 in
+		--ignore-build-error )	 echo "When building libksi and libgtrfc3161 result of the tests is ignored."
+								 ignore_exit_code=true
+								 ;;
+		* )						 echo "Unknown token '$1' from command-line."
+								 exit 1
+	esac
+	shift
+done
+
 
 rm -rf $tmp_build_dir_name
 mkdir -p $tmp_build_dir_name
@@ -42,12 +55,12 @@ cd $tmp_build_dir_name
 
   cd $libksi_dir_name
     git checkout $libksi_version
-    ./rebuild.sh
+    ./rebuild.sh || $ignore_exit_code
   cd ..
 
   cd $libgtrfc3161_dir_name
     git checkout $libgtrfc3161_version
-    ./rebuild.sh LDFLAGS=-L$(pwd)/../libksi/src/ksi/.libs/ CPPFLAGS=-I$(pwd)/../libksi/src/
+    ./rebuild.sh LDFLAGS=-L$(pwd)/../libksi/src/ksi/.libs/ CPPFLAGS=-I$(pwd)/../libksi/src/ || $ignore_exit_code
   cd ..
 cd ..
 
