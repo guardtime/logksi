@@ -30,7 +30,10 @@
 extern "C" {
 #endif
 
-
+/* To make it backward compatible, define KSI_HASHALG_INVALID_VALUE. */
+#ifndef KSI_HASHALG_INVALID_VALUE
+#	define KSI_HASHALG_INVALID_VALUE KSI_HASHALG_INVALID
+#endif
 
 #define ERR_CATCH_MSG(err, res, msg, ...) \
 	if (res != KT_OK) { \
