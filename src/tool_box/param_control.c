@@ -384,8 +384,16 @@ int isFormatOk_hashAlg(const char *hashAlg){
 	return FORMAT_OK;
 }
 
+static KSI_HashAlgorithm KSI_getHashAlgorithmByName_wrapper(const char *alg) {
+	int ret = KSI_getHashAlgorithmByName(alg);
+	/* NB! KSI_getHashAlgorithmByName contains a bug, and will
+	   returns constant -1 in case of failure instead of
+	   KSI_HASHALG_INVALID or KSI_HASHALG_INVALID_VALUE. */
+	return (ret == -1) ? KSI_HASHALG_INVALID_VALUE : ret;
+}
+
 int isContentOk_hashAlg(const char *alg){
-	if (KSI_getHashAlgorithmByName(alg) != KSI_HASHALG_INVALID_VALUE) return PARAM_OK;
+	if (KSI_getHashAlgorithmByName_wrapper(alg) != KSI_HASHALG_INVALID_VALUE) return PARAM_OK;
 	else return HASH_ALG_INVALID_NAME;
 }
 
@@ -395,7 +403,7 @@ int extract_hashAlg(void *extra, const char* str, void** obj) {
 
 	if (extra);
 	hash_alg_name = str != NULL ? (str) : ("default");
-	*hash_id = KSI_getHashAlgorithmByName(hash_alg_name);
+	*hash_id = KSI_getHashAlgorithmByName_wrapper(hash_alg_name);
 
 	if (*hash_id == KSI_HASHALG_INVALID_VALUE) return KT_UNKNOWN_HASH_ALG;
 
@@ -447,7 +455,7 @@ static int imprint_extract_fields(const char *imprint, KSI_HashAlgorithm *ID, in
 	}
 
 	if (ID != NULL) {
-		*ID = KSI_getHashAlgorithmByName(alg);
+		*ID = KSI_getHashAlgorithmByName_wrapper(alg);
 	}
 
 	if (isColon != NULL) {
