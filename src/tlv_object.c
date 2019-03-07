@@ -42,6 +42,10 @@ int tlv_element_get_uint(KSI_TlvElement *tlv, KSI_CTX *ksi, unsigned tag, size_t
 	size_t val = 0;
 	unsigned char buf[0xffff + 4];
 
+	if (tlv == NULL || ksi == NULL || tag > 0x1fff || out == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
 
 	res = KSI_TlvElement_getElement(tlv, tag, &el);
 	if (res != KSI_OK) goto cleanup;
@@ -76,6 +80,11 @@ int tlv_element_get_octet_string(KSI_TlvElement *tlv, KSI_CTX *ksi, unsigned tag
 	int res;
 	KSI_OctetString *tmp = NULL;
 
+	if (tlv == NULL || ksi == NULL || tag > 0x1fff || out == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
 	res = KSI_TlvElement_getOctetString(tlv, ksi, tag, &tmp);
 	if (res != KSI_OK) goto cleanup;
 	if (tmp == NULL) {
@@ -97,6 +106,11 @@ int tlv_element_get_hash(ERR_TRCKR *err, KSI_TlvElement *tlv, KSI_CTX *ksi, unsi
 	int res;
 	KSI_TlvElement *el = NULL;
 	KSI_DataHash *hash = NULL;
+
+	if (tlv == NULL || ksi == NULL || tag > 0x1fff || out == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
 
 	res = KSI_TlvElement_getElement(tlv, tag, &el);
 	if (res != KSI_OK) goto cleanup;
@@ -123,6 +137,11 @@ int tlv_element_set_uint(KSI_TlvElement *tlv, KSI_CTX *ksi, unsigned tag, KSI_ui
 	int res;
 	KSI_Integer *tmp = NULL;
 
+	if (tlv == NULL || ksi == NULL || tag > 0x1fff) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
 	res = KSI_Integer_new(ksi, val, &tmp);
 	if (res != KSI_OK) goto cleanup;
 
@@ -140,6 +159,11 @@ int tlv_element_set_hash(KSI_TlvElement *tlv, KSI_CTX *ksi, unsigned tag, KSI_Da
 	KSI_OctetString *tmp = NULL;
 	const unsigned char *buf = NULL;
 	size_t len = 0;
+
+	if (tlv == NULL || ksi == NULL || tag > 0x1fff || hash == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
 
 	res = KSI_DataHash_getImprint(hash, &buf, &len);
 	if (res != KSI_OK) goto cleanup;
@@ -162,6 +186,11 @@ int tlv_element_set_signature(KSI_TlvElement *tlv, KSI_CTX *ksi, unsigned tag, K
 	unsigned char *buf = NULL;
 	size_t len = 0;
 
+	if (tlv == NULL || ksi == NULL || tag > 0x1fff || sig == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
 	res = KSI_Signature_serialize(sig, &buf, &len);
 	if (res != KSI_OK) goto cleanup;
 
@@ -183,6 +212,11 @@ int tlv_element_create_hash(KSI_DataHash *hash, unsigned tag, KSI_TlvElement **t
 	KSI_TlvElement *tmp = NULL;
 	unsigned char *imprint = NULL;
 	size_t length = 0;
+
+	if (hash == NULL || tag > 0x1fff || tlv == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
 
 	res = KSI_TlvElement_new(&tmp);
 	if (res != KSI_OK) goto cleanup;
@@ -211,7 +245,7 @@ int tlv_element_write_hash(KSI_DataHash *hash, unsigned tag, SMART_FILE *out) {
 	size_t len = 0;
 	unsigned char *ptr = NULL;
 
-	if (hash == NULL || out == NULL) {
+	if (hash == NULL || tag > 0x1fff || out == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
@@ -239,7 +273,7 @@ int tlv_element_parse_and_check_sub_elements(ERR_TRCKR *err, KSI_CTX *ksi, unsig
 	int res;
 	KSI_TlvElement *tmp = NULL;
 
-	if (dat == NULL || out == NULL) {
+	if (err == NULL || ksi == NULL || dat == NULL || dat_len == 0 || hdr_len == 0 || out == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
