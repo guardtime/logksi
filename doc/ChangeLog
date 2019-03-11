@@ -1,3 +1,8 @@
+Version 1.4
+
+2019-03-11 1.4.518
+
+* IMPROVEMENT: At least libksi 3.18 is needed to build logksi.
 * IMPROVEMENT: Verification error handling improved.
 * IMPROVEMENT: Debug output with -d option is more compact.
 * IMPROVEMENT: Option --show-progress works only with debug level 1 (just one -d).
