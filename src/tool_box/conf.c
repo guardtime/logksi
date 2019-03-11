@@ -112,13 +112,13 @@ char *conf_help_toString(char *buf, size_t len) {
 		"  these configuration options:\n\n"
 
 		"   * directly on command line (highest priority);\n"
-		"   * in a file specified by the --conf command-line argument;\n"
+		"   * in a file specified by the '--conf' command-line argument;\n"
 		"   * in a file specified by the KSI_CONF environment variable (lowest priority).\n\n"
 
 		"  If a configuration option is specified in more than one source (e.g. both directly\n"
 		"  on command-line argument and in a configuration file) the source with the highest\n"
-		"  priority will be used. A short parameter or multiple flags must have prefix - and\n"
-		"  long parameters have prefix --. If some parameter values contain whitespace\n"
+		"  priority will be used. A short parameter or multiple flags must have prefix '-' and\n"
+		"  long parameters have prefix '--'. If some parameter values contain whitespace\n"
 		"  characters double quote marks (\") must be used to wrap the entire value. If double\n"
 		"  quote mark or backslash have to be used inside the value part an escape character\n"
 		"  (\\) must be typed before the character(\\\" or \\\\). If configuration option with\n"
@@ -126,7 +126,7 @@ char *conf_help_toString(char *buf, size_t len) {
 
 		"  In configuration file each key-value pair must be placed on a single line. Start\n"
 		"  the line with # to write a comment. Not full paths (V, W and P with URI scheme\n"
-		"  file://) are interpreted as relative to the configuration file.\n\n"
+		"  'file://') are interpreted as relative to the configuration file.\n\n"
 
 		"All known parameters:\n"
 		);

@@ -5,17 +5,17 @@
 .\"
 .SH SYNOPSIS
 .HP 4
-\fBlogksi integrate \fIlogfile \fR[\fB-o \fIout.logsig\fR]
+\fBlogksi integrate \fI<logfile> \fR[\fB-o \fI<out.logsig>\fR]
 .\"
 .SH DESCRIPTION
-Integrates the two temporary files created while asynchronously signing the log file \fIlogfile\fR:
+Integrates the two temporary files created while asynchronously signing the log file \fI<logfile>\fR:
 .LP
 .IP \(bu 4
-the log signature blocks file: \fIlogfile.logsig.parts/blocks.dat\fR; and
+the log signature blocks file: \fI<logfile>.logsig.parts/blocks.dat\fR; and
 .IP \(bu 4
-the log signature file containing the respective KSI signatures: \fIlogfile.logsig.parts/block-signatures.dat\fR.
+the log signature file containing the respective KSI signatures: \fI<logfile>.logsig.parts/block-signatures.dat\fR.
 .LP
-If the output file name is not specified, it is derived from the name of the log file \fIlogfile\fR by adding the standard suffix \fI.logsig\fR. An attempt to overwrite an existing log signature file will result in an error, unless the \fB--force-overwrite\fR option is specified.
+If the output file name is not specified, it is derived from the name of the log file \fI<logfile>\fR by adding the standard suffix \fI.logsig\fR. An attempt to overwrite an existing log signature file will result in an error, unless the \fB--force-overwrite\fR option is specified.
 .LP
 The integration of the files can be performed once both files are complete. \fBlogksi integrate \fR waits to acquire a read lock on the files before integrating them. The read lock is advisory and relies on the same implementation in the signing application.
 .LP
@@ -32,8 +32,12 @@ If some KSI signatures are missing from the log signature file \fIblock-signatur
 .\"
 .SH OPTIONS
 .TP
-\fB-o \fIout.logsig\fR
-Specify the name of the integrated output log signature file. If not specified, the log signature file is saved as \fIlogfile.logsig\fR in the same folder where the \fIlogfile\fR is located. An attempt to overwrite an existing log signature file will result in an error. Use '-' as file name to redirect the output as a binary stream to \fIstdout\fR.
+\fI<logfile>\fR
+Log file to which the temporary files belong to.
+.\"
+.TP
+\fB-o \fI<out.logsig>\fR
+Specify the name of the integrated output log signature file; recommended file extension is \fI.logsig\fR. If not specified, the log signature file is saved as \fI<logfile>.logsig\fR in the same folder where the \fI<logfile>\fR is located. An attempt to overwrite an existing log signature file will result in an error. Use '-' as file name to redirect the output as a binary stream to \fIstdout\fR.
 .\"
 .TP
 \fB--insert-missing-hashes\fR
@@ -45,7 +49,7 @@ Force overwriting of an existing log signature. If the existing log signature co
 .\"
 .TP
 \fB-d\fR
-Print detailed information about processes and errors to \fIstderr\fR.
+Print detailed information about processes and errors to \fIstderr\fR. To make output more verbose increase debug level with \fB-dd\fR or \fB-ddd\fR. With debug level 1 a summary of log file is displayed. With debug level 2 a summary of each block and the log file is displayed. Debug level 3 will display the whole parsing of the log signature file. The parsing of \fIrecord hashes (r)\fR, \fItree hashes (.)\fR, \fIfinal tree hashes (:)\fR and \fImeta-records (M)\fR is displayed inside curly brackets in following manner \fI{r.Mr..:}\fR. In case of a failure \fI(X)\fR is displayed and closing curly bracket is omitted.
 .\"
 .TP
 \fB--log \fIfile\fR

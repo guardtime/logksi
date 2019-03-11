@@ -24,7 +24,6 @@
 #include <ctype.h>
 #include <ksi/ksi.h>
 #include <ksi/compatibility.h>
-#include "smart_file.h"
 #include "err_trckr.h"
 #include "param_set/param_set.h"
 #include "printer.h"

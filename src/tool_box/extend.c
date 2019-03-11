@@ -43,15 +43,25 @@
 #include "rsyslog.h"
 #include <inttypes.h>
 
-static int extend_to_nearest_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_VerificationContext *context, KSI_Signature **ext);
-static int extend_to_specified_time(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_VerificationContext *context, KSI_Signature **ext);
-static int extend_to_specified_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_VerificationContext *context, KSI_Signature **ext);
+static int extend_to_nearest_publication(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_PublicationsFile *pubFile, KSI_VerificationContext *context, KSI_Signature **ext);
+static int extend_to_specified_time(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_PublicationsFile *pubFile, KSI_VerificationContext *context, KSI_Signature **ext);
+static int extend_to_specified_publication(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_PublicationsFile *pubFile, KSI_VerificationContext *context, KSI_Signature **ext);
 static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
 static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err);
+static int check_io_naming_and_type_errors(PARAM_SET *set, ERR_TRCKR *err);
 static int generate_filenames(ERR_TRCKR *err, IO_FILES *files);
 static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files);
 static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files);
 static void close_input_and_output_files(ERR_TRCKR *err, int res, IO_FILES *files);
+
+enum {
+	EXT_TO_EAV_PUBLICATION_FROM_FILE = 0x00,
+	EXT_TO_EAV_PUBLICATION_FROM_STDIN = 0x01,
+	EXT_TO_TIME_FROM_FILE = 0x02,
+	EXT_TO_TIME_FROM_STDIN = 0x03,
+	EXT_TO_SPEC_PUBLICATION_FROM_FILE = 0x04,
+	EXT_TO_SPEC_PUBLICATION_FROM_STDIN = 0x05,
+};
 
 int extend_run(int argc, char** argv, char **envp) {
 	int res;
@@ -65,8 +75,10 @@ int extend_run(int argc, char** argv, char **envp) {
 	int d = 0;
 	IO_FILES files;
 	EXTENDING_FUNCTION extend_signature = NULL;
+	KSI_PublicationsFile *pubFile = NULL;
+	MULTI_PRINTER *mp = NULL;
 
-	memset(&files, 0, sizeof(files));
+	IO_FILES_init(&files);
 
 	/**
 	 * Extract command line parameters.
@@ -88,12 +100,18 @@ int extend_run(int argc, char** argv, char **envp) {
 	res = TASK_INITIALIZER_check_analyze_report(set, task_set, 0.5, 0.1, &task);
 	if (res != KT_OK) goto cleanup;
 
+	res = TASK_INITIALIZER_getPrinter(set, &mp);
+	ERR_CATCH_MSG(err, res, "Error: Unable to create Multi printer!");
+
 	res = TOOL_init_ksi(set, &ksi, &err, &logfile);
 	if (res != KT_OK) goto cleanup;
 
 	d = PARAM_SET_isSetByName(set, "d");
 
 	res = check_pipe_errors(set, err);
+	if (res != KT_OK) goto cleanup;
+
+	res = check_io_naming_and_type_errors(set, err);
 	if (res != KT_OK) goto cleanup;
 
 	res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.user.inLog);
@@ -103,18 +121,37 @@ int extend_run(int argc, char** argv, char **envp) {
 	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
 
 	switch(TASK_getID(task)) {
-		case 0:
-		case 1:
+		case EXT_TO_EAV_PUBLICATION_FROM_FILE:
+		case EXT_TO_EAV_PUBLICATION_FROM_STDIN:
+		case EXT_TO_SPEC_PUBLICATION_FROM_FILE:
+		case EXT_TO_SPEC_PUBLICATION_FROM_STDIN:
+				print_progressDesc(mp, MP_ID_BLOCK, d, DEBUG_LEVEL_1, "%s", getPublicationsFileRetrieveDescriptionString(set));
+				res = LOGKSI_receivePublicationsFile(err, ksi, &pubFile);
+				ERR_CATCH_MSG(err, res, "Error: Unable to receive publications file.");
+				print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
+
+				if (!PARAM_SET_isSetByName(set, "publications-file-no-verify")) {
+					print_progressDesc(mp, MP_ID_BLOCK, d, DEBUG_LEVEL_1, "Verifying publications file... ");
+					res = LOGKSI_verifyPublicationsFile(err, ksi, pubFile);
+					ERR_CATCH_MSG(err, res, "Error: Unable to verify publications file.");
+					print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
+				}
+		break;
+	}
+
+	switch(TASK_getID(task)) {
+		case EXT_TO_EAV_PUBLICATION_FROM_FILE:
+		case EXT_TO_EAV_PUBLICATION_FROM_STDIN:
 			extend_signature = extend_to_nearest_publication;
 		break;
 
-		case 2:
-		case 3:
+		case EXT_TO_TIME_FROM_FILE:
+		case EXT_TO_TIME_FROM_STDIN:
 			extend_signature = extend_to_specified_time;
 		break;
 
-		case 4:
-		case 5:
+		case EXT_TO_SPEC_PUBLICATION_FROM_FILE:
+		case EXT_TO_SPEC_PUBLICATION_FROM_STDIN:
 			extend_signature = extend_to_specified_publication;
 		break;
 
@@ -130,7 +167,9 @@ int extend_run(int argc, char** argv, char **envp) {
 	res = open_input_and_output_files(err, &files);
 	if (res != KT_OK) goto cleanup;
 
-	res = logsignature_extend(set, err, ksi, extend_signature, &files);
+	print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_EQUAL | DEBUG_LEVEL_1, "Extending... ");
+	res = logsignature_extend(set, mp, err, ksi, pubFile, extend_signature, &files);
+	print_progressResult(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_1, res);
 	if (res != KT_OK) goto cleanup;
 
 	res = rename_temporary_and_backup_files(err, &files);
@@ -141,7 +180,12 @@ cleanup:
 	/* If there is an error while closing files, report it only if everything else was OK. */
 	close_input_and_output_files(err, res, &files);
 
-	print_progressResult(res);
+	MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
+	if (MULTI_PRINTER_hasDataByID(mp, MP_ID_LOGFILE_WARNINGS)) {
+		print_debug("\n");
+		MULTI_PRINTER_printByID(mp, MP_ID_LOGFILE_WARNINGS);
+	}
+
 	LOGKSI_KSI_ERRTrace_save(ksi);
 
 	if (res != KT_OK) {
@@ -149,15 +193,17 @@ cleanup:
 		LOGKSI_KSI_ERRTrace_LOG(ksi);
 
 		print_errors("\n");
-		if (d) ERR_TRCKR_printExtendedErrors(err);
-		else  ERR_TRCKR_printErrors(err);
+		ERR_TRCKR_print(err, d);
 	}
 
 	SMART_FILE_close(logfile);
 	PARAM_SET_free(set);
 	TASK_SET_free(task_set);
 	ERR_TRCKR_free(err);
+	KSI_PublicationsFile_free(pubFile);
 	KSI_CTX_free(ksi);
+	MULTI_PRINTER_free(mp);
+
 
 	return LOGKSI_errToExitCode(res);
 }
@@ -168,19 +214,18 @@ char *extend_help_toString(char*buf, size_t len) {
 		"    [--ext-user <user> --ext-key <key>] -P <URL> [--cnstr <oid=value>]... [more_options]\n"
 		" %s extend <logfile> [-o <out.logsig>] -X <URL>\n"
 		"    [--ext-user <user> --ext-key <key>] -P <URL> [--cnstr <oid=value>]... [--pub-str <str>] [more_options]\n"
-		" %s extend <logfile> [-o <out.logsig>] --conf <logksi.conf> [more_options]\n"
-		" %s extend --sig-from-stdin [-o <out.logsig>] --conf <logksi.conf> [more_options]\n"
+		" %s extend --sig-from-stdin [-o <out.logsig>] [more_options]\n"
 		"\n"
 		" <logfile>\n"
 		"           - Name of the log file whose log signature file is to be extended. Log signature file name is\n"
-		"             derived by adding either .logsig or .gtsig to <logfile>. The file is expected to be found in\n"
-		"             the same folder as the <logfile>. If specified, the --sig-from-stdin switch cannot be used.\n"
+		"             derived by adding either '.logsig' or '.gtsig' to '<logfile>'. The file is expected to be found in\n"
+		"             the same folder as the '<logfile>'. If specified, the '--sig-from-stdin' switch cannot be used.\n"
 		" --sig-from-stdin\n"
 		"             The log signature file is read from stdin.\n"
 		" -o <out.logsig>\n"
 		"           - Name of the extended output log signature file. An existing log signature file is always overwritten.\n"
-		"             If not specified, the log signature is saved to <logfile.logsig> while a backup of <logfile.logsig>\n"
-		"             is saved in <logfile.logsig.bak>.\n"
+		"             If not specified, the log signature is saved to '<logfile>.logsig' while a backup of '<logfile>.logsig'\n"
+		"             is saved in '<logfile>.logsig.bak'.\n"
 		"             Use '-' to redirect the extended log signature binary stream to stdout.\n"
 		"             If input is read from stdin and output is not specified, stdout is used for output.\n"
 		" -X <URL>\n"
@@ -206,9 +251,10 @@ char *extend_help_toString(char*buf, size_t len) {
 		" --enable-rfc3161-conversion\n"
 		"           - Enable conversion, extending and replacing of RFC3161 timestamps with KSI signatures.\n"
 		"             Note: this flag is not required if a different output log signature file name is specified\n"
-		"             with -o to avoid overwriting of the original log signature file.\n"
+		"             with '-o' to avoid overwriting of the original log signature file.\n"
 		" -d\n"
 		"           - Print detailed information about processes and errors to stderr.\n"
+		"             To make output more verbose use -dd or -ddd.\n"
 		" --conf <file>\n"
 		"             Read configuration options from the given file.\n"
 		"             Configuration options given explicitly on command line will\n"
@@ -226,61 +272,73 @@ char *extend_help_toString(char*buf, size_t len) {
 const char *extend_get_desc(void) {
 	return "Extends KSI signatures in a log signature file to the desired publication.";
 }
-
-static int extend_to_nearest_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_VerificationContext *context, KSI_Signature **ext) {
+static int extend_to_nearest_publication(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_PublicationsFile *pubFile, KSI_VerificationContext *context, KSI_Signature **ext) {
 	int res;
-	int d = 0;
 	KSI_Signature *tmp = NULL;
-	KSI_PublicationsFile *pubFile = NULL;
+	KSI_Integer *sigTime = NULL;
+	KSI_PublicationRecord *pubRec = NULL;
+	char buf[256];
 
-	if (set == NULL || ksi == NULL || err == NULL || sig == NULL || ext == NULL) {
+	if (set == NULL || ksi == NULL || blocks == NULL || files == NULL || err == NULL || sig == NULL || ext == NULL) {
 		ERR_TRCKR_ADD(err, res = KT_INVALID_ARGUMENT, NULL);
 		goto cleanup;
 	}
 
+	res = KSI_Signature_getSigningTime(sig, &sigTime);
+	ERR_CATCH_MSG(err, res, "Error: Unable to get signing time.");
 
-	d = PARAM_SET_isSetByName(set, "d");
+	res = KSI_PublicationsFile_getNearestPublication(pubFile, sigTime, &pubRec);
+	ERR_CATCH_MSG(err, res, "Error: Unable to get earliest available publication from publications file.");
 
-	print_progressDesc(d, "%s", getPublicationsFileRetrieveDescriptionString(set));
-	res = LOGKSI_receivePublicationsFile(err, ksi, &pubFile);
-	ERR_CATCH_MSG(err, res, "Error: Unable to receive publications file.");
-	print_progressResult(res);
 
-	if (!PARAM_SET_isSetByName(set, "publications-file-no-verify")) {
-		print_progressDesc(d, "Verifying publications file... ");
-		res = LOGKSI_verifyPublicationsFile(err, ksi, pubFile);
-		ERR_CATCH_MSG(err, res, "Error: Unable to verify publications file.");
-		print_progressResult(res);
+
+	if (pubRec == NULL) {
+		print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_LEVEL_3, "Block no. %3zu: extending KSI signature to the earliest available publication (na)... ", blocks->blockNo);
+		print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_EQUAL | DEBUG_LEVEL_2, "Extending Block no. %3zu to the earliest available publication... ", blocks->blockNo);
+		res = KSI_EXTEND_NO_SUITABLE_PUBLICATION;
+		ERR_TRCKR_ADD(err, res, "No suitable publication found from publications file to extend the signature to (signing time %s (%llu)).", KSI_Integer_toDateString(sigTime, buf, sizeof(buf)), (unsigned long long)KSI_Integer_getUInt64(sigTime));
+	} else {
+		KSI_PublicationData *pubData = NULL;
+		KSI_Integer *pubTime = NULL;
+
+		res = KSI_PublicationRecord_getPublishedData(pubRec, &pubData);
+		ERR_CATCH_MSG(err, res, "Error: Unable to get publication data.");
+
+		res = KSI_PublicationData_getTime(pubData, &pubTime);
+		ERR_CATCH_MSG(err, res, "Error: Unable to get publication time.");
+
+		print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_LEVEL_3, "Block no. %3zu: extending KSI signature to the earliest available publication: %s (%llu)... ", blocks->blockNo, KSI_Integer_toDateString(pubTime, buf, sizeof(buf)), (unsigned long long)KSI_Integer_getUInt64(pubTime));
+		print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_EQUAL | DEBUG_LEVEL_2, "Extending Block no. %3zu to the earliest available publication... ", blocks->blockNo);
 	}
 
-	print_progressDesc(d, "Extend the signature to the earliest available publication... ");
-	res = LOGKSI_extendSignature(err, ksi, sig, context, &tmp);
+
+	LOGKSI_Signature_extend(err, sig, ksi, pubRec, context, &tmp);
+
 	ERR_CATCH_MSG(err, res, "Error: Unable to extend signature.");
-	print_progressResult(res);
+	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 
 	*ext = tmp;
 	tmp = NULL;
 	res = KT_OK;
 
 cleanup:
-	print_progressResult(res);
+	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 
-	KSI_PublicationsFile_free(pubFile);
 	KSI_Signature_free(tmp);
+	KSI_PublicationRecord_free(pubRec);
 
 	return res;
 }
 
-static int extend_to_specified_time(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_VerificationContext *context, KSI_Signature **ext) {
+static int extend_to_specified_time(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_PublicationsFile* pubFile, KSI_VerificationContext *context, KSI_Signature **ext) {
 	int res;
-	int d = 0;
 	KSI_Signature *tmp = NULL;
 	KSI_Integer *pubTime = NULL;
 	char buf[256];
 	COMPOSITE extra;
 
 
-	if (set == NULL || ksi == NULL || err == NULL || sig == NULL || ext == NULL) {
+	if (set == NULL || ksi == NULL || blocks == NULL || files == NULL || err == NULL || sig == NULL || ext == NULL) {
 		ERR_TRCKR_ADD(err, res = KT_INVALID_ARGUMENT, NULL);
 		goto cleanup;
 	}
@@ -288,7 +346,6 @@ static int extend_to_specified_time(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi
 	extra.ctx = ksi;
 	extra.err = err;
 
-	d = PARAM_SET_isSetByName(set, "d");
 
 	res = PARAM_SET_getObjExtended(set, "T", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &extra, (void**)&pubTime);
 	if (res != KT_OK) {
@@ -297,12 +354,19 @@ static int extend_to_specified_time(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi
 	}
 
 	/* Extend the signature. */
-	print_progressDesc(d, "Extending the signature to %s (%" PRIu64 "u)... ",
-			KSI_Integer_toDateString(pubTime, buf, sizeof(buf)),
-			KSI_Integer_getUInt64(pubTime));
+
+	print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_LEVEL_3, "Block no. %3zu: extending KSI signature to time %s (%llu)... ",
+		blocks->blockNo,
+		KSI_Integer_toDateString(pubTime, buf, sizeof(buf)),
+		(unsigned long long)KSI_Integer_getUInt64(pubTime));
+
+	print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_EQUAL | DEBUG_LEVEL_2, "Extending Block no. %3zu to time %s (%llu)... ",
+		blocks->blockNo,
+		KSI_Integer_toDateString(pubTime, buf, sizeof(buf)),
+		(unsigned long long)KSI_Integer_getUInt64(pubTime));
 	res = LOGKSI_Signature_extendTo(err, sig, ksi, pubTime, context, &tmp);
 	ERR_CATCH_MSG(err, res, "Error: Unable to extend signature.");
-	print_progressResult(res);
+	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 
 	*ext = tmp;
 	tmp = NULL;
@@ -310,7 +374,7 @@ static int extend_to_specified_time(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi
 	res = KT_OK;
 
 cleanup:
-	print_progressResult(res);
+	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 
 	KSI_Integer_free(pubTime);
 	KSI_Signature_free(tmp);
@@ -318,58 +382,51 @@ cleanup:
 	return res;
 }
 
-static int extend_to_specified_publication(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, KSI_Signature *sig, KSI_VerificationContext *context, KSI_Signature **ext) {
+static int extend_to_specified_publication(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_PublicationsFile *pubFile, KSI_VerificationContext *context, KSI_Signature **ext) {
 	int res;
-	int d = 0;
 	KSI_Signature *tmp = NULL;
 	KSI_PublicationRecord *pub_rec = NULL;
-	KSI_PublicationsFile *pubFile = NULL;
 	char *pubs_str = NULL;
+	KSI_PublicationData *pubData = NULL;
+	KSI_Integer *pubTime = NULL;
+	char buf[256];
 
-	if (set == NULL || ksi == NULL || err == NULL || sig == NULL || ext == NULL) {
+	if (set == NULL || ksi == NULL || blocks == NULL || files == NULL || err == NULL || sig == NULL || ext == NULL) {
 		ERR_TRCKR_ADD(err, res = KT_INVALID_ARGUMENT, NULL);
 		goto cleanup;
 	}
 
-	d = PARAM_SET_isSetByName(set, "d");
 	res = PARAM_SET_getStr(set, "pub-str", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &pubs_str);
 	ERR_CATCH_MSG(err, res, "Error: Unable get publication string.");
 
-	print_progressDesc(d, "%s", getPublicationsFileRetrieveDescriptionString(set));
-	res = LOGKSI_receivePublicationsFile(err, ksi, &pubFile);
-	ERR_CATCH_MSG(err, res, "Error: Unable to receive publications file.");
-	print_progressResult(res);
-
-	print_progressDesc(d, "Searching for a publication record from publications file... ");
+	print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_LEVEL_3, "Block no. %3zu: Searching for a publication record from publications file... ", blocks->blockNo);
 	res = KSI_PublicationsFile_getPublicationDataByPublicationString(pubFile, pubs_str, &pub_rec);
 	ERR_CATCH_MSG(err, res, "Error: Unable get publication record from publications file.");
 	if (pub_rec == NULL) {
 		ERR_TRCKR_ADD(err, res = KT_PUBFILE_HAS_NO_PUBREC_TO_EXTEND_TO, "Error: Unable to extend signature as publication record not found from publications file.");
 		goto cleanup;
 	}
-	print_progressResult(res);
+	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 
+	res = KSI_PublicationRecord_getPublishedData(pub_rec, &pubData);
+	ERR_CATCH_MSG(err, res, "Error: Unable to get published data.");
 
-	if (!PARAM_SET_isSetByName(set, "publications-file-no-verify")) {
-		print_progressDesc(d, "Verifying publications file... ");
-		res = LOGKSI_verifyPublicationsFile(err, ksi, pubFile);
-		ERR_CATCH_MSG(err, res, "Error: Unable to verify publications file.");
-		print_progressResult(res);
-	}
+	res = KSI_PublicationData_getTime(pubData, &pubTime);
+	ERR_CATCH_MSG(err, res, "Error: Unable to get publication time.");
 
-	print_progressDesc(d, "Extend the signature to the specified publication... ");
+	print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_LEVEL_3, "Block no. %3zu: extending KSI signature to the specified publication: %s (%llu)... ", blocks->blockNo, KSI_Integer_toDateString(pubTime, buf, sizeof(buf)), (unsigned long long)KSI_Integer_getUInt64(pubTime));
+	print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_EQUAL | DEBUG_LEVEL_2, "Extending Block no. %3zu to the specified publication... ", blocks->blockNo);
 	res = LOGKSI_Signature_extend(err, sig, ksi, pub_rec, context, &tmp);
 	ERR_CATCH_MSG(err, res, "Error: Unable to extend signature.");
-	print_progressResult(res);
+	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 
 	*ext = tmp;
 	tmp = NULL;
 	res = KT_OK;
 
 cleanup:
-	print_progressResult(res);
+	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 
-	KSI_PublicationsFile_free(pubFile);
 	KSI_Signature_free(tmp);
 
 	return res;
@@ -394,7 +451,7 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	 */
 	PARAM_SET_addControl(set, "{conf}", isFormatOk_inputFile, isContentOk_inputFileRestrictPipe, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{log}{o}", isFormatOk_path, NULL, convertRepair_path, NULL);
-	PARAM_SET_addControl(set, "{input}", isFormatOk_inputFile, NULL, convertRepair_path, NULL);
+	PARAM_SET_addControl(set, "{input}", isFormatOk_inputFile, isContentOk_inputFileWithPipe, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{T}", isFormatOk_utcTime, isContentOk_utcTime, NULL, extract_utcTime);
 	PARAM_SET_addControl(set, "{sig-from-stdin}{enable-rfc3161-conversion}{d}", isFormatOk_flag, NULL, NULL, NULL);
 	PARAM_SET_addControl(set, "{pub-str}", isFormatOk_pubString, NULL, NULL, extract_pubString);
@@ -407,22 +464,28 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	 * Define possible tasks.
 	 */
 	/*					  ID	DESC												MAN						ATL		FORBIDDEN			IGN	*/
-	TASK_SET_add(task_set, 0,	"Extend, "
+	TASK_SET_add(task_set, EXT_TO_EAV_PUBLICATION_FROM_FILE,
+								"Extend, "
 								"from file, "
 								"to the earliest available publication.",			"input,X,P",					NULL,	"sig-from-stdin,T,pub-str",	NULL);
-	TASK_SET_add(task_set, 1,	"Extend, "
+	TASK_SET_add(task_set, EXT_TO_EAV_PUBLICATION_FROM_STDIN,
+								"Extend, "
 								"from standard input, "
 								"to the earliest available publication.",			"sig-from-stdin,X,P",			NULL,	"input,T,pub-str",			NULL);
-	TASK_SET_add(task_set, 2,	"Extend, "
+	TASK_SET_add(task_set, EXT_TO_TIME_FROM_FILE,
+								"Extend, "
 								"from file, "
 								"to the specified time.",							"input,X,T",					NULL,	"sig-from-stdin,pub-str",	NULL);
-	TASK_SET_add(task_set, 3,	"Extend, "
+	TASK_SET_add(task_set, EXT_TO_TIME_FROM_STDIN,
+								"Extend, "
 								"from standard input, "
 								"to the specified time.",							"sig-from-stdin,X,T",			NULL,	"input,pub-str",			NULL);
-	TASK_SET_add(task_set, 4,	"Extend, "
+	TASK_SET_add(task_set, EXT_TO_SPEC_PUBLICATION_FROM_FILE,
+								"Extend, "
 								"from file, "
 								"to time specified in publications string.",		"input,X,P,pub-str",			NULL,	"sig-from-stdin,T",			NULL);
-	TASK_SET_add(task_set, 5,	"Extend, "
+	TASK_SET_add(task_set, EXT_TO_SPEC_PUBLICATION_FROM_STDIN,
+								"Extend, "
 								"from standard input, "
 								"to time specified in publications string.",		"sig-from-stdin,X,P,pub-str",	NULL,	"input,T",					NULL);
 
@@ -441,6 +504,35 @@ static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err) {
 	if (res != KT_OK) goto cleanup;
 
 cleanup:
+	return res;
+}
+
+static int check_io_naming_and_type_errors(PARAM_SET *set, ERR_TRCKR *err) {
+	int res;
+	int in_count = 0;
+
+	if (set == NULL || err == NULL) {
+		ERR_TRCKR_ADD(err, res = KT_INVALID_ARGUMENT, NULL);
+		goto cleanup;
+	}
+
+	/**
+	 * Get the count of inputs and outputs for error handling.
+	 */
+	res = PARAM_SET_getValueCount(set, "input", NULL, PST_PRIORITY_NONE, &in_count);
+	if (res != PST_OK) goto cleanup;
+
+	if (in_count > 1) {
+		 ERR_TRCKR_ADD(err, res = KT_INVALID_CMD_PARAM, "Error: Only one inputs (log file to locate its log signature file) is required, but there are %i!", in_count);
+	}
+
+	if (res != KT_OK) goto cleanup;
+
+
+	res = KT_OK;
+
+cleanup:
+
 	return res;
 }
 

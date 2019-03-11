@@ -41,6 +41,7 @@
 #include "rsyslog.h"
 
 static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
+static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err);
 
 static int generate_filenames(ERR_TRCKR *err, IO_FILES *files);
 static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files);
@@ -60,8 +61,9 @@ int extract_run(int argc, char **argv, char **envp) {
 	KSI_Signature *sig = NULL;
 	IO_FILES files;
 	int count = 0;
+	MULTI_PRINTER *mp = NULL;
 
-	memset(&files, 0, sizeof(files));
+	IO_FILES_init(&files);
 
 	/**
 	 * Extract command line parameters and also add configuration specific parameters.
@@ -83,10 +85,16 @@ int extract_run(int argc, char **argv, char **envp) {
 	res = TASK_INITIALIZER_check_analyze_report(set, task_set, 0.2, 0.1, &task);
 	if (res != KT_OK) goto cleanup;
 
+	res = TASK_INITIALIZER_getPrinter(set, &mp);
+	ERR_CATCH_MSG(err, res, "Error: Unable to create Multi printer!");
+
 	res = TOOL_init_ksi(set, &ksi, &err, &logfile);
 	if (res != KT_OK) goto cleanup;
 
 	d = PARAM_SET_isSetByName(set, "d");
+
+	res = check_pipe_errors(set, err);
+	if (res != KT_OK) goto cleanup;
 
 	files.user.bStdinLog = PARAM_SET_isSetByName(set, "log-from-stdin");
 	files.user.bStdinSig = PARAM_SET_isSetByName(set, "sig-from-stdin");
@@ -125,7 +133,10 @@ int extract_run(int argc, char **argv, char **envp) {
 	res = open_log_and_signature_files(err, &files);
 	if (res != KT_OK) goto cleanup;
 
-	res = logsignature_extract(set, err, ksi, &files);
+
+	print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_EQUAL | DEBUG_LEVEL_1, "Extracting records... ");
+	res = logsignature_extract(set, mp, err, ksi, &files);
+	print_progressResult(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_1, res);
 	if (res != KT_OK) goto cleanup;
 
 	res = rename_temporary_and_backup_files(err, &files);
@@ -135,7 +146,11 @@ cleanup:
 
 	close_log_and_signature_files(err, res, &files);
 
-	print_progressResult(res);
+	MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
+	if (MULTI_PRINTER_hasDataByID(mp, MP_ID_LOGFILE_WARNINGS)) {
+		print_debug("\n");
+		MULTI_PRINTER_printByID(mp, MP_ID_LOGFILE_WARNINGS);
+	}
 	LOGKSI_KSI_ERRTrace_save(ksi);
 
 	if (res != KT_OK) {
@@ -143,8 +158,7 @@ cleanup:
 		LOGKSI_KSI_ERRTrace_LOG(ksi);
 
 		print_errors("\n");
-		if (d) ERR_TRCKR_printExtendedErrors(err);
-		else  ERR_TRCKR_printErrors(err);
+		ERR_TRCKR_print(err, d);
 	}
 
 	SMART_FILE_close(logfile);
@@ -153,6 +167,7 @@ cleanup:
 	KSI_Signature_free(sig);
 	ERR_TRCKR_free(err);
 	KSI_CTX_free(ksi);
+	MULTI_PRINTER_free(mp);
 
 	return LOGKSI_errToExitCode(res);
 }
@@ -168,32 +183,33 @@ char *extract_help_toString(char *buf, size_t len) {
 		"           - Log file from where to extract log records.\n"
 		" <logfile.logsig>\n"
 		"             Log signature file from where to extract the KSI signature for integrity proof.\n"
-		"             If omitted, the log signature file name is derived by adding either .logsig or .gtsig to <logfile>.\n"
-		"             It is expected to be found in the same folder as the <logfile>.\n"
+		"             If omitted, the log signature file name is derived by adding either '.logsig' or '.gtsig' to '<logfile>'.\n"
+		"             It is expected to be found in the same folder as the '<logfile>'.\n"
 		" --log-from-stdin\n"
-		"             The log file is read from stdin. Cannot be used with --sig-from-stdin.\n"
-		"             If --log-from-stdin is used, the log signature file name must be specified explicitly.\n"
+		"             The log file is read from stdin. Cannot be used with '--sig-from-stdin'.\n"
+		"             If '--log-from-stdin' is used, the log signature file name must be specified explicitly.\n"
 		" --sig-from-stdin\n"
-		"             The log signature file is read from stdin. Cannot be used with --log-from-stdin.\n"
-		"             If --sig-from-stdin is used, the log file name must be specified explicitly.\n"
+		"             The log signature file is read from stdin. Cannot be used with '--log-from-stdin'.\n"
+		"             If '--sig-from-stdin' is used, the log file name must be specified explicitly.\n"
 		" -o <outfile>\n"
-		"             Names of the output files will be derived from <outfile> by adding the appropriate suffixes.\n"
-		"             Name of the excerpt file will be <outfile.excerpt>.\n"
-		"             Name of the integrity proof file will be <outfile.excerpt.logsig>.\n"
-		"             If <outfile> is not specified, names of the output files will be derived from <logfile>.\n"
-		"             <outfile> must be specified if the log file is read from stdin.\n"
+		"             Names of the output files will be derived from '<outfile>' by adding the appropriate suffixes.\n"
+		"             Name of the excerpt file will be '<outfile>.excerpt'.\n"
+		"             Name of the integrity proof file will be '<outfile>.excerpt.logsig'.\n"
+		"             If '<outfile>' is not specified, names of the output files will be derived from '<logfile>'.\n"
+		"             '<outfile>' must be specified if the log file is read from stdin.\n"
 		" --out-log <log.records>\n"
 		"             Name of the output log records file. '-' can be used to redirect the file to stdout.\n"
-		"             If <log.records> is not specified, the name is derived from either <outfile> or <logfile>.\n"
+		"             If '<log.records>' is not specified, the name is derived from either '<outfile>' or '<logfile>'.\n"
 		" --out-proof <integrity.proof>\n"
 		"             Name of the output integrity proof file. '-' can be used to redirect the file to stdout.\n"
-		"             If <integrity.proof> is not specified, the name is derived from either <outfile> or <logfile>.\n"
+		"             If '<integrity.proof>' is not specified, the name is derived from either '<outfile>' or '<logfile>'.\n"
 		" -r <records>\n"
 		"             Positions of log records to be extraced, given as a list of ranges.\n"
 		"             Example: -r 12-18,21,88-192\n"
 		"             List of positions must be given in a strictly ascending order using positive decimal numbers.\n"
 		" -d\n"
 		"           - Print detailed information about processes and errors to stderr.\n"
+		"             To make output more verbose use -dd or -ddd.\n"
 		" --log <file>\n"
 		"           - Write libksi log to the given file. Use '-' as file name to redirect the log to stdout.\n",
 		TOOL_getName(),
@@ -245,6 +261,19 @@ cleanup:
 	return res;
 }
 
+static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err) {
+	int res;
+
+	res = get_pipe_out_error(set, err, NULL, "log,out-log,out-proof", NULL);
+	if (res != KT_OK) goto cleanup;
+
+	res = get_pipe_in_error(set, err, NULL, NULL, "log-from-stdin,sig-from-stdin");
+	if (res != KT_OK) goto cleanup;
+
+cleanup:
+	return res;
+}
+
 static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 	int res;
 	IO_FILES tmp;
@@ -292,7 +321,9 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 	} else if (files->user.outBase) {
 		if (!strcmp(files->user.outBase, "-")) {
 			res = KT_INVALID_CMD_PARAM;
-			ERR_CATCH_MSG(err, res, "Error: Both output files cannot be redirected to stdout.");
+			ERR_TRCKR_ADD(err, res, "Error: Both output files cannot be redirected to stdout.");
+			ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion:  Use ONLY '--out-log -' OR '--out-proof -' to redirect desired output to stdout.\n");
+			goto cleanup;
 		} else {
 			res = concat_names(files->user.outBase, ".excerpt", &tmp.internal.outLog);
 			ERR_CATCH_MSG(err, res, "Error: Could not generate output log records file name.");
@@ -315,13 +346,8 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 			ERR_CATCH_MSG(err, res, "Error: Could not duplicate output integrity proof file name.");
 		}
 	} else if (files->user.outBase) {
-		if (!strcmp(files->user.outBase, "-")) {
-			res = KT_INVALID_CMD_PARAM;
-			ERR_CATCH_MSG(err, res, "Error: Both output files cannot be redirected to stdout.");
-		} else {
-			res = concat_names(files->user.outBase, ".excerpt.logsig", &tmp.internal.outProof);
-			ERR_CATCH_MSG(err, res, "Error: Could not generate output log records file name.");
-		}
+		res = concat_names(files->user.outBase, ".excerpt.logsig", &tmp.internal.outProof);
+		ERR_CATCH_MSG(err, res, "Error: Could not generate output log records file name.");
 	} else {
 		if (files->user.inLog) {
 			res = concat_names(files->user.inLog, ".excerpt.logsig", &tmp.internal.outProof);
@@ -330,11 +356,6 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 			res = KT_INVALID_CMD_PARAM;
 			ERR_CATCH_MSG(err, res, "Error: Output integrity proof file name must be specified if log file is read from stdin.");
 		}
-	}
-
-	if (tmp.internal.bStdoutLog && tmp.internal.bStdoutProof) {
-		res = KT_INVALID_CMD_PARAM;
-		ERR_CATCH_MSG(err, res, "Error: Both output files cannot be redirected to stdout.");
 	}
 
 	if(!tmp.internal.bStdoutLog) {

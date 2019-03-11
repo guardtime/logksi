@@ -1,3 +1,34 @@
+Version 1.4
+
+2019-03-11 1.4.518
+
+* IMPROVEMENT: At least libksi 3.18 is needed to build logksi.
+* IMPROVEMENT: Verification error handling improved.
+* IMPROVEMENT: Debug output with -d option is more compact.
+* IMPROVEMENT: Option --show-progress works only with debug level 1 (just one -d).
+* FEATURE: Script rebuild.sh has new option --ign-dep-online-err to ignore test results during online build (--get-dep-online).
+* FEATURE: By specifying -d options only once will display summary of the log file.
+* FEATURE: By specifying multiple -d options (-d -d or -dd) will display summary of each block.
+* FEATURE: By specifying multiple -d options (-d -d -d or -ddd) debug output will be more verbose.
+* FEATURE: Debug output (-d, -dd and -ddd) of verify shows inter-linking input and output hash for each block and log file.
+* FEATURE: Debug output (-dd and -ddd) shows block signing time.
+* FEATURE: Debug output (-dd and -ddd) of extend shows time where signature was extended.
+* FEATURE: Debug output (-dd and -ddd) shows block line numbers.
+* FEATURE: Debug output (-ddd) shows meta-record key and value.
+* FEATURE: Signing time of a block is verified to have more recent signing time than previous block.
+* FEATURE: New option --ignore-desc-block-time to skip signing time verification where more recent log blocks must have more recent signing time.
+* FEATURE: New option -- for verify task that enables user to list multiple log files for verification.
+* FEATURE: New option --input-hash to specify inter-linking hash as input for verification.
+* FEATURE: New option --output-hash to output the last leaf hash for inter-linking.
+* FEATURE: New option --warn-same-block-time that prints a warning when two consecutive blocks has same signing time.
+* BUGFIX: Scripts rebuild.sh option --get-dep-online fixed, where dependencies are downloaded properly from github.
+* BUGFIX: Some suggestion messages pointing to KSI tool instead of logksi fixed.
+* BUGFIX: Verifying: help function fixed, help text now available.
+* BUGFIX: Verification error message fixed and improved in case where publication record is not available in publications file.
+* BUGFIX: When extending log signature thats name is derived from log files name, the log file existence is checked.
+* BUGFIX: When extending and only one log file is required, but there are more, error message is displayed.
+* BUGFIX: When parsing signatures, meta-record internal structure is parsed.
+
 Version 1.3
 
 2018-08-30 1.3.396

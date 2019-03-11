@@ -63,8 +63,9 @@ int sign_run(int argc, char** argv, char **envp) {
 	SMART_FILE *logfile = NULL;
 	int d = 0;
 	IO_FILES files;
-
-	memset(&files, 0, sizeof(files));
+	MULTI_PRINTER *mp = NULL;
+	int noProgress = 1;
+	IO_FILES_init(&files);
 
 	/**
 	 * Extract command line parameters.
@@ -89,7 +90,10 @@ int sign_run(int argc, char** argv, char **envp) {
 	res = TOOL_init_ksi(set, &ksi, &err, &logfile);
 	if (res != KT_OK) goto cleanup;
 
-	d = PARAM_SET_isSetByName(set, "d");
+	PARAM_SET_getValueCount(set, "d", NULL, PST_PRIORITY_HIGHEST, &d);
+
+	res = TASK_INITIALIZER_getPrinter(set, &mp);
+	ERR_CATCH_MSG(err, res, "Error: Unable to create Multi printer!");
 
 	res = check_pipe_errors(set, err);
 	if (res != KT_OK) goto cleanup;
@@ -106,7 +110,14 @@ int sign_run(int argc, char** argv, char **envp) {
 	res = open_input_and_output_files(err, &files);
 	if (res != KT_OK) goto cleanup;
 
-	res = logsignature_sign(set, err, ksi, &files);
+	if (d > 1) PARAM_SET_clearParameter(set, "show-progress");
+
+	noProgress = !PARAM_SET_isSetByName(set, "show-progress");
+
+
+	if (noProgress) print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_EQUAL | DEBUG_LEVEL_1, "Signing... ");
+	res = logsignature_sign(set, mp, err, ksi, &files);
+	if (noProgress) print_progressResult(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_1, res);
 	if (res != KT_OK) goto cleanup;
 
 	res = rename_temporary_and_backup_files(err, &files);
@@ -117,7 +128,12 @@ cleanup:
 	/* If there is an error while closing files, report it only if everything else was OK. */
 	close_input_and_output_files(err, res, &files);
 
-	print_progressResult(res);
+	MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
+	if (MULTI_PRINTER_hasDataByID(mp, MP_ID_LOGFILE_WARNINGS)) {
+		print_debug("\n");
+		MULTI_PRINTER_printByID(mp, MP_ID_LOGFILE_WARNINGS);
+	}
+
 	LOGKSI_KSI_ERRTrace_save(ksi);
 
 	if (res != KT_OK) {
@@ -125,8 +141,7 @@ cleanup:
 		LOGKSI_KSI_ERRTrace_LOG(ksi);
 
 		print_errors("\n");
-		if (d) 	ERR_TRCKR_printExtendedErrors(err);
-		else 	ERR_TRCKR_printErrors(err);
+		ERR_TRCKR_print(err, d);
 	}
 
 	SMART_FILE_close(logfile);
@@ -134,6 +149,8 @@ cleanup:
 	PARAM_SET_free(set);
 	ERR_TRCKR_free(err);
 	KSI_CTX_free(ksi);
+	MULTI_PRINTER_free(mp);
+
 
 	return LOGKSI_errToExitCode(res);
 }
@@ -148,14 +165,14 @@ char *sign_help_toString(char*buf, size_t len) {
 		"\n"
 		" <logfile>\n"
 		"           - Name of the log file whose log signature file's unsigned blocks are to be signed.\n"
-		"             Name of the log signature file is derived by adding either .logsig or .gtsig to <logfile>.\n"
-		"             If specified, the --sig-from-stdin switch cannot be used.\n"
+		"             Name of the log signature file is derived by adding either '.logsig' or '.gtsig' to '<logfile>'.\n"
+		"             If specified, the '--sig-from-stdin' switch cannot be used.\n"
 		" --sig-from-stdin\n"
 		"             The log signature file is read from stdin.\n"
 		" -o <out.logsig>\n"
 		"           - Name of the signed output log signature file. An existing log signature file is overwritten.\n"
-		"             If not specified, the log signature is saved to <logfile.logsig> while a backup of <logfile.logsig>\n"
-		"             is saved in <logfile.logsig.bak>.\n"
+		"             If not specified, the log signature is saved to '<logfile>.logsig' while a backup of '<logfile>.logsig'\n"
+		"             is saved in '<logfile>.logsig.bak'.\n"
 		"             Use '-' to redirect the signed log signature binary stream to stdout.\n"
 		"             If input is read from stdin and output is not specified, stdout is used for output.\n"
 		" -S <URL>\n"
@@ -169,8 +186,9 @@ char *sign_help_toString(char*buf, size_t len) {
 		"             towards KSI aggregator. If not set, default algorithm is used.\n"
 		" -d\n"
 		"           - Print detailed information about processes and errors to stderr.\n"
+		"             To make output more verbose use -dd or -ddd.\n"
 		" --show-progress\n"
-		"           - Print signing progress. Only valid with -d.\n"
+		"           - Print signing progress. Only valid with '-d' and debug level 1.\n"
 		" --conf <file>\n"
 		"           - Read configuration options from the given file. It must be noted\n"
 		"             that configuration options given explicitly on command line will\n"

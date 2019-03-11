@@ -146,7 +146,7 @@ int main(int argc, char** argv, char **envp) {
 	char buf[0xffff];
 
 	/**
-	 * Configure KSI tool to print only values that are result of the user request
+	 * Configure logksi to print only values that are result of the user request
 	 * or an error.
 	 */
 	print_init();

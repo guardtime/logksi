@@ -5,12 +5,12 @@
 .\"
 .SH SYNOPSIS
 .HP 4
-\fBlogksi sign \fIlogfile\fR [\fB-o \fIout.logsig\fR] \fB-S \fIURL \fR[\fB--aggr-user \fIuser \fB--aggr-key \fIkey\fR] [\fImore options\fR]
+\fBlogksi sign \fI<logfile>\fR [\fB-o \fI<out.logsig>\fR] \fB-S \fIURL \fR[\fB--aggr-user \fIuser \fB--aggr-key \fIkey\fR] [\fImore options\fR]
 .HP 4
-\fBlogksi sign --sig-from-stdin [\fB-o \fIout.logsig\fR] \fB-S \fIURL \fR[\fB--aggr-user \fIuser \fB--aggr-key \fIkey\fR] [\fImore options\fR]
+\fBlogksi sign --sig-from-stdin [\fB-o \fI<out.logsig>\fR] \fB-S \fIURL \fR[\fB--aggr-user \fIuser \fB--aggr-key \fIkey\fR] [\fImore options\fR]
 .\"
 .SH DESCRIPTION
-Signs the unsigned log blocks in a log signature file of a given \fIlogfile\fR. The name of the log signature file located in the same directory as the \fIlogfile\fR is expected to be \fIlogfile.logsig\fR or \fIlogfile.gtsig\fR. Alternatively, if no \fIlogfile\fR is specified, the \fB--sig-from-stdin\fR option should be used to read the log signature file from the \fIstdin\fR. If neither the \fIlogfile\fR nor \fB--sig-from-stdin\fR option is given, help text is returned.
+Signs the unsigned log blocks in a log signature file of a given \fI<logfile>\fR. The name of the log signature file located in the same directory as the \fI<logfile>\fR is expected to be \fI<logfile>.logsig\fR or \fI<logfile>.gtsig\fR. Alternatively, if no \fI<logfile>\fR is specified, the \fB--sig-from-stdin\fR option should be used to read the log signature file from the \fIstdin\fR. If neither the \fI<logfile>\fR nor \fB--sig-from-stdin\fR option is given, help text is returned.
 .LP
 \fBlogksi sign\fR provides the recovery signing functionality for cases when some log blocks have been left unsigned during routine signing/logging. For instance, when the KSI service was not reachable.
 .LP
@@ -18,16 +18,16 @@ User must have access to KSI signing service (KSI Aggregator) for signing.
 .\"
 .SH OPTIONS
 .TP
-\fIlogfile\fR
-Name of the log file whose unsigned log blocks should be signed. If \fIlogfile\fR is specified, the \fB--sig-from-stdin\fR option cannot be used.
+\fI<logfile>\fR
+Name of the log file whose unsigned log blocks should be signed. If \fI<logfile>\fR is specified, the \fB--sig-from-stdin\fR option cannot be used.
 .\"
 .TP
 \fB--sig-from-stdin\fR
 Use to read the log signature file from \fIstdin\fR. If no output file is specified with \fB-o\fR, the result will be returned to \fIstdout\fR.
 .\"
 .TP
-\fB-o \fIout.logsig\fR
-Specify the name of the output log signature file. If not specified, the input file \fIlogfile.logsig\fR is modified. The backup of the original log signature file will be saved to \fIlogfile.logsig.bak\fR. If the output file name is explicitly specified, an existing file will always be overwritten and no backup file will be created. Use '-' as file name to redirect the output as a binary stream to \fIstdout\fR.
+\fB-o \fI<out.logsig>\fR
+Specify the name of the output log signature file; recommended file extension is \fI.logsig\fR. If not specified, the input file \fI<logfile>.logsig\fR is modified. The backup of the original log signature file will be saved to \fI<logfile>.logsig.bak\fR. If the output file name is explicitly specified, an existing file will always be overwritten and no backup file will be created. Use '-' as file name to redirect the output as a binary stream to \fIstdout\fR.
 .\"
 .TP
 \fB-S \fIURL\fR
@@ -55,11 +55,11 @@ Repair the log signature by inserting missing final tree hashes. Final tree hash
 .\"
 .TP
 \fB-d\fR
-Print detailed information about processes and errors to \fIstderr\fR.
+Print detailed information about processes and errors to \fIstderr\fR. To make output more verbose increase debug level with \fB-dd\fR or \fB-ddd\fR. With debug level 1 a summary of log file is displayed. With debug level 2 a summary of each block and the log file is displayed. Debug level 3 will display the whole parsing of the log signature file. The parsing of \fIrecord hashes (r)\fR, \fItree hashes (.)\fR, \fIfinal tree hashes (:)\fR and \fImeta-records (M)\fR is displayed inside curly brackets in following manner \fI{r.Mr..:}\fR. In case of a failure \fI(X)\fR is displayed and closing curly bracket is omitted.
 .\"
 .TP
 \fB--show-progress\fR
-Print signing progress. Only valid with -d\fR.
+Print signing progress. Only valid with -d and debug level 1.\fR.
 .\"
 .TP
 \fB--conf \fIfile\fR
