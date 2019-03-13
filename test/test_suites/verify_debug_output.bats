@@ -5,13 +5,13 @@ export KSI_CONF=test/test.cfg
 @test "verify output with debug level 1" {
 	run src/logksi verify test/resource/logs_and_signatures/log_repaired --ignore-desc-block-time -d
 	[ "$status" -eq 0 ]
-	[[ "$output" =~ (Verifying... ok.).(Summary of logfile:).( . Count of blocks:             30.*).( . Count of record hashes:      88).( . Count of meta.records:       1).( . Input hash:  SHA-512:dd4e87.*e2b137).( . Output hash: SHA-512:7f5a17.*cd7827) ]]
+	[[ "$output" =~ (Verifying... ok.)..(Summary of logfile:).( . Count of blocks:             30.*).( . Count of record hashes:      88).( . Count of meta.records:       1).( . Input hash:  SHA-512:dd4e87.*e2b137).( . Output hash: SHA-512:7f5a17.*cd7827) ]]
 }
 
 @test "verify output with debug level 2" {
 	run src/logksi verify test/resource/logs_and_signatures/signed --ignore-desc-block-time -dd
 	[ "$status" -eq 0 ]
-	[[ "$output" =~ (Verifying block no.   1... ok.).(Summary of block 1:).( . Sig time:    .1517928882.*).( . Input hash:  SHA-512:7f3dea.*ee3141).( . Output hash: SHA-512:20cfea.*88944a).( . Lines:                       1 . 3 .3.)..(Verifying block no.   2... ok.).(Summary of block 2:).( . Sig time:    .1517928883.*).( . Input hash:  SHA-512:20cfea.*88944a).( . Output hash: SHA-512:9c1ea0.*42e444).( . Lines:                       4 . 6 .3.)..(Verifying block no.   3... ok.).(Summary of block 3:).( . Sig time:    .1517928884.*).( . Input hash:  SHA-512:9c1ea0.*42e444).( . Output hash: SHA-512:1dfeae.*43e987).( . Lines:                       7 . 9 .3.)..(Verifying block no.   4... ok.).(Summary of block 4:).( . Sig time:    .1517928885.*).( . Input hash:  SHA-512:1dfeae.*43e987).( . Output hash: SHA-512:f7f5b4.*b2b596).( . Line:                        n.a).( . Count of meta-records:       1)..(Summary of logfile:).( . Count of blocks:             4).( . Count of record hashes:      9).( . Count of meta-records:       1).( . Input hash:  SHA-512:7f3dea.*ee3141).( . Output hash: SHA-512:f7f5b4.*b2b596) ]]
+	[[ "$output" =~ (Verifying block no.   1... ok.)..(Summary of block 1:).( . Sig time:    .1517928882.*).( . Input hash:  SHA-512:7f3dea.*ee3141).( . Output hash: SHA-512:20cfea.*88944a).( . Lines:                       1 . 3 .3.)..(Verifying block no.   2... ok.)..(Summary of block 2:).( . Sig time:    .1517928883.*).( . Input hash:  SHA-512:20cfea.*88944a).( . Output hash: SHA-512:9c1ea0.*42e444).( . Lines:                       4 . 6 .3.)..(Verifying block no.   3... ok.)..(Summary of block 3:).( . Sig time:    .1517928884.*).( . Input hash:  SHA-512:9c1ea0.*42e444).( . Output hash: SHA-512:1dfeae.*43e987).( . Lines:                       7 . 9 .3.)..(Verifying block no.   4... ok.)..(Summary of block 4:).( . Sig time:    .1517928885.*).( . Input hash:  SHA-512:1dfeae.*43e987).( . Output hash: SHA-512:f7f5b4.*b2b596).( . Line:                        n.a).( . Count of meta-records:       1)...(Summary of logfile:).( . Count of blocks:             4).( . Count of record hashes:      9).( . Count of meta-records:       1).( . Input hash:  SHA-512:7f3dea.*ee3141).( . Output hash: SHA-512:f7f5b4.*b2b596) ]]
 }
 
 @test "verify output with debug level 3. Multiple blocks. Missing hshes" {
@@ -29,7 +29,7 @@ export KSI_CONF=test/test.cfg
 @test "previous block is more recent than next block with debug level 2" {
 	run ./src/logksi verify test/resource/logs_and_signatures/log_repaired -dd
 	[ "$status" -eq 6 ]
-	[[ "$output" =~ (Verifying block no.  17... ok.).*(Verifying block no.  18... failed.)..(Error: Block no.  17 .*is more recent than).(       block no.  18 .1517928940. 2018.02.06 14.55.40 UTC.00.00)..(Summary of block 18:).( . Sig time:    .1517928940.*).( . Input hash:  SHA-512:0e11fd.*1991c4).( . Output hash: SHA-512:907899.*d2be10).( . Lines:                       52 . 54 .3.)..(Verifying block no.  19... ok.) ]]
+	[[ "$output" =~ (Verifying block no.  17... ok.).*(Verifying block no.  18... failed.)..( x Error: Block no.  17 .*is more recent than).(          block no.  18 .1517928940. 2018.02.06 14.55.40 UTC.00.00)..(Summary of block 18:).( . Sig time:    .1517928940.*).( . Input hash:  SHA-512:0e11fd.*1991c4).( . Output hash: SHA-512:907899.*d2be10).( . Lines:                       52 . 54 .3.)..(Verifying block no.  19... ok.) ]]
 }
 
 @test "previous block is more recent than next block with debug level 3" {
