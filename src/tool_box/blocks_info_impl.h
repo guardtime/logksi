@@ -124,7 +124,8 @@ typedef struct {
 	char errSignTime;
 	char curBlockNotSigned;
 	char curBlockJustReSigned;
-	char lastBlockWasSkipped;		/* If block is skipped (--continue-on-failure) due to verification failure, this is set. It is cleared if process_ksi_signature or process_block_signature. */
+	char lastBlockWasSkipped;		/* If block is skipped (--continue-on-failure) due to verification failure, this is set. It is cleared in process_ksi_signature or process_block_signature. */
+	char signatureTLVReached;		/* This is set if signature TLV is reached (in process_block_signature, process_ksi_signature or process_partial_signature) and is cleared in init_next_block.*/
 	size_t nofTotaHashFails;		/* Overall count of hahs failures inside log signature. */
 	size_t nofHashFails;			/* Count of hahs failures inside log block. */
 	uint64_t sigTime_0;
