@@ -1087,6 +1087,7 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 	KSI_DataHash *hash = NULL;
 	KSI_TlvElement *tlv = NULL;
 	KSI_TlvElement *tlvSig = NULL;
+	KSI_TlvElement *tlvUnsig = NULL;
 	KSI_TlvElement *tlvRfc3161 = NULL;
 	KSI_TlvElement *recChain = NULL;
 	KSI_TlvElement *hashStep = NULL;
@@ -1136,12 +1137,35 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 
 		blocks->warningLegacy = 1;
 	}
+
+	/* Try to extract KSI signature or unsigned block marker. */
 	res = KSI_TlvElement_getElement(tlv, 0x905, &tlvSig);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to extract KSI signature element in block signature.", blocks->blockNo);
 
-	if (tlvSig == NULL) {
+	res = KSI_TlvElement_getElement(tlv, 0x02, &tlvUnsig);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to extract unsigned block marker.", blocks->blockNo);
+
+	/* If block is unsigned, return verification error. If signature data is missing, return format error. */
+	if (tlvUnsig != NULL) {
+		res = KT_VERIFICATION_FAILURE;
+		blocks->curBlockNotSigned = 1;
+
+		/* Don't use ERR_CATCH_MSG when --continue-on-fail is set, as the amount of errors
+		   produced will easily exceed the limits of ERR_TRCKR. */
+		if (PARAM_SET_isSetByName(set, "continue-on-fail")) {
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Block %zu is unsigned!\n", blocks->blockNo);
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Block is unsigned!\n", blocks->blockNo);
+		} else {
+			ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion: Make sure that block signature is actually the original output\n"
+											 "                and KSI signature is not replaced with unsigned marker!\n"
+											 "                If that's correct, use logksi sign to sign unsigned blocks.\n");
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu is unsigned and missing KSI signature in block signature.", blocks->blockNo);
+		}
+
+		goto cleanup;
+	} else if (tlvSig == NULL) {
 		res = KT_INVALID_INPUT_FORMAT;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing KSI signature in block signature.", blocks->blockNo);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing KSI signature (and unsigned block marker) in block signature.", blocks->blockNo);
 	}
 
 
@@ -1372,6 +1396,7 @@ cleanup:
 	KSI_VerificationContext_clean(&context);
 	KSI_PolicyVerificationResult_free(verificationResult);
 	KSI_TlvElement_free(tlvSig);
+	KSI_TlvElement_free(tlvUnsig);
 	KSI_TlvElement_free(tlvRfc3161);
 	KSI_TlvElement_free(tlv);
 	KSI_TlvElement_free(hashStep);
@@ -2368,7 +2393,7 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 									skipCurrentBlock = 1;
 									blocks->lastBlockWasSkipped = 1;
 
-									print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Skipping block %zu as it does not verify!\n", blocks->blockNo);
+									print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Skipping block %zu!\n", blocks->blockNo);
 									print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Block is skipped!\n", blocks->blockNo);
 									continue;
 								}
