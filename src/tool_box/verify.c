@@ -40,6 +40,8 @@
 #include "conf_file.h"
 #include "tool.h"
 #include "rsyslog.h"
+#include "blocks_info.h"
+#include "io_files.h"
 
 enum {
 	/* Trust anchor based verification. */

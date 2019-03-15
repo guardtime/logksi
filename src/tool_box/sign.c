@@ -44,6 +44,8 @@
 #include "param_set/param_set_obj_impl.h"
 #include "param_set/strn.h"
 #include "rsyslog.h"
+#include "blocks_info.h"
+#include "io_files.h"
 
 static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
 static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err);

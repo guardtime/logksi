@@ -647,6 +647,35 @@ cleanup:
 	return ret;
 }
 
+char* LOGKSI_signature_sigTimeToString(const KSI_Signature* sig, char *buf, size_t buf_len) {
+	int res = KT_UNKNOWN_ERROR;
+	KSI_Integer *sigTime = NULL;
+
+	if (sig == NULL || buf == NULL || buf_len == 0) return NULL;
+
+	res = KSI_Signature_getSigningTime(sig, &sigTime);
+	if (res != KSI_OK) return NULL;
+
+
+	return KSI_Integer_toDateString(sigTime, buf, buf_len);;
+}
+
+char* LOGKSI_uint64_toDateString(uint64_t time, char *buf, size_t buf_len) {
+	int res = KT_UNKNOWN_ERROR;
+	KSI_Integer *t = NULL;
+	char tmp[256];
+
+	if (buf == NULL || buf_len == 0) return NULL;
+
+	res = KSI_Integer_new(NULL, time, &t);
+	if (res != KSI_OK) return NULL;
+
+	KSI_snprintf(buf, buf_len, "(%llu) %s+00:00", (unsigned long long)time, KSI_Integer_toDateString(t, tmp, sizeof(tmp)));
+
+	KSI_Integer_free(t);
+	return buf;
+}
+
 static const char *level2str(int level) {
 	switch (level) {
 		case KSI_LOG_DEBUG: return "DEBUG";
