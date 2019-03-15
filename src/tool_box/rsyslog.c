@@ -114,8 +114,8 @@ static int logksi_datahash_compare(ERR_TRCKR *err, MULTI_PRINTER *mp, BLOCK_INFO
 
 		print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: %s\n", blocks->blockNo, failureReason);
 		print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Hash algorithms differ\n", blocks->blockNo);
-		print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: %*s %s\n", blocks->blockNo, minSize, helpLeft, LOGKSI_DataHash_toString(left, buf, sizeof(buf)));
-		print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: %*s %s\n", blocks->blockNo, minSize, helpRight, LOGKSI_DataHash_toString(right, buf, sizeof(buf)));
+		print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: %-*s %s\n", blocks->blockNo, minSize, helpLeft, LOGKSI_DataHash_toString(left, buf, sizeof(buf)));
+		print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: %-*s %s\n", blocks->blockNo, minSize, helpRight, LOGKSI_DataHash_toString(right, buf, sizeof(buf)));
 
 		goto cleanup;
 	}
@@ -392,7 +392,7 @@ static int finalize_block(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI
 	}
 
 	/* Print Output hash of previous block. */
-	if (blocks->prevLeaf != NULL && blocks->taskId == TASK_VERIFY) {
+	if (blocks->prevLeaf != NULL && blocks->taskId == TASK_VERIFY && blocks->signatureTLVReached) {
 		char buf[256];
 		LOGKSI_DataHash_toString(blocks->prevLeaf, buf, sizeof(buf));
 		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, "Block no. %3zu: output hash: %s.\n", blocks->blockNo, buf);
