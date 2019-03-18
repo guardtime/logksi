@@ -119,8 +119,12 @@ static const char* logksiErrToString(int error_code) {
 			return "User has no privileges.";
 		case KT_KSI_SIG_VER_IMPOSSIBLE:
 			return "Verification can't be performed.";
+		case KT_INVALID_CONF:
+			return "Invalid configuration file.";
 		case KT_VERIFICATION_FAILURE:
 			return "Log signature verification failed.";
+		case KT_VERIFICATION_SKIPPED:
+			return "Verification skipped.";
 		case KT_PUBFILE_HAS_NO_PUBREC_TO_EXTEND_TO:
 			return "No publication record found to extend to.";
 		case KT_RFC3161_EXT_IMPOSSIBLE:
@@ -129,13 +133,16 @@ static const char* logksiErrToString(int error_code) {
 			return "The hash length is not even number.";
 		case KT_INVALID_HEX_CHAR:
 			return "The hex data contains invalid characters.";
+		case KT_CHANNEL_NOT_FOUND:
+			return "Multi printer channel does not exist.";
+		case KT_INTEGRATION_PURPOSELY_STOPPED:
+			return "Integration purposely stopped.";
 		case KT_UNKNOWN_ERROR:
 			return "Unknown error.";
 		default:
 			return "Unknown error.";
 	}
 }
-
 
 int LOGKSI_errToExitCode(int error) {
 	int exit;

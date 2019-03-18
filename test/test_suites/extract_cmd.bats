@@ -175,7 +175,7 @@ export KSI_CONF=test/test.cfg
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r +
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
-	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r *
+	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r \*
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r %
