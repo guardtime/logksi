@@ -1,5 +1,5 @@
 #
-# Copyright 2013-2016 Guardtime, Inc.
+# Copyright 2013-2019 Guardtime, Inc.
 #
 # This file is part of the Guardtime client SDK.
 #
@@ -34,6 +34,15 @@ logksi_SOURCES = \
 	main.c	\
 	smart_file.c \
 	smart_file.h \
+	tlv_object.c \
+	tlv_object.h \
+	tool_box/blocks_info.c \
+	tool_box/blocks_info.h \
+	tool_box/io_files.c \
+	tool_box/io_files.h \
+	tool_box/extract_info.c \
+	tool_box/extract_info.h \
+	tool_box/blocks_info_impl.h \
 	tool_box/param_control.c \
 	tool_box/param_control.h \
 	tool_box/ksi_init.c \

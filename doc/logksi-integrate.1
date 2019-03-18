@@ -5,7 +5,11 @@
 .\"
 .SH SYNOPSIS
 .HP 4
-\fBlogksi integrate \fI<logfile> \fR[\fB-o \fI<out.logsig>\fR]
+\fBlogksi integrate \fI<logfile>\fR [\fB-o \fI<out.logsig>\fR]
+.HP 4
+\fBlogksi integrate \fI<logfile>\fR \fB--recover\fR [\fB-o \fI<out.recovered.logsig>\fR] [\fB--out-log \fI<log.recovered>\fR]
+.HP 4
+\fBlogksi integrate \fI<logfile>\fR \fR[\fI<logsig.parts>\fR] \fB--recover\fR [\fB-o \fI<out.recovered.logsig>\fR] [\fB--out-log \fI<log.recovered>\fR]
 .\"
 .SH DESCRIPTION
 Integrates the two temporary files created while asynchronously signing the log file \fI<logfile>\fR:
@@ -36,8 +40,16 @@ If some KSI signatures are missing from the log signature file \fIblock-signatur
 Log file to which the temporary files belong to.
 .\"
 .TP
-\fB-o \fI<out.logsig>\fR
-Specify the name of the integrated output log signature file; recommended file extension is \fI.logsig\fR. If not specified, the log signature file is saved as \fI<logfile>.logsig\fR in the same folder where the \fI<logfile>\fR is located. An attempt to overwrite an existing log signature file will result in an error. Use '-' as file name to redirect the output as a binary stream to \fIstdout\fR.
+\fI<logsig.parts>\fR
+Directory containing log signature parts. Useful with \fB--recover\fR when log file and log signature parts are separated.
+.\"
+.TP
+\fB-o\fR \fI<out.logsig>\fR
+Specify the name of the integrated output log signature file; recommended file extension is \fI.logsig\fR. If not specified, the log signature file is saved as \fI<logfile>.logsig\fR (or \fI<logfile>.recovered.logsig\fR if \fB--recover\fR is set) in the same folder where the \fI<logfile>\fR is located. An attempt to overwrite an existing log signature file will result in an error. Use '-' as file name to redirect the output as a binary stream to \fIstdout\fR.
+.\"
+.TP
+\fB--out-log\fR \fI<logfile>\fR
+Specify the name of recovered log file (only valid with \fB--recover\fR). If not specified, the log signature file is saved as \fI<logfile>.recovered\fR in the same folder where the \fI<logfile>\fR is located. An attempt to overwrite an existing log file will result in an error. Use '-' as file name to redirect the output as a binary stream to \fIstdout\fR.
 .\"
 .TP
 \fB--insert-missing-hashes\fR
@@ -45,7 +57,12 @@ Pre-emptively repair the log signature by inserting missing final tree hashes. F
 .\"
 .TP
 \fB--force-overwrite\fR
-Force overwriting of an existing log signature. If the existing log signature contains KSI signatures obtained during sign recovery, these signatures are lost and must be obtained again by running \fBlogksi sign\fR.
+Force overwriting of an existing log signature. If the existing log signature contains KSI signatures obtained during sign recovery, these signatures are lost and must be obtained again by running \fBlogksi sign\fR. With \fB--recover\fR this will also affect \fB--out-hash\fR.
+.\"
+.\"
+.TP
+\fB--recover\fR
+Tries to recover as many blocks as possible from corrupted log and log signature temporary files. For example if block no. 6 is corrupted it is possible to recover log records and log block signatures until the end of the block no. 5. By default output file names are derived from the log file name: \fR<logfile>.recovered\fR and \fR<logfile>.recovered.logsig\fR for log and log signature file accordingly. If the files already exist, error is returned (see \fB-o\fR, \fB--out-log\fR and \fB--force-overwrite\fR).
 .\"
 .TP
 \fB-d\fR
@@ -66,6 +83,14 @@ See \fBlogksi\fR(1) for more information.
 .LP
 .RS 4
 \fBlogksi integrate \fI/var/log/secure
+.RE
+.\"
+.TP 2
+\fB2
+\fRTo integrate partially corrupted temporary files (log file is \fImy-corrupted-log\fR and log signature parts can be found from \fImy-corrupted-log.logsig.parts\fR) into a recovered log and log signature file, run command below. For example block no. 6 can not be parsed, thus it is possible to recover log up to the end of block no. 5. Log and log signature files will be saved into \fImy-corrupted-log.recovered\fR and \fImy-corrupted-log.recovered.logsig\fR accordingly:
+.LP
+.RS 4
+\fBlogksi integrate --recover\fR \fImy-corrupted-log\fR
 .RE
 .\"
 .SH AUTHOR

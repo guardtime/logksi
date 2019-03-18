@@ -44,11 +44,13 @@
 #include "param_set/param_set_obj_impl.h"
 #include "param_set/strn.h"
 #include "rsyslog.h"
+#include "blocks_info.h"
+#include "io_files.h"
 
 static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
 static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err);
-static int generate_filenames(ERR_TRCKR *err, IO_FILES *files);
-static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files);
+static int generate_filenames(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files);
+static int open_input_and_output_files(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files);
 static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files);
 static void close_input_and_output_files(ERR_TRCKR *err, int res, IO_FILES *files);
 
@@ -98,16 +100,10 @@ int sign_run(int argc, char** argv, char **envp) {
 	res = check_pipe_errors(set, err);
 	if (res != KT_OK) goto cleanup;
 
-	res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.user.inLog);
-	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
-
-	res = PARAM_SET_getStr(set, "o", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files.user.inSig);
-	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
-
-	res = generate_filenames(err, &files);
+	res = generate_filenames(set, err, &files);
 	if (res != KT_OK) goto cleanup;
 
-	res = open_input_and_output_files(err, &files);
+	res = open_input_and_output_files(set, err, &files);
 	if (res != KT_OK) goto cleanup;
 
 	if (d > 1) PARAM_SET_clearParameter(set, "show-progress");
@@ -252,7 +248,7 @@ cleanup:
 	return res;
 }
 
-static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
+static int generate_filenames(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files) {
 	int res;
 	IO_FILES tmp;
 	char *legacy_name = NULL;
@@ -264,16 +260,18 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 		goto cleanup;
 	}
 
-	/* If not specified, the input signature is read from stdin. */
+	res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files->user.inLog);
+	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
+
+	res = PARAM_SET_getStr(set, "o", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &files->user.outSig);
+	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
+
+	/* Get input signature file name. */
 	if (files->user.inLog == NULL) {
-		if (files->user.inSig == NULL || !strcmp(files->user.inSig, "-")) {
-			/* Output must go to a nameless temporary file before redirecting it to stdout. */
-			tmp.internal.bStdout = 1;
-		} else {
-			/* Output must go to a named temporary file that is renamed appropriately on success. */
-			res = temp_name(files->user.inSig, &tmp.internal.tempSig);
-			ERR_CATCH_MSG(err, res, "Error: Could not generate temporary output log signature file name.");
-			res = duplicate_name(files->user.inSig, &tmp.internal.outSig);
+		/* If not specified, the input signature is read from stdin. */
+		/* If log file is not specified and o is not specified get input signature from stdin. */
+		if (PARAM_SET_isSetByName(set, "sig-from-stdin")) {
+			res = duplicate_name("-", &tmp.internal.inSig);
 			ERR_CATCH_MSG(err, res, "Error: Could not duplicate output log signature file name.");
 		}
 	} else {
@@ -289,26 +287,17 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 				legacy_name = NULL;
 			}
 		}
-
-		/* Check if output would overwrite the input log signature file. */
-		if (files->user.inSig == NULL || !strcmp(files->user.inSig, tmp.internal.inSig)) {
-			/* Output must to go to a temporary file before overwriting the input log signature file. */
-			res = temp_name(tmp.internal.inSig, &tmp.internal.tempSig);
-			ERR_CATCH_MSG(err, res, "Error: Could not generate temporary output log signature file name.");
-			/* Input must kept in a backup file when overwritten by the output log signature file. */
-			res = concat_names(tmp.internal.inSig, ".bak", &tmp.internal.backupSig);
-			ERR_CATCH_MSG(err, res, "Error: Could not generate backup input log signature file name.");
-		} else if (!strcmp(files->user.inSig, "-")) {
-			/* Output must go to a nameless temporary file before redirecting it to stdout. */
-			tmp.internal.bStdout = 1;
-		} else {
-			/* Output must go to a named temporary file that is renamed appropriately on success. */
-			res = temp_name(files->user.inSig, &tmp.internal.tempSig);
-			ERR_CATCH_MSG(err, res, "Error: Could not generate temporary output log signature file name.");
-			res = duplicate_name(files->user.inSig, &tmp.internal.outSig);
-			ERR_CATCH_MSG(err, res, "Error: Could not duplicate output log signature file name.");
-		}
 	}
+
+	/* Get Output signature file name. */
+	if (files->user.outSig == NULL && tmp.internal.inSig != NULL) {
+		res = duplicate_name(tmp.internal.inSig, &tmp.internal.outSig);
+		ERR_CATCH_MSG(err, res, "Error: Could not duplicate input log signature file name.");
+	} else {
+		res = duplicate_name(files->user.outSig, &tmp.internal.outSig);
+		ERR_CATCH_MSG(err, res, "Error: Could not duplicate output log signature file name.");
+	}
+
 	files->internal = tmp.internal;
 	memset(&tmp.internal, 0, sizeof(tmp.internal));
 	res = KT_OK;
@@ -321,9 +310,10 @@ cleanup:
 	return res;
 }
 
-static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
+static int open_input_and_output_files(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files) {
 	int res;
 	IO_FILES tmp;
+	int overWrite = 0;
 
 	memset(&tmp.files, 0, sizeof(tmp.files));
 
@@ -332,15 +322,17 @@ static int open_input_and_output_files(ERR_TRCKR *err, IO_FILES *files) {
 		goto cleanup;
 	}
 
+	overWrite = PARAM_SET_isSetByName(set, "o");
+
 	if (files->internal.inSig) {
-		res = logksi_file_check_and_open(err, files->internal.inSig, &tmp.files.inSig);
+		res = SMART_FILE_open(files->internal.inSig, "rbs", &tmp.files.inSig);
 		if (res != KT_OK) goto cleanup;
 	} else {
-		/* If not specified, the input is taken from stdin. */
-		tmp.files.inSig = stdin;
+		res = SMART_FILE_open("-", "rbs", &tmp.files.inSig);	/* A buffered (nameless temporary file) stream. */
+		if (res != KT_OK) goto cleanup;
 	}
 
-	res = logksi_file_create_temporary(files->internal.tempSig, &tmp.files.outSig, files->internal.bStdout);
+	res = SMART_FILE_open(files->internal.outSig, overWrite ? "wbTs" : "wbBTs", &tmp.files.outSig);
 	ERR_CATCH_MSG(err, res, "Error: Could not create temporary output log signature file.");
 
 	files->files = tmp.files;
@@ -362,53 +354,23 @@ static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files) {
 		goto cleanup;
 	}
 
-	/* Check if input log signature must be backed up. */
-	if (files->internal.backupSig) {
-		/* Create a backup of the input log signature file by renaming it. */
-		logksi_file_close(&files->files.inSig);
-		res = logksi_file_remove(files->internal.backupSig);
-		ERR_CATCH_MSG(err, res, "Error: Could not remove existing backup file %s.", files->internal.backupSig);
-		res = logksi_file_rename(files->internal.inSig, files->internal.backupSig);
-		ERR_CATCH_MSG(err, res, "Error: Could not rename input log signature file %s to backup file %s.", files->internal.inSig, files->internal.backupSig);
-		/* Output must be saved in input log signature file, so the temporary file is renamed. */
-		logksi_file_close(&files->files.outSig);
-		res = logksi_file_rename(files->internal.tempSig, files->internal.inSig);
-		ERR_CATCH_MSG(err, res, "Error: Could not rename temporary file %s to input log signature file %s.", files->internal.tempSig, files->internal.inSig);
-	} else if (files->internal.tempSig) {
-		logksi_file_close(&files->files.inSig);
-		res = logksi_file_remove(files->internal.outSig);
-		ERR_CATCH_MSG(err, res, "Error: Could not remove existing output log signature file %s.", files->internal.outSig);
-		/* Output must be saved in output log signature file, so the temporary file is renamed. */
-		logksi_file_close(&files->files.outSig);
-		res = logksi_file_rename(files->internal.tempSig, files->internal.outSig);
-		ERR_CATCH_MSG(err, res, "Error: Could not rename temporary file %s to output log signature file %s.", files->internal.tempSig, files->internal.outSig);
-	} else if (files->internal.bStdout) {
-		res = logksi_file_redirect_to_stdout(files->files.outSig);
-		ERR_CATCH_MSG(err, res, "Error: Could not write temporary output log signature file to stdout.");
-	}
+	/* Close input file first, so it is possible to make a backup of it or overwrite it. */
+	logksi_file_close(&files->files.inSig);
 
-	logksi_filename_free(&files->internal.backupSig);
+	res = SMART_FILE_markConsistent(files->files.outSig);
+	ERR_CATCH_MSG(err, res, "Error: Could not close output log signature file %s.", files->internal.outSig);
+	logksi_file_close(&files->files.outSig);
+
 	res = KT_OK;
 
 cleanup:
 
-	/* Restore initial situation if something failed. */
-	if (files && files->internal.backupSig) {
-		if (!SMART_FILE_doFileExist(files->internal.inSig)) {
-			res = logksi_file_rename(files->internal.backupSig, files->internal.inSig);
-		}
-	}
 	return res;
 }
 
 static void close_input_and_output_files(ERR_TRCKR *err, int res, IO_FILES *files) {
 	if (files) {
 		logksi_files_close(&files->files);
-		if (files->internal.tempSig && res != KT_OK) {
-			if (remove(files->internal.tempSig) != 0) {
-				if (err) ERR_TRCKR_ADD(err, KT_IO_ERROR, "Error: Could not remove temporary output log signature %s.", files->internal.tempSig);
-			}
-		}
 		logksi_internal_filenames_free(&files->internal);
 	}
 }

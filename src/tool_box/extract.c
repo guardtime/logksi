@@ -39,11 +39,12 @@
 #include "conf_file.h"
 #include "tool.h"
 #include "rsyslog.h"
+#include "io_files.h"
 
 static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
 static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err);
 
-static int generate_filenames(ERR_TRCKR *err, IO_FILES *files);
+static int generate_filenames(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files);
 static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files);
 static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files);
 static void close_log_and_signature_files(ERR_TRCKR *err, int res, IO_FILES *files);
@@ -96,38 +97,10 @@ int extract_run(int argc, char **argv, char **envp) {
 	res = check_pipe_errors(set, err);
 	if (res != KT_OK) goto cleanup;
 
-	files.user.bStdinLog = PARAM_SET_isSetByName(set, "log-from-stdin");
-	files.user.bStdinSig = PARAM_SET_isSetByName(set, "sig-from-stdin");
-
 	res = PARAM_SET_getValueCount(set, "input", NULL, PST_PRIORITY_NONE, &count);
 	if (res != KT_OK) goto cleanup;
 
-	/* Either log or signature is from stdin, but not both. */
-	if (files.user.bStdinLog) {
-		res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, 0, &files.user.inSig);
-		if (res != KT_OK) goto cleanup;
-	} else if (files.user.bStdinSig) {
-		res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, 0, &files.user.inLog);
-		if (res != KT_OK) goto cleanup;
-	} else {
-		res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, 0, &files.user.inLog);
-		if (res != KT_OK) goto cleanup;
-		if (count > 1) {
-			res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, 1, &files.user.inSig);
-			if (res != KT_OK) goto cleanup;
-		}
-	}
-
-	res = PARAM_SET_getStr(set, "out-log", NULL, PST_PRIORITY_NONE, 0, &files.user.outLog);
-	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
-
-	res = PARAM_SET_getStr(set, "out-proof", NULL, PST_PRIORITY_NONE, 0, &files.user.outProof);
-	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
-
-	res = PARAM_SET_getStr(set, "o", NULL, PST_PRIORITY_NONE, 0, &files.user.outBase);
-	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
-
-	res = generate_filenames(err, &files);
+	res = generate_filenames(set, err, &files);
 	if (res != KT_OK) goto cleanup;
 
 	res = open_log_and_signature_files(err, &files);
@@ -274,10 +247,11 @@ cleanup:
 	return res;
 }
 
-static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
+static int generate_filenames(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files) {
 	int res;
 	IO_FILES tmp;
 	char *legacy_name = NULL;
+	int count = 0;
 
 	memset(&tmp.internal, 0, sizeof(tmp.internal));
 
@@ -286,6 +260,38 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 		goto cleanup;
 	}
 
+	files->user.bStdinLog = PARAM_SET_isSetByName(set, "log-from-stdin");
+	files->user.bStdinSig = PARAM_SET_isSetByName(set, "sig-from-stdin");
+
+	res = PARAM_SET_getValueCount(set, "input", NULL, PST_PRIORITY_NONE, &count);
+	if (res != KT_OK) goto cleanup;
+
+	/* Either log or signature is from stdin, but not both. */
+	if (files->user.bStdinLog) {
+		res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, 0, &files->user.inSig);
+		if (res != KT_OK) goto cleanup;
+	} else if (files->user.bStdinSig) {
+		res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, 0, &files->user.inLog);
+		if (res != KT_OK) goto cleanup;
+	} else {
+		res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, 0, &files->user.inLog);
+		if (res != KT_OK) goto cleanup;
+		if (count > 1) {
+			res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, 1, &files->user.inSig);
+			if (res != KT_OK) goto cleanup;
+		}
+	}
+
+	res = PARAM_SET_getStr(set, "out-log", NULL, PST_PRIORITY_NONE, 0, &files->user.outLog);
+	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
+
+	res = PARAM_SET_getStr(set, "out-proof", NULL, PST_PRIORITY_NONE, 0, &files->user.outProof);
+	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
+
+	res = PARAM_SET_getStr(set, "o", NULL, PST_PRIORITY_NONE, 0, &files->user.outBase);
+	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
+
+	/* Log file is specified. */
 	if (files->user.inLog) {
 		res = duplicate_name(files->user.inLog, &tmp.internal.inLog);
 		ERR_CATCH_MSG(err, res, "Error: Could not duplicate input log file name.");
@@ -312,12 +318,8 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 	}
 
 	if (files->user.outLog) {
-		if (!strcmp(files->user.outLog, "-")) {
-			tmp.internal.bStdoutLog = 1;
-		} else {
-			res = duplicate_name(files->user.outLog, &tmp.internal.outLog);
-			ERR_CATCH_MSG(err, res, "Error: Could not duplicate output log records file name.");
-		}
+		res = duplicate_name(files->user.outLog, &tmp.internal.outLog);
+		ERR_CATCH_MSG(err, res, "Error: Could not duplicate output log records file name.");
 	} else if (files->user.outBase) {
 		if (!strcmp(files->user.outBase, "-")) {
 			res = KT_INVALID_CMD_PARAM;
@@ -339,12 +341,8 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 	}
 
 	if (files->user.outProof) {
-		if (!strcmp(files->user.outProof, "-")) {
-			tmp.internal.bStdoutProof = 1;
-		} else {
-			res = duplicate_name(files->user.outProof, &tmp.internal.outProof);
-			ERR_CATCH_MSG(err, res, "Error: Could not duplicate output integrity proof file name.");
-		}
+		res = duplicate_name(files->user.outProof, &tmp.internal.outProof);
+		ERR_CATCH_MSG(err, res, "Error: Could not duplicate output integrity proof file name.");
 	} else if (files->user.outBase) {
 		res = concat_names(files->user.outBase, ".excerpt.logsig", &tmp.internal.outProof);
 		ERR_CATCH_MSG(err, res, "Error: Could not generate output log records file name.");
@@ -356,16 +354,6 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 			res = KT_INVALID_CMD_PARAM;
 			ERR_CATCH_MSG(err, res, "Error: Output integrity proof file name must be specified if log file is read from stdin.");
 		}
-	}
-
-	if(!tmp.internal.bStdoutLog) {
-		res = temp_name(tmp.internal.outLog, &tmp.internal.tempLog);
-		ERR_CATCH_MSG(err, res, "Error: Could not generate temporary output log records file name.");
-	}
-
-	if (!tmp.internal.bStdoutProof) {
-		res = temp_name(tmp.internal.outProof, &tmp.internal.tempProof);
-		ERR_CATCH_MSG(err, res, "Error: Could not generate temporary output integrity proof file name.");
 	}
 
 	files->internal = tmp.internal;
@@ -391,25 +379,28 @@ static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files) {
 		goto cleanup;
 	}
 
+
 	if (files->user.bStdinLog) {
-		tmp.files.inLog = stdin;
+		res = SMART_FILE_open("-", "rbs", &tmp.files.inLog);
+		ERR_CATCH_MSG(err, res, "Error: Could not open input log file.");
 	} else {
-		res = logksi_file_check_and_open(err, files->internal.inLog, &tmp.files.inLog);
-		if (res != KT_OK) goto cleanup;
+		res = SMART_FILE_open(files->internal.inLog, "rb", &tmp.files.inLog);
+		ERR_CATCH_MSG(err, res, "Error: Could not open input log file.");
 	}
 
 	if (files->user.bStdinSig) {
-		tmp.files.inSig = stdin;
+		res = SMART_FILE_open("-", "rbs", &tmp.files.inSig);
+		ERR_CATCH_MSG(err, res, "Error: Could not open input sig file.");
 	} else {
-		res = logksi_file_check_and_open(err, files->internal.inSig, &tmp.files.inSig);
-		if (res != KT_OK) goto cleanup;
+		res = SMART_FILE_open(files->internal.inSig, "rb", &tmp.files.inSig);
+		ERR_CATCH_MSG(err, res, "Error: Could not open input sig file.");
 	}
 
-	res = logksi_file_create_temporary(files->internal.tempLog, &tmp.files.outLog, files->internal.bStdoutLog);
+	res = SMART_FILE_open(files->internal.outLog, "wbTs", &tmp.files.outLog);
 	ERR_CATCH_MSG(err, res, "Error: Could not create temporary output log records file.");
 
-	res = logksi_file_create_temporary(files->internal.tempProof, &tmp.files.outProof, files->internal.bStdoutProof);
-	ERR_CATCH_MSG(err, res, "Error: Could not create temporary output integrity proof file.");
+	res = SMART_FILE_open(files->internal.outProof, "wbTs", &tmp.files.outProof);
+	ERR_CATCH_MSG(err, res, "Error: Could not create temporary output log records file.");
 
 	files->files = tmp.files;
 	memset(&tmp.files, 0, sizeof(tmp.files));
@@ -430,25 +421,14 @@ static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files) {
 		goto cleanup;
 	}
 
-	if (files->internal.tempLog) {
-		/* Output must be saved in log records file, so the temporary file is renamed. */
-		logksi_file_close(&files->files.outLog);
-		res = logksi_file_rename(files->internal.tempLog, files->internal.outLog);
-		ERR_CATCH_MSG(err, res, "Error: Could not rename temporary file %s to output log records file %s.", files->internal.tempLog, files->internal.outLog);
-	} else if (files->internal.bStdoutLog) {
-		res = logksi_file_redirect_to_stdout(files->files.outLog);
-		ERR_CATCH_MSG(err, res, "Error: Could not write temporary output log records file to stdout.");
-	}
 
-	if (files->internal.tempProof) {
-		/* Output must be saved in integrity proof file, so the temporary file is renamed. */
-		logksi_file_close(&files->files.outProof);
-		res = logksi_file_rename(files->internal.tempProof, files->internal.outProof);
-		ERR_CATCH_MSG(err, res, "Error: Could not rename temporary file %s to output integrity proof file %s.", files->internal.tempProof, files->internal.outProof);
-	} else if (files->internal.bStdoutProof) {
-		res = logksi_file_redirect_to_stdout(files->files.outProof);
-		ERR_CATCH_MSG(err, res, "Error: Could not write temporary output integrity proof file to stdout.");
-	}
+	res = SMART_FILE_markConsistent(files->files.outLog);
+	ERR_CATCH_MSG(err, res, "Error: Could not close output log file %s.", files->internal.outLog);
+	logksi_file_close(&files->files.outLog);
+
+	res = SMART_FILE_markConsistent(files->files.outProof);
+	ERR_CATCH_MSG(err, res, "Error: Could not close output log signature file %s.", files->internal.outProof);
+	logksi_file_close(&files->files.outProof);
 
 	res = KT_OK;
 
@@ -460,16 +440,6 @@ cleanup:
 static void close_log_and_signature_files(ERR_TRCKR *err, int res, IO_FILES *files) {
 	if (files) {
 		logksi_files_close(&files->files);
-		if (files->internal.tempLog && res != KT_OK) {
-			if (remove(files->internal.tempLog) != 0) {
-				if (err) ERR_TRCKR_ADD(err, KT_IO_ERROR, "Error: Could not remove temporary log records file %s.", files->internal.tempLog);
-			}
-		}
-		if (files->internal.tempProof && res != KT_OK) {
-			if (remove(files->internal.tempProof) != 0) {
-				if (err) ERR_TRCKR_ADD(err, KT_IO_ERROR, "Error: Could not remove temporary integrity proof file %s.", files->internal.tempProof);
-			}
-		}
 		logksi_internal_filenames_free(&files->internal);
 	}
 }
