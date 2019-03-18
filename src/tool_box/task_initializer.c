@@ -326,10 +326,7 @@ int TASK_INITIALIZER_getPrinter(PARAM_SET *set, MULTI_PRINTER **mp) {
 	res = MULTI_PRINTER_openChannel(tmp, MP_ID_BLOCK_ERRORS, 0x1000000, print_errors);
 	if (res != KT_OK) goto cleanup;
 
-	res = MULTI_PRINTER_openChannel(tmp, MP_ID_BLOCK_WARNINGS, 0, print_debug);
-	if (res != KT_OK) goto cleanup;
-
-	res = MULTI_PRINTER_openChannel(tmp, MP_ID_LOGFILE_WARNINGS, 0, print_debug);
+	res = MULTI_PRINTER_openChannel(tmp, MP_ID_LOGFILE_WARNINGS, 0, print_errors);
 	if (res != KT_OK) goto cleanup;
 
 	res = MULTI_PRINTER_openChannel(tmp, MP_ID_BLOCK_PARSING_TREE_NODES, 0, print_debug);
