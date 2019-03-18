@@ -31,12 +31,14 @@ cp -r test/resource/logfiles/unsigned test/out
 	run ./src/logksi verify test/out/unsigned -ddd
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
-	[[ "$output" =~ "missing KSI signature in block signature." ]]
+	[[ "$output" =~ "Block no. 5 is unsigned and missing KSI signature in block signature." ]]
+	[[ "$output" =~ (Suggestion: Make sure that block signature is actually the original output).*(use logksi sign to sign unsigned blocks) ]]
 }
 
 @test "try verifying integrated unsigned_all_final_hashes.logsig" {
 	run ./src/logksi verify test/out/unsigned test/out/unsigned_all_final_hashes.logsig -ddd
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
-	[[ "$output" =~ "missing KSI signature in block signature." ]]
+	[[ "$output" =~ "Block no. 5 is unsigned and missing KSI signature in block signature." ]]
+	[[ "$output" =~ (Suggestion: Make sure that block signature is actually the original output).*(use logksi sign to sign unsigned blocks) ]]
 }

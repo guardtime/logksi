@@ -112,8 +112,8 @@ typedef struct {
 	unsigned char balanced;
 	LOGSIG_VERSION version;
 	char warningLegacy;
-	char keepRecordHashes;			/* This is set to 1, when (meta-)record is read from file. */
-	char keepTreeHashes;
+	char keepRecordHashes;			/* This is set to 1, when (meta-)record hash is read from file. Indicates that rsyslog keeps record hashes. */
+	char keepTreeHashes;			/* This is set to 1, when tree hash is read from file. Indicates that rsyslog keeps tree hashes. */
 	char finalTreeHashesSome;
 	char finalTreeHashesNone;
 	char finalTreeHashesAll;
@@ -124,7 +124,10 @@ typedef struct {
 	char errSignTime;
 	char curBlockNotSigned;
 	char curBlockJustReSigned;
-	size_t nofHashFails;
+	char lastBlockWasSkipped;		/* If block is skipped (--continue-on-failure) due to verification failure, this is set. It is cleared in process_ksi_signature or process_block_signature. */
+	char signatureTLVReached;		/* This is set if signature TLV is reached (in process_block_signature, process_ksi_signature or process_partial_signature) and is cleared in init_next_block.*/
+	size_t nofTotaHashFails;		/* Overall count of hahs failures inside log signature. */
+	size_t nofHashFails;			/* Count of hahs failures inside log block. */
 	uint64_t sigTime_0;
 	uint64_t sigTime_1;
 	uint64_t extendedToTime;

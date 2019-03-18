@@ -61,30 +61,61 @@ static size_t max_tree_hashes(size_t nof_records) {
 	return max;
 }
 
-static int logksi_datahash_compare(ERR_TRCKR *err, MULTI_PRINTER *mp, KSI_DataHash *left, KSI_DataHash *right, const char *helpLeft, const char *helpRight) {
+static int logksi_datahash_compare(ERR_TRCKR *err, MULTI_PRINTER *mp, BLOCK_INFO* blocks, int isLogline, KSI_DataHash *left, KSI_DataHash *right, const char * reason, const char *helpLeft_raw, const char *helpRight_raw) {
 	int res;
 	KSI_HashAlgorithm leftId;
 	KSI_HashAlgorithm rightId;
 	char buf[1024];
+	const char *failureReason = NULL;
+	int differentHashAlg = 0;
 
-	if (left == NULL || right == NULL) {
+	if (mp == NULL || blocks == NULL || left == NULL || right == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
 
+	failureReason = (reason == NULL) ? "Hash values do not match" : reason;
+
 	if (!KSI_DataHash_equals(left, right)) {
+		const char *helpLeft = NULL;
+		const char *helpRight = NULL;
+		size_t minSize = 0;
+
 		res = KT_VERIFICATION_FAILURE;
 		print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 		MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
-		if (KSI_DataHash_getHashAlg(left, &leftId) == KSI_OK &&
-			KSI_DataHash_getHashAlg(right, &rightId) == KSI_OK &&
-			leftId != rightId) {
-			ERR_TRCKR_ADD(err, res, "Error: Hash algorithm in block header does not match the hash algorithm that was used for building the tree.");
+		differentHashAlg = KSI_DataHash_getHashAlg(left, &leftId) == KSI_OK && KSI_DataHash_getHashAlg(right, &rightId) == KSI_OK && leftId != rightId;
+
+		helpLeft = helpLeft_raw == NULL ? "Computed hash:" : helpLeft_raw;
+		helpRight = helpRight_raw == NULL ? "Stored hash:" : helpRight_raw;
+		minSize = strlen(helpLeft);
+		minSize = strlen(helpRight) > minSize ? strlen(helpRight) : minSize;
+
+		if (isLogline) {
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Failed to verify logline no. %zu:\n"
+																				  "   + Logline:\n"
+																				  "     '%.*s'\n", get_nof_lines(blocks), (strlen(blocks->logLine) - 1), blocks->logLine);
+			if (differentHashAlg) print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "   + Hash algorithms differ!%s\n");
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "   + %s\n"
+																				  "     %s\n", helpLeft, LOGKSI_DataHash_toString(left, buf, sizeof(buf)));
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "   + %s\n"
+																				  "     %s\n", helpRight, LOGKSI_DataHash_toString(right, buf, sizeof(buf)));
+
+
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: failed to verify logline no. %zu: %s", blocks->blockNo, get_nof_lines(blocks), blocks->logLine);
+		} else {
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: %s:\n", failureReason);
+			if (differentHashAlg) print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "   + Hash algorithms differ!%s\n");
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "   + %s\n"
+																				  "     %s\n", helpLeft, LOGKSI_DataHash_toString(left, buf, sizeof(buf)));
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "   + %s\n"
+																				  "     %s\n", helpRight, LOGKSI_DataHash_toString(right, buf, sizeof(buf)));
 		}
 
-		print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_LEVEL_0, "\nError: Hash values do not match:\n");
-		print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_LEVEL_0, "%s%s\n", (helpLeft == NULL ? "Computed hash: " : helpLeft), LOGKSI_DataHash_toString(left, buf, sizeof(buf)));
-		print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_LEVEL_0, "%s%s\n", (helpRight == NULL ? "Stored hash:   " : helpRight), LOGKSI_DataHash_toString(right, buf, sizeof(buf)));
+		print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: %s\n", blocks->blockNo, failureReason);
+		print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Hash algorithms differ\n", blocks->blockNo);
+		print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: %-*s %s\n", blocks->blockNo, minSize, helpLeft, LOGKSI_DataHash_toString(left, buf, sizeof(buf)));
+		print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: %-*s %s\n", blocks->blockNo, minSize, helpRight, LOGKSI_DataHash_toString(right, buf, sizeof(buf)));
 
 		goto cleanup;
 	}
@@ -178,7 +209,7 @@ cleanup:
 	return res;
 }
 
-static int continue_on_hash_fail(int result, PARAM_SET *set, BLOCK_INFO *blocks, KSI_DataHash *computed, KSI_DataHash *stored, KSI_DataHash **replacement) {
+static int continue_on_hash_fail(int result, PARAM_SET *set, MULTI_PRINTER* mp, BLOCK_INFO *blocks, KSI_DataHash *computed, KSI_DataHash *stored, KSI_DataHash **replacement) {
 	int res = result;
 
 	if (set == NULL || blocks == NULL || computed == NULL || stored == NULL || replacement == NULL) {
@@ -188,14 +219,17 @@ static int continue_on_hash_fail(int result, PARAM_SET *set, BLOCK_INFO *blocks,
 	if (res == KT_OK) {
 		*replacement = KSI_DataHash_ref(computed);
 	} else {
+		blocks->nofTotaHashFails++;
 		blocks->nofHashFails++;
 		if (PARAM_SET_isSetByName(set, "use-computed-hash-on-fail")) {
-			print_debug("Using computed hash to continue.\n");
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "   + Using computed hash to continue.\n");
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Using computed hash to continue.\n", blocks->blockNo);
 			*replacement = KSI_DataHash_ref(computed);
 			res = KT_OK;
 		} else if (PARAM_SET_isSetByName(set, "use-stored-hash-on-fail")) {
 			*replacement = KSI_DataHash_ref(stored);
-			print_debug("Using stored hash to continue.\n");
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "   + Using stored hash to continue.\n");
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Using stored hash to continue.\n", blocks->blockNo);
 			res = KT_OK;
 		} else {
 			*replacement = KSI_DataHash_ref(computed);
@@ -239,8 +273,9 @@ static int finalize_block(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI
 		char *previousLogFile = files->previousLogFile;
 
 
-		/* When sigTime is 0 it is the first signature and there is nothing to check. */
-		if (blocks->sigTime_0 > 0) {
+		/* When sigTime_0 is 0 it is the first signature and there is nothing to check.
+		   If sigTime_1 is 0 the last block must have been failed and skipped. */
+		if (blocks->sigTime_0 > 0 && blocks->sigTime_1 > 0) {
 
 			LOGKSI_uint64_toDateString(blocks->sigTime_0, strT0, sizeof(strT0));
 			LOGKSI_uint64_toDateString(blocks->sigTime_1, strT1, sizeof(strT1));
@@ -255,12 +290,12 @@ static int finalize_block(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI
 				if (blocks->blockNo == 1) {
 
 					print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Last block %s from file '%s' is more recent than first block %s from file '%s'\n", blocks->blockNo, strT0, previousLogFile, strT1, currentLogFile);
-					print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\nError: Last block  %s from file '%s' is more recent than\n"
-						                                                     "       first block %s from file '%s'\n\n", strT0, previousLogFile, strT1, currentLogFile);
+					print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Last block %s from file '%s' is more recent than\n"
+																						  "          first block %s from file '%s'\n", strT0, previousLogFile, strT1, currentLogFile);
 				} else {
 					print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Block no. %3zu %s in %s '%s' is more recent than block no. %3zu %s\n",blocks->blockNo, blocks->blockNo - 1, strT0, (logStdin ? "log from" : "file"), currentLogFile, blocks->blockNo, strT1);
-					print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\nError: Block no. %3zu %s in %s '%s' is more recent than\n"
-						                                                     "       block no. %3zu %s\n\n", blocks->blockNo - 1, strT0, (logStdin ? "log from" : "file"), currentLogFile, blocks->blockNo, strT1);
+					print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Block no. %3zu %s in %s '%s' is more recent than\n"
+																						  "          block no. %3zu %s\n", blocks->blockNo - 1, strT0, (logStdin ? "log from" : "file"), currentLogFile, blocks->blockNo, strT1);
 				}
 
 				blocks->nofTotalFailedBlocks++;
@@ -269,7 +304,7 @@ static int finalize_block(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI
 
 			if (blocks->sigTime_0 == blocks->sigTime_1 && PARAM_SET_isSetByName(set, "warn-same-block-time")) {
 				if (blocks->blockNo == 1) {
-					print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Warning: Last block from file '%s' and first block from file '%' has same signing time %s.\n", previousLogFile, currentLogFile, LOGKSI_uint64_toDateString(blocks->sigTime_1, buf, sizeof(buf)));
+					print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Warning: Last block from file '%s' and first block from file '%' has same signing time %s.\n",blocks->blockNo - 1, previousLogFile, currentLogFile, LOGKSI_uint64_toDateString(blocks->sigTime_1, buf, sizeof(buf)));
 					print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "Warning: Last block from file      '%s'\n"
 						                                                   "         and first block from file '%s'\n"
 																		   "         has same signing time %s.\n", previousLogFile, currentLogFile, LOGKSI_uint64_toDateString(blocks->sigTime_1, buf, sizeof(buf)));
@@ -288,7 +323,7 @@ static int finalize_block(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, 0);
 
 	if (blocks->blockNo > 0) {
-		char strT1[256] = "<not signed>";
+		char strT1[256] = "<no signature data available>";
 		char strExtTo[256] = "<null>";
 		char inHash[256] = "<null>";
 		char outHash[256] = "<null>";
@@ -315,7 +350,7 @@ static int finalize_block(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI
 
 
 		if ((isSignTask && blocks->curBlockJustReSigned) || (isExtractTask && blocks->nofExtractPositionsInBlock) || (!isSignTask && !isExtractTask)) {
-			print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, "Summary of block %zu:\n", blocks->blockNo);
+			print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, "\nSummary of block %zu:\n", blocks->blockNo);
 
 			if (isSignTask || isExtractTask || isExtendTask) {
 				shortIndentation = longIndentation;
@@ -330,7 +365,11 @@ static int finalize_block(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI
 
 			if (!isSignTask && !isExtractTask && !isExtendTask) {
 				print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", shortIndentation, "Input hash:", inHash);
-				print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", shortIndentation, "Output hash:", outHash);
+				if (blocks->signatureTLVReached) {
+					print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", shortIndentation, "Output hash:", outHash);
+				} else {
+					print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", shortIndentation, "Output hash:", "<not valid value>");
+				}
 			}
 
 			/* Print line numbers. */
@@ -353,7 +392,7 @@ static int finalize_block(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI
 	}
 
 	/* Print Output hash of previous block. */
-	if (blocks->prevLeaf != NULL && blocks->taskId == TASK_VERIFY) {
+	if (blocks->prevLeaf != NULL && blocks->taskId == TASK_VERIFY && blocks->signatureTLVReached) {
 		char buf[256];
 		LOGKSI_DataHash_toString(blocks->prevLeaf, buf, sizeof(buf));
 		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, "Block no. %3zu: output hash: %s.\n", blocks->blockNo, buf);
@@ -400,6 +439,8 @@ static int init_next_block(BLOCK_INFO *blocks) {
 	blocks->nofMetaRecords = 0;
 	blocks->curBlockNotSigned = 0;
 	blocks->curBlockJustReSigned = 0;
+	blocks->nofHashFails = 0;
+	blocks->signatureTLVReached = 0;
 
 	/* Previous and current (next) signature time. Note that 0 indicates not set. */
 	blocks->sigTime_0 = blocks->sigTime_1;
@@ -451,9 +492,26 @@ static int process_block_header(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *er
 	blocks->inputHash = KSI_DataHash_ref(hash);
 
 	if (blocks->prevLeaf != NULL) {
-		res = logksi_datahash_compare(err, mp, blocks->prevLeaf, hash, "Last hash computed from previous block data: ", "Last hash stored in current block header: ");
-		res = continue_on_hash_fail(res, set, blocks, blocks->prevLeaf, hash, &replacement);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: last hashes of previous block not equal.", blocks->blockNo);
+		char description[1024];
+		PST_snprintf(description, sizeof(description), "Output hash of block %zu differs from input hash of block %zu", blocks->blockNo - 1, blocks->blockNo);
+
+		res = logksi_datahash_compare(err, mp, blocks, 0, blocks->prevLeaf, hash, description, "Last hash computed from previous block data:", "Input hash stored in current block header:");
+		res = continue_on_hash_fail(res, set, mp, blocks, blocks->prevLeaf, hash, &replacement);
+
+		if (PARAM_SET_isSetByName(set, "continue-on-fail") && res != KT_OK) {
+			char debugMessage[1024] = "";
+
+			if (blocks->lastBlockWasSkipped) {
+				PST_snprintf(debugMessage, sizeof(debugMessage), " Failure may be caused by the error in the previous block %zu. Using input hash of the current block instead.", blocks->blockNo - 1);
+				replacement = KSI_DataHash_ref(hash);
+			}
+
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "   + Verification is continued.%s\n", debugMessage);
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Verification is continued.%s\n", blocks->blockNo, debugMessage);
+			res = KT_OK;
+		} else {
+			ERR_CATCH_MSG(err, res, "Error: %s.", description);
+		}
 	} else {
 		replacement = KSI_DataHash_ref(hash);
 	}
@@ -575,9 +633,12 @@ static int process_record_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse hash of logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
 
 	if (blocks->metarecordHash != NULL) {
+		char description[1024];
+		PST_snprintf(description, sizeof(description), "Metarecord hash mismatch in block %zu", blocks->blockNo);
+
 		/* This is a metarecord hash. */
-		res = logksi_datahash_compare(err, mp, blocks->metarecordHash, recordHash, "Metarecord hash computed from metarecord: ", "Metarecord hash stored in log signature file: ");
-		res = continue_on_hash_fail(res, set, blocks, blocks->metarecordHash, recordHash, &replacement);
+		res = logksi_datahash_compare(err, mp, blocks, 0, blocks->metarecordHash, recordHash, description, "Metarecord hash computed from metarecord:", "Metarecord hash stored in log signature file:");
+		res = continue_on_hash_fail(res, set, mp, blocks, blocks->metarecordHash, recordHash, &replacement);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: metarecord hashes not equal.", blocks->blockNo);
 
 		res = block_info_add_record_hash_to_merkle_tree(blocks, err, ksi, 1, replacement);
@@ -595,11 +656,8 @@ static int process_record_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate hash of logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
 			}
 
-			res = logksi_datahash_compare(err, mp, hash, recordHash, "Record hash computed from logline: ", "Record hash stored in log signature file: ");
-			if (res != KT_OK) {
-				print_debug("Failed to verify logline no. %zu: %s", get_nof_lines(blocks), blocks->logLine);
-			}
-			res = continue_on_hash_fail(res, set, blocks, hash, recordHash, &replacement);
+			res = logksi_datahash_compare(err, mp, blocks, 1, hash, recordHash, NULL, "Record hash computed from logline:", "Record hash stored in log signature file:");
+			res = continue_on_hash_fail(res, set, mp, blocks, hash, recordHash, &replacement);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: record hashes not equal for logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
 		} else {
 			replacement = KSI_DataHash_ref(recordHash);
@@ -772,6 +830,9 @@ static int process_tree_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, 
 			}
 		}
 		if (blocks->nofRecordHashes) {
+			char description[1024];
+			PST_snprintf(description, sizeof(description), "Tree hash mismatch in block %zu", blocks->blockNo);
+
 			/* Find the corresponding tree hash from the Merkle tree. */
 			for (i = 0; i < blocks->treeHeight; i++) {
 				if (blocks->notVerified[i] != NULL) break;
@@ -781,8 +842,8 @@ static int process_tree_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, 
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unexpected tree hash for logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
 			}
 
-			res = logksi_datahash_compare(err, mp, blocks->notVerified[i], treeHash, "Tree hash computed from record hashes: ", "Tree hash stored in log signature file: ");
-			res = continue_on_hash_fail(res, set, blocks, blocks->notVerified[i], treeHash, &replacement);
+			res = logksi_datahash_compare(err, mp, blocks, 0, blocks->notVerified[i], treeHash, description, "Tree hash computed from record hashes:", "Tree hash stored in log signature file:");
+			res = continue_on_hash_fail(res, set, mp, blocks, blocks->notVerified[i], treeHash, &replacement);
 			if (blocks->keepRecordHashes) {
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: tree hashes not equal for logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
 			} else {
@@ -801,6 +862,9 @@ static int process_tree_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, 
 		}
 	} else {
 		if (blocks->nofRecordHashes) {
+			char description[1024];
+			PST_snprintf(description, sizeof(description), "Tree hash mismatch in block %zu", blocks->blockNo);
+
 			if (finalHash != NULL) *finalHash = 1;
 			print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_LEVEL_3, "Block no. %3zu: interpreting tree hash no. %3zu as a final hash... ", blocks->blockNo, blocks->nofTreeHashes);
 			/* Find the corresponding tree hash from the Merkle tree. */
@@ -828,8 +892,8 @@ static int process_tree_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, 
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unexpected tree hash for logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
 			}
 
-			res = logksi_datahash_compare(err, mp, blocks->notVerified[i], treeHash, "Tree hash computed from record hashes: ", "Tree hash stored in log signature file: ");
-			res = continue_on_hash_fail(res, set, blocks, blocks->notVerified[i], treeHash, &replacement);
+			res = logksi_datahash_compare(err, mp, blocks, 0, blocks->notVerified[i], treeHash, description, "Tree hash computed from record hashes:", "Tree hash stored in log signature file:");
+			res = continue_on_hash_fail(res, set, mp, blocks, blocks->notVerified[i], treeHash, &replacement);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: tree hashes not equal for logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
 		}
 	}
@@ -894,6 +958,11 @@ static int process_metarecord(PARAM_SET* set, MULTI_PRINTER *mp, ERR_TRCKR *err,
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
 		}
 
+		/*
+		 * If there are some record hashes missing, read loglines from logfile and
+		 * calculate corresponding record hash values and add them to merkle tree.
+		 * After that it is possible to add metarecord itself to the Merkle tree.
+		 */
 		while (blocks->nofRecordHashes < metarecord_index) {
 			blocks->nofRecordHashes++;
 			res = block_info_calculate_hash_of_logline_and_store_logline(blocks, files, &hash);
@@ -1033,6 +1102,7 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 	KSI_DataHash *hash = NULL;
 	KSI_TlvElement *tlv = NULL;
 	KSI_TlvElement *tlvSig = NULL;
+	KSI_TlvElement *tlvUnsig = NULL;
 	KSI_TlvElement *tlvRfc3161 = NULL;
 	KSI_TlvElement *recChain = NULL;
 	KSI_TlvElement *hashStep = NULL;
@@ -1056,6 +1126,8 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 		res = KT_VERIFICATION_FAILURE;
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: block signature data without preceding block header found.", blocks->sigNo);
 	}
+
+	blocks->signatureTLVReached = 1;
 
 	print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_LEVEL_3, "Block no. %3zu: processing block signature data... ", blocks->blockNo);
 
@@ -1082,12 +1154,35 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 
 		blocks->warningLegacy = 1;
 	}
+
+	/* Try to extract KSI signature or unsigned block marker. */
 	res = KSI_TlvElement_getElement(tlv, 0x905, &tlvSig);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to extract KSI signature element in block signature.", blocks->blockNo);
 
-	if (tlvSig == NULL) {
+	res = KSI_TlvElement_getElement(tlv, 0x02, &tlvUnsig);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to extract unsigned block marker.", blocks->blockNo);
+
+	/* If block is unsigned, return verification error. If signature data is missing, return format error. */
+	if (tlvUnsig != NULL) {
+		res = KT_VERIFICATION_FAILURE;
+		blocks->curBlockNotSigned = 1;
+
+		/* Don't use ERR_CATCH_MSG when --continue-on-fail is set, as the amount of errors
+		   produced will easily exceed the limits of ERR_TRCKR. */
+		if (PARAM_SET_isSetByName(set, "continue-on-fail")) {
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Block %zu is unsigned!\n", blocks->blockNo);
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Block is unsigned!\n", blocks->blockNo);
+		} else {
+			ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion: Make sure that block signature is actually the original output\n"
+											 "                and KSI signature is not replaced with unsigned marker!\n"
+											 "                If that's correct, use logksi sign to sign unsigned blocks.\n");
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu is unsigned and missing KSI signature in block signature.", blocks->blockNo);
+		}
+
+		goto cleanup;
+	} else if (tlvSig == NULL) {
 		res = KT_INVALID_INPUT_FORMAT;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing KSI signature in block signature.", blocks->blockNo);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing KSI signature (and unsigned block marker) in block signature.", blocks->blockNo);
 	}
 
 
@@ -1168,6 +1263,10 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 		res = processors->verify_signature(set, mp, err, ksi, blocks, files, sig, (KSI_DataHash*)context.documentHash, context.docAggrLevel, &verificationResult);
 		if (res != KSI_OK) {
 			blocks->nofTotalFailedBlocks++;
+
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Verification of block %zu KSI signature failed!\n", blocks->blockNo);
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Verification of KSI signature failed!\n", blocks->blockNo);
+
 			ERR_TRCKR_ADD(err, res, "Error: Block no. %zu: KSI signature verification failed.", blocks->blockNo);
 			goto cleanup;
 		}
@@ -1300,7 +1399,7 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, "Block no. %3zu: signing time: (%llu) %s\n", blocks->blockNo, blocks->sigTime_1, LOGKSI_signature_sigTimeToString(sig, sigTimeStr, sizeof(sigTimeStr)));
 	}
 
-
+	blocks->lastBlockWasSkipped = 0;
 	res = KT_OK;
 
 cleanup:
@@ -1314,6 +1413,7 @@ cleanup:
 	KSI_VerificationContext_clean(&context);
 	KSI_PolicyVerificationResult_free(verificationResult);
 	KSI_TlvElement_free(tlvSig);
+	KSI_TlvElement_free(tlvUnsig);
 	KSI_TlvElement_free(tlvRfc3161);
 	KSI_TlvElement_free(tlv);
 	KSI_TlvElement_free(hashStep);
@@ -1339,6 +1439,8 @@ static int process_ksi_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *e
 	blocks->blockNo++;
 	blocks->sigNo++;
 	print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_LEVEL_3, "Block no. %3zu: processing KSI signature ... ", blocks->blockNo);
+
+	blocks->signatureTLVReached = 1;
 
 	res = tlv_element_parse_and_check_sub_elements(err, ksi, blocks->ftlv_raw, blocks->ftlv_len, blocks->ftlv.hdr_len, &tlvSig);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse KSI signature as TLV element.", blocks->blockNo);
@@ -1377,6 +1479,8 @@ static int process_ksi_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *e
 		KSI_DataHash_free(blocks->rootHash);
 		blocks->rootHash = KSI_DataHash_ref(hash);
 	}
+
+	blocks->lastBlockWasSkipped = 0;
 	res = KT_OK;
 
 cleanup:
@@ -1468,9 +1572,12 @@ static int process_record_chain(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *er
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse hash of logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
 
 	if (blocks->metarecordHash != NULL) {
+		char description[1024];
+		PST_snprintf(description, sizeof(description), "Metarecord hash mismatch in block %zu", blocks->blockNo);
+
 		/* This is a metarecord hash. */
-		res = logksi_datahash_compare(err, mp, blocks->metarecordHash, recordHash, "Metarecord hash computed from metarecord: ", "Metarecord hash stored in integrity proof file: ");
-		res = continue_on_hash_fail(res, set, blocks, blocks->metarecordHash, recordHash, &replacement);
+		res = logksi_datahash_compare(err, mp, blocks, 0, blocks->metarecordHash, recordHash, description, "Metarecord hash computed from metarecord:", "Metarecord hash stored in integrity proof file:");
+		res = continue_on_hash_fail(res, set, mp, blocks, blocks->metarecordHash, recordHash, &replacement);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: metarecord hashes not equal.", blocks->blockNo);
 	} else {
 		/* This is a logline record hash. */
@@ -1482,11 +1589,8 @@ static int process_record_chain(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *er
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate hash of logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
 			}
 
-			res = logksi_datahash_compare(err, mp, hash, recordHash, "Record hash computed from logline: ", "Record hash stored in integrity proof file: ");
-			if (res != KT_OK) {
-				print_debug("Failed to verify logline no. %zu: %s", get_nof_lines(blocks), blocks->logLine);
-			}
-			res = continue_on_hash_fail(res, set, blocks, hash, recordHash, &replacement);
+			res = logksi_datahash_compare(err, mp, blocks, 1, hash, recordHash, NULL, "Record hash computed from logline:", "Record hash stored in integrity proof file:");
+			res = continue_on_hash_fail(res, set, mp, blocks, hash, recordHash, &replacement);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: record hashes not equal.", blocks->blockNo);
 		} else {
 			replacement = KSI_DataHash_ref(recordHash);
@@ -1495,6 +1599,8 @@ static int process_record_chain(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *er
 
 	if (tlv->subList) {
 		int i;
+		char description[1024];
+
 		blocks->treeHeight = 0;
 		root = KSI_DataHash_ref(replacement);
 
@@ -1515,10 +1621,12 @@ static int process_record_chain(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *er
 			}
 		}
 
-		res = logksi_datahash_compare(err, mp, root, blocks->rootHash, "Root hash computed from hash chain: ", "Root hash stored in KSI signature: ");
+		PST_snprintf(description, sizeof(description), "Root hash mismatch in block %zu", blocks->blockNo);
+
+		res = logksi_datahash_compare(err, mp, blocks, 0, root, blocks->rootHash, description, "Root hash computed from hash chain:", "Root hash stored in KSI signature:");
 		KSI_DataHash_free(replacement);
 		replacement = NULL;
-		res = continue_on_hash_fail(res, set, blocks, root, blocks->rootHash, &replacement);
+		res = continue_on_hash_fail(res, set, mp, blocks, root, blocks->rootHash, &replacement);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: root hashes not equal.", blocks->blockNo);
 	} else {
 		res = KT_INVALID_INPUT_FORMAT;
@@ -1582,11 +1690,14 @@ static int process_partial_block(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, B
 
 	/* If the blocks file contains hashes, re-compute and compare the root hash against the provided root hash. */
 	if (blocks->nofRecordHashes) {
+		char description[1024];
+		PST_snprintf(description, sizeof(description), "Root hash mismatch in block %zu", blocks->blockNo);
+
 		res = block_info_calculate_root_hash(blocks, ksi, &rootHash);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate root hash.", blocks->blockNo);
 
-		res = logksi_datahash_compare(err, mp, rootHash, hash, "Root hash computed from record hashes: ", "Unsigned root hash stored in block data file: ");
-		res = continue_on_hash_fail(res, set, blocks, rootHash, hash, &replacement);
+		res = logksi_datahash_compare(err, mp, blocks, 0, rootHash, hash, description, "Root hash computed from record hashes:", "Unsigned root hash stored in block data file:");
+		res = continue_on_hash_fail(res, set, mp, blocks, rootHash, hash, &replacement);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: root hashes not equal.", blocks->blockNo);
 	} else {
 		replacement = KSI_DataHash_ref(hash);
@@ -1618,6 +1729,7 @@ static int process_partial_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCK
 	KSI_TlvElement *tlvNoSig = NULL;
 	KSI_TlvElement *tlvRfc3161 = NULL;
 	int insertHashes = 0;
+	char description[1024];
 
 	if (err == NULL || ksi == NULL || processors == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -1629,6 +1741,7 @@ static int process_partial_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCK
 		MULTI_PRINTER_printByID(mp, MP_ID_BLOCK_PARSING_TREE_NODES);
 	}
 
+	PST_snprintf(description, sizeof(description), "Root hash mismatch in block %zu", blocks->blockNo);
 	print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_LEVEL_3, "Block no. %3zu: processing partial signature data... ", blocks->blockNo);
 
 	blocks->sigNo++;
@@ -1636,6 +1749,9 @@ static int process_partial_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCK
 		res = KT_INVALID_INPUT_FORMAT;
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: block signature data without preceding block header found.", blocks->sigNo);
 	}
+
+	blocks->signatureTLVReached = 1;
+
 	res = tlv_element_parse_and_check_sub_elements(err, ksi, blocks->ftlv_raw, blocks->ftlv_len, blocks->ftlv.hdr_len, &tlv);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse block signature as TLV element.", blocks->blockNo);
 
@@ -1701,16 +1817,16 @@ static int process_partial_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCK
 
 		/* Compare signed root hash with unsigned root hash. */
 		if (blocks->rootHash) {
-			res = logksi_datahash_compare(err, mp, blocks->rootHash, docHash, "Unsigned root hash stored in block data file: ", "Signed root hash stored in KSI signature: ");
-			res = continue_on_hash_fail(res, set, blocks, blocks->rootHash, docHash, &replacement);
+			res = logksi_datahash_compare(err, mp, blocks, 0, blocks->rootHash, docHash, description, "Unsigned root hash stored in block data file:", "Signed root hash stored in KSI signature:");
+			res = continue_on_hash_fail(res, set, mp, blocks, blocks->rootHash, docHash, &replacement);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: root hashes not equal.", blocks->blockNo);
 		} else if (blocks->nofRecordHashes) {
 			/* Compute the root hash and compare with signed root hash. */
 			res = block_info_calculate_root_hash(blocks, ksi, &rootHash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate root hash.", blocks->blockNo);
 
-			res = logksi_datahash_compare(err, mp, rootHash, docHash, "Root hash computed from record hashes: ", "Signed root hash stored in KSI signature: ");
-			res = continue_on_hash_fail(res, set, blocks, rootHash, docHash, &replacement);
+			res = logksi_datahash_compare(err, mp, blocks, 0, rootHash, docHash, description, "Root hash computed from record hashes:", "Signed root hash stored in KSI signature:");
+			res = continue_on_hash_fail(res, set, mp, blocks, rootHash, docHash, &replacement);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: root hashes not equal.", blocks->blockNo);
 		}
 	} else if (tlvNoSig != NULL) {
@@ -1720,16 +1836,16 @@ static int process_partial_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCK
 
 		/* Compare unsigned root hashes. */
 		if (blocks->rootHash) {
-			res = logksi_datahash_compare(err, mp, blocks->rootHash, hash, "Unsigned root hash stored in block data file: ", "Unsigned root hash stored in block signature file: ");
-			res = continue_on_hash_fail(res, set, blocks, blocks->rootHash, hash, &replacement);
+			res = logksi_datahash_compare(err, mp, blocks, 0, blocks->rootHash, hash, description, "Unsigned root hash stored in block data file:", "Unsigned root hash stored in block signature file:");
+			res = continue_on_hash_fail(res, set, mp, blocks, blocks->rootHash, hash, &replacement);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: root hashes not equal.", blocks->blockNo);
 		} else if (blocks->nofRecordHashes) {
 			/* Compute the root hash and compare with unsigned root hash. */
 			res = block_info_calculate_root_hash(blocks, ksi, &rootHash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate root hash.", blocks->blockNo);
 
-			res = logksi_datahash_compare(err, mp, rootHash, hash, "Root hash computed from record hashes: ", "Unsigned root hash stored in block signature file: ");
-			res = continue_on_hash_fail(res, set, blocks, rootHash, hash, &replacement);
+			res = logksi_datahash_compare(err, mp, blocks, 0, rootHash, hash, description, "Root hash computed from record hashes:", "Unsigned root hash stored in block signature file:");
+			res = continue_on_hash_fail(res, set, mp, blocks, rootHash, hash, &replacement);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: root hashes not equal.", blocks->blockNo);
 		}
 
@@ -1882,9 +1998,9 @@ static int finalize_log_signature(PARAM_SET* set, MULTI_PRINTER* mp, ERR_TRCKR *
 		}
 	}
 
-	if (blocks->nofHashFails) {
+	if (blocks->nofTotaHashFails) {
 		res = KT_VERIFICATION_FAILURE;
-		ERR_CATCH_MSG(err, res, "Error: %zu hash comparison failures found.", blocks->nofHashFails);
+		ERR_CATCH_MSG(err, res, "Error: %zu hash comparison failures found.", blocks->nofTotaHashFails);
 	}
 
 	if (blocks->nofExtractPositionsFound < blocks->nofExtractPositions) {
@@ -1904,7 +2020,7 @@ cleanup:
 
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 
-	print_debug_mp(mp, MP_ID_LOGFILE_SUMMARY, DEBUG_SMALLER | DEBUG_LEVEL_3, "Summary of logfile:\n");
+	print_debug_mp(mp, MP_ID_LOGFILE_SUMMARY, DEBUG_SMALLER | DEBUG_LEVEL_3, "\nSummary of logfile:\n");
 
 	print_debug_mp(mp, MP_ID_LOGFILE_SUMMARY, DEBUG_SMALLER | DEBUG_LEVEL_3, " * %-*s%zu\n", longIndentation, "Count of blocks:", blocks->blockNo);
 	if (blocks->nofTotalFailedBlocks > 0) print_debug_mp(mp, MP_ID_LOGFILE_SUMMARY, DEBUG_SMALLER | DEBUG_LEVEL_3, " * %-*s%zu\n", longIndentation, "Count of failures:", blocks->nofTotalFailedBlocks);
@@ -1919,7 +2035,7 @@ cleanup:
 	}
 
 	if (blocks->nofTotalMetarecors > 0) print_debug_mp(mp, MP_ID_LOGFILE_SUMMARY, DEBUG_SMALLER | DEBUG_LEVEL_3, " * %-*s%zu\n", longIndentation, "Count of meta-records:", blocks->nofTotalMetarecors); /* Meta records not included. */
-	if (blocks->nofHashFails > 0) print_debug_mp(mp, MP_ID_LOGFILE_SUMMARY, DEBUG_SMALLER | DEBUG_LEVEL_3, " * %-*s%zu\n", longIndentation, "Count of hash failures:", blocks->nofHashFails);
+	if (blocks->nofTotaHashFails > 0) print_debug_mp(mp, MP_ID_LOGFILE_SUMMARY, DEBUG_SMALLER | DEBUG_LEVEL_3, " * %-*s%zu\n", longIndentation, "Count of hash failures:", blocks->nofTotaHashFails);
 	if (blocks->nofExtractPositions > 0) print_debug_mp(mp, MP_ID_LOGFILE_SUMMARY, DEBUG_SMALLER | DEBUG_LEVEL_3, " * %-*s%zu\n", longIndentation, "Records extracted:", blocks->nofExtractPositions);
 
 	LOGKSI_DataHash_toString(inputHash, inHash, sizeof(inHash));
@@ -2187,6 +2303,66 @@ static const char *io_files_getCurrentLogFilePrintRepresentation(IO_FILES *files
 	return logStdin ? "stdin" : files->internal.inLog;
 }
 
+static int skip_current_block_as_it_does_not_verify(BLOCK_INFO *blocks, MULTI_PRINTER* mp, IO_FILES *files, ERR_TRCKR *err, KSI_CTX *ksi, int *skip) {
+	int res = KT_UNKNOWN_ERROR;
+	KSI_TlvElement *tlv = NULL;
+	size_t i = 0;
+	char buf[1024];
+	size_t logLinesToSkip = 0;
+
+
+	if (blocks == NULL || ksi == NULL ||  skip == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	/* If skipping is not enabled, just exit. */
+	if ((*skip) == 0) {
+		res = KT_OK;
+		goto cleanup;
+	}
+
+	switch (blocks->ftlv.tag) {
+		case 0x901:
+			*skip = 0;
+
+			/* Normally this is incremented in process_block_signature or process_partial_signature.
+			   If this has not happened it must be incremented here. */
+			if (blocks->firstLineInBlock - 1 == blocks->nofTotalRecordHashes) {
+				blocks->nofTotalRecordHashes += blocks->recordCount;
+			}
+
+			logLinesToSkip = blocks->recordCount - (blocks->nofRecordHashes - blocks->nofMetaRecords);
+
+			if (logLinesToSkip > 0) {
+				print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, "Block no. %3zu: Skipping %zu log lines.\n", blocks->blockNo, logLinesToSkip);
+
+				for (i = 0; i < logLinesToSkip; i++) {
+					res = SMART_FILE_gets(files->files.inLog, buf, sizeof(buf), NULL);
+					if (res != SMART_FILE_OK) goto cleanup;
+				}
+			}
+		break;
+
+		case 0x904:
+			res = tlv_element_parse_and_check_sub_elements(err, ksi, blocks->ftlv_raw, blocks->ftlv_len, blocks->ftlv.hdr_len, &tlv);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse block signature as TLV element.", blocks->blockNo);
+
+			res = tlv_element_get_uint(tlv, ksi, 0x01, &blocks->recordCount);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing record count in block signature.", blocks->blockNo);
+			blocks->sigNo++;
+		break;
+	}
+
+	res = KT_OK;
+
+cleanup:
+
+	KSI_TlvElement_free(tlv);
+
+	return res;
+}
+
 int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, KSI_DataHash *firstLink, VERIFYING_FUNCTION verify_signature, IO_FILES *files, KSI_DataHash **lastLeaf) {
 	int res;
 
@@ -2194,6 +2370,8 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 	unsigned char ftlv_raw[SOF_FTLV_BUFFER];
 	SIGNATURE_PROCESSORS processors;
 	int isFirst = 1;
+	int skipCurrentBlock = 0;
+	int lastError = KT_OK;
 
 	if (set == NULL || err == NULL || ksi == NULL || blocks == NULL || verify_signature == NULL || files == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -2213,6 +2391,9 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 
 		res = LOGKSI_FTLV_smartFileRead(files->files.inSig, blocks->ftlv_raw, SOF_FTLV_BUFFER, &blocks->ftlv_len, &blocks->ftlv);
 		if (res == KSI_OK) {
+			skip_current_block_as_it_does_not_verify(blocks, mp, files, err, ksi, &skipCurrentBlock);
+			if (skipCurrentBlock) continue;
+
 			switch (blocks->version) {
 				case LOGSIG11:
 				case LOGSIG12:
@@ -2223,7 +2404,23 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 						case 0x903:
 						case 0x911:
 							res = process_log_signature_with_block_signature(set, mp, err, ksi, NULL, blocks, files, &processors);
-							if (res != KT_OK) goto cleanup;
+							if (res != KT_OK) {
+								/* In case of verification failure and --continue-on-fail option, verification is continued. */
+								if ((res == KT_VERIFICATION_FAILURE || res == KSI_VERIFICATION_FAILURE) && PARAM_SET_isSetByName(set, "continue-on-fail")) {
+									print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
+									print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_2, res);
+									print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
+
+									lastError = KT_VERIFICATION_FAILURE;
+									skipCurrentBlock = 1;
+									blocks->lastBlockWasSkipped = 1;
+
+									print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Skipping block %zu!\n", blocks->blockNo);
+									print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Block is skipped!\n", blocks->blockNo);
+									continue;
+								}
+								goto cleanup;
+							}
 						break;
 
 						default:
@@ -2342,7 +2539,17 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 
 cleanup:
 
+	if (lastError != KT_OK) {
+		res = lastError;
+		ERR_TRCKR_ADD(err, res, "Error: Verification FAILED but was continued for further analysis.");
+	}
+
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_2, res);
+
+	if (MULTI_PRINTER_hasDataByID(mp, MP_ID_BLOCK_ERRORS)) {
+		print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n");
+	}
+
 	MULTI_PRINTER_printByID(mp, MP_ID_BLOCK_ERRORS);
 
 	KSI_DataHash_free(theFirstInputHashInFile);

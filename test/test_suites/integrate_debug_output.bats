@@ -5,13 +5,13 @@ export KSI_CONF=test/test.cfg
 
 @test "integrate output with debug level 1" {
 	run ./src/logksi integrate test/resource/logsignatures/signed -o test/out/dummy.ksig --force-overwrite -d
-	[[ "$output" =~ (Integrating... ok.).(Summary of logfile:).( . Count of blocks:             4).( . Count of record hashes:      9).( . Count of meta-records:       1) ]]
+	[[ "$output" =~ (Integrating... ok.)..(Summary of logfile:).( . Count of blocks:             4).( . Count of record hashes:      9).( . Count of meta-records:       1) ]]
 	[ "$status" -eq 0 ]
 }
 
 @test "integrate output with debug level 2" {
 	run ./src/logksi integrate test/resource/logsignatures/signed -o test/out/dummy.ksig --force-overwrite -dd
-	[[ "$output" =~ (Integrating block no.   1: into log signature... ok.).(Summary of block 1:).( . Sig time:    .1517928882.*).( . Input hash:  SHA-512:7f3dea.*ee3141).( . Output hash: SHA-512:20cfea.*88944a).( . Lines:                       1 . 3 .3.)..(Integrating block no.   2: into log signature... ok.).(Summary of block 2:).( . Sig time:    .1517928883.*).( . Input hash:  SHA-512:20cfea.*88944a).( . Output hash: SHA-512:9c1ea0.*42e444).( . Lines:                       4 . 6 .3.)..(Integrating block no.   3: into log signature... ok.).(Summary of block 3:).( . Sig time:    .1517928884.*).( . Input hash:  SHA-512:9c1ea0.*42e444).( . Output hash: SHA-512:1dfeae.*43e987).( . Lines:                       7 . 9 .3.)..(Integrating block no.   4: into log signature... ok.).(Summary of block 4:).( . Sig time:    .1517928885.*).( . Input hash:  SHA-512:1dfeae.*43e987).( . Output hash: SHA-512:f7f5b4.*b2b596).( . Line:                        n.a).( . Count of meta-records:       1)..(Summary of logfile:).( . Count of blocks:             4).( . Count of record hashes:      9).( . Count of meta-records:       1) ]]
+	[[ "$output" =~ (Integrating block no.   1: into log signature... ok.)..(Summary of block 1:).( . Sig time:    .1517928882.*).( . Input hash:  SHA-512:7f3dea.*ee3141).( . Output hash: SHA-512:20cfea.*88944a).( . Lines:                       1 . 3 .3.)..(Integrating block no.   2: into log signature... ok.)..(Summary of block 2:).( . Sig time:    .1517928883.*).( . Input hash:  SHA-512:20cfea.*88944a).( . Output hash: SHA-512:9c1ea0.*42e444).( . Lines:                       4 . 6 .3.)..(Integrating block no.   3: into log signature... ok.)..(Summary of block 3:).( . Sig time:    .1517928884.*).( . Input hash:  SHA-512:9c1ea0.*42e444).( . Output hash: SHA-512:1dfeae.*43e987).( . Lines:                       7 . 9 .3.)..(Integrating block no.   4: into log signature... ok.)..(Summary of block 4:).( . Sig time:    .1517928885.*).( . Input hash:  SHA-512:1dfeae.*43e987).( . Output hash: SHA-512:f7f5b4.*b2b596).( . Line:                        n.a).( . Count of meta-records:       1)...(Summary of logfile:).( . Count of blocks:             4).( . Count of record hashes:      9).( . Count of meta-records:       1) ]]
 	[ "$status" -eq 0 ]
 }
 

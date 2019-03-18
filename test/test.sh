@@ -25,6 +25,8 @@ test/test_suites/extract_cmd.bats \
 test/test_suites/treehash_check.bats \
 test/test_suites/legacy.bats \
 test/test_suites/verify_linking.bats \
+test/test_suites/verify_continue.bats \
+test/test_suites/verify_continue_debug_output.bats \
 test/test_suites/verify_debug_output.bats \
 test/test_suites/verify_cmd.bats
 

@@ -21,7 +21,7 @@ mkdir -p test/out/integrate-recover
 	run src/logksi integrate test/resource/recover_logsig_parts/logfile test/resource/recover_logsig_parts/recover-second-block-tlv-corrupted.logsig.parts -o test/out/integrate-recover/recovered-2.logsig --out-log test/out/integrate-recover/recovered-2 -d --force-overwrite --recover
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ (Integrating... failed.).(Checking recoverability... ok.).(Removing corrupted data from log signature... ok.).(Copying valid log lines into recovered log file... ok.).(It was possible to recover 1 blocks .lines 1 . 3..).(Recovered log signature saved to \'test\/out\/integrate-recover\/recovered-2.logsig\').(Recovered Log file saved to \'test\/out\/integrate-recover\/recovered-2\') ]]
-	[[ "$output" =~ "Error: Block no. 2: last hashes of previous block not equal." ]]
+	[[ "$output" =~ "Error: Output hash of block 1 differs from input hash of block 2." ]]
 }
 
 @test "recover-2: verify" {
