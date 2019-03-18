@@ -98,15 +98,15 @@ Prints a warning when two consecutive blocks have same signing time. When multip
 .\"
 .TP
 \fB--continue-on-fail\fR
-This option can be used to continue verification, if verification error is encountered, for debugging purpose. In case of other errors (e.g. IO or Invalid Format error) verification is terminated. If error is encountered current block is skipped and next block is verified. When checking interlinking of blocks, where previous block was skipped due to of error, and hash values do not match, input hash of the current block is used instead. Despite of continuation, errors are reported and logksi will exit code other than 0. See options \fB--use-stored-hash-on-fail\fR and \fB--use-computed-hash-on-fail\fR to debug hash comparison failures.
+This option can be used to continue verification to improve debugging of verification errors. Other errors (e.g. IO error) will terminated verification. Problematic block is skipped and next block is verified. When interlinking check fails and previous block was skipped, error message is displayed and input hash from the current blocks header is used instead to continue. Despite of continuation, errors are reported and logksi will exit code other than 0. See options \fB--use-stored-hash-on-fail\fR and \fB--use-computed-hash-on-fail\fR to debug hash comparison failures. When used together with debug level 2 (\fB-dd\fR), block summary may be missing some regular information as the data is not available (not reached due to of failure - e.g. signing time) or is incomplete (e.g. output hash).
 .\"
 .TP
 \fB--use-stored-hash-on-fail\fR
-This options can be used to debug hash comparison failures, by using stored hash value to continue verification process. For example stored hash value in log signature file are: input hash in block header, record / meta-record / tree hashes in block or root hash value in KSI signature.
+This options can be used to debug hash comparison failures, by using stored hash values to continue verification process. For example stored hash values in log signature file are: input hash in block header, record / meta-record / tree hashes in block or root hash value in KSI signature.
 .\"
 .TP
 \fB--use-computed-hash-on-fail\fR
-This options can be used to debug hash comparison failures, by using computed hash value to continue verification process. For example computed hash values are: output hash computed from block data, record hash computed from log line and root hash computed from record hashes.
+This options can be used to debug hash comparison failures, by using computed hash values to continue verification process. For example computed hash values are: output hash computed from block data, record hash computed from log line and root hash computed from record hashes.
 .\"
 .TP
 \fB-x\fR
