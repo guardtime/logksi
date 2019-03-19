@@ -11,11 +11,15 @@
 (LOGKSI-118) * BUGFIX: Verification debug output (-d and -dd) for excerpt file displays information instead of nonsense.
 (LOGKSI-110) *IMPROVEMENT: Internal file handling refactored.
 
------------ remove this line when release is made -----------
+Version 1.4
 
+2019-03-11 1.4.518
+
+* IMPROVEMENT: At least libksi 3.18 is needed to build logksi.
 * IMPROVEMENT: Verification error handling improved.
 * IMPROVEMENT: Debug output with -d option is more compact.
 * IMPROVEMENT: Option --show-progress works only with debug level 1 (just one -d).
+* FEATURE: Script rebuild.sh has new option --ign-dep-online-err to ignore test results during online build (--get-dep-online).
 * FEATURE: By specifying -d options only once will display summary of the log file.
 * FEATURE: By specifying multiple -d options (-d -d or -dd) will display summary of each block.
 * FEATURE: By specifying multiple -d options (-d -d -d or -ddd) debug output will be more verbose.
@@ -30,6 +34,7 @@
 * FEATURE: New option --input-hash to specify inter-linking hash as input for verification.
 * FEATURE: New option --output-hash to output the last leaf hash for inter-linking.
 * FEATURE: New option --warn-same-block-time that prints a warning when two consecutive blocks has same signing time.
+* BUGFIX: Scripts rebuild.sh option --get-dep-online fixed, where dependencies are downloaded properly from github.
 * BUGFIX: Some suggestion messages pointing to KSI tool instead of logksi fixed.
 * BUGFIX: Verifying: help function fixed, help text now available.
 * BUGFIX: Verification error message fixed and improved in case where publication record is not available in publications file.

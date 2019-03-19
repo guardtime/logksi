@@ -22,6 +22,8 @@
 
 #include "logksi_err.h"
 #include <ksi/ksi.h>
+#include <ksi/hash.h>
+#include <ksi/version.h>
 #include <ksi/policy.h>
 #include "err_trckr.h"
 #include <ksi/tlv_element.h>
@@ -30,7 +32,10 @@
 extern "C" {
 #endif
 
-
+/* To make it backward compatible, define KSI_HASHALG_INVALID_VALUE. */
+#if KSI_SDK_VER_MAJOR == 3 && KSI_SDK_VER_MINOR <= 18
+#	define KSI_HASHALG_INVALID_VALUE KSI_HASHALG_INVALID
+#endif
 
 #define ERR_CATCH_MSG(err, res, msg, ...) \
 	if (res != KT_OK) { \

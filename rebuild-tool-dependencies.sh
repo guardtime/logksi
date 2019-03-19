@@ -1,7 +1,7 @@
 #!/bin/sh
 
 #
-# Copyright 2013-2018 Guardtime, Inc.
+# Copyright 2013-2019 Guardtime, Inc.
 #
 # This file is part of the Guardtime client SDK.
 #
@@ -20,19 +20,29 @@
 
 set -e
 
-#libksi_git="https://github.com/guardtime/libksi.git"
-#libksi_version=v3.17.2693
-libksi_git="git@git.ee.guardtime.com:developers/libksi.git"
-libksi_version="develop"
-#libgtrfc3161_git="https://github.com/guardtime/signatureconverter-c.git"
-#libgtrfc3161_version=v1.0.000
-libgtrfc3161_git="git@git.ee.guardtime.com:developers/signatureconverter-c.git"
-libgtrfc3161_version="develop"
+libksi_git="https://github.com/guardtime/libksi.git"
+libksi_version=v3.19.2939
+libgtrfc3161_git="https://github.com/guardtime/libgtrfc3161.git"
+libgtrfc3161_version=4def4646c17939c049a1da550e50c49fbf5b7f75
+
 
 tmp_build_dir_name="tmp_dep_build"
 lib_out_dir="dependencies"
 libksi_dir_name="libksi"
 libgtrfc3161_dir_name="libgtrfc3161"
+
+ignore_exit_code=false
+
+while [ "$1" != "" ]; do
+	case $1 in
+		--ignore-build-error )	 echo "When building libksi and libgtrfc3161 result of the tests is ignored."
+								 ignore_exit_code=true
+								 ;;
+		* )						 echo "Unknown token '$1' from command-line."
+								 exit 1
+	esac
+	shift
+done
 
 
 rm -rf $tmp_build_dir_name
@@ -45,12 +55,12 @@ cd $tmp_build_dir_name
 
   cd $libksi_dir_name
     git checkout $libksi_version
-    ./rebuild.sh
+    ./rebuild.sh || $ignore_exit_code
   cd ..
 
   cd $libgtrfc3161_dir_name
     git checkout $libgtrfc3161_version
-    ./rebuild.sh LDFLAGS=-L$(pwd)/../libksi/src/ksi/.libs/ CPPFLAGS=-I$(pwd)/../libksi/src/
+    ./rebuild.sh LDFLAGS=-L$(pwd)/../libksi/src/ksi/.libs/ CPPFLAGS=-I$(pwd)/../libksi/src/ || $ignore_exit_code
   cd ..
 cd ..
 
