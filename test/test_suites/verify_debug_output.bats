@@ -78,19 +78,19 @@ export KSI_CONF=test/test.cfg
 }
 
 @test "verify output with debug level 1. excerpt file." {
-	run src/logksi verify test/resource/proof/log_repaired.excerpt -d
+	run src/logksi verify test/resource/excerpt/log-ok.excerpt -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ (Verifying... ok.)..(Summary of logfile:).( . Count of blocks:             2).( . Count of record hashes:      4) ]]
 }
 
 @test "verify output with debug level 2. excerpt file." {
-	run src/logksi verify test/resource/proof/log_repaired.excerpt -dd
+	run src/logksi verify test/resource/excerpt/log-ok.excerpt -dd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ (Verifying block no.   1... ok.).(Summary of block 1:).( . Sig time:    .1517928936.*).( . Record count:                2)..(Verifying block no.   2... ok.).(Summary of block 2:).( . Sig time:    .1517928937.*).( . Record count:                2)...(Summary of logfile:).( . Count of blocks:             2).( . Count of record hashes:      4) ]]
 }
 
 @test "verify output with debug level 3. excerpt file." {
-	run src/logksi verify test/resource/proof/log_repaired.excerpt -ddd
+	run src/logksi verify test/resource/excerpt/log-ok.excerpt -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ (Processing magic number... ok.).(Block no.   1: processing KSI signature ... ok.).(Block no.   1: verifying KSI signature... ok.*ms.).(Block no.   1: signing time: .1517928936.*).(Block no.   1: .rr.).(Block no.   2: processing KSI signature ... ok.).(Block no.   2: verifying KSI signature... ok.*ms.).(Block no.   2: signing time: .1517928937.*).(Block no.   2: .rr.) ]]
 }
