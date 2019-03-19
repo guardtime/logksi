@@ -8,6 +8,7 @@
 (LOGKSI-80) * BUGFIX: When integrating not suitable log signature that expects to have different count of record hashes, a meaningful error message is displayed.
 (LOGKSI-117) * BUGFIX: Warning about same signing time with debug level 1 is not mixed up with other messages.
 (LOGKSI-117) * BUGFIX: Warning about same signing time with debug level 3 prints correct block number and file name.
+(LOGKSI-118) * BUGFIX: Verification debug output (-d and -dd) for excerpt file displays information instead of nonsense.
 (LOGKSI-110) *IMPROVEMENT: Internal file handling refactored.
 
 ----------- remove this line when release is made -----------
