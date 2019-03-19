@@ -77,7 +77,7 @@ typedef struct {
 	size_t noSigCount;				/* Count of not signed blocks counted in the beginning of the sign task. */
 
 	size_t noSigCreated;			/* Count of signatures created for unsigned blocks. */
-	size_t blockNo;					/* Index of current block (incremented if block header is processed). */
+	size_t blockNo;					/* Index of current block (incremented if block header or KSI signature in excerpt file is processed ). */
 	size_t partNo;					/* Index of partial blocks (incremented if partial block is processed). */
 	size_t sigNo;					/* Index of block-signatures + ksi signatures + partial signatures. */
 	size_t noSigNo;					/* Count of not signed blocks. */

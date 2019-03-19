@@ -1,0 +1,4 @@
+Apr 26 14:39:27 CentOS sudo:  vagrant : TTY=pts/0 ; PWD=/home/vagrant/work/logksi ; USER=root ; COMMAND=/bin/ls -la /var/log/secure.logsig.parts
+Apr 26 14:39:57 CentOS sudo:  vagrant : TTY=pts/0 ; PWD=/home/vagrant/work/logksi ; USER=root ; COMMAND=/bin/cp -r /var/log/secure-20170426-143917 /var/log/secure-20170426-143917.logsig.parts .
+Apr 26 14:40:56 CentOS sudo:  vagrant : TTY=pts/0 ; PWD=/home/vagrant/work/logksi ; USER=root ; COMMAND=/bin/ls -la /var/log/secure.logsig.parts
+Apr 26 14:40:57 CentOS sudo:  vagrant : TTY=pts/0 ; PWD=/home/vagrant/work/logksi ; USER=root ; COMMAND=/bin/ls -la /var/log/secure.logsig.parts
