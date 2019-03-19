@@ -58,3 +58,21 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ (Block no.   1: processing block header... ok.).(Block no.   1: input hash: SHA-512:7f5a17.*cd7827.).(Block no.   1: interpreting tree hash no.   5 as a final hash... ok.).(Block no.   1: [{]r.r..r.:. X) ]]
 	[[ "$output" =~ "Error: Block no. 1: unexpected final tree hash no. 6." ]]
 }
+
+@test "verify output with debug level 1. two files with same signing time for output and input hash" {
+	run src/logksi verify --warn-same-block-time -d -- test/resource/interlink/ok-testlog-interlink-same-sig-time-[12]
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ (Verifying... ok.)..(Summary of logfile:).*( . Output hash: SHA-256:601697.*35dc7d)..(Warning: Last block from file).*(ok-testlog-interlink-same-sig-time-1).*(and).*(first block from file).*(ok-testlog-interlink-same-sig-time-2).*(has same signing time .1540454662.) ]]
+}
+
+@test "verify output with debug level 2. two files with same signing time for output and input hash" {
+	run src/logksi verify --warn-same-block-time -dd -- test/resource/interlink/ok-testlog-interlink-same-sig-time-[12]
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ (Log file.*ok-testlog-interlink-same-sig-time-1..).(Verifying block no.   1... ok.).*(Log file.*ok-testlog-interlink-same-sig-time-2..).(Verifying block no.   1... ok.).*(Summary of logfile:).*( . Output hash: SHA-256:601697.*35dc7d)..(Warning: Last block from file).*(ok-testlog-interlink-same-sig-time-1).*(and).*(first block from file).*(ok-testlog-interlink-same-sig-time-2).*(has same signing time .1540454662.) ]]
+}
+
+@test "verify output with debug level 3. two files with same signing time for output and input hash" {
+	run src/logksi verify --warn-same-block-time -ddd -- test/resource/interlink/ok-testlog-interlink-same-sig-time-[12]
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ (Block no.   1: output hash: SHA-256:601697.*35dc7d.).(Block no.   1: Warning: Last block from file).*(ok-testlog-interlink-same-sig-time-1).*(and).*(first block from file).*(ok-testlog-interlink-same-sig-time-2).*(has same signing time .1540454662.) ]]
+}
