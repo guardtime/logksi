@@ -1794,6 +1794,7 @@ static int process_partial_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCK
 					res = tlv_element_write_hash(missing, 0x903, files->files.outSig);
 					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing tree hash could not be written.", blocks->blockNo);
 					KSI_DataHash_free(missing);
+					blocks->outSigModified = 1;
 				}
 			} while (missing);
 			blocks->finalTreeHashesNone = 0;
@@ -1873,6 +1874,7 @@ static int process_partial_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCK
 
 			blocks->noSigCreated++;
 			blocks->curBlockJustReSigned = 1;
+			blocks->outSigModified = 1;
 
 			res = KSI_TlvElement_new(&tlvSig);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to serialize KSI signature.", blocks->blockNo);
@@ -2873,9 +2875,26 @@ int logsignature_sign(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX
 	res = finalize_log_signature(set, mp, err, ksi, theFirstInputHashInFile, &blocks, files);
 	if (res != KT_OK) goto cleanup;
 
+	res = SMART_FILE_markConsistent(files->files.outSig);
+	ERR_CATCH_MSG(err, res, "Error: Could not close output log signature file %s.", files->internal.outSig);
+
 	res = KT_OK;
 
 cleanup:
+	/**
+	 * + If there is error mark output file as inconsistent.
+	 * + If there is no changes and output is not explicitly specified
+	 *   and output file already exists, mark output file as inconsistent.
+	 * + Inconsistent state discards temporary file created.
+	 */
+	if (files->files.outSig != NULL &&
+										(res != KT_OK ||
+										 (!blocks.outSigModified && !PARAM_SET_isSetByName(set, "o") && SMART_FILE_doFileExist(files->internal.outSig))
+										)) {
+		res = SMART_FILE_markInconsistent(files->files.outSig);
+		ERR_CATCH_MSG(err, res, "Error: Unable to mark output signature file as inconsistent.");
+	}
+
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_2, res);
 	BLOCK_INFO_freeAndClearInternals(&blocks);
 	KSI_DataHash_free(theFirstInputHashInFile);

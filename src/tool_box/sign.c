@@ -356,9 +356,6 @@ static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files) {
 
 	/* Close input file first, so it is possible to make a backup of it or overwrite it. */
 	logksi_file_close(&files->files.inSig);
-
-	res = SMART_FILE_markConsistent(files->files.outSig);
-	ERR_CATCH_MSG(err, res, "Error: Could not close output log signature file %s.", files->internal.outSig);
 	logksi_file_close(&files->files.outSig);
 
 	res = KT_OK;

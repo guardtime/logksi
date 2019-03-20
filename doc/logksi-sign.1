@@ -27,7 +27,7 @@ Use to read the log signature file from \fIstdin\fR. If no output file is specif
 .\"
 .TP
 \fB-o \fI<out.logsig>\fR
-Specify the name of the output log signature file; recommended file extension is \fI.logsig\fR. If not specified, the input file \fI<logfile>.logsig\fR is modified. The backup of the original log signature file will be saved to \fI<logfile>.logsig.bak\fR. If the output file name is explicitly specified, an existing file will always be overwritten and no backup file will be created. Use '-' as file name to redirect the output as a binary stream to \fIstdout\fR.
+Specify the name of the output log signature file; recommended file extension is \fI.logsig\fR. If not specified, the input file \fI<logfile>.logsig\fR is modified. At first output is written into temporary file without affecting original file at all. If there are some changes the original file is renamed to backup file \fI<logfile>.logsig.bak\fR, otherwise temporary file is discarded. If the output file name is explicitly specified, output file is created even without any changes and an existing file will always be overwritten and no backup file will be created. Use '-' as file name to redirect the output as a binary stream to \fIstdout\fR.
 .\"
 .TP
 \fB-S \fIURL\fR
