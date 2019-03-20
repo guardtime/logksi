@@ -6,7 +6,7 @@
 (LOGKSI-99) * FEATURE: New option --recover for integrate, to recover useful amount of data from partially corrupted log signatures.
 (LOGKSI-99) * FEATURE: New option --out-log for integrate, to output recovered log lines.
 (LOGKSI-80) * BUGFIX: When integrating not suitable log signature that expects to have different count of record hashes, a meaningful error message is displayed.
-(LOGKSI-113) * BUGFIX: When signing and output file is not modified no identical backup is created.
+(LOGKSI-113) * BUGFIX: In case signing does not modify the output file, no identical backup is created.
 (LOGKSI-117) * BUGFIX: Warning about same signing time with debug level 1 is not mixed up with other messages.
 (LOGKSI-117) * BUGFIX: Warning about same signing time with debug level 3 prints correct block number and file name.
 (LOGKSI-118) * BUGFIX: Verification debug output (-d and -dd) for excerpt file displays information instead of nonsense.
