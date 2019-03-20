@@ -490,6 +490,7 @@ void BLOCK_INFO_freeAndClearInternals(BLOCK_INFO *blocks) {
 		blocks->nofTotalMetarecors = 0;
 		blocks->nofTotalRecordHashes = 0;
 		blocks->extendedToTime = 0;
+		blocks->outSigModified = 0;
 		blocks->taskId = TASK_NONE;
 	}
 }

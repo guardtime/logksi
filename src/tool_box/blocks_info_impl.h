@@ -124,6 +124,7 @@ typedef struct {
 	char errSignTime;
 	char curBlockNotSigned;
 	char curBlockJustReSigned;
+	char outSigModified;			/* Indicates that output signature file is actually modified. */
 	char lastBlockWasSkipped;		/* If block is skipped (--continue-on-failure) due to verification failure, this is set. It is cleared in process_ksi_signature or process_block_signature. */
 	char signatureTLVReached;		/* This is set if signature TLV is reached (in process_block_signature, process_ksi_signature or process_partial_signature) and is cleared in init_next_block.*/
 	size_t nofTotaHashFails;		/* Overall count of hahs failures inside log signature. */
