@@ -22,6 +22,7 @@
 #include <ksi/ksi.h>
 #include <ksi/tlv_element.h>
 #include <gtrfc3161/tsconvert.h>
+#include <ctype.h>
 #include "param_set/param_set.h"
 #include "param_set/strn.h"
 #include "err_trckr.h"
@@ -914,6 +915,43 @@ cleanup:
 	return res;
 }
 
+static const char *meta_data_value_to_string(PARAM_SET* set, const KSI_OctetString *oct, char *buf, size_t buf_len) {
+	int res = KT_UNKNOWN_ERROR;
+	size_t i = 0;
+	const unsigned char *data = NULL;
+	size_t data_len = 0;
+	size_t count = 0;
+	const char *ret = NULL;
+
+	if (set == NULL || oct == NULL || buf == NULL || buf_len == 0) return NULL;
+
+	if (PARAM_SET_isSetByName(set, "mdata-as-string")) {
+		res = KSI_OctetString_extract(oct, &data, &data_len);
+		if (res != KSI_OK) return NULL;
+
+		buf[count++] = '\'';
+		for (i = 0; i < data_len && count + 2 < buf_len; i++) {
+			char c = data[i];
+
+			if (isprint(c)) {
+				buf[count] = c;
+				count++;
+			} else {
+				count += PST_snprintf(buf + count, buf_len - count, "\\%02x", c);
+			}
+		}
+		buf[count++] = '\'';
+		buf[count] = '\0';
+
+		ret = buf;
+	} else {
+		ret = KSI_OctetString_toString(oct, 0, buf, buf_len);
+	}
+
+	return ret;
+}
+
+
 static int process_metarecord(PARAM_SET* set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	KSI_DataHash *hash = NULL;
@@ -922,7 +960,7 @@ static int process_metarecord(PARAM_SET* set, MULTI_PRINTER *mp, ERR_TRCKR *err,
 	KSI_Utf8String *meta_key = NULL;
 	KSI_OctetString *meta_value = NULL;
 	size_t metarecord_index = 0;
-	char buf[0xffff];
+	char buf[0xffff + 3];
 
 	if (err == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -947,7 +985,7 @@ static int process_metarecord(PARAM_SET* set, MULTI_PRINTER *mp, ERR_TRCKR *err,
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: Unable to get TLV 911.02.02 (Meta record value).", blocks->blockNo);
 
 	print_debug_mp(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Meta-record key  : '%s'.\n", blocks->blockNo, KSI_Utf8String_cstr(meta_key));
-	print_debug_mp(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Meta-record value: %s.\n", blocks->blockNo, KSI_OctetString_toString(meta_value, 0, buf, sizeof(buf)));
+	print_debug_mp(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Meta-record value: %s.\n", blocks->blockNo, meta_data_value_to_string(set, meta_value, buf, sizeof(buf)));
 
 
 	if (files->files.inLog) {

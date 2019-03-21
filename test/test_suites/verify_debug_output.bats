@@ -26,6 +26,12 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ (Processing magic number... ok.).(Block no.   1: processing block header... ok.).(Block no.   1: input hash: SHA-256:a55829.*a5fc9.).(Block no.   1: Meta-record key  : .com.guardtime.blockCloseReason..).(Block no.   1: Meta-record value: 426c6f636b20636c6f7365642064756520746f2066696c6520636c6f737572652e00.).(Block no.   1: .rrrrrrrrrrrrMr.).(Block no.   1: processing block signature data... ok.).(Block no.   1: lines processed 1 . 12 .12.).(Block no.   1: verifying KSI signature... ok.*ms.).(Block no.   1: signing time: .1539771487.) ]]
 }
 
+@test "verify output with debug level 3. Single block with Metarecord as string" {
+	run src/logksi verify test/resource/interlink/ok-testlog-interlink-1 -ddd --mdata-as-string
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ (Block no.   1: input hash: SHA-256:a55829.*a5fc9.).(Block no.   1: Meta-record key  : .com.guardtime.blockCloseReason..).(Block no.   1: Meta-record value: .Block closed due to file closure..00..).(Block no.   1: .rrrrrrrrrrrrMr.) ]]
+}
+
 @test "previous block is more recent than next block with debug level 2" {
 	run ./src/logksi verify test/resource/logs_and_signatures/log_repaired -dd
 	[ "$status" -eq 6 ]
