@@ -441,6 +441,10 @@ static int acquire_file_locks(ERR_TRCKR *err, MULTI_PRINTER *mp, IO_FILES *files
 		goto cleanup;
 	}
 
+	/**
+	 * For debugging see command lslocks,
+	 * Logksi acquires POSIX style file locks.
+	 */
 	if (files->files.partsBlk && files->files.partsSig) {
 		/* Check that the asynchronous signing process has completed writing to blocks and signatures files. */
 
@@ -450,6 +454,12 @@ static int acquire_file_locks(ERR_TRCKR *err, MULTI_PRINTER *mp, IO_FILES *files
 		ERR_CATCH_MSG(err, res, "Error: Could not acquire read lock for input signatures file %s.", files->internal.partsSig);
 		res = KT_OK;
 	} else if (files->files.partsBlk == NULL && files->files.partsSig == NULL) {
+		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, "Log signature parts not found:\n", SMART_FILE_getFname(files->files.inSig));
+		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, " %s\n", files->internal.partsBlk);
+		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, " %s\n\n", files->internal.partsSig);
+		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, "Interpreting file '%s' as result of synchronous signing.\n", SMART_FILE_getFname(files->files.inSig));
+		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, "There is nothing to integrate.\n\n", SMART_FILE_getFname(files->files.inSig));
+
 		res = SMART_FILE_lock(files->files.inSig, SMART_FILE_READ_LOCK);
 		ERR_CATCH_MSG(err, res, "Error: Could not acquire read lock for output log signature file %s.", files->internal.inSig);
 		res = KT_VERIFICATION_SKIPPED;
