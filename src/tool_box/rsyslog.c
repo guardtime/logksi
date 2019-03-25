@@ -501,7 +501,7 @@ static int process_block_header(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *er
 		res = logksi_datahash_compare(err, mp, blocks, 0, blocks->prevLeaf, hash, description, "Last hash computed from previous block data:", "Input hash stored in current block header:");
 		res = continue_on_hash_fail(res, set, mp, blocks, blocks->prevLeaf, hash, &replacement);
 
-		if (PARAM_SET_isSetByName(set, "continue-on-fail") && res != KT_OK) {
+		if (res != KT_OK && PARAM_SET_isSetByName(set, "continue-on-fail") && blocks->taskId == TASK_VERIFY) {
 			char debugMessage[1024] = "";
 
 			if (blocks->lastBlockWasSkipped) {
@@ -1741,6 +1741,7 @@ static int process_partial_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCK
 	KSI_TlvElement *tlvRfc3161 = NULL;
 	int insertHashes = 0;
 	char description[1024];
+	int sign_err = 0;
 
 	if (err == NULL || ksi == NULL || processors == NULL || files == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -1870,24 +1871,39 @@ static int process_partial_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCK
 			print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_LEVEL_3, "Block no. %3zu: creating missing KSI signature... ", blocks->blockNo);
 
 			res = processors->create_signature(set, mp, err, ksi, blocks, files, hash, block_info_get_aggregation_level(blocks), &sig);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to sign root hash.", blocks->blockNo);
+			if (res != KT_OK && PARAM_SET_isSetByName(set, "continue-on-fail")) {
+				sign_err = KT_SIGNING_FAILURE;
+				print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 
-			blocks->noSigCreated++;
-			blocks->curBlockJustReSigned = 1;
-			blocks->outSigModified = 1;
+				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Failed to sign unsigned block %zu:\n"
+																					  "   + %s (0x%02x)\n"
+																					  "   + Signing is continued and unsigned block will be kept.\n", blocks->blockNo, LOGKSI_errToString(res), res);
+				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_2, "\n");
 
-			res = KSI_TlvElement_new(&tlvSig);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to serialize KSI signature.", blocks->blockNo);
-			tlvSig->ftlv.tag = 0x904;
+				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Signing is continued and unsigned block will be kept.\n", blocks->blockNo);
 
-			res = tlv_element_set_uint(tlvSig, ksi, 0x01, blocks->recordCount);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to serialize KSI signature.", blocks->blockNo);
+				res = KSI_TlvElement_serialize(tlv, blocks->ftlv_raw, SOF_FTLV_BUFFER, &blocks->ftlv_len, 0);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to serialize unsigned block.", blocks->blockNo);
+			} else {
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to sign root hash.", blocks->blockNo);
 
-			res = tlv_element_set_signature(tlvSig, ksi, 0x905, sig);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to serialize KSI signature.", blocks->blockNo);
+				blocks->curBlockJustReSigned = 1;
+				blocks->outSigModified = 1;
+				blocks->noSigCreated++;
 
-			res = KSI_TlvElement_serialize(tlvSig, blocks->ftlv_raw, SOF_FTLV_BUFFER, &blocks->ftlv_len, 0);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to serialize KSI signature.", blocks->blockNo);
+				res = KSI_TlvElement_new(&tlvSig);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to serialize KSI signature.", blocks->blockNo);
+				tlvSig->ftlv.tag = 0x904;
+
+				res = tlv_element_set_uint(tlvSig, ksi, 0x01, blocks->recordCount);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to serialize KSI signature.", blocks->blockNo);
+
+				res = tlv_element_set_signature(tlvSig, ksi, 0x905, sig);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to serialize KSI signature.", blocks->blockNo);
+
+				res = KSI_TlvElement_serialize(tlvSig, blocks->ftlv_raw, SOF_FTLV_BUFFER, &blocks->ftlv_len, 0);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to serialize KSI signature.", blocks->blockNo);
+			}
 		} else {
 			/* Missing signatures found during integration. */
 			blocks->warningSignatures = 1;
@@ -1951,7 +1967,8 @@ cleanup:
 	KSI_TlvElement_free(tlvNoSig);
 	KSI_TlvElement_free(tlvRfc3161);
 	KSI_TlvElement_free(tlv);
-	return res;
+
+	return (sign_err == 0) ? res : sign_err;
 }
 
 static int check_warnings(BLOCK_INFO *blocks) {
@@ -2040,8 +2057,11 @@ cleanup:
 	print_debug_mp(mp, MP_ID_LOGFILE_SUMMARY, DEBUG_SMALLER | DEBUG_LEVEL_3, " * %-*s%zu\n", longIndentation, "Count of record hashes:", blocks->nofTotalRecordHashes); /* Meta records not included. */
 
 	if (blocks->noSigNo > 0) {
-		if (blocks->noSigCreated) {
-			print_debug_mp(mp, MP_ID_LOGFILE_SUMMARY, DEBUG_SMALLER | DEBUG_LEVEL_3, " * %-*s%zu\n", longIndentation, "Count of resigned blocks:", blocks->noSigNo);
+		if (blocks->taskId == TASK_SIGN) {
+			print_debug_mp(mp, MP_ID_LOGFILE_SUMMARY, DEBUG_SMALLER | DEBUG_LEVEL_3, " * %-*s%zu\n", longIndentation, "Count of resigned blocks:", blocks->noSigCreated);
+			if (blocks->noSigCreated < blocks->noSigNo) {
+				print_debug_mp(mp, MP_ID_LOGFILE_SUMMARY, DEBUG_SMALLER | DEBUG_LEVEL_3, " * %-*s%zu\n", longIndentation, "Count of unsigned blocks:", blocks->noSigNo - blocks->noSigCreated);
+			}
 		} else {
 			print_debug_mp(mp, MP_ID_LOGFILE_SUMMARY, DEBUG_SMALLER | DEBUG_LEVEL_3, " * %-*s%zu\n", longIndentation, "Count of unsigned blocks:", blocks->noSigNo);
 		}
@@ -2785,13 +2805,18 @@ cleanup:
 
 static int wrapper_LOGKSI_createSignature(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_DataHash *hash, KSI_uint64_t rootLevel, KSI_Signature **sig) {
 	int res = KT_UNKNOWN_ERROR;
+	int noErrTrckr = 0;
 
 	if (set == NULL || err == NULL || ksi == NULL || blocks == NULL || files == NULL || hash == NULL || sig == NULL) {
 		return KT_INVALID_ARGUMENT;
 	}
 
+	/* If --continue-on-fail is set, do not add errors to ERR_TRCKR as the amount of errors
+	   will easily exceed its limits. */
+	noErrTrckr = PARAM_SET_isSetByName(set, "continue-on-fail");
+
 	print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_EQUAL | DEBUG_LEVEL_2, "Signing Block no. %3zu... ", blocks->blockNo);
-	res = LOGKSI_createSignature(err, ksi, hash, rootLevel, sig);
+	res = LOGKSI_createSignature((noErrTrckr ? NULL : err), ksi, hash, rootLevel, sig);
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_2, res);
 
 	return res;
@@ -2804,6 +2829,7 @@ int logsignature_sign(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX
 	unsigned char ftlv_raw[SOF_FTLV_BUFFER];
 	SIGNATURE_PROCESSORS processors;
 	KSI_DataHash *theFirstInputHashInFile = NULL;
+	int lastError = KT_OK;
 
 	if (set == NULL || err == NULL || ksi == NULL || files == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -2850,6 +2876,11 @@ int logsignature_sign(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX
 				case 0x904:
 				{
 					res = process_partial_signature(set, mp, err, ksi, &processors, &blocks, files, progress);
+					if (res == KT_SIGNING_FAILURE) {
+						lastError = res;
+						res = KT_OK;
+					}
+
 					if (res != KT_OK) goto cleanup;
 				}
 				break;
@@ -2891,8 +2922,14 @@ cleanup:
 										(res != KT_OK ||
 										 (!blocks.outSigModified && !PARAM_SET_isSetByName(set, "o") && SMART_FILE_doFileExist(files->internal.outSig))
 										)) {
-		res = SMART_FILE_markInconsistent(files->files.outSig);
-		ERR_CATCH_MSG(err, res, "Error: Unable to mark output signature file as inconsistent.");
+		int tmp_res;
+		tmp_res = SMART_FILE_markInconsistent(files->files.outSig);
+		ERR_CATCH_MSG(err, tmp_res, "Error: Unable to mark output signature file as inconsistent.");
+	}
+
+	if (lastError != KT_OK) {
+		res = lastError;
+		ERR_TRCKR_ADD(err, res, "Error: Signing FAILED but was continued. All failed blocks are left unsigned!");
 	}
 
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_2, res);
