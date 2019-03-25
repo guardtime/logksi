@@ -54,12 +54,16 @@ Specify the KSIAP (KSI Aggregation Protocol) PDU version. Valid values are \fIv1
 Repair the log signature by inserting missing final tree hashes. Final tree hashes might be missing if the Merkle tree is not perfectly balanced. If the option is not used, a warning message is printed about missing hashes with a recommendation to run \fBlogksi sign\fR again with the \fB--insert-missing-hashes\fR option. Inserting missing hashes improves verifiablity, but a log signature without final tree hashes is verifiable as well.
 .\"
 .TP
+\fB--continue-on-fail\fR
+This option can be used to continue signing in case of signing error. Other errors (e.g. verification error) will terminated the process. Problematic block is not changed and is written to file to be able to fix that in the future. Despite of continuation, errors are reported and logksi will exit code other than 0.
+.\"
+.TP
 \fB-d\fR
 Print detailed information about processes and errors to \fIstderr\fR. To make output more verbose increase debug level with \fB-dd\fR or \fB-ddd\fR. With debug level 1 a summary of log file is displayed. With debug level 2 a summary of each block and the log file is displayed. Debug level 3 will display the whole parsing of the log signature file. The parsing of \fIrecord hashes (r)\fR, \fItree hashes (.)\fR, \fIfinal tree hashes (:)\fR and \fImeta-records (M)\fR is displayed inside curly brackets in following manner \fI{r.Mr..:}\fR. In case of a failure \fI(X)\fR is displayed and closing curly bracket is omitted.
 .\"
 .TP
 \fB--show-progress\fR
-Print signing progress. Only valid with -d and debug level 1.\fR.
+Print signing progress. Only valid with -d and debug level 1.\fR
 .\"
 .TP
 \fB--conf \fIfile\fR
