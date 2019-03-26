@@ -164,7 +164,7 @@ Print detailed information about processes and errors to \fIstderr\fR. To make o
 .\"
 .TP
 \fB--hex-to-str\fR
-When used with \fB-ddd\fR meta-data is displayed as string. Non-printable characters are displayed in hex with leading backslash (e.g. 'Text\\00').
+Will encode applicable hex encoded data fields to string (e.g. meta-record value). Non-printable characters are displayed in hex with leading backslash (e.g. 'Text\\00').
 .TP
 \fB--conf \fIfile\fR
 Read configuration options from the given file. It must be noted that configuration options given explicitly on command line will override the ones in the configuration file (see \fBlogksi-conf\fR(5) for more information).
