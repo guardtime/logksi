@@ -46,8 +46,32 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 }
 
-@test "warn about consecutive blocks that has same signing time. " {
+@test "warn about consecutive blocks that has same signing time" {
 	run src/logksi verify test/resource/logfiles/unsigned test/resource/logsignatures/unsigned-same-sign-time.logsig --ignore-desc-block-time --warn-same-block-time
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ .*(Warning).*(Block).*(1).*(and).*(2).*(in file).*(unsigned).*(has same signing time).*(1540389597).* ]]
+}
+
+@test "verify log signature with expected client ID" {
+	run src/logksi verify test/resource/logs_and_signatures/signed -d --client-id "GT :: .* :: GT :: anon"
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Verifying... ok." ]]
+}
+
+@test "verify log signature with unexpected client ID" {
+	run src/logksi verify test/resource/logs_and_signatures/signed -d --client-id "GT :: KT :: GT :: anon"
+	[ "$status" -eq 1 ]
+	[[ "$output" =~ (Error: Client ID mismatch).*(GT :: GT :: GT :: anon).*(Error: Not matching pattern).*(GT :: KT :: GT :: anon) ]]
+}
+
+@test "verify excerpt file with expected client ID" {
+	run src/logksi verify test/resource/excerpt/log-ok.excerpt -d  --client-id "GT :: .* :: GT :: anon"
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Verifying... ok." ]]
+}
+
+@test "verify excerpt file with unexpected client ID" {
+	run src/logksi verify test/resource/excerpt/log-ok.excerpt -d --client-id "GT :: KT :: GT :: anon"
+	[ "$status" -eq 1 ]
+	[[ "$output" =~ (Error: Client ID mismatch).*(GT :: GT :: GT :: anon).*(Error: Not matching pattern).*(GT :: KT :: GT :: anon) ]]
 }

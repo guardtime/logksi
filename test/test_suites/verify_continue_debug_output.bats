@@ -33,21 +33,25 @@ f_failed_to_ver_log_line () {
 	echo "( x Error: Failed to verify logline no. $1:).(   . Logline:).(     .$2..).(   . Record hash computed from logline:).(     $3).(   . Record hash stored in log signature file:).(     $4)"
 }
 
- # block_count, rec_hash_count, meta_rec_count, hash_fail_count, ih, oh
- f_summary_of_logfile_hash_fail () {
-	 echo "(Summary of logfile:).( . Count of blocks:             $1).( . Count of record hashes:      $2).( . Count of meta-records:       $3).( . Count of hash failures:      $4).( . Input hash:  $5).( . Output hash: $6)"
- }
+# block_count, rec_hash_count, meta_rec_count, hash_fail_count, ih, oh
+f_summary_of_logfile_hash_fail () {
+	echo "(Summary of logfile:).( . Count of blocks:             $1).( . Count of record hashes:      $2).( . Count of meta-records:       $3).( . Count of hash failures:      $4).( . Input hash:  $5).( . Output hash: $6)"
+}
  
 # block_count, fail_count, rec_hash_count, meta_rec_count, ih, oh
 f_summary_of_logfile_failure () {
 	 echo "(Summary of logfile:).( . Count of blocks:             $1).( . Count of failures:           $2).( . Count of record hashes:      $3).( . Count of meta-records:       $4).( . Input hash:  $5).( . Output hash: $6)"
- }
+}
 
 #block_num0, block_num1, h1, h2
 f_internal_interlink_error () {
 	echo "( x Error: Output hash of block $1 differs from input hash of block $2:).(   . Last hash computed from previous block data:).(     $3).(   . Input hash stored in current block header:).(     $4).(   . Verification is continued. Failure may be caused by the error in the previous block $1. Using input hash of the current block instead.)"
 }
 
+# block, cid, pattern
+f_client_if_fail () {
+	 echo "( x Error: Failed to match KSI signatures client ID for block $1:).(   . Client ID:       '$2').(   . Regexp. pattern: '$3')"
+}
 
 ##
 # Some more common predefined test structures.
@@ -58,6 +62,7 @@ err_interlink_2_3=`f_internal_interlink_error 2 3 "SHA-512:20cfea.*88944a" "SHA-
 summary_of_logfile_2hf=`f_summary_of_logfile_hash_fail 4 9 1 2 "SHA-512:7f3dea.*ee3141" "SHA-512:f7f5b4.*b2b596"`
 summary_of_logfile_1hf=`f_summary_of_logfile_hash_fail 4 9 1 1 "SHA-512:7f3dea.*ee3141" "SHA-512:f7f5b4.*b2b596"`
 summary_of_logfile_1_sig_fail=`f_summary_of_logfile_failure 4 1 9 1 "SHA-512:7f3dea.*ee3141" "SHA-512:f7f5b4.*b2b596"`
+summary_of_logfile_4_sig_fail=`f_summary_of_logfile_failure 4 4 9 1 "SHA-512:7f3dea.*ee3141" "SHA-512:f7f5b4.*b2b596"`
 
 summary_of_block_1_ok=`f_summary_of_block_ok 1 1517928882 "SHA-512:7f3dea.*ee3141" "SHA-512:20cfea.*88944a" 1 3 3`
 summary_of_block_2_ok=`f_summary_of_block_ok 2 1517928883 "SHA-512:20cfea.*88944a" "SHA-512:9c1ea0.*42e444" 4 6 3`
@@ -67,6 +72,10 @@ summary_of_block_2_ok_1_hash_fail="$summary_of_block_2_ok.( . Count of hash fail
 summary_of_block_3_expected_in_hash_fail=`f_summary_of_block_hash_fail 3 "".1517928884..*UTC.00.00"" "SHA-512:9c1ea0.*42e444" "SHA-512:1dfeae.*43e987" 7 9 3 1`
 summary_of_block_4_ok=`f_summary_of_block_ok_only_metadata 4 1517928885 "SHA-512:1dfeae.*43e987" "SHA-512:f7f5b4.*b2b596" `
 
+cli_id_fail_1="`f_client_if_fail 1 "GT :: GT :: GT :: anon" "XX"`..( x Error: Skipping block 1!)"
+cli_id_fail_2="`f_client_if_fail 2 "GT :: GT :: GT :: anon" "XX"`..( x Error: Skipping block 2!)"
+cli_id_fail_3="`f_client_if_fail 3 "GT :: GT :: GT :: anon" "XX"`..( x Error: Skipping block 3!)"
+cli_id_fail_4="`f_client_if_fail 4 "GT :: GT :: GT :: anon" "XX"`..( x Error: Skipping block 4!)"
 
 ##
 # Actual tests.
@@ -136,4 +145,21 @@ summary_of_block_4_ok=`f_summary_of_block_ok_only_metadata 4 1517928885 "SHA-512
 	[[ "$output" =~ (2[\)]).*(Error: Verification FAILED but was continued for further analysis)  ]]
 }
 
+@test "Debug output for continuated verification: Client ID mismatch. Debug level 1." {
+	run src/logksi verify test/resource/continue-verification/log test/resource/continue-verification/log-ok.logsig -d --continue-on-fail --client-id "XX"
+	[ "$status" -eq 6 ]
+	[[ "$output" =~ (Verifying... failed.)..$cli_id_fail_1..$cli_id_fail_2..$cli_id_fail_3..$cli_id_fail_4..($summary_of_logfile_4_sig_fail) ]]
+}
+
+@test "Debug output for continuated verification: Client ID mismatch. Debug level 2." {
+	run src/logksi verify test/resource/continue-verification/log test/resource/continue-verification/log-ok.logsig -dd --continue-on-fail --client-id "XX"
+	[ "$status" -eq 6 ]
+	[[ "$output" =~ (Verifying block no.   1... failed.)..$cli_id_fail_1..$summary_of_block_1_ok..(Verifying block no.   2... failed.)..$cli_id_fail_2..$summary_of_block_2_ok..(Verifying block no.   3... failed.)..$cli_id_fail_3..$summary_of_block_3_ok..(Verifying block no.   4... failed.)..$cli_id_fail_4..$summary_of_block_4_ok...($summary_of_logfile_4_sig_fail) ]]
+}
+
+@test "Debug output for continuated verification: Client ID mismatch. Debug level 3." {
+	run src/logksi verify test/resource/continue-verification/log test/resource/continue-verification/log-ok.logsig -ddd --continue-on-fail --client-id "XX"
+	[ "$status" -eq 6 ]
+	[[ "$output" =~ (Block no.   1: verifying KSI signature... ok.*ms.).(Block no.   1: signing time: .1517928882.*UTC).(Block no.   1: Verifying Client ID... failed.).(Block no.   1: output hash: SHA-512:20cfea.*88944a.).(Block no.   1: Warning: all final tree hashes are missing.).(Block no.   1: Error: Client ID mismatch .GT :: GT :: GT :: anon..).(Block no.   1: Error: Not matching pattern .XX..).(Block no.   1: Error: Block is skipped.).(Block no.   2: processing block header... ok.) ]]
+}
 

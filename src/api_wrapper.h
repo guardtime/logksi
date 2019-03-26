@@ -77,6 +77,7 @@ char *LOGKSI_DataHash_toString(KSI_DataHash *hsh, char *buf, size_t buf_len);
 char *LOGKSI_PublicationData_toString(KSI_PublicationData *data, char *buf, size_t buf_len);
 char *LOGKSI_PublicationRecord_toString(KSI_PublicationRecord *rec, char *buf, size_t buf_len);
 char* LOGKSI_signature_sigTimeToString(const KSI_Signature* sig, char *buf, size_t buf_len);
+char* LOGKSI_signerIdentityToString(KSI_Signature *sig, char *buf, size_t buf_len);
 char* LOGKSI_uint64_toDateString(uint64_t time, char *buf, size_t buf_len);
 
 int LOGKSI_LOG_SmartFile(void *logCtx, int logLevel, const char *message);

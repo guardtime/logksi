@@ -470,6 +470,9 @@ void BLOCK_INFO_freeAndClearInternals(BLOCK_INFO *blocks) {
 		KSI_DataHasher_free(blocks->hasher);
 		KSI_DataHash_free(blocks->inputHash);
 
+		REGEXP_free(blocks->client_id_match);
+		free(blocks->client_id_last);
+
 		/* Set objects to NULL. */
 		blocks->prevLeaf = NULL;
 		blocks->randomSeed = NULL;
@@ -482,6 +485,8 @@ void BLOCK_INFO_freeAndClearInternals(BLOCK_INFO *blocks) {
 		blocks->metaRecord = NULL;
 		blocks->hasher = NULL;
 		blocks->inputHash = NULL;
+		blocks->client_id_match = NULL;
+		blocks->client_id_last = NULL;
 
 		blocks->blockNo = 0;
 		blocks->sigNo = 0;
@@ -497,6 +502,6 @@ void BLOCK_INFO_freeAndClearInternals(BLOCK_INFO *blocks) {
 
 void BLOCK_INFO_reset(BLOCK_INFO *block) {
 	if (block != NULL) {
-		memset(block, 0, sizeof(BLOCK_INFO) /*- sizeof(block->warnBuf) - sizeof(block->errorBuf)*/);
+		memset(block, 0, sizeof(BLOCK_INFO));
 	}
 }

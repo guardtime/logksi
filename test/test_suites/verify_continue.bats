@@ -32,9 +32,8 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ (Error: Skipping block 2)  ]]	
 	[[ ! "$output" =~ (Error: Skipping block 3)  ]]	
 	[[ ! "$output" =~ (Error: Skipping block 4)  ]]	
-	[[ "$output" =~ (4[\)]).*(Error: Verification FAILED but was continued for further analysis).*(Log signature verification failed)  ]]
-	[[ "$output" =~ (3[\)]).*(Error: 1 hash comparison failures found).*(Verification failed)  ]]
-	[[ "$output" =~ (2[\)]).*(Error: Block no. 2: KSI signature verification failed).*(Verification failed)  ]]
+	[[ "$output" =~ (3[\)]).*(Error: Verification FAILED but was continued for further analysis).*(Log signature verification failed)  ]]
+	[[ "$output" =~ (2[\)]).*(Error: 1 hash comparison failures found).*(Verification failed)  ]]
 	[[ "$output" =~ (1[\)]).*(Error:).*(GEN-01).*(Wrong document. Signature verification according to trust anchor failed.).*(Verification failed)  ]]
 }
 
@@ -58,9 +57,8 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ (Error: Skipping block 2)  ]]	
 	[[ ! "$output" =~ (Error: Skipping block 3)  ]]	
 	[[ ! "$output" =~ (Error: Skipping block 4)  ]]	
-	[[ "$output" =~ (4[\)]).*(Error: Verification FAILED but was continued for further analysis).*(Log signature verification failed)  ]]
-	[[ "$output" =~ (3[\)]).*(Error: 1 hash comparison failures found).*(Verification failed)  ]]
-	[[ "$output" =~ (2[\)]).*(Error: Block no. 2: KSI signature verification failed).*(Verification failed)  ]]
+	[[ "$output" =~ (3[\)]).*(Error: Verification FAILED but was continued for further analysis).*(Log signature verification failed)  ]]
+	[[ "$output" =~ (2[\)]).*(Error: 1 hash comparison failures found).*(Verification failed)  ]]
 	[[ "$output" =~ (1[\)]).*(Error:).*(GEN-01).*(Wrong document. Signature verification according to trust anchor failed.).*(Verification failed)  ]]
 }
 
@@ -72,8 +70,7 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ (Error: Skipping block 2)  ]]	
 	[[ ! "$output" =~ (Error: Skipping block 3)  ]]	
 	[[ ! "$output" =~ (Error: Skipping block 4)  ]]	
-	[[ "$output" =~ (3[\)]).*(Error: Verification FAILED but was continued for further analysis).*(Log signature verification failed)  ]]
-	[[ "$output" =~ (2[\)]).*(Error: Block no. 2: KSI signature verification failed).*(Verification failed)  ]]
+	[[ "$output" =~ (2[\)]).*(Error: Verification FAILED but was continued for further analysis).*(Log signature verification failed)  ]]
 	[[ "$output" =~ (1[\)]).*(Error:).*(GEN-01).*(Wrong document. Signature verification according to trust anchor failed.).*(Verification failed)  ]]
 }
 
@@ -86,6 +83,12 @@ export KSI_CONF=test/test.cfg
 	[[ ! "$output" =~ (Error: Skipping block 24)  ]]	
 	[[ ! "$output" =~ (Error: Skipping block 26)  ]]	
 	[[ "$output" =~ (2[\)]).*(Error: Verification FAILED but was continued for further analysis)  ]]
+}
+
+@test "Verify log signature that has unexpected client ID." {
+	run src/logksi verify test/resource/continue-verification/log test/resource/continue-verification/log-ok.logsig -d --continue-on-fail --client-id "GT :: KT :: GT :: anon"
+	[ "$status" -eq 6 ]
+	[[ "$output" =~ "Error: Verification FAILED but was continued for further analysis." ]]
 }
 
 ##
