@@ -925,7 +925,7 @@ static const char *meta_data_value_to_string(PARAM_SET* set, const KSI_OctetStri
 
 	if (set == NULL || oct == NULL || buf == NULL || buf_len == 0) return NULL;
 
-	if (PARAM_SET_isSetByName(set, "mdata-as-string")) {
+	if (PARAM_SET_isSetByName(set, "hex-to-str")) {
 		res = KSI_OctetString_extract(oct, &data, &data_len);
 		if (res != KSI_OK) return NULL;
 

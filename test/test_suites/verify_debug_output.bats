@@ -27,7 +27,7 @@ export KSI_CONF=test/test.cfg
 }
 
 @test "verify output with debug level 3. Single block with Metarecord as string" {
-	run src/logksi verify test/resource/interlink/ok-testlog-interlink-1 -ddd --mdata-as-string
+	run src/logksi verify test/resource/interlink/ok-testlog-interlink-1 -ddd --hex-to-str
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ (Block no.   1: input hash: SHA-256:a55829.*a5fc9.).(Block no.   1: Meta-record key  : .com.guardtime.blockCloseReason..).(Block no.   1: Meta-record value: .Block closed due to file closure..00..).(Block no.   1: .rrrrrrrrrrrrMr.) ]]
 }
