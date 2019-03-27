@@ -135,7 +135,7 @@ typedef struct {
 	uint64_t extendedToTime;
 	LOGKSI_TASK_ID taskId;
 
-	char *client_id_last;		/* Last signer id. Used to detect change. */
+	char client_id_last[0xffff];	/* Last signer id. Used to detect change. */
 	REGEXP *client_id_match;		/* A regular expression value to be matched with KSI signatures. */
 } BLOCK_INFO;
 

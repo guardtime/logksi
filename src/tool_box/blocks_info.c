@@ -471,7 +471,6 @@ void BLOCK_INFO_freeAndClearInternals(BLOCK_INFO *blocks) {
 		KSI_DataHash_free(blocks->inputHash);
 
 		REGEXP_free(blocks->client_id_match);
-		free(blocks->client_id_last);
 
 		/* Set objects to NULL. */
 		blocks->prevLeaf = NULL;
@@ -486,7 +485,7 @@ void BLOCK_INFO_freeAndClearInternals(BLOCK_INFO *blocks) {
 		blocks->hasher = NULL;
 		blocks->inputHash = NULL;
 		blocks->client_id_match = NULL;
-		blocks->client_id_last = NULL;
+		blocks->client_id_last[0] = '\0';
 
 		blocks->blockNo = 0;
 		blocks->sigNo = 0;

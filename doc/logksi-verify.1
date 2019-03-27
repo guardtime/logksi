@@ -95,6 +95,10 @@ Skip signing time verification where more recent log blocks must have more recen
 Verifies if KSI signatures client ID is matching regular expression specified.
 .\"
 .TP
+\fB--warn-client-id-change\fR
+Will warn the user if KSI signatures client ID is not constant over all the blocks.
+.\"
+.TP
 \fB--warn-same-block-time\fR
 Prints a warning when two consecutive blocks have same signing time. When multiple log files are verified the last block from the previous file is compared with the first block from the current file.
 .\"

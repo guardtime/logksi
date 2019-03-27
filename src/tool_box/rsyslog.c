@@ -1136,6 +1136,7 @@ cleanup:
 
 static int check_log_signature_client_id(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, BLOCK_INFO *blocks, KSI_Signature *sig) {
 	int res = KT_UNKNOWN_ERROR;
+	char strClientId[0xffff] = "<client id not available>";
 
 	if (set == NULL || mp == NULL || err == NULL || blocks == NULL || sig == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -1144,8 +1145,6 @@ static int check_log_signature_client_id(PARAM_SET *set, MULTI_PRINTER* mp, ERR_
 
 	/* Verify KSI signatures Client ID. */
 	if (blocks->client_id_match != NULL && blocks->taskId == TASK_VERIFY) {
-		char strClientId[1024] = "<client id not available>";
-
 		print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
 		print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_LEVEL_3, "Block no. %3zu: Verifying Client ID... ", blocks->blockNo);
 
@@ -1171,6 +1170,21 @@ static int check_log_signature_client_id(PARAM_SET *set, MULTI_PRINTER* mp, ERR_
 
 		res = KT_VERIFICATION_FAILURE;
 		goto cleanup;
+		}
+	}
+
+	if (PARAM_SET_isSetByName(set, "warn-client-id-change")) {
+		if (blocks->client_id_last[0] == '\0') {
+			LOGKSI_signerIdentityToString(sig, blocks->client_id_last, sizeof(blocks->client_id_last));
+		} else {
+			LOGKSI_signerIdentityToString(sig, strClientId, sizeof(strClientId));
+
+			if (strcmp(blocks->client_id_last, strClientId) != 0) {
+				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Warning: Client ID is not constant. Expecting '%s', but is '%s'.\n", blocks->blockNo, blocks->client_id_last, strClientId);
+				print_debug_mp(mp, MP_ID_LOGFILE_WARNINGS, DEBUG_SMALLER | DEBUG_LEVEL_3, " o Warning: Client ID in block %zu is not constant:\n"
+																						  "   + Expecting: '%s'\n"
+																						  "   + But is:    '%s'.\n\n", blocks->blockNo, blocks->client_id_last, strClientId);
+			}
 		}
 	}
 
@@ -2652,7 +2666,7 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 
 							LOGKSI_uint64_toDateString(blocks->sigTime_1, strT1, sizeof(strT1));
 
-							print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, "Summary of block %zu:\n", blocks->blockNo);
+							print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, "\nSummary of block %zu:\n", blocks->blockNo);
 							print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", SIZE_OF_SHORT_INDENTENTION, "Sig time:", strT1);
 
 							printHeader = 1;
