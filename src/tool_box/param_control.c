@@ -871,6 +871,92 @@ cleanup:
 	return res;
 }
 
+int isFormatOk_timeDiff(const char *time_diff) {
+	int res = 0;
+	int i = 0;
+	int is_d = 0;
+	int is_H = 0;
+	int is_M = 0;
+	int is_S = 0;
+	char c = 0;
+	int lastWasDigit = 0;
+
+	res = isFormatOk_string(time_diff);
+	if (res != FORMAT_OK) return res;
+
+	res = isFormatOk_int(time_diff);
+	if (res == PARAM_OK) return res;
+
+	while(time_diff[i]) {
+		c = time_diff[i];
+
+		if (c == '-' && i == 0) {
+			i++;
+			continue;
+		}
+		if (!isdigit(c)) {
+			if (c == 'd' && lastWasDigit && !is_d ) is_d = 1;
+			else if (c == 'H' && lastWasDigit && !is_H) is_H = 1;
+			else if (c == 'M' && lastWasDigit && !is_M) is_M = 1;
+			else if (c == 'S' && lastWasDigit && !is_S) is_S = 1;
+			else return FORMAT_INVALID_TIME_DIFF_FORMAT;
+			lastWasDigit = 0;
+		} else {
+			lastWasDigit = 1;
+		}
+
+		i++;
+	}
+
+	/* S is specified and last integer does not end with any marker - it must be
+	   double specification of seconds! */
+	if (is_S && isdigit(c)) return FORMAT_INVALID_TIME_DIFF_FORMAT;
+
+	return FORMAT_OK;
+}
+
+int extract_timeDiff(void *extra, const char* time_diff,  void** obj) {
+	long result = 0;
+	long tmp = 0;
+	int i = 0;
+	int *pI = (int*)obj;
+	int sign = 1;
+	VARIABLE_IS_NOT_USED(extra);
+
+	while (time_diff[i]) {
+		int c = time_diff[i];
+
+		if (c == '-' && i == 0) {
+			i++;
+			sign = -1;
+			continue;
+		}
+
+		if (c == 'S') {
+			result += tmp;
+			tmp = 0;
+		} else if (c == 'M') {
+			result += tmp * 60;
+			tmp = 0;
+		} else if (c == 'H') {
+			result += tmp * 3600;
+			tmp = 0;
+		} else if (c == 'd') {
+			result += tmp * 24 * 3600;
+			tmp = 0;
+		} else {
+			tmp *= 10;
+			tmp += c - '0';
+		}
+
+		i++;
+	}
+
+	result += tmp;
+	*pI = (int)(sign * result);
+
+	return PST_OK;
+}
 
 int isFormatOk_timeString(const char *time) {
 	struct tm time_st;
@@ -1016,6 +1102,7 @@ const char *getParameterErrorString(int res) {
 		case FORMAT_FLAG_HAS_ARGUMENT: return "Parameter must not have arguments";
 		case FORMAT_INVALID_UTC: return "Time not formatted as YYYY-MM-DD hh:mm:ss";
 		case FORMAT_INVALID_UTC_OUT_OF_RANGE: return "Time out of range";
+		case FORMAT_INVALID_TIME_DIFF_FORMAT: return "Only digits and 1x d, H, M and S allowed";
 		case PARAM_INVALID: return "Parameter is invalid";
 		case FORMAT_NOT_INTEGER: return "Invalid integer";
 		case HASH_ALG_INVALID_NAME: return "Algorithm name is incorrect";

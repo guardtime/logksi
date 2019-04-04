@@ -87,6 +87,7 @@ enum formatStatus_enum{
 	FORMAT_FLAG_HAS_ARGUMENT,
 	FORMAT_INVALID_UTC,
 	FORMAT_INVALID_UTC_OUT_OF_RANGE,
+	FORMAT_INVALID_TIME_DIFF_FORMAT,
 	FORMAT_UNKNOWN_ERROR
 };
 
@@ -113,6 +114,9 @@ int isContentOk_inputFileRestrictPipe(const char* path);
 int isFormatOk_path(const char *path);
 int convertRepair_path(const char* arg, char* buf, unsigned len);
 
+int isFormatOk_timeDiff(const char *time_diff);
+int extract_timeDiff(void *extra, const char* str,  void** obj);
+
 int isFormatOk_int(const char *integer);
 int isFormatOk_int_can_be_null(const char *integer);
 int isContentOk_uint_can_be_null(const char* integer);
@@ -138,7 +142,6 @@ int isFormatOk_flag(const char *flag);
 int isFormatOk_constraint(const char *constraint);
 int isFormatOk_userPass(const char *uss_pass);
 
-int isFormatOk_oid(const char *constraint);
 int convertRepair_constraint(const char* arg, char* buf, unsigned len);
 
 int get_pipe_out_error(PARAM_SET *set, ERR_TRCKR *err, const char *check_all_files, const char *out_file_names, const char *print_out_names);

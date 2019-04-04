@@ -111,7 +111,7 @@ int verify_run(int argc, char **argv, char **envp) {
 	 * Extract command line parameters and also add configuration specific parameters.
 	 */
 	res = PARAM_SET_new(
-			CONF_generate_param_set_desc("{warn-same-block-time}{warn-client-id-change}{ignore-desc-block-time}{multiple_logs}{input}{input-hash}{client-id}{output-hash}{log-from-stdin}{x}{d}{pub-str}{ver-int}{ver-cal}{ver-key}{ver-pub}{use-computed-hash-on-fail}{use-stored-hash-on-fail}{continue-on-fail}{conf}{log}{h|help}{hex-to-str}", "XP", buf, sizeof(buf)),
+			CONF_generate_param_set_desc("{warn-same-block-time}{warn-client-id-change}{ignore-desc-block-time}{multiple_logs}{input}{input-hash}{client-id}{output-hash}{log-from-stdin}{x}{d}{pub-str}{ver-int}{ver-cal}{ver-key}{ver-pub}{use-computed-hash-on-fail}{use-stored-hash-on-fail}{continue-on-fail}{conf}{time-form}{time-base}{time-diff}{log}{h|help}{hex-to-str}", "XP", buf, sizeof(buf)),
 			&set);
 	if (res != KT_OK) goto cleanup;
 
@@ -429,9 +429,12 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	PARAM_SET_addControl(set, "{input-hash}", isFormatOk_inputHash, isContentOk_inputHash, convertRepair_path, extract_inputHashFromImprintOrImprintInFile);
 	PARAM_SET_addControl(set, "{log-from-stdin}{d}{x}{ver-int}{ver-cal}{ver-key}{ver-pub}{use-computed-hash-on-fail}{use-stored-hash-on-fail}{continue-on-fail}{hex-to-str}", isFormatOk_flag, NULL, NULL, NULL);
 	PARAM_SET_addControl(set, "{pub-str}", isFormatOk_pubString, NULL, NULL, extract_pubString);
-	PARAM_SET_addControl(set, "{client-id}", isFormatOk_string, NULL, NULL, NULL);
+	PARAM_SET_addControl(set, "client-id,time-form", isFormatOk_string, NULL, NULL, NULL);
+	PARAM_SET_addControl(set, "time-base", isFormatOk_int, isContentOk_uint, NULL, extract_int);
+	PARAM_SET_addControl(set, "time-diff", isFormatOk_timeDiff, NULL, NULL, extract_timeDiff);
 
 	PARAM_SET_setParseOptions(set, "m", PST_PRSCMD_HAS_MULTIPLE_INSTANCES | PST_PRSCMD_BREAK_VALUE_WITH_EXISTING_PARAMETER_MATCH);
+	PARAM_SET_setParseOptions(set, "time-form,time-base,time-diff", PST_PRSCMD_HAS_VALUE);
 
 	/* Make input also collect same values as multiple_logs. It simplifies task handling. */
 	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_COLLECT_WHEN_PARSING_IS_CLOSED |PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);

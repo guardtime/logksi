@@ -95,3 +95,34 @@ export KSI_CONF=test/test.cfg
 	[ "$status" -eq 3 ]
 	[[ "$output" =~ (OID is invalid).*(Parameter).*(--cnstr).*(dummy=nothing) ]]
 }
+
+@test "verify CMD test: Try to use invalid --time-diff 1" {
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/log_repaired -d --time-diff "" --time-diff " " --time-diff S --time-diff M --time-diff H --time-diff d --time-diff s --time-diff m --time-diff h --time-diff D
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ (Parameter has no content).*(Parameter).*(--time-diff).*(\'\') ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(\' \') ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(\'S\') ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(\'M\') ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(\'H\') ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(\'d\') ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(\'s\') ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(\'m\') ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(\'h\') ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(\'D\') ]]
+}
+
+@test "verify CMD test: Try to use invalid --time-diff 2" {
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/log_repaired -d --time-diff 1S2 --time-diff 1S3S --time-diff 1M3M  --time-diff 1H3H  --time-diff 1d3d --time-diff "2 2" --time-diff dHMS --time-diff S5 --time-diff M6 --time-diff H7 --time-diff d8
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(1S2) ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(1S3S) ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(1M3M) ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(1H3H) ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(1d3d) ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(2 2) ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(dHMS) ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(S5) ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(M6) ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(H7) ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(d8) ]]
+}
