@@ -1134,6 +1134,52 @@ cleanup:
 	return res;
 }
 
+static int check_log_signature_client_id(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, BLOCK_INFO *blocks, KSI_Signature *sig) {
+	int res = KT_UNKNOWN_ERROR;
+
+	if (set == NULL || mp == NULL || err == NULL || blocks == NULL || sig == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	/* Verify KSI signatures Client ID. */
+	if (blocks->client_id_match != NULL && blocks->taskId == TASK_VERIFY) {
+		char strClientId[1024] = "<client id not available>";
+
+		print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
+		print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_LEVEL_3, "Block no. %3zu: Verifying Client ID... ", blocks->blockNo);
+
+		LOGKSI_signerIdentityToString(sig, strClientId, sizeof(strClientId));
+
+		res = REGEXP_processString(blocks->client_id_match, strClientId, NULL);
+		if (res != REGEXP_OK) {
+			blocks->nofTotalFailedBlocks++;
+			print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
+			if (PARAM_SET_isSetByName(set, "continue-on-fail") && (blocks->version == LOGSIG11 || blocks->version == LOGSIG12)) {
+
+				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Failed to match KSI signatures client ID for block %zu:\n"
+																					  "   + Client ID:       '%s'\n"
+																					  "   + Regexp. pattern: '%s'\n", blocks->blockNo, strClientId, REGEXP_getPattern(blocks->client_id_match));
+
+				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Client ID mismatch '%s'.\n", blocks->blockNo, strClientId);
+				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Not matching pattern '%s'.\n", blocks->blockNo, REGEXP_getPattern(blocks->client_id_match));
+			} else {
+				ERR_TRCKR_ADD(err, res, "Error: Not matching pattern '%s'.", REGEXP_getPattern(blocks->client_id_match));
+				ERR_TRCKR_ADD(err, res, "Error: Client ID mismatch '%s'.", strClientId);
+				goto cleanup;
+			}
+
+		res = KT_VERIFICATION_FAILURE;
+		goto cleanup;
+		}
+	}
+
+	res = KT_OK;
+
+cleanup:
+	return res;
+}
+
 static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, KSI_PublicationsFile *pubFile, SIGNATURE_PROCESSORS *processors, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	KSI_Signature *sig = NULL;
@@ -1298,19 +1344,27 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 	context.docAggrLevel = block_info_get_aggregation_level(blocks);
 
 	if (processors->verify_signature) {
+
 		res = LOGKSI_Signature_parseWithPolicy(err, ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_EMPTY, NULL, &sig);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse KSI signature.", blocks->blockNo);
 
+		/* Verify KSI signature. */
 		res = processors->verify_signature(set, mp, err, ksi, blocks, files, sig, (KSI_DataHash*)context.documentHash, context.docAggrLevel, &verificationResult);
 		if (res != KSI_OK) {
 			blocks->nofTotalFailedBlocks++;
 
-			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Verification of block %zu KSI signature failed!\n", blocks->blockNo);
-			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Verification of KSI signature failed!\n", blocks->blockNo);
-
-			ERR_TRCKR_ADD(err, res, "Error: Block no. %zu: KSI signature verification failed.", blocks->blockNo);
-			goto cleanup;
+			if (PARAM_SET_isSetByName(set, "continue-on-fail")) {
+				print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
+				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Verification of block %zu KSI signature failed!\n", blocks->blockNo);
+				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Verification of KSI signature failed!\n", blocks->blockNo);
+				res = KT_VERIFICATION_FAILURE;
+				goto cleanup;
+			} else {
+				ERR_TRCKR_ADD(err, res, "Error: Block no. %zu: KSI signature verification failed.", blocks->blockNo);
+				goto cleanup;
+			}
 		}
+
 		/* TODO: add dumping of verification results. */
 		KSI_PolicyVerificationResult_free(verificationResult);
 		verificationResult = NULL;
@@ -1440,6 +1494,10 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, "Block no. %3zu: signing time: (%llu) %s\n", blocks->blockNo, blocks->sigTime_1, LOGKSI_signature_sigTimeToString(sig, sigTimeStr, sizeof(sigTimeStr)));
 	}
 
+	/* Verify KSI signatures Client ID. */
+	res = check_log_signature_client_id(set, mp, err, blocks, sig);
+	if (res != KT_OK) goto cleanup;
+
 	blocks->lastBlockWasSkipped = 0;
 	res = KT_OK;
 
@@ -1535,6 +1593,10 @@ static int process_ksi_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *e
 		print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
 		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, "Block no. %3zu: signing time: (%llu) %s\n", blocks->blockNo, blocks->sigTime_1, LOGKSI_signature_sigTimeToString(sig, sigTimeStr, sizeof(sigTimeStr)));
 	}
+
+	/* Verify KSI signatures Client ID. */
+	res = check_log_signature_client_id(set, mp, err, blocks, sig);
+	if (res != KT_OK) goto cleanup;
 
 cleanup:
 
@@ -2444,6 +2506,7 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 	int skipCurrentBlock = 0;
 	int lastError = KT_OK;
 	int printHeader = 0;
+	REGEXP *tmp_regxp = NULL;
 
 	if (set == NULL || err == NULL || ksi == NULL || blocks == NULL || verify_signature == NULL || files == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -2457,6 +2520,18 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 
 	res = process_magic_number(set, mp, err, blocks, files);
 	if (res != KT_OK) goto cleanup;
+
+	if (PARAM_SET_isSetByName(set, "client-id")) {
+		char *pattern = NULL;
+		PARAM_SET_getStr(set, "client-id", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &pattern);
+
+		res = REGEXP_new(pattern, &tmp_regxp);
+		ERR_CATCH_MSG(err, res, "Error: Unable to parse regular expression for matching the client ID.");
+
+		blocks->client_id_match = tmp_regxp;
+		tmp_regxp = NULL;
+	}
+
 
 	while (!SMART_FILE_isEof(files->files.inSig)) {
 		MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
@@ -2659,8 +2734,10 @@ cleanup:
 		print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n");
 	}
 
+	MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
 	MULTI_PRINTER_printByID(mp, MP_ID_BLOCK_ERRORS);
 
+	REGEXP_free(tmp_regxp);
 	KSI_DataHash_free(theFirstInputHashInFile);
 	BLOCK_INFO_freeAndClearInternals(blocks);
 

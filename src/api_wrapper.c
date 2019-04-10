@@ -660,6 +660,40 @@ char* LOGKSI_signature_sigTimeToString(const KSI_Signature* sig, char *buf, size
 	return KSI_Integer_toDateString(sigTime, buf, buf_len);;
 }
 
+char* LOGKSI_signerIdentityToString(KSI_Signature *sig, char *buf, size_t buf_len) {
+	int res = KSI_UNKNOWN_ERROR;
+	KSI_HashChainLinkIdentityList *identityList = NULL;
+	size_t count = 0;
+
+	if (sig == NULL || buf == NULL || buf_len == 0) goto cleanup;
+
+	res = KSI_Signature_getAggregationHashChainIdentity(sig, &identityList);
+	if (res != KSI_OK) goto cleanup;
+
+
+	if (identityList != NULL) {
+		size_t k;
+
+		for (k = 0; k < KSI_HashChainLinkIdentityList_length(identityList); k++) {
+			KSI_HashChainLinkIdentity *identity = NULL;
+			KSI_Utf8String *clientId = NULL;
+
+			res = KSI_HashChainLinkIdentityList_elementAt(identityList, k, &identity);
+			if (res != KSI_OK) goto cleanup;
+
+			res = KSI_HashChainLinkIdentity_getClientId(identity, &clientId);
+			if (res != KSI_OK) goto cleanup;
+			count += KSI_snprintf(buf + count, buf_len - count, "%s%s", (k > 0 ? " :: " : ""), KSI_Utf8String_cstr(clientId));
+		}
+	}
+
+cleanup:
+
+	KSI_HashChainLinkIdentityList_free(identityList);
+
+	return (res == KT_OK) ? buf : NULL;
+}
+
 char* LOGKSI_uint64_toDateString(uint64_t time, char *buf, size_t buf_len) {
 	int res = KT_UNKNOWN_ERROR;
 	KSI_Integer *t = NULL;

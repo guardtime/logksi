@@ -24,6 +24,7 @@
 #include <ksi/hash.h>
 #include <ksi/fast_tlv.h>
 #include <ksi/tlv_element.h>
+#include "regexpwrap.h"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -133,6 +134,9 @@ typedef struct {
 	uint64_t sigTime_1;
 	uint64_t extendedToTime;
 	LOGKSI_TASK_ID taskId;
+
+	char *client_id_last;		/* Last signer id. Used to detect change. */
+	REGEXP *client_id_match;		/* A regular expression value to be matched with KSI signatures. */
 } BLOCK_INFO;
 
 #ifdef	__cplusplus

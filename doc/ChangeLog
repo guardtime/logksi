@@ -1,8 +1,9 @@
 (LOGKSI-78) * IMPROVEMENT: Wording of hash comparison failure error messages improved.
 (LOGKSI-63) * IMPROVEMENT: Improved error messages when integrating invalid or broken log signature files.
 (LOGKSI-111) * IMPROVEMENT: Improved debug output (-d) in case of integrating is not needed and output already exists as result of synchronous signing.
-(LOGKSI-44) * FEATURE: New option --continue-on-fail that tries to continue signing when signing of the block fails.
-(LOGKSI-78) * FEATURE: New option --continue-on-fail that tries to continue verification when verification failure is encountered.
+(LOGKSI-88) * FEATURE: New option --client-id to match KSI signatures client ID against regular expression.
+(LOGKSI-78) * FEATURE: New option --continue-on-fail that tries to continue verification when verification fails.
+(LOGKSI-40) * FEATURE: New option --continue-on-fail that tries to continue signing when signing of the block fails.
 (LOGKSI-78) * FEATURE: New option --use-stored-hash-on-fail that continues verification on hash comparison failure with stored hash value.
 (LOGKSI-78) * FEATURE: New option --use-computed-hash-on-fail that continues verification on hash comparison failure with computed hash value.
 (LOGKSI-99) * FEATURE: New option --recover for integrate, to recover useful amount of data from partially corrupted log signatures.
