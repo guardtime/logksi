@@ -58,10 +58,45 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ "Verifying... ok." ]]
 }
 
+@test "verify log signature with expected client ID using more complex client id pattern" {
+	run src/logksi verify test/resource/continue-verification/log test/resource/continue-verification/log-ok-one-sig-diff-client-id.logsig  -d --client-id "GT :: GT :: GT :: (anon|sha512)" --ignore-desc-block-time
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Verifying... ok." ]]
+}
+
+@test "verify log signature with expected client ID using more complex client id pattern and enabled warnings" {
+	run src/logksi verify test/resource/continue-verification/log test/resource/continue-verification/log-ok-one-sig-diff-client-id.logsig  -d --client-id "GT :: GT :: GT :: (anon|sha512)" --ignore-desc-block-time --warn-client-id-change
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Verifying... ok." ]]
+	[[ "$output" =~ "o Warning: Client ID in block 2 is not constant" ]]
+}
+
 @test "verify log signature with unexpected client ID" {
 	run src/logksi verify test/resource/logs_and_signatures/signed -d --client-id "GT :: KT :: GT :: anon"
 	[ "$status" -eq 1 ]
 	[[ "$output" =~ (Error: Client ID mismatch).*(GT :: GT :: GT :: anon).*(Error: Not matching pattern).*(GT :: KT :: GT :: anon) ]]
+}
+
+@test "verify log signature with unexpected client ID using more complex client ID pattern" {
+	run src/logksi verify test/resource/continue-verification/log test/resource/continue-verification/log-ok-one-sig-diff-client-id.logsig  -d --client-id "GT :: GT :: GT :: (anon|Xsha512X)" --ignore-desc-block-time
+	[ "$status" -eq 1 ]
+	[[ "$output" =~ "Verifying... failed." ]]
+	[[ "$output" =~ (Error: Client ID mismatch).*(GT :: GT :: GT :: sha512).*(Error: Not matching pattern).*(GT :: GT :: GT :: .anon|Xsha512X.) ]]
+}
+
+@test "verify log signature with unexpected client ID using more complex client ID pattern and enabled warnings" {
+	run src/logksi verify test/resource/continue-verification/log test/resource/continue-verification/log-ok-one-sig-diff-client-id.logsig  -d --client-id "GT :: GT :: GT :: (anon|Xsha512X)" --ignore-desc-block-time --warn-client-id-change
+	[ "$status" -eq 1 ]
+	[[ "$output" =~ "Verifying... failed." ]]
+	[[ "$output" =~ (Error: Client ID mismatch).*(GT :: GT :: GT :: sha512).*(Error: Not matching pattern).*(GT :: GT :: GT :: .anon|Xsha512X.) ]]
+	[[ ! "$output" =~ "o Warning: Client ID in block.*is not constant" ]]
+}
+
+@test "verify log signature with changing client ID and with enabled warnings" {
+	run src/logksi verify test/resource/continue-verification/log test/resource/continue-verification/log-ok-one-sig-diff-client-id.logsig  -d --warn-client-id-change --ignore-desc-block-time
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Verifying... ok." ]]
+	[[ "$output" =~ ( o Warning: Client ID in block 2 is not constant:).*(Expecting: .GT :: GT :: GT :: anon.).*(But is:    .GT :: GT :: GT :: sha512.) ]]
 }
 
 @test "verify excerpt file with expected client ID" {
@@ -70,8 +105,22 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ "Verifying... ok." ]]
 }
 
+@test "verify excerpt file with expected client ID using more complex client id pattern" {
+	run src/logksi verify test/resource/excerpt/diff-client-id.excerpt -d --client-id "GT :: GT :: GT :: (anon|sha512)"
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Verifying... ok." ]]
+}
+
 @test "verify excerpt file with unexpected client ID" {
 	run src/logksi verify test/resource/excerpt/log-ok.excerpt -d --client-id "GT :: KT :: GT :: anon"
 	[ "$status" -eq 1 ]
+	[[ "$output" =~ "Verifying... failed." ]]
 	[[ "$output" =~ (Error: Client ID mismatch).*(GT :: GT :: GT :: anon).*(Error: Not matching pattern).*(GT :: KT :: GT :: anon) ]]
+}
+
+@test "verify excerpt file with changing client ID and with enabled warnings" {
+	run src/logksi verify test/resource/excerpt/diff-client-id.excerpt -d --warn-client-id-change
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Verifying... ok." ]]
+	[[ "$output" =~ ( o Warning: Client ID in block 2 is not constant:).*(Expecting: .GT :: GT :: GT :: anon.).*(But is:    .GT :: GT :: GT :: sha512.) ]]
 }

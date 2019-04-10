@@ -92,11 +92,49 @@ export KSI_CONF=test/test.cfg
 @test "verify output with debug level 2. excerpt file." {
 	run src/logksi verify test/resource/excerpt/log-ok.excerpt -dd
 	[ "$status" -eq 0 ]
-	[[ "$output" =~ (Verifying block no.   1... ok.).(Summary of block 1:).( . Sig time:    .1517928936.*).( . Record count:                2)..(Verifying block no.   2... ok.).(Summary of block 2:).( . Sig time:    .1517928937.*).( . Record count:                2)...(Summary of logfile:).( . Count of blocks:             2).( . Count of record hashes:      4) ]]
+	[[ "$output" =~ (Verifying block no.   1... ok.)..(Summary of block 1:).( . Sig time:    .1517928936.*).( . Record count:                2)..(Verifying block no.   2... ok.)..(Summary of block 2:).( . Sig time:    .1517928937.*).( . Record count:                2)...(Summary of logfile:).( . Count of blocks:             2).( . Count of record hashes:      4) ]]
 }
 
 @test "verify output with debug level 3. excerpt file." {
 	run src/logksi verify test/resource/excerpt/log-ok.excerpt -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ (Processing magic number... ok.).(Block no.   1: processing KSI signature ... ok.).(Block no.   1: verifying KSI signature... ok.*ms.).(Block no.   1: signing time: .1517928936.*).(Block no.   1: .rr.).(Block no.   2: processing KSI signature ... ok.).(Block no.   2: verifying KSI signature... ok.*ms.).(Block no.   2: signing time: .1517928937.*).(Block no.   2: .rr.) ]]
+}
+
+@test "verify and warn about changing client id with debug level 1" {
+	run src/logksi verify test/resource/continue-verification/log test/resource/continue-verification/log-ok-one-sig-diff-client-id.logsig --ignore-desc-block-time --warn-client-id-change -d
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ (Verifying... ok.)..(Summary of logfile:).*(Output hash: SHA-512:f7f5b4.*b2b596)..( o Warning: Client ID in block 2 is not constant:).(   . Expecting: .GT :: GT :: GT :: anon.).(   . But is:    .GT :: GT :: GT :: sha512.) ]]
+}
+
+@test "verify and warn about changing client id with debug level 2" {
+	run src/logksi verify test/resource/continue-verification/log test/resource/continue-verification/log-ok-one-sig-diff-client-id.logsig --ignore-desc-block-time --warn-client-id-change -dd
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ (Verifying block no.   1... ok.).*(Verifying block no.   2... ok.).*(Verifying block no.   3... ok.).*(Verifying block no.   4... ok.).*(Summary of logfile:).*(Output hash: SHA-512:f7f5b4.*b2b596)..( o Warning: Client ID in block 2 is not constant:).(   . Expecting: .GT :: GT :: GT :: anon.).(   . But is:    .GT :: GT :: GT :: sha512.) ]]
+}
+
+@test "verify and warn about changing client id with debug level 3" {
+	run src/logksi verify test/resource/continue-verification/log test/resource/continue-verification/log-ok-one-sig-diff-client-id.logsig --ignore-desc-block-time --warn-client-id-change -ddd
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ (Block no.   2: output hash: SHA-512:9c1ea0.*42e444.).(Block no.   2: Warning: all final tree hashes are missing.).(Block no.   2: Warning: Client ID is not constant. Expecting .GT :: GT :: GT :: anon.. but is .GT :: GT :: GT :: sha512..).(Block no.   3: processing block header... ok.) ]]
+	[[ ! "$output" =~ " o Warning: Client ID in block 2 is not constant" ]]
+}
+
+@test "verify excerpt file and warn about changing client id with debug level 1" {
+	run src/logksi verify test/resource/excerpt/diff-client-id.excerpt --warn-client-id-change -d
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ (Verifying... ok.)..(Summary of logfile:).*( . Count of record hashes:      2)..( o Warning: Client ID in block 2 is not constant:).(   . Expecting: .GT :: GT :: GT :: anon.).(   . But is:    .GT :: GT :: GT :: sha512.) ]]
+}
+
+@test "verify excerpt file and warn about changing client id with debug level 2" {
+	run src/logksi verify test/resource/excerpt/diff-client-id.excerpt --warn-client-id-change -dd
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ (Verifying block no.   1... ok.).*(Verifying block no.   2... ok.).*(Summary of logfile:).*( . Count of record hashes:      2)..( o Warning: Client ID in block 2 is not constant:).(   . Expecting: .GT :: GT :: GT :: anon.).(   . But is:    .GT :: GT :: GT :: sha512.) ]]
+}
+
+@test "verify excerpt file and warn about changing client id with debug level 3" {
+	run src/logksi verify test/resource/excerpt/diff-client-id.excerpt --warn-client-id-change -ddd
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ (Block no.   2: verifying KSI signature... ok.*ms.).(Block no.   2: signing time: .1553672948.*UTC).(Block no.   2: .r.).(Block no.   2: Warning: Client ID is not constant. Expecting .GT :: GT :: GT :: anon.. but is .GT :: GT :: GT :: sha512..).(Finalizing log signature... ok.) ]]
+	[[ ! "$output" =~ " o Warning: Client ID in block 2 is not constant" ]]
 }
