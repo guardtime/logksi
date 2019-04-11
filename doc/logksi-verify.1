@@ -50,10 +50,10 @@ Publication-based verification (\fB--ver-pub\fR). The signature must be extended
 It must be noted that only publication-based verification should be preferred in the long term as it does not rely on any keys and trusted services. The other policies can be used temporarily when the signature is created and there is not yet a publication to extend the signature to.
 .LP
 .SH LOG SIGNATURE VERIFICATION DETAILS
-Using options \fB--time-form\fR together with \fB--time-diff\fR, it is possible to extract and verify the date embedded into log lines. If only \fB--time-form\fR is specified, log block and file summary is updated with extracted time data (lowest and highest log record time in block and log file) and verification of embedded time is not performed. Option \fB--time-diff\fR together with signing time of the KSI signature forms a time window where all the log records in signed block must fit. In following examples \fILn\fR and \fISn\fR stand for log record and KSI Signature accordingly. Log records are placed on time line by the embedded time, and KSI signature by the signing time!
+Using options \fB--time-form\fR together with \fB--time-diff\fR, it is possible to extract and verify the date embedded into log lines. If only \fB--time-form\fR is specified, log block and file summary is updated with extracted time data (lowest and highest log record time in block and log file) and verification of embedded time is not performed. Option \fB--time-diff\fR together with signing time of the KSI signature forms a time window where all the log records in signed block must fit. In following examples \fILn\fR and \fISn\fR stand for log record and KSI Signature accordingly. Log records are placed on time line by the embedded time, and KSI signature by the signing time. NB! Following representation is explanatory only and does not describe the actual order of objects inside the log signature.
 .LP
 .RS 4
-Regular case where all log records and KSI signatures are strictly in chronological order. Option \fB--time-diff\fR is set to 5 creating a valid time window. First block is ok, but second fails as \fIL4\fR does not fit into permitted time window relative to \fIS2\fR.
+Regular case where all log records and KSI signatures are strictly in chronological order. Option \fB--time-diff\fR is set to 5 creating a valid time window. First block is ok, but second fails as \fIL4\fR does not fit into expected time window relative to \fIS2\fR.
 .RS 4
 .LP
 .EX
@@ -65,20 +65,20 @@ Failures:                          X
 .EE
 .RE
 .LP
-Irregular case, where log record embedded time is more recent than the KSI signature itself! This may have been caused by invalid system clock during log record creation. Option \fB--time-diff\fR is set to -5 creating a valid time window in another direction.
+Irregular case, where log record embedded time is more recent than the KSI signature itself! This may have been caused by invalid system clock during log record creation. Option \fB--time-diff\fR is set to -5 creating a valid time window in another direction. First block is ok, but second fails as \fIL6\fR does not fit into expected time window relative to \fIS2\fR.
 .RS 4
 .LP
 .EX
 log file: (S1  L1  L2          L3)(S2  L4  L5             L6)
 time:      1   2   3   4   5   6   7   8   9  10  11  12  13
-time win.: |______ -5s _______|    |______ -5s _______|   |
+time win.:   |______ -5s ______|     |______ -5s ______|  |
                                                           |
 Failures:                                                 X
 .EE
 .RE
 .RE
 .LP
-Additionally the chronological order (e.g. 1, 2, 3, 4) of the log records is verified. If multiple log files are verified the most recent log record from the previous file is compared with the oldest log record in the first block of the current log file. Due to the network latency or invalid system clock, it is possible that some of the log records are not in chronological order (e.g. 1, 3, 2, 4) and this will make verification fail. To overcome this issue see \fB--time-permit-disordered-records\fR.
+Additionally the chronological order (e.g. 1, 2, 3, 4) of the log records is verified. If multiple log files are verified the most recent log record from the previous file is compared with the least recent log record in the first block of the current log file. Due to the network latency or invalid system clock, it is possible that some of the log records are not in chronological order (e.g. 1, 3, 2, 4) and this will make verification fail. To overcome this issue see \fB--time-permit-disordered-records\fR.
 .LP
 .\"
 .SH OPTIONS
@@ -128,7 +128,7 @@ Verifies if KSI signatures client ID is matching regular expression specified.
 .\"
 .TP
 \fB--time-form \fIfmt\fR
-Format string (\fIfmt\fR) used to extract time stamp from the beginning of the log line to be matched with KSI signature signing time. \fIFmt\fR is specified by function \fIstrptime\fR and its documentation can be read for more details. \fIFmt\fR can contain regular characters and various formats. Some more common formats:
+Format string (\fIfmt\fR) is used to extract time stamp from the beginning of the log line to be matched with KSI signature signing time. \fIFmt\fR is specified by function \fIstrptime\fR and its documentation can be read for more details. \fIFmt\fR can contain regular characters and various formats. Some more common formats:
 .RS
 .RS
 .IP \(bu 2
