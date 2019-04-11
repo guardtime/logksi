@@ -1,0 +1,9 @@
+Apr 26 14:18:05 CentOS sudo:  vagrant : TTY=pts/0 ; PWD=/home/vagrant/work/rsyslog ; USER=root ; COMMAND=/bin/ls -la /var/log
+Apr 26 14:18:50 CentOS sudo:  vagrant : TTY=pts/0 ; PWD=/home/vagrant/work/rsyslog ; USER=root ; COMMAND=/bin/ls -la secure*.logsig.parts
+Apr 26 14:18:43 CentOS sudo:  vagrant : TTY=pts/0 ; PWD=/home/vagrant/work/rsyslog ; USER=root ; COMMAND=/bin/ls -la /var/log/secure-20170426-141803.logsig.parts /var/log/secure.logsig.parts
+Apr 26 14:18:53 CentOS sudo:  vagrant : TTY=pts/0 ; PWD=/home/vagrant/work/rsyslog ; USER=root ; COMMAND=/bin/ls -la /var/log/secure-20170426-141803.logsig.parts /var/log/secure.logsig.parts
+Apr 26 14:18:53 CentOS sudo:  vagrant : TTY=pts/0 ; PWD=/home/vagrant/work/rsyslog ; USER=root ; COMMAND=/bin/ls -la /var/log/secure-20170426-141803.logsig.parts /var/log/secure.logsig.parts
+Apr 26 14:18:54 CentOS sudo:  vagrant : TTY=pts/0 ; PWD=/home/vagrant/work/rsyslog ; USER=root ; COMMAND=/bin/ls -la /var/log/secure-20170426-141803.logsig.parts /var/log/secure.logsig.parts
+Apr 26 14:18:56 CentOS sudo:  vagrant : TTY=pts/0 ; PWD=/home/vagrant/work/rsyslog ; USER=root ; COMMAND=/bin/ls -la /var/log/secure-20170426-141803.logsig.parts /var/log/secure.logsig.parts
+Apr 26 14:18:58 CentOS sudo:  vagrant : TTY=pts/0 ; PWD=/home/vagrant/work/rsyslog ; USER=root ; COMMAND=/bin/ls -la /var/log
+Apr 26 14:19:03 CentOS sudo:  vagrant : TTY=pts/0 ; PWD=/home/vagrant/work/rsyslog ; USER=root ; COMMAND=/usr/sbin/logrotate /etc/logrotate.d/secure-rotate

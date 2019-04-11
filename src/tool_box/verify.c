@@ -103,7 +103,7 @@ int verify_run(int argc, char **argv, char **envp) {
 	char *sigFileNameCpy = NULL;
 	BLOCK_INFO blocks;
 	MULTI_PRINTER *mp = NULL;
-
+	uint64_t las_rec_time = 0;
 
 	BLOCK_INFO_reset(&blocks);
 	IO_FILES_init(&files);
@@ -111,7 +111,7 @@ int verify_run(int argc, char **argv, char **envp) {
 	 * Extract command line parameters and also add configuration specific parameters.
 	 */
 	res = PARAM_SET_new(
-			CONF_generate_param_set_desc("{warn-same-block-time}{warn-client-id-change}{ignore-desc-block-time}{multiple_logs}{input}{input-hash}{client-id}{output-hash}{log-from-stdin}{x}{d}{pub-str}{ver-int}{ver-cal}{ver-key}{ver-pub}{use-computed-hash-on-fail}{use-stored-hash-on-fail}{continue-on-fail}{conf}{time-form}{time-base}{time-diff}{log}{h|help}{hex-to-str}", "XP", buf, sizeof(buf)),
+			CONF_generate_param_set_desc("{warn-same-block-time}{warn-client-id-change}{ignore-desc-block-time}{multiple_logs}{input}{input-hash}{client-id}{output-hash}{log-from-stdin}{x}{d}{pub-str}{ver-int}{ver-cal}{ver-key}{ver-pub}{use-computed-hash-on-fail}{use-stored-hash-on-fail}{continue-on-fail}{conf}{time-form}{time-base}{time-diff}{time-permit-disordered-records}{log}{h|help}{hex-to-str}", "XP", buf, sizeof(buf)),
 			&set);
 	if (res != KT_OK) goto cleanup;
 
@@ -211,9 +211,10 @@ int verify_run(int argc, char **argv, char **envp) {
 			print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, "%sLog file '%s'.\n", (i == 0 ? "" : "\n"), files.internal.inLog);
 		}
 
+		blocks.rec_time_in_file_max = las_rec_time;
 
 		print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_EQUAL | DEBUG_LEVEL_1, "Verifying... ");
-		res = logsignature_verify(set, mp, err, ksi, &blocks, inputHash, verify_signature, &files, &outputHash);
+		res = logsignature_verify(set, mp, err, ksi, &blocks, inputHash, verify_signature, &files, &outputHash, &las_rec_time);
 		print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 		if (res != KT_OK) goto cleanup;
 
@@ -431,10 +432,10 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	PARAM_SET_addControl(set, "{pub-str}", isFormatOk_pubString, NULL, NULL, extract_pubString);
 	PARAM_SET_addControl(set, "client-id,time-form", isFormatOk_string, NULL, NULL, NULL);
 	PARAM_SET_addControl(set, "time-base", isFormatOk_int, isContentOk_uint, NULL, extract_int);
-	PARAM_SET_addControl(set, "time-diff", isFormatOk_timeDiff, NULL, NULL, extract_timeDiff);
+	PARAM_SET_addControl(set, "time-diff,time-permit-disordered-records", isFormatOk_timeDiff, NULL, NULL, extract_timeDiff);
 
 	PARAM_SET_setParseOptions(set, "m", PST_PRSCMD_HAS_MULTIPLE_INSTANCES | PST_PRSCMD_BREAK_VALUE_WITH_EXISTING_PARAMETER_MATCH);
-	PARAM_SET_setParseOptions(set, "time-form,time-base,time-diff", PST_PRSCMD_HAS_VALUE);
+	PARAM_SET_setParseOptions(set, "time-form,time-base,time-diff,time-permit-disordered-records", PST_PRSCMD_HAS_VALUE);
 
 	/* Make input also collect same values as multiple_logs. It simplifies task handling. */
 	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_COLLECT_WHEN_PARSING_IS_CLOSED |PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);

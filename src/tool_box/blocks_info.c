@@ -496,6 +496,9 @@ void BLOCK_INFO_freeAndClearInternals(BLOCK_INFO *blocks) {
 		blocks->extendedToTime = 0;
 		blocks->outSigModified = 0;
 		blocks->taskId = TASK_NONE;
+		blocks->quietError = 0;
+		blocks->rec_time_in_file_min = 0;
+		blocks->rec_time_in_file_max = 0;
 	}
 }
 

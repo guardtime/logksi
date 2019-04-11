@@ -129,3 +129,10 @@ export KSI_CONF=test/test.cfg
 	[[ ! "$output" =~ (Block no.   4: processing block signature data... ok)  ]]
 	[[ ! "$output" =~ (Error: Verification FAILED but was continued for further analysis)  ]]
 }
+
+@test "verify log record --time-diff: block 1,2 and 4 ok, block 3 nok" {
+	run ./src/logksi verify test/resource/logs_and_signatures/totally-resigned -dd --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff 340d19H58M59 --continue-on-fail
+	[ "$status" -eq 6 ]
+	[[ "$output" =~ (Verifying block no.   1... ok.).*(Verifying block no.   2... ok.).*(Verifying block no.   3... failed.).*(Verifying block no.   4... ok.) ]]
+	[[ "$output" =~ (Error: Verification FAILED but was continued for further analysis)  ]]
+}

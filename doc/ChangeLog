@@ -1,6 +1,9 @@
 (LOGKSI-78) * IMPROVEMENT: Wording of hash comparison failure error messages improved.
 (LOGKSI-63) * IMPROVEMENT: Improved error messages when integrating invalid or broken log signature files.
 (LOGKSI-111) * IMPROVEMENT: Improved debug output (-d) in case of integrating is not needed and output already exists as result of synchronous signing.
+(LOGKSI-94) * FEATURE: New option --time-form and --time-base to extract log record time embedded into log line.
+(LOGKSI-94) * FEATURE: New option --time-diff to verify log record embedded time against KSI signature signing time.
+(LOGKSI-94) * FEATURE: New option --time-permit-disordered-records to allow log records that are not listed in chronological order.
 (LOGKSI-88) * FEATURE: New option --client-id to match KSI signatures client ID against regular expression.
 (LOGKSI-88) * FEATURE: New option --warn-client-id-change that will warn user when KSI signatures client ID is not constant value.
 (LOGKSI-78) * FEATURE: New option --continue-on-fail that tries to continue verification when verification fails.
