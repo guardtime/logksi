@@ -111,8 +111,8 @@ static int block_info_calculate_hash_of_logline_and_store_logline_check_log_time
 			if (blocks->rec_time_max < t) blocks->rec_time_max = t;
 
 			if (PARAM_SET_isSetByName(set, "time-diff")) {
-				uint64_t line_nr_0 = get_nof_lines(blocks) - 1;
-				uint64_t line_nr_1 = get_nof_lines(blocks);
+				size_t line_nr_0 = get_nof_lines(blocks) - 1;
+				size_t line_nr_1 = get_nof_lines(blocks);
 
 				if (last_time > t && line_nr_0 > 0) {
 					char str_last_time[1024] = "<null>";
