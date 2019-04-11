@@ -454,7 +454,7 @@ static int check_log_record_embedded_time_against_ksi_signature_time(PARAM_SET *
 		LOGKSI_uint64_toDateString(blocks->rec_time_min, str_rec_time_min, sizeof(str_rec_time_min));
 		LOGKSI_uint64_toDateString(blocks->rec_time_max, str_rec_time_max, sizeof(str_rec_time_max));
 
-		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, "Block no. %3zu: time extracted from less recent log line: %s\n", blocks->blockNo, str_rec_time_min);
+		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, "Block no. %3zu: time extracted from least recent log line: %s\n", blocks->blockNo, str_rec_time_min);
 		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, "Block no. %3zu: time extracted from most recent log line:  %s\n", blocks->blockNo, str_rec_time_max);
 		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, "Block no. %3zu: block time window:  %s%s\n", blocks->blockNo, diff_calc_sign_str, str_diff_calc);
 
@@ -475,9 +475,9 @@ static int check_log_record_embedded_time_against_ksi_signature_time(PARAM_SET *
 			if (PARAM_SET_isSetByName(set, "continue-on-fail")) {
 				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: %s the log lines are more recent than KSI signature.\n", blocks->blockNo, (blocks->sigTime_1 < blocks->rec_time_min ? "All" : "Some of"));
 				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: %s the log lines in block %zu are more recent than KSI signature:\n"
-																					  "   + Signing time:                             %s\n"
-																					  "   + Time extracted from less recent log line: %s\n"
-																					  "   + Time extracted from most recent log line: %s\n"
+																					  "   + Signing time:                              %s\n"
+																					  "   + Time extracted from least recent log line: %s\n"
+																					  "   + Time extracted from most recent log line:  %s\n"
 																					  ,  (blocks->sigTime_1 < blocks->rec_time_min ? "All" : "Some of"), blocks->blockNo, str_sigTime1, str_rec_time_min, str_rec_time_max);
 			blocks->quietError = res;
 			res = KT_OK;
@@ -489,11 +489,11 @@ static int check_log_record_embedded_time_against_ksi_signature_time(PARAM_SET *
 				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Log lines do not fit into expected time window (%s%s).\n", blocks->blockNo, sign_str, str_allowed_diff);
 			if (PARAM_SET_isSetByName(set, "continue-on-fail")) {
 				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Log lines in block %zu do not fit into time window:\n"
-																					  "   + Signing time:                             %s\n"
-																					  "   + Time extracted from less recent log line: %s\n"
-																					  "   + Time extracted from most recent log line: %s\n"
-																					  "   + Block time window:                        %s%s\n"
-																					  "   + Expected time window:                     %s%s\n"
+																					  "   + Signing time:                              %s\n"
+																					  "   + Time extracted from least recent log line: %s\n"
+																					  "   + Time extracted from most recent log line:  %s\n"
+																					  "   + Block time window:                         %s%s\n"
+																					  "   + Expected time window:                      %s%s\n"
 																					  , blocks->blockNo, str_sigTime1, str_rec_time_min, str_rec_time_max, diff_calc_sign_str, str_diff_calc, sign_str, str_allowed_diff);
 				blocks->quietError = res;
 				res = KT_OK;
@@ -548,14 +548,17 @@ static int handle_record_time_check_between_files(PARAM_SET *set, MULTI_PRINTER*
 			if (PARAM_SET_isSetByName(set, "continue-on-fail")) {
 				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Last log line (%s) from previous file is more recent than first log line (%s) from current file.\n", blocks->blockNo, str_last_time, str_current_time);
 
-				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Last log line from previous file is more recent than first log line from current file:\n"
-																			  "   + Previous log file: %s\n"
-																			  "   + Time for last log line: %s\n"
-																			  "   + Current log file: %s\n"
-																			  "   + Time for first log line: %s\n"
+				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Most recent log line from previous file is more recent than least recent log line from current file:\n"
+																			  "   + Previous log file:              %s\n"
+																			  "   + Time for most recent log line:  %s\n"
+																			  "   + Current log file:               %s\n"
+																			  "   + Time for least recent log line: %s\n"
 																			  ,files->previousLogFile , str_last_time, io_files_getCurrentLogFilePrintRepresentation(files), str_current_time);
+					blocks->quietError = res;
+					res = KT_OK;
+					goto cleanup;
 			} else {
-				ERR_CATCH_MSG(err, res, "Error: Last log line from previous file ('%s' - %s) is more recent than first log line from current file ('%s' - %s).", files->previousLogFile, str_last_time, io_files_getCurrentLogFilePrintRepresentation(files), str_current_time);
+				ERR_CATCH_MSG(err, res, "Error: Most recent log line from previous file ('%s' - %s) is more recent than least recent log line from current file ('%s' - %s).", files->previousLogFile, str_last_time, io_files_getCurrentLogFilePrintRepresentation(files), str_current_time);
 			}
 		}
 	}

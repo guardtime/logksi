@@ -60,7 +60,7 @@ f_internal_interlink_error () {
 
 # block, sig_time, first_rec_time, last_rec_time, block_time_win, permit_time_window
 f_failed_to_ver_log_rec_time () {
-	echo "( x Error: Log lines in block $1 do not fit into time window:).(   . Signing time:                             .$2.*UTC.00:00).(   . Time extracted from less recent log line: .$3.*UTC.00:00).(   . Time extracted from most recent log line: .$4.*UTC.00:00).(   . Block time window:                        $5).(   . Expected time window:                     $6)"
+	echo "( x Error: Log lines in block $1 do not fit into time window:).(   . Signing time:                              .$2.*UTC.00:00).(   . Time extracted from least recent log line: .$3.*UTC.00:00).(   . Time extracted from most recent log line:  .$4.*UTC.00:00).(   . Block time window:                         $5).(   . Expected time window:                      $6)"
 }
 
 # block, cid, pattern
@@ -70,7 +70,7 @@ f_client_if_fail () {
 
 #some_or_all?, block_num, sig_time, logline_0_time, logline_1_time
 f_log_line_more_recent_than_ksig () {
-	echo "( x Error: $1 the log lines in block $2 are more recent than KSI signature:).(   . Signing time:                             .$3.*UTC.00:00).(   . Time extracted from less recent log line: .$4.*UTC.00:00).(   . Time extracted from most recent log line: .$5.*UTC.00:00)"
+	echo "( x Error: $1 the log lines in block $2 are more recent than KSI signature:).(   . Signing time:                              .$3.*UTC.00:00).(   . Time extracted from least recent log line: .$4.*UTC.00:00).(   . Time extracted from most recent log line:  .$5.*UTC.00:00)"
 }
 
 ##
@@ -211,8 +211,8 @@ log_some_of_lines_more_recent_than_ksig_in_block_2=`f_log_line_more_recent_than_
 @test "Debug output for continuated verification. Verify log record --time-diff: block 1,2 and 4 ok, block 3 nok. Debug level 3." {
 	run ./src/logksi verify test/resource/logs_and_signatures/totally-resigned -ddd --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff 340d19H58M59 --continue-on-fail
 	[ "$status" -eq 6 ]
-	[[ "$output" =~ (Block no.   1: verifying KSI signature... ok.*ms.).(Block no.   1: signing time: .1554200224.*UTC).(Block no.   1: time extracted from less recent log line: .1524752285.*UTC.00:00).(Block no.   1: time extracted from most recent log line:  .1524752323.*UTC.00:00).(Block no.   1: block time window:  340d 19:58:59).(Block no.   1: checking if time embedded into log lines fits in specified time window relative to the KSI signature... ok.).(Block no.   1: output hash: SHA-512:20cfea.*88944a.).(Block no.   1: Warning: all final tree hashes are missing.).(Block no.   2: processing block header... ok.) ]]
-	[[ "$output" =~ (Block no.   3: signing time: .1554201464.*UTC).(Block no.   3: time extracted from less recent log line: .1524752336.*UTC.00:00).(Block no.   3: time extracted from most recent log line:  .1524752343.*UTC.00:00).(Block no.   3: block time window:  340d 20:18:48).(Block no.   3: checking if time embedded into log lines fits in specified time window relative to the KSI signature... failed.).(Block no.   3: checking signing time with previous block... ok.).(Block no.   3: output hash: SHA-512:1dfeae.*43e987.).(Block no.   3: Warning: all final tree hashes are missing.).(Block no.   3: Error: Log lines do not fit into expected time window .340d 19:58:59.) ]]
+	[[ "$output" =~ (Block no.   1: verifying KSI signature... ok.*ms.).(Block no.   1: signing time: .1554200224.*UTC).(Block no.   1: time extracted from least recent log line: .1524752285.*UTC.00:00).(Block no.   1: time extracted from most recent log line:  .1524752323.*UTC.00:00).(Block no.   1: block time window:  340d 19:58:59).(Block no.   1: checking if time embedded into log lines fits in specified time window relative to the KSI signature... ok.).(Block no.   1: output hash: SHA-512:20cfea.*88944a.).(Block no.   1: Warning: all final tree hashes are missing.).(Block no.   2: processing block header... ok.) ]]
+	[[ "$output" =~ (Block no.   3: signing time: .1554201464.*UTC).(Block no.   3: time extracted from least recent log line: .1524752336.*UTC.00:00).(Block no.   3: time extracted from most recent log line:  .1524752343.*UTC.00:00).(Block no.   3: block time window:  340d 20:18:48).(Block no.   3: checking if time embedded into log lines fits in specified time window relative to the KSI signature... failed.).(Block no.   3: checking signing time with previous block... ok.).(Block no.   3: output hash: SHA-512:1dfeae.*43e987.).(Block no.   3: Warning: all final tree hashes are missing.).(Block no.   3: Error: Log lines do not fit into expected time window .340d 19:58:59.) ]]
 }
 
 @test "verify log record where all the log lines are more recent than KSI signature - debug lvl 2" {
@@ -228,4 +228,17 @@ log_some_of_lines_more_recent_than_ksig_in_block_2=`f_log_line_more_recent_than_
 	[[ "$output" =~ $log_some_of_lines_more_recent_than_ksig_in_block_2 ]]
 	[[ "$output" =~ (All the log lines in block 3 are more recent than) ]]
 	[[ ! "$output" =~ (log lines in block 1 are more recent than) ]]
+}
+
+# prev_file, log_line_time, curr_file, log_line_time
+f_log_line_from_previous_file_more_recent_than_cur_log_line () {
+	echo "( x Error: Most recent log line from previous file is more recent than least recent log line from current file:).(   . Previous log file:              $1).(   . Time for most recent log line:  .$2.*UTC.00:00).(   . Current log file:               $3).(   . Time for least recent log line: .$4.*UTC.00:00)"
+}
+
+prev_file_rec_time_check_fail=`f_log_line_from_previous_file_more_recent_than_cur_log_line "test/resource/interlink/ok-testlog-interlink-1" 1539771483 "test/resource/interlink/testlog-interlink-first-rec-time-changed-2" 1539771480`
+
+@test "verify inter-linking and log record embedded time chronological order - debug level 1" {
+	run src/logksi verify --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff 50S -dd --use-stored-hash-on-fail --continue-on-fail -- test/resource/interlink/ok-testlog-interlink-1 test/resource/interlink/testlog-interlink-first-rec-time-changed-2
+	[ "$status" -eq 6 ]
+	[[ "$output" =~ $prev_file_rec_time_check_fail ]]
 }

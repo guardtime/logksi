@@ -117,7 +117,7 @@ echo SHA-512:dd4e870e7e0c998f160688b97c7bdeef3d6d01b1c5f02db117018058ad51996777a
 	run src/logksi verify --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff 50S -dd --use-stored-hash-on-fail  -- test/resource/interlink/ok-testlog-interlink-1 test/resource/interlink/testlog-interlink-first-rec-time-changed-2
 	[ "$status" -eq 6 ]
 	[[ "$output" =~ (Log file .*ok-testlog-interlink-1..).(Verifying block no.   1... ok.).*(Log file .*testlog-interlink-first-rec-time-changed-2..).(Verifying block no.   1... failed.) ]]
-	[[ "$output" =~ (Error: Last log line from previous file).*(ok-testlog-interlink-1).*(1539771483).*(is more recent than first log line from current file).*(testlog-interlink-first-rec-time-changed-2).*(1539771480) ]]
+	[[ "$output" =~ (Error: Most recent log line from previous file).*(ok-testlog-interlink-1).*(1539771483).*(is more recent than least recent log line from current file).*(testlog-interlink-first-rec-time-changed-2).*(1539771480) ]]
 	[[ ! "$output" =~ "unable to calculate hash of logline no" ]]
 }
 
@@ -133,5 +133,5 @@ echo SHA-512:dd4e870e7e0c998f160688b97c7bdeef3d6d01b1c5f02db117018058ad51996777a
 @test "verify inter-linking and log record embedded time chronological order - check most recent value from previous block" {
 	run src/logksi verify  -d --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff 50S -dd --use-stored-hash-on-fail --time-permit-disordered-records 3  -- test/resource/interlink/testlog-interlink-n-1-rec-time-changed-1 test/resource/interlink/testlog-interlink-first-rec-time-changed-2
 	[ "$status" -eq 6 ]
-	[[ "$output" =~ (Error: Last log line from previous file).*(testlog-interlink-n-1-rec-time-changed-1).*(1539771484).*(is more recent than first log line from current file).*(testlog-interlink-first-rec-time-changed-2).*(1539771480) ]]
+	[[ "$output" =~ (Error: Most recent log line from previous file).*(testlog-interlink-n-1-rec-time-changed-1).*(1539771484).*(is more recent than least recent log line from current file).*(testlog-interlink-first-rec-time-changed-2).*(1539771480) ]]
 }
