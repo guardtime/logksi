@@ -50,7 +50,7 @@ Publication-based verification (\fB--ver-pub\fR). The signature must be extended
 It must be noted that only publication-based verification should be preferred in the long term as it does not rely on any keys and trusted services. The other policies can be used temporarily when the signature is created and there is not yet a publication to extend the signature to.
 .LP
 .SH LOG SIGNATURE VERIFICATION DETAILS
-Using options \fB--time-form\fR together with \fB--time-diff\fR, it is possible to extract and verify the date embedded into log lines. If only \fB--time-form\fR is specified, log block and file summary is updated with extracted time data (lowest and highest log record time in block and log file) and verification of embedded time is not performed. Option \fB--time-diff\fR together with signing time of the KSI signature forms a time window where all the log records in signed block must fit. In following examples \fILn\fR and \fISn\fR stand for log record and KSI Signature accordingly. Log records are placed on time line by the embedded time, and KSI signature by the signing time. NB! Following representation is explanatory only and does not describe the actual order of objects inside the log signature.
+Using option \fB--time-form\fR together with \fB--time-diff\fR, it is possible to extract and verify the date embedded into log lines. If only \fB--time-form\fR is specified, log block and file summary is updated with extracted time data (lowest and highest log record time in block and log file) and verification of embedded time is not performed. Option \fB--time-diff\fR together with signing time of the KSI signature forms a time window where all the log records in signed block must fit. In following examples \fILn\fR and \fISn\fR stand for log record and KSI signature accordingly. Log records are placed on time line by the embedded time, and KSI signature by the signing time. NB! Following representation is explanatory only and does not describe the actual order of objects inside the log signature.
 .LP
 .RS 4
 Regular case where all log records and KSI signatures are strictly in chronological order. Option \fB--time-diff\fR is set to 5 creating a valid time window. First block is ok, but second fails as \fIL4\fR does not fit into expected time window relative to \fIS2\fR.
@@ -141,7 +141,7 @@ Format string (\fIfmt\fR) is used to extract time stamp from the beginning of th
 \fB%H %M %S\fR - Hour (0 - 23), minute (0 - 59) and second (0 - 60).
 .RE
 .LP
-Every character and format in \fIfmt\fR must have a match. For example "[%Y %m %d %H:%M:%S" can have 0-N whitespace characters followed by '[' and strict format for the timestamp. This will match a logline "[2019 4 1 00:00:34] ..." but will not accept any of the following: "[2019 4 1 00 00 34] ...", "[2019 4 1] ..." and "2019 4 1 00:00:34 ...".
+Every character and format in \fIfmt\fR must have a match. For example "%n[%Y %m %d %H:%M:%S" can have 0-N whitespace characters followed by '[' and strict format for the timestamp. This will match a logline "[2019 4 1 00:00:34] ..." but will not accept any of the following: "[2019 4 1 00 00 34] ...", "[2019 4 1] ..." and "2019 4 1 00:00:34 ...".
 .LP
 If year info is not specified in log lines see option \fB--time-base\fR. If combined with \fB-d\fR or \fB-dd\fR log file and block summary is updated with extracted data. See \fB--time-diff\fR to enable and configure log record time verification.
 .RE
@@ -152,10 +152,10 @@ Specify the year (e.g. 2019) when it can not be extracted with \fB--time-form\fR
 .\"
 .TP
 \fB--time-diff \fItime\fR
-A specified time difference that with the signing time of the KSI signature forms a valid time window where all the log records must fit. Also the chronological order of the log records is checked. The difference can be specified as seconds (e.g 86400) or using integers followed by markers (e.g. 10d2H3M1S), where \fBd\fR, \fBH\fR, \fBM\fR and \fBS\fR stand for day, hour, minute and second accordingly. The order of the markers is not important but every marker can only be specified once. Marker \fBS\fR can be omitted for the last integer. See \fB--time-form\fR to see how to extract log record time.
+A specified time difference that with the signing time of the KSI signature forms a valid time window where all the log records must fit; either before signing time (use "-" sign to indicate negative value) or after signing time. Also the chronological order of the log records is checked. The difference can be specified as seconds (e.g 86400) or using integers followed by markers (e.g. 10d2H3M1S), where \fBd\fR, \fBH\fR, \fBM\fR and \fBS\fR stand for day, hour, minute and second accordingly. The order of the markers is not important but every marker can only be specified once. Marker \fBS\fR can be omitted for the last integer. See \fB--time-form\fR to see how to extract log record time.
 .LP
 .RS
-In some cases, where log lines contain timestamps that point to a time after the KSI signature (e.g. due to machine clock difference), it is still possible to specify a valid negative time difference for verification (e.g. -15d). NB! When using negative value make sure that You know why there is abnormal time difference between KSI Signature and timestamps embedded into the log lines.
+In some cases, where log lines contain timestamps that point to a time after the KSI signature (e.g. due to machine clock difference), it is still possible to specify a valid negative time difference for verification (e.g. -15d). NB! When using negative value make sure that You know why there is abnormal time difference between KSI signature and timestamps embedded into the log lines.
 .RE
 .\"
 .TP
