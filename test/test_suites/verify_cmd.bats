@@ -130,10 +130,10 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(2d-1) ]]
 }
 
-@test "verify CMD test: Check if --time-permit-disordered-records has the same type as --time-diff" {
-	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/log_repaired -d --time-permit-disordered-records 1S2
+@test "verify CMD test: Check if --time-disordered has the same type as --time-diff" {
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/log_repaired -d --time-disordered 1S2
 	[ "$status" -eq 3 ]
-	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-permit-disordered-records).*(1S2) ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-disordered).*(1S2) ]]
 }
 
 @test "verify CMD test: Check parsing of --time-diff S" {

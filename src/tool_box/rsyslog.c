@@ -120,8 +120,8 @@ static int block_info_calculate_hash_of_logline_and_store_logline_check_log_time
 					int time_diff = 0;
 
 					/* Check if deviation in current range is accepted. */
-					if (PARAM_SET_isSetByName(set, "time-permit-disordered-records")) {
-						res = PARAM_SET_getObj(set, "time-permit-disordered-records", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, (void**)&time_diff);
+					if (PARAM_SET_isSetByName(set, "time-disordered")) {
+						res = PARAM_SET_getObj(set, "time-disordered", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, (void**)&time_diff);
 						ERR_CATCH_MSG(err, res, "Error: Unable to extract time base as integer.");
 
 						if (last_time <= t + time_diff) {
@@ -530,8 +530,8 @@ static int handle_record_time_check_between_files(PARAM_SET *set, MULTI_PRINTER*
 	if (blocks->blockNo == 1 && blocks->rec_time_in_file_max != 0 && blocks->rec_time_min != 0 && PARAM_SET_isSetByName(set, "time-diff")) {
 		int time_diff = 0;
 
-		if (PARAM_SET_isSetByName(set, "time-permit-disordered-records")) {
-			res = PARAM_SET_getObj(set, "time-permit-disordered-records", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, (void**)&time_diff);
+		if (PARAM_SET_isSetByName(set, "time-disordered")) {
+			res = PARAM_SET_getObj(set, "time-disordered", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, (void**)&time_diff);
 			ERR_CATCH_MSG(err, res, "Error: Unable to extract time base as integer.");
 		}
 
@@ -3117,7 +3117,7 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 	}
 
 	if (last_rec_time != NULL) {
-		*last_rec_time = blocks->rec_time_in_file_max;
+		*last_rec_time = blocks->rec_time_max;
 	}
 
 	res = finalize_log_signature(set, mp, err, ksi, theFirstInputHashInFile, blocks, files);

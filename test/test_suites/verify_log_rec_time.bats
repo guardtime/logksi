@@ -83,15 +83,15 @@ export KSI_CONF=test/test.cfg
 	[[ ! "$output" =~ "unable to calculate hash of logline no" ]]
 }
 
-@test "verify that log records in log file are in chronological order: use --time-permit-disordered-records with too small value" {
-	run ./src/logksi verify test/resource/log_rec_time/log-line-embedded-date-changed test/resource/log_rec_time/log-line-embedded-date-changed.logsig -d --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -80d --use-stored-hash-on-fail --time-permit-disordered-records 6
+@test "verify that log records in log file are in chronological order: use --time-disordered with too small value" {
+	run ./src/logksi verify test/resource/log_rec_time/log-line-embedded-date-changed test/resource/log_rec_time/log-line-embedded-date-changed.logsig -d --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -80d --use-stored-hash-on-fail --time-disordered 6
 	[ "$status" -eq 6 ]
 	[[ "$output" =~ "Verifying... failed." ]]
 	[[ "$output" =~ (Error: Block no. 1: Log line 2).*(1524752330).*(is more recent than log line 3).*(1524752323) ]]
 }
 
-@test "verify that log records in log file are in chronological order: fix failure with --time-permit-disordered-records minimum value" {
-	run ./src/logksi verify test/resource/log_rec_time/log-line-embedded-date-changed test/resource/log_rec_time/log-line-embedded-date-changed.logsig -d --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -80d --use-stored-hash-on-fail --time-permit-disordered-records 7
+@test "verify that log records in log file are in chronological order: fix failure with --time-disordered minimum value" {
+	run ./src/logksi verify test/resource/log_rec_time/log-line-embedded-date-changed test/resource/log_rec_time/log-line-embedded-date-changed.logsig -d --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -80d --use-stored-hash-on-fail --time-disordered 7
 	[ "$status" -eq 6 ]
 	[[ "$output" =~ "Verifying... failed." ]]
 	[[ "$output" =~ (Error: 1 hash comparison failures found) ]]
@@ -144,16 +144,16 @@ export KSI_CONF=test/test.cfg
 	[[ ! "$output" =~ "unable to calculate hash of logline no" ]]
 }
 
-@test "verify that log records in log excerpt file are in chronological order: use --time-permit-disordered-records with too small value" {
-	run ./src/logksi verify test/resource/log_rec_time/log-line-embedded-date-changed.excerpt test/resource/log_rec_time/log-line-embedded-date-changed.excerpt.logsig -d --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -80d --use-stored-hash-on-fail --time-permit-disordered-records 3
+@test "verify that log records in log excerpt file are in chronological order: use --time-disordered with too small value" {
+	run ./src/logksi verify test/resource/log_rec_time/log-line-embedded-date-changed.excerpt test/resource/log_rec_time/log-line-embedded-date-changed.excerpt.logsig -d --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -80d --use-stored-hash-on-fail --time-disordered 3
 	[ "$status" -eq 6 ]
 	[[ "$output" =~ "Verifying... failed." ]]
 	[[ "$output" =~ "Error: Failed to verify logline no. 1" ]]
 	[[ "$output" =~ (Error: Block no. 1: Log line 1).*(1524753601).*(is more recent than log line 2).*(1524753597) ]]
 }
 
-@test "verify that log records in log excerpt file are in chronological order: use --time-permit-disordered-records" {
-	run ./src/logksi verify test/resource/log_rec_time/log-line-embedded-date-changed.excerpt test/resource/log_rec_time/log-line-embedded-date-changed.excerpt.logsig -d --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -80d --use-stored-hash-on-fail --time-permit-disordered-records 4
+@test "verify that log records in log excerpt file are in chronological order: use --time-disordered" {
+	run ./src/logksi verify test/resource/log_rec_time/log-line-embedded-date-changed.excerpt test/resource/log_rec_time/log-line-embedded-date-changed.excerpt.logsig -d --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -80d --use-stored-hash-on-fail --time-disordered 4
 	[ "$status" -eq 6 ]
 	[[ "$output" =~ "Verifying... failed." ]]
 	[[ "$output" =~ "Error: 1 hash comparison failures found" ]]

@@ -78,7 +78,7 @@ Failures:                                                 X
 .RE
 .RE
 .LP
-Additionally the chronological order (e.g. 1, 2, 3, 4) of the log records is verified. If multiple log files are verified the most recent log record from the previous file is compared with the least recent log record in the first block of the current log file. Due to the network latency or invalid system clock, it is possible that some of the log records are not in chronological order (e.g. 1, 3, 2, 4) and this will make verification fail. To overcome this issue see \fB--time-permit-disordered-records\fR.
+Additionally the chronological order (e.g. 1, 2, 3, 4) of the log records is verified. If multiple log files are verified the most recent log record from the previous file is compared with the least recent log record in the first block of the current log file. Due to the network latency or invalid system clock, it is possible that some of the log records are not in chronological order (e.g. 1, 3, 2, 4) and this will make verification fail. To overcome this issue see \fB--time-disordered\fR.
 .LP
 .\"
 .SH OPTIONS
@@ -159,7 +159,7 @@ In some cases, where log lines contain timestamps that point to a time after the
 .RE
 .\"
 .TP
-\fB--time-permit-disordered-records \fItime\fR
+\fB--time-disordered \fItime\fR
 Will permit log records to be disordered within specified range (e.g. with value 1 following sequence of time values is correct: 1, 3, 2, 4). This option is useful when verifying time values embedded into the log lines and multiple sources with slightly different system clock or network latency have produced logs where log record time is not always ascending! See \fB--time-form\fR and \fB--time-diff\fR to see how to enable this check.
 .\"
 .TP
