@@ -330,6 +330,39 @@ To verify integrity and inter-linking of multiple log files (note that signature
 \fBlogksi verify -- log1 log2 log3 log4
 .RE
 .\"
+.TP 3
+\fB10
+To verify time embedded into log lines against KSI signature signing time '\fB--time-form\fR [%B %d %H:%M:%S' and '\fB--time-diff\fR 1d3S' (or greater) must be used. As the year number is not included inside timestamp and is represented in file name, it must be specified manually with '\fB--time-base\fR 2019'.
+.LP
+.RS 4
+.EX
+Time extract pattern:
+  [%B  %d %H:%M:%S
+.EE
+.LP
+.EX
+Log file log2019-1:
+  [Apr 22 00:00:00] log line 1.
+  [Apr 22 00:01:34] log line 2.
+  ...
+  [Apr 22 23:59:59] log line N.
+.EE
+.LP
+.EX
+KSI signature:
+  2019-04-23 00:00:03
+.EE
+.LP
+.EX
+Time line:
+  log file: (L1 ..  L2 ..  LN    .. S1   )
+  time:      0  ..  94 ..  86399 .. 86403
+  time win.: |_______ 86403s ______|
+.EE
+.LP
+\fBlogksi verify \fIlog2019-1 \fB--time-form\fR \fI"[%B %d %H:%M:%S"\fR \fB--time-diff\fR \fI1d3S\fR \fB--time-base\fR \fI2019\fR
+.RE
+.\"
 .SH ENVIRONMENT
 Use the environment variable \fBKSI_CONF\fR to define the default configuration file. See \fBlogksi-conf\fR(5) for more information.
 .LP
