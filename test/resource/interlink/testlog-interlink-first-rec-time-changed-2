@@ -1,0 +1,12 @@
+Oct 17 10:18:00 localhost syslog_caller[5807]: test message nbr 0, severity=6
+Oct 17 10:18:18 localhost syslog_caller[5807]: test message nbr 1, severity=6
+Oct 17 10:18:18 localhost syslog_caller[5807]: test message nbr 2, severity=6
+Oct 17 10:18:18 localhost syslog_caller[5807]: test message nbr 3, severity=6
+Oct 17 10:18:18 localhost syslog_caller[5807]: test message nbr 4, severity=6
+Oct 17 10:18:18 localhost syslog_caller[5807]: test message nbr 5, severity=6
+Oct 17 10:18:18 localhost syslog_caller[5807]: test message nbr 6, severity=6
+Oct 17 10:18:18 localhost syslog_caller[5807]: test message nbr 7, severity=6
+Oct 17 10:18:18 localhost syslog_caller[5807]: test message nbr 8, severity=6
+Oct 17 10:18:18 localhost syslog_caller[5807]: test message nbr 9, severity=6
+Oct 17 10:18:18 localhost syslog_caller[5807]: test message nbr 10, severity=6
+Oct 17 10:18:18 localhost syslog_caller[5807]: test message nbr 11, severity=6

@@ -128,12 +128,18 @@ typedef struct {
 	char outSigModified;			/* Indicates that output signature file is actually modified. */
 	char lastBlockWasSkipped;		/* If block is skipped (--continue-on-failure) due to verification failure, this is set. It is cleared in process_ksi_signature or process_block_signature. */
 	char signatureTLVReached;		/* This is set if signature TLV is reached (in process_block_signature, process_ksi_signature or process_partial_signature) and is cleared in init_next_block.*/
+	int quietError;					/* In case of failure and --continue-on-fail, this option will keep the error code and block is not skipped. */
 	size_t nofTotaHashFails;		/* Overall count of hahs failures inside log signature. */
 	size_t nofHashFails;			/* Count of hahs failures inside log block. */
+	uint64_t rec_time_in_file_min;	/* The lowest record time value in the log file, extracted from the log line. */
+	uint64_t rec_time_in_file_max;	/* The highest record time value in the log file, extracted from the log line. */
+	uint64_t rec_time_min;			/* The lowest record time value in the block, extracted from the log line. */
+	uint64_t rec_time_max;			/* The highest record time value in the block, extracted from the log line. */
 	uint64_t sigTime_0;
 	uint64_t sigTime_1;
 	uint64_t extendedToTime;
 	LOGKSI_TASK_ID taskId;
+
 
 	char client_id_last[0xffff];	/* Last signer id. Used to detect change. */
 	REGEXP *client_id_match;		/* A regular expression value to be matched with KSI signatures. */

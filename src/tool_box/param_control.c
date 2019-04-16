@@ -871,6 +871,134 @@ cleanup:
 	return res;
 }
 
+int isFormatOk_timeDiff(const char *time_diff) {
+	int res = 0;
+	int i = 0;
+	int base = 0;
+	int is_d = 0;
+	int is_H = 0;
+	int is_M = 0;
+	int is_S = 0;
+	int is_value_extracted = 0;
+	int has_comma = 1;	/* Comma is currently not used, so make as it is already parsed. */
+	int has_minus = 0;
+
+	char c = 0;
+	int lastWasDigit = 0;
+
+	res = isFormatOk_string(time_diff);
+	if (res != FORMAT_OK) return res;
+
+	while (time_diff[base + i]) {
+		c = time_diff[base + i];
+
+		/* First value is extracted and a comma is encountered - it must be the second value. */
+		if (c ==',' && !has_comma && i > 0) {
+			has_comma = 1;
+			i++;
+			base = i;
+			i = 0;
+			is_value_extracted = 0;
+			lastWasDigit = 0;
+			is_d = 0;
+			is_H = 0;
+			is_M = 0;
+			is_S = 0;
+			continue;
+		}
+
+		/* There can be only 1 negative or 1 positive, but not 2 negative and 2 positive values. */
+		if (c == '-' && i == 0 && !has_minus) {
+			has_minus = 1;
+			i++;
+			continue;
+		}
+
+		/* There has been a comma, first value is positive and the second ´one too - rise an error! */
+		/*if (has_comma && !has_minus && i == 0 && c != '-') {
+			return FORMAT_INVALID_TIME_DIFF_FORMAT;
+		}*/
+
+		if (!isdigit(c)) {
+			if (c == 'd' && lastWasDigit && !is_d ) is_d = 1;
+			else if (c == 'H' && lastWasDigit && !is_H) is_H = 1;
+			else if (c == 'M' && lastWasDigit && !is_M) is_M = 1;
+			else if (c == 'S' && lastWasDigit && !is_S) is_S = 1;
+			else return FORMAT_INVALID_TIME_DIFF_FORMAT;
+			lastWasDigit = 0;
+		} else {
+			lastWasDigit = 1;
+		}
+
+		is_value_extracted = 1;
+		i++;
+	}
+
+	/* S is specified and last integer does not end with any marker - it must be
+	   double specification of seconds! */
+	if (is_S && isdigit(c)) return FORMAT_INVALID_TIME_DIFF_FORMAT;
+
+	/* No actual numeric value is extracted. */
+	if (!is_value_extracted) return FORMAT_INVALID_TIME_DIFF_FORMAT;
+
+	return FORMAT_OK;
+}
+
+static const char* extract_seconds(const char *str, long *value) {
+	long result = 0;
+	long tmp = 0;
+	int sign = 1;
+	size_t i = 0;
+
+	if (str == NULL || value == NULL) return NULL;
+
+	while (str[i] != '\0' && str[i] != ',') {
+			int c = str[i];
+
+			if (c == '-' && i == 0) {
+				i++;
+				sign = -1;
+				continue;
+			}
+
+			if (c == 'S') {
+				result += tmp;
+				tmp = 0;
+			} else if (c == 'M') {
+				result += tmp * 60;
+				tmp = 0;
+			} else if (c == 'H') {
+				result += tmp * 3600;
+				tmp = 0;
+			} else if (c == 'd') {
+				result += tmp * 24 * 3600;
+				tmp = 0;
+			} else {
+				tmp *= 10;
+				tmp += c - '0';
+			}
+
+			i++;
+	}
+
+	result += tmp;
+	*value = sign * result;
+
+	return (str[i] == '\0') ? NULL : &str[i];
+}
+
+int extract_timeDiff(void *extra, const char* time_diff,  void** obj) {
+	long result_1 = 0;
+	int *pI = (int*)obj;
+	const char *pStr = time_diff;
+
+	VARIABLE_IS_NOT_USED(extra);
+
+	extract_seconds(pStr, &result_1);
+	*pI = (int)(result_1);
+
+	return PST_OK;
+}
 
 int isFormatOk_timeString(const char *time) {
 	struct tm time_st;
@@ -1016,6 +1144,7 @@ const char *getParameterErrorString(int res) {
 		case FORMAT_FLAG_HAS_ARGUMENT: return "Parameter must not have arguments";
 		case FORMAT_INVALID_UTC: return "Time not formatted as YYYY-MM-DD hh:mm:ss";
 		case FORMAT_INVALID_UTC_OUT_OF_RANGE: return "Time out of range";
+		case FORMAT_INVALID_TIME_DIFF_FORMAT: return "Only digits and 1x d, H, M and S allowed";
 		case PARAM_INVALID: return "Parameter is invalid";
 		case FORMAT_NOT_INTEGER: return "Invalid integer";
 		case HASH_ALG_INVALID_NAME: return "Algorithm name is incorrect";

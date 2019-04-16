@@ -48,6 +48,38 @@ Key-based verification (\fB--ver-key\fR). The signature must contain a calendar 
 Publication-based verification (\fB--ver-pub\fR). The signature must be extended to a time of publication and contain a publication record unless automatic extension of the signature is enabled with \fB-x\fR. Verification is done by checking that the publication record in the signature matches a publication in the publications file or the publication string given on the command line. Publications file or publication string retrieved from printed media is needed.
 .LP
 It must be noted that only publication-based verification should be preferred in the long term as it does not rely on any keys and trusted services. The other policies can be used temporarily when the signature is created and there is not yet a publication to extend the signature to.
+.LP
+.SH LOG SIGNATURE VERIFICATION DETAILS
+Using option \fB--time-form\fR together with \fB--time-diff\fR, it is possible to extract and verify the date embedded into log lines. If only \fB--time-form\fR is specified, log block and file summary is updated with extracted time data (lowest and highest log record time in block and log file) and verification of embedded time is not performed. Option \fB--time-diff\fR together with signing time of the KSI signature forms a time window where all the log records in signed block must fit. In following examples \fILn\fR and \fISn\fR stand for log record and KSI signature accordingly. Log records are placed on time line by the embedded time, and KSI signature by the signing time. NB! Following representation is explanatory only and does not describe the actual order of objects inside the log signature.
+.LP
+.RS 4
+Regular case where all log records and KSI signatures are strictly in chronological order. Option \fB--time-diff\fR is set to 5 creating a valid time window. First block is ok, but second fails as \fIL4\fR does not fit into expected time window relative to \fIS2\fR.
+.RS 4
+.LP
+.EX
+log file: (L1  L2      L3      S1)(L4  L5         L6      S2)
+time:      1   2   3   4   5   6   7   8   9  10  11  12  13
+time win.: |_______ 5s _______|    |   |_______ 5s ______|
+                                   |
+Failures:                          X
+.EE
+.RE
+.LP
+Irregular case, where log record embedded time is more recent than the KSI signature itself! This may have been caused by invalid system clock during log record creation. Option \fB--time-diff\fR is set to -5 creating a valid time window in another direction. First block is ok, but second fails as \fIL6\fR does not fit into expected time window relative to \fIS2\fR.
+.RS 4
+.LP
+.EX
+log file: (S1  L1  L2          L3)(S2  L4  L5             L6)
+time:      1   2   3   4   5   6   7   8   9  10  11  12  13
+time win.:   |______ -5s ______|     |______ -5s ______|  |
+                                                          |
+Failures:                                                 X
+.EE
+.RE
+.RE
+.LP
+Additionally the chronological order (e.g. 1, 2, 3, 4) of the log records is verified. If multiple log files are verified the most recent log record from the previous file is compared with the least recent log record in the first block of the current log file. Due to the network latency or invalid system clock, it is possible that some of the log records are not in chronological order (e.g. 1, 3, 2, 4) and this will make verification fail. To overcome this issue see \fB--time-disordered\fR.
+.LP
 .\"
 .SH OPTIONS
 .TP
@@ -95,6 +127,42 @@ Skip signing time verification where more recent log blocks must have more recen
 Verifies if KSI signatures client ID is matching regular expression specified.
 .\"
 .TP
+\fB--time-form \fIfmt\fR
+Format string (\fIfmt\fR) is used to extract time stamp from the beginning of the log line to be matched with KSI signature signing time. \fIFmt\fR is specified by function \fIstrptime\fR and its documentation can be read for more details. \fIFmt\fR can contain regular characters and various formats. Some more common formats:
+.RS
+.RS
+.IP \(bu 2
+\fB%n\fR - Matches any whitespace characters.
+.IP \(bu 2
+\fB%Y %m %d\fR - The year (e.g. 2019),  month (1 - 12) and day (1 - 31) as a decimal number.
+.IP \(bu 2
+\fB%B\fR - A month (e.g. Apr) name according to the current locale.
+.IP \(bu 2
+\fB%H %M %S\fR - Hour (0 - 23), minute (0 - 59) and second (0 - 60).
+.RE
+.LP
+Every character and format in \fIfmt\fR must have a match. For example "%n[%Y %m %d %H:%M:%S" can have 0-N whitespace characters followed by '[' and strict format for the timestamp. This will match a logline "[2019 4 1 00:00:34] ..." but will not accept any of the following: "[2019 4 1 00 00 34] ...", "[2019 4 1] ..." and "2019 4 1 00:00:34 ...".
+.LP
+If year info is not specified in log lines see option \fB--time-base\fR. If combined with \fB-d\fR or \fB-dd\fR log file and block summary is updated with extracted data. See \fB--time-diff\fR to enable and configure log record time verification.
+.RE
+.\"
+.TP
+\fB--time-base \fIregexp\fR
+Specify the year (e.g. 2019) when it can not be extracted with \fB--time-form\fR.
+.\"
+.TP
+\fB--time-diff \fItime\fR
+A specified time difference that with the signing time of the KSI signature forms a valid time window where all the log records must fit; either before signing time (use "-" sign to indicate negative value) or after signing time. Also the chronological order of the log records is checked. The difference can be specified as seconds (e.g 86400) or using integers followed by markers (e.g. 10d2H3M1S), where \fBd\fR, \fBH\fR, \fBM\fR and \fBS\fR stand for day, hour, minute and second accordingly. The order of the markers is not important but every marker can only be specified once. Marker \fBS\fR can be omitted for the last integer. See \fB--time-form\fR to see how to extract log record time.
+.LP
+.RS
+In some cases, where log lines contain timestamps that point to a time after the KSI signature (e.g. due to machine clock difference), it is still possible to specify a valid negative time difference for verification (e.g. -15d). NB! When using negative value make sure that You know why there is abnormal time difference between KSI signature and timestamps embedded into the log lines.
+.RE
+.\"
+.TP
+\fB--time-disordered \fItime\fR
+Will permit log records to be disordered within specified range (e.g. with value 1 following sequence of time values is correct: 1, 3, 2, 4). This option is useful when verifying time values embedded into the log lines and multiple sources with slightly different system clock or network latency have produced logs where log record time is not always ascending! See \fB--time-form\fR and \fB--time-diff\fR to see how to enable this check.
+.\"
+.TP
 \fB--warn-client-id-change\fR
 Will warn the user if KSI signatures client ID is not constant over all the blocks.
 .\"
@@ -104,15 +172,15 @@ Prints a warning when two consecutive blocks have same signing time. When multip
 .\"
 .TP
 \fB--continue-on-fail\fR
-This option can be used to continue verification to improve debugging of verification errors. Other errors (e.g. IO error) will terminated verification. Problematic block is skipped and next block is verified. When interlinking check fails and previous block was skipped, error message is displayed and input hash from the current blocks header is used instead to continue. Despite of continuation, errors are reported and logksi will exit code other than 0. See options \fB--use-stored-hash-on-fail\fR and \fB--use-computed-hash-on-fail\fR to debug hash comparison failures. When used together with debug level 2 (\fB-dd\fR), block summary may be missing some regular information as the data is not available (not reached due to of failure - e.g. signing time) or is incomplete (e.g. output hash).
+Can be used to continue verification to improve debugging of verification errors. Other errors (e.g. IO error) will terminate the verification. Problematic block is skipped and next block is verified. When interlinking check fails and previous block was skipped, error message is displayed and input hash from the current block's header is used instead to continue. Despite of continuation, errors are reported and logksi will exit code other than 0. See options \fB--use-stored-hash-on-fail\fR and \fB--use-computed-hash-on-fail\fR to debug hash comparison failures. When used together with debug level 2 (\fB-dd\fR), block summary may be missing some regular information as the data is not available (not reached due to of failure - e.g. signing time) or is incomplete (e.g. output hash).
 .\"
 .TP
 \fB--use-stored-hash-on-fail\fR
-This options can be used to debug hash comparison failures, by using stored hash values to continue verification process. For example stored hash values in log signature file are: input hash in block header, record / meta-record / tree hashes in block or root hash value in KSI signature.
+Can be used to debug hash comparison failures, by using stored hash values to continue verification process. For example stored hash values in log signature file are: input hash in block header, record / meta-record / tree hashes in block or root hash value in KSI signature.
 .\"
 .TP
 \fB--use-computed-hash-on-fail\fR
-This options can be used to debug hash comparison failures, by using computed hash values to continue verification process. For example computed hash values are: output hash computed from block data, record hash computed from log line and root hash computed from record hashes.
+Can be used to debug hash comparison failures, by using computed hash values to continue verification process. For example computed hash values are: output hash computed from block data, record hash computed from log line and root hash computed from record hashes.
 .\"
 .TP
 \fB-x\fR
@@ -260,6 +328,39 @@ To verify integrity and inter-linking of multiple log files (note that signature
 .LP
 .RS 4
 \fBlogksi verify -- log1 log2 log3 log4
+.RE
+.\"
+.TP 3
+\fB10
+To verify time embedded into log lines against KSI signature signing time '\fB--time-form\fR [%B %d %H:%M:%S' and '\fB--time-diff\fR 1d3S' (or greater) must be used. As the year number is not included inside timestamp and is represented in file name, it must be specified manually with '\fB--time-base\fR 2019'.
+.LP
+.RS 4
+.EX
+Time extract pattern:
+  [%B  %d %H:%M:%S
+.EE
+.LP
+.EX
+Log file log2019-1:
+  [Apr 22 00:00:00] log line 1.
+  [Apr 22 00:01:34] log line 2.
+  ...
+  [Apr 22 23:59:59] log line N.
+.EE
+.LP
+.EX
+KSI signature:
+  2019-04-23 00:00:03
+.EE
+.LP
+.EX
+Time line:
+  log file: (L1 ..  L2 ..  LN    .. S1   )
+  time:      0  ..  94 ..  86399 .. 86403
+  time win.: |_______ 86403s ______|
+.EE
+.LP
+\fBlogksi verify \fIlog2019-1 \fB--time-form\fR \fI"[%B %d %H:%M:%S"\fR \fB--time-diff\fR \fI1d3S\fR \fB--time-base\fR \fI2019\fR
 .RE
 .\"
 .SH ENVIRONMENT

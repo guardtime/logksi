@@ -29,7 +29,9 @@ test/test_suites/verify_linking.bats \
 test/test_suites/verify_continue.bats \
 test/test_suites/verify_continue_debug_output.bats \
 test/test_suites/verify_debug_output.bats \
-test/test_suites/verify_cmd.bats
+test/test_suites/verify_cmd.bats \
+test/test_suites/verify_log_rec_time.bats \
+test/test_suites/verify_log_rec_time_debug_output.bats
 
 exit_code=$?
 
