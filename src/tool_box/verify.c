@@ -451,7 +451,8 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	PARAM_SET_addControl(set, "{pub-str}", isFormatOk_pubString, NULL, NULL, extract_pubString);
 	PARAM_SET_addControl(set, "client-id,time-form", isFormatOk_string, NULL, NULL, NULL);
 	PARAM_SET_addControl(set, "time-base", isFormatOk_int, isContentOk_uint, NULL, extract_int);
-	PARAM_SET_addControl(set, "time-diff,time-disordered", isFormatOk_timeDiff, NULL, NULL, extract_timeDiff);
+	PARAM_SET_addControl(set, "time-diff", isFormatOk_timeDiff, NULL, NULL, extract_timeDiff);
+	PARAM_SET_addControl(set, "time-disordered", isFormatOk_timeValue, NULL, NULL, extract_timeValue);
 
 	PARAM_SET_setParseOptions(set, "m", PST_PRSCMD_HAS_MULTIPLE_INSTANCES | PST_PRSCMD_BREAK_VALUE_WITH_EXISTING_PARAMETER_MATCH);
 	PARAM_SET_setParseOptions(set, "time-form,time-base,time-diff,time-disordered", PST_PRSCMD_HAS_VALUE);
