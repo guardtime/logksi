@@ -35,6 +35,7 @@
 #include "io_files.h"
 #include "blocks_info.h"
 #include "rsyslog.h"
+#include "param_control.h"
 #include <time.h>
 
 static char* time_diff_to_string(uint64_t time_diff, char *buf, size_t buf_len);
@@ -420,39 +421,67 @@ static int check_log_record_embedded_time_against_ksi_signature_time(PARAM_SET *
 		char str_sigTime1[1024] = "<null>";
 		char str_rec_time_min[1024] = "<null>";
 		char str_rec_time_max[1024] = "<null>";
+		char str_diff_calc_past[1024] = "<null>";
+		char str_diff_calc_future[1024] = "<null>";
 		char str_diff_calc[1024] = "<null>";
 		char str_allowed_diff[1024] = "<null>";
-		int allowed_deviation = 0;
+		int allowed_deviation_neg = 0;
+		int allowed_deviation_pos = 0;
 		int isSigTimeOlderThanRecTime = 0;
+		int isTimeDiffTooLarge_future = 0;
+		int isTimeDiffTooLarge_past = 0;
 		int isTimeDiffTooLarge = 0;
-		const char *sign_str = "";
+		int neg_sign = 1;
 		const char *diff_calc_sign_str = "";
-		int diff_calc_sign = 1;
-		uint64_t diff_calc = 0;
+		int diff_calc_less_recent_sign = 1;
+		int diff_calc_most_recent_sign = 1;
+		uint64_t diff_calc_most_recent = 0;
+		uint64_t diff_calc_less_recent = 0;
+		MIN_MAX_INT tmp;
 
-		res = PARAM_SET_getObj(set, "time-diff", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, (void**)&allowed_deviation);
+
+		res = PARAM_SET_getObj(set, "time-diff", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, (void**)&tmp);
 		ERR_CATCH_MSG(err, res, "Error: Unable to extract time base as integer.");
 
-		/* Check for errors. */
-		if (allowed_deviation < 0) {
-			allowed_deviation *= -1;
-			sign_str = "-";
-
-			diff_calc = uint64_diff(blocks->sigTime_1, blocks->rec_time_max, &diff_calc_sign);
-
-			isTimeDiffTooLarge = diff_calc_sign >= 0 || uint64_signcmp(diff_calc_sign, diff_calc, -1, allowed_deviation) < 0;	/* Calculated deviation must be smaller or equal to allowed deviation. */
+		if (tmp.count == 2) {
+			allowed_deviation_neg = tmp.min;
+			allowed_deviation_pos = tmp.max;
 		} else {
-			isSigTimeOlderThanRecTime = (blocks->sigTime_1 < blocks->rec_time_min) || (blocks->sigTime_1 < blocks->rec_time_max);
-			diff_calc = uint64_diff(blocks->sigTime_1, blocks->rec_time_min, &diff_calc_sign);
-			isTimeDiffTooLarge = diff_calc_sign <= 0 || uint64_signcmp(diff_calc_sign, diff_calc, 1, allowed_deviation) > 0;	/* Calculated deviation must be greater or equal to allowed deviation. */
+			allowed_deviation_neg = tmp.min < 0 ? tmp.min : 0;
+			allowed_deviation_pos = tmp.max > 0 ? tmp.max : 0;
 		}
 
-		if (diff_calc_sign < 0) diff_calc_sign_str = "-";
+		/* Check for errors. */
+		if (allowed_deviation_neg < 0) {
+			neg_sign = -1;
+		}
+
+		diff_calc_most_recent = uint64_diff(blocks->sigTime_1, blocks->rec_time_max, &diff_calc_most_recent_sign);
+		diff_calc_less_recent = uint64_diff(blocks->sigTime_1, blocks->rec_time_min, &diff_calc_less_recent_sign);
+		isTimeDiffTooLarge_past = uint64_signcmp(diff_calc_less_recent_sign, diff_calc_less_recent, 1, allowed_deviation_pos) > 0;	/* Calculated deviation must be greater or equal to allowed deviation to fail. */
+		isTimeDiffTooLarge_future = uint64_signcmp(diff_calc_most_recent_sign, diff_calc_most_recent, neg_sign, neg_sign * allowed_deviation_neg) < 0;	/* Calculated deviation must be smaller or equal to allowed deviation to fail. */
+		isTimeDiffTooLarge = isTimeDiffTooLarge_past || isTimeDiffTooLarge_future;
+
+		if (allowed_deviation_pos > 0 && allowed_deviation_neg == 0) {
+			isSigTimeOlderThanRecTime = (blocks->sigTime_1 < blocks->rec_time_min) || (blocks->sigTime_1 < blocks->rec_time_max);
+		}
+
+		if (diff_calc_less_recent_sign < 0) diff_calc_sign_str = "-";
 
 		/* Format some strings for debugging output and error messages. */
-		time_diff_to_string(diff_calc, str_diff_calc, sizeof(str_diff_calc));
+		time_diff_to_string(diff_calc_less_recent, str_diff_calc_past, sizeof(str_diff_calc_past));
+		time_diff_to_string(diff_calc_most_recent, str_diff_calc_future, sizeof(str_diff_calc_future));
 		LOGKSI_uint64_toDateString(blocks->rec_time_min, str_rec_time_min, sizeof(str_rec_time_min));
 		LOGKSI_uint64_toDateString(blocks->rec_time_max, str_rec_time_max, sizeof(str_rec_time_max));
+
+		if (uint64_signcmp(diff_calc_most_recent_sign, diff_calc_most_recent, 1, 0) >= 0 && uint64_signcmp(diff_calc_less_recent_sign, diff_calc_less_recent, 1, 0) >= 0) {
+			KSI_snprintf(str_diff_calc, sizeof(str_diff_calc), "%s%s", (diff_calc_less_recent_sign < 0 ? "-" : ""), str_diff_calc_past);
+		} else if (uint64_signcmp(diff_calc_most_recent_sign, diff_calc_most_recent, 1, 0) <= 0 && uint64_signcmp(diff_calc_less_recent_sign, diff_calc_less_recent, 1, 0) <= 0) {
+			KSI_snprintf(str_diff_calc, sizeof(str_diff_calc), "%s%s", (diff_calc_most_recent_sign < 0 ? "-" : ""), str_diff_calc_future);
+		} else {
+			KSI_snprintf(str_diff_calc, sizeof(str_diff_calc), "-%s - %s", str_diff_calc_future, str_diff_calc_past);
+		}
+
 
 		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, "Block no. %3zu: time extracted from least recent log line: %s\n", blocks->blockNo, str_rec_time_min);
 		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, "Block no. %3zu: time extracted from most recent log line:  %s\n", blocks->blockNo, str_rec_time_max);
@@ -467,7 +496,24 @@ static int check_log_record_embedded_time_against_ksi_signature_time(PARAM_SET *
 			print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 
 			LOGKSI_uint64_toDateString(blocks->sigTime_1, str_sigTime1, sizeof(str_sigTime1));
-			time_diff_to_string(allowed_deviation, str_allowed_diff, sizeof(str_allowed_diff));
+
+			if (allowed_deviation_neg != 0 && allowed_deviation_pos != 0) {
+				char neg_buf[256];
+				char pos_buf[256];
+
+				time_diff_to_string(neg_sign * allowed_deviation_neg, neg_buf, sizeof(neg_buf));
+				time_diff_to_string(allowed_deviation_pos, pos_buf, sizeof(pos_buf));
+
+				KSI_snprintf(str_allowed_diff, sizeof(str_allowed_diff), "-%s - %s", neg_buf, pos_buf);
+			} else if (allowed_deviation_neg != 0) {
+				str_allowed_diff[0] = '-';
+				time_diff_to_string(neg_sign * allowed_deviation_neg, str_allowed_diff + 1, sizeof(str_allowed_diff) - 1);
+			} else if (allowed_deviation_pos != 0) {
+				time_diff_to_string(allowed_deviation_pos, str_allowed_diff, sizeof(str_allowed_diff));
+			} else {
+				PST_strncpy(str_allowed_diff, "<unexpected: no value>", sizeof(str_allowed_diff));
+			}
+
 		}
 
 		/* In case of failures format final error messages.*/
@@ -486,20 +532,20 @@ static int check_log_record_embedded_time_against_ksi_signature_time(PARAM_SET *
 				ERR_CATCH_MSG(err, res, "Error: %s the log lines in block %zu are more recent than KSI signature. KSI Signature - %s. The most recent log line - %s.", (blocks->sigTime_1 < blocks->rec_time_min ? "All" : "Some of"), blocks->blockNo, str_sigTime1, str_rec_time_max);
 			}
 		} else if (isTimeDiffTooLarge) {
-				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Log lines do not fit into expected time window (%s%s).\n", blocks->blockNo, sign_str, str_allowed_diff);
+				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Log lines do not fit into expected time window (%s).\n", blocks->blockNo, str_allowed_diff);
 			if (PARAM_SET_isSetByName(set, "continue-on-fail")) {
 				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Log lines in block %zu do not fit into time window:\n"
 																					  "   + Signing time:                              %s\n"
 																					  "   + Time extracted from least recent log line: %s\n"
 																					  "   + Time extracted from most recent log line:  %s\n"
-																					  "   + Block time window:                         %s%s\n"
-																					  "   + Expected time window:                      %s%s\n"
-																					  , blocks->blockNo, str_sigTime1, str_rec_time_min, str_rec_time_max, diff_calc_sign_str, str_diff_calc, sign_str, str_allowed_diff);
+																					  "   + Block time window:                         %s\n"
+																					  "   + Expected time window:                      %s\n"
+																					  , blocks->blockNo, str_sigTime1, str_rec_time_min, str_rec_time_max, str_diff_calc, str_allowed_diff);
 				blocks->quietError = res;
 				res = KT_OK;
 				goto cleanup;
 			} else {
-				ERR_CATCH_MSG(err, res, "Error: Log lines in block %zu (%s%s) do not fit in expected time window (%s%s).", blocks->blockNo, diff_calc_sign_str, str_diff_calc, sign_str, str_allowed_diff);
+				ERR_CATCH_MSG(err, res, "Error: Log lines in block %zu (%s) do not fit in expected time window (%s).", blocks->blockNo, str_diff_calc, str_allowed_diff);
 				res = KT_VERIFICATION_FAILURE;
 			}
 

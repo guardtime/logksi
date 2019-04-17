@@ -871,7 +871,7 @@ cleanup:
 	return res;
 }
 
-int isFormatOk_timeDiff(const char *time_diff) {
+static int is_format_ok_time_seconds(const char *time_diff, int allow2values, int allow_negative) {
 	int res = 0;
 	int i = 0;
 	int base = 0;
@@ -880,7 +880,7 @@ int isFormatOk_timeDiff(const char *time_diff) {
 	int is_M = 0;
 	int is_S = 0;
 	int is_value_extracted = 0;
-	int has_comma = 1;	/* Comma is currently not used, so make as it is already parsed. */
+	int has_comma = 0;
 	int has_minus = 0;
 
 	char c = 0;
@@ -891,20 +891,27 @@ int isFormatOk_timeDiff(const char *time_diff) {
 
 	while (time_diff[base + i]) {
 		c = time_diff[base + i];
+		if (!allow2values && c ==',') return FORMAT_NO_TIME_RANGE_SUPPORTED;
+		if (!allow_negative && c =='-') return FORMAT_ONLY_UNSIGNED_VALUE;
+
 
 		/* First value is extracted and a comma is encountered - it must be the second value. */
-		if (c ==',' && !has_comma && i > 0) {
-			has_comma = 1;
-			i++;
-			base = i;
-			i = 0;
-			is_value_extracted = 0;
-			lastWasDigit = 0;
-			is_d = 0;
-			is_H = 0;
-			is_M = 0;
-			is_S = 0;
-			continue;
+		if (c == ',') {
+			if (!has_comma && i > 0 && is_value_extracted) {
+				has_comma = 1;
+				i++;
+				base = i;
+				i = 0;
+				is_value_extracted = 0;
+				lastWasDigit = 0;
+				is_d = 0;
+				is_H = 0;
+				is_M = 0;
+				is_S = 0;
+				continue;
+			}
+
+			return FORMAT_INVALID_TIME_RANGE;
 		}
 
 		/* There can be only 1 negative or 1 positive, but not 2 negative and 2 positive values. */
@@ -914,10 +921,10 @@ int isFormatOk_timeDiff(const char *time_diff) {
 			continue;
 		}
 
-		/* There has been a comma, first value is positive and the second ´one too - rise an error! */
-		/*if (has_comma && !has_minus && i == 0 && c != '-') {
-			return FORMAT_INVALID_TIME_DIFF_FORMAT;
-		}*/
+		/* There has been a comma, one of the values must be negative. */
+		if (has_comma && i == 0 && ((!has_minus && c != '-') || (has_minus && c == '-'))) {
+			return FORMAT_INVALID_TIME_RANGE;
+		}
 
 		if (!isdigit(c)) {
 			if (c == 'd' && lastWasDigit && !is_d ) is_d = 1;
@@ -928,9 +935,9 @@ int isFormatOk_timeDiff(const char *time_diff) {
 			lastWasDigit = 0;
 		} else {
 			lastWasDigit = 1;
+			is_value_extracted = 1;
 		}
 
-		is_value_extracted = 1;
 		i++;
 	}
 
@@ -939,9 +946,18 @@ int isFormatOk_timeDiff(const char *time_diff) {
 	if (is_S && isdigit(c)) return FORMAT_INVALID_TIME_DIFF_FORMAT;
 
 	/* No actual numeric value is extracted. */
+	if (has_comma && !is_value_extracted) return FORMAT_INVALID_TIME_RANGE;
 	if (!is_value_extracted) return FORMAT_INVALID_TIME_DIFF_FORMAT;
 
 	return FORMAT_OK;
+}
+
+int isFormatOk_timeDiff(const char *time_diff) {
+	return is_format_ok_time_seconds(time_diff, 1, 1);
+}
+
+int isFormatOk_timeValue(const char *time_diff) {
+	return is_format_ok_time_seconds(time_diff, 0, 0);
 }
 
 static const char* extract_seconds(const char *str, long *value) {
@@ -977,7 +993,6 @@ static const char* extract_seconds(const char *str, long *value) {
 				tmp *= 10;
 				tmp += c - '0';
 			}
-
 			i++;
 	}
 
@@ -989,14 +1004,40 @@ static const char* extract_seconds(const char *str, long *value) {
 
 int extract_timeDiff(void *extra, const char* time_diff,  void** obj) {
 	long result_1 = 0;
-	int *pI = (int*)obj;
+	long result_2 = 0;
+	MIN_MAX_INT *pObj = (MIN_MAX_INT*)obj;
 	const char *pStr = time_diff;
 
 	VARIABLE_IS_NOT_USED(extra);
+	if (obj == NULL) return PST_INVALID_ARGUMENT;
 
-	extract_seconds(pStr, &result_1);
-	*pI = (int)(result_1);
+	pObj->count = 0;
+	pStr = extract_seconds(pStr, &result_1);
+	pObj->count++;
+	if (pStr != NULL && *pStr == ',') {
+		pStr++;
+		pObj->count++;
+		extract_seconds(pStr, &result_2);
+	}
 
+	if (pObj->count == 2) {
+		pObj->min = result_1 < result_2 ? (int)(result_1) : (int)(result_2);
+		pObj->max = result_1 > result_2 ? (int)(result_1) : (int)(result_2);
+	} else {
+		pObj->min = (int)(result_1);
+		pObj->max = (int)(result_1);
+	}
+
+	return PST_OK;
+}
+
+int extract_timeValue(void *extra, const char* time_diff,  void** obj) {
+	long result = 0;
+	int *pI = (int*)obj;
+	VARIABLE_IS_NOT_USED(extra);
+	if (obj == NULL) return PST_INVALID_ARGUMENT;
+	extract_seconds(time_diff, &result);
+	*pI = (int)result;
 	return PST_OK;
 }
 
@@ -1145,6 +1186,9 @@ const char *getParameterErrorString(int res) {
 		case FORMAT_INVALID_UTC: return "Time not formatted as YYYY-MM-DD hh:mm:ss";
 		case FORMAT_INVALID_UTC_OUT_OF_RANGE: return "Time out of range";
 		case FORMAT_INVALID_TIME_DIFF_FORMAT: return "Only digits and 1x d, H, M and S allowed";
+		case FORMAT_ONLY_UNSIGNED_VALUE: return "Only unsigned value allowed";
+		case FORMAT_NO_TIME_RANGE_SUPPORTED: return "No comma (,) supported for range";
+		case FORMAT_INVALID_TIME_RANGE: return "Time range should be -<int>,<int>";
 		case PARAM_INVALID: return "Parameter is invalid";
 		case FORMAT_NOT_INTEGER: return "Invalid integer";
 		case HASH_ALG_INVALID_NAME: return "Algorithm name is incorrect";

@@ -6,14 +6,14 @@ export KSI_CONF=test/test.cfg
 	run ./src/logksi verify test/resource/logs_and_signatures/totally-resigned -dd --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff 340d19H58M59
 	[ "$status" -eq 6 ]
 	[[ "$output" =~ (Verifying block no.   1... ok.).*(Verifying block no.   2... ok.).*(Verifying block no.   3... failed.) ]]
-	[[ "$output" =~ (Error: Log lines in block 3)..(340d 20:18:48)..(do not fit in expected time window)..(340d 19:58:59)  ]]	
+	[[ "$output" =~ (Error: Log lines in block 3)..(340d 20:18:48)..(do not fit in expected time window)..(340d 19:58:59)  ]]
 }
 
 @test "verify log record --time-diff: block 1 nok (first line do not match)" {
 	run ./src/logksi verify test/resource/logs_and_signatures/totally-resigned -dd --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff 340d19H58M58
 	[ "$status" -eq 6 ]
 	[[ "$output" =~ (Verifying block no.   1... failed.) ]]
-	[[ "$output" =~ (Error: Log lines in block 1)..(340d 19:58:59)..(do not fit in expected time window)..(340d 19:58:58)  ]]	
+	[[ "$output" =~ (Error: Log lines in block 1)..(340d 19:58:59)..(do not fit in expected time window)..(340d 19:58:58)  ]]
 }
 
 @test "verify log record --time-diff: all blocks ok (last block contains only meta-record and is passed)" {
@@ -26,7 +26,7 @@ export KSI_CONF=test/test.cfg
 	run ./src/logksi verify test/resource/logs_and_signatures/totally-resigned -dd --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -340d19H58M59
 	[ "$status" -eq 6 ]
 	[[ "$output" =~ (Verifying block no.   1... failed.) ]]
-	[[ "$output" =~ (Error: Log lines in block 1)..(340d 19:58:21)..(do not fit in expected time window)..(-340d 19:58:59)  ]]	
+	[[ "$output" =~ (Error: Log lines in block 1)..(340d 19:58:59)..(do not fit in expected time window)..(-340d 19:58:59)  ]]
 }
 
 ##
@@ -39,14 +39,14 @@ export KSI_CONF=test/test.cfg
 	run ./src/logksi verify test/resource/logs_and_signatures/signed -dd --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -78d23H24M01
 	[ "$status" -eq 6 ]
 	[[ "$output" =~ (Verifying block no.   1... ok.).*(Verifying block no.   2... failed.) ]]
-	[[ "$output" =~ (Error: Log lines in block 2)..(-78d 23:24:11)..(do not fit in expected time window)..(-78d 23:24:01)  ]]	
+	[[ "$output" =~ (Error: Log lines in block 2)..(-78d 23:24:11)..(do not fit in expected time window)..(-78d 23:24:01)  ]]
 }
 
 @test "verify log record with negative --time-diff: block 1 nok (last line do not match)" {
 	run ./src/logksi verify test/resource/logs_and_signatures/signed -dd --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -78d23H24M00
 	[ "$status" -eq 6 ]
 	[[ "$output" =~ (Verifying block no.   1... failed.) ]]
-	[[ "$output" =~ (Error: Log lines in block 1)..(-78d 23:24:01)..(do not fit in expected time window)..(-78d 23:24:00)  ]]	
+	[[ "$output" =~ (Error: Log lines in block 1)..(-78d 23:24:01)..(do not fit in expected time window)..(-78d 23:24:00)  ]]
 }
 
 @test "verify log record with negative --time-diff: all blocks ok (last block contains only meta-record and is passed)" {
@@ -62,6 +62,13 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ (Error: All the log lines in block 1 are more recent than KSI signature.).*(KSI Signature.*1517928882).*(The most recent log line.*1524752323) ]]
 }
 
+
+##
+# Note that following 6 tests contain a hack. As there was not log files available containing log lines
+# that are not in chronological order, the existing log file is changed. Expected hash failure is passed
+# with --use-stored-hash-on-fail. Because of that every verification ends with error (2 of them should be OK).
+##
+
 @test "verify log record where some (NOT ALL) of the log lines in block 2 are more recent than KSI signature" {
 	run ./src/logksi verify test/resource/log_rec_time/log-line-embedded-date-higher-and-lower-from-ksig test/resource/log_rec_time/log-line-embedded-date-changed.logsig --use-stored-hash-on-fail  -dd --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff 80d
 	[ "$status" -eq 6 ]
@@ -69,11 +76,32 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ (Error: Some of the log lines in block 2 are more recent than KSI signature.).*(KSI Signature.*1517928883).*(The most recent log line.*1517928900) ]]
 }
 
-##
-# Note that following 6 tests contain a hack. As there was not log files available containing log lines
-# that are not in chronological order, the existing log file is changed. Expected hash failure is passed
-# with --use-stored-hash-on-fail. Because of that every verification ends with error (2 of them should be OK).
-##
+@test "verify log record where some (NOT ALL) of the log lines in block 2 are more recent than KSI signature: verify both directions with failure in block 2 and 3" {
+	# Positive time window in block 2 OK, negative failing.
+	run ./src/logksi verify test/resource/log_rec_time/log-line-embedded-date-higher-and-lower-from-ksig test/resource/log_rec_time/log-line-embedded-date-changed.logsig --use-stored-hash-on-fail  -dd --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff 80d,-1
+	[ "$status" -eq 6 ]
+	[[ "$output" =~ (Verifying block no.   2... failed.) ]]
+	[[ "$output" =~ (Error: Log lines in block 2).*(-00:00:17 - 00:35:50).*(do not fit in expected time window).*(-00:00:01 - 80d 00:00:00) ]]
+
+	# Positive and negative time window in block 2 OK, but block 3 negative time window failing.
+	run ./src/logksi verify test/resource/log_rec_time/log-line-embedded-date-higher-and-lower-from-ksig test/resource/log_rec_time/log-line-embedded-date-changed.logsig --use-stored-hash-on-fail  -dd --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff 80d,-17
+	[ "$status" -eq 6 ]
+	[[ "$output" =~ (Verifying block no.   3... failed.) ]]
+	[[ "$output" =~ (Error: Log lines in block 3).*(-23:24:19).*(do not fit in expected time window).*(-00:00:17 - 80d 00:00:00) ]]
+
+	# Negative time window OK, positive failing in block 1.
+	run ./src/logksi verify test/resource/log_rec_time/log-line-embedded-date-higher-and-lower-from-ksig test/resource/log_rec_time/log-line-embedded-date-changed.logsig --use-stored-hash-on-fail  -dd --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff 1d,-17
+	[ "$status" -eq 6 ]
+	[[ "$output" =~ (Verifying block no.   1... failed.) ]]
+	[[ "$output" =~ (Error: Log lines in block 1).*(1d 00:36:37).*(do not fit in expected time window).*(-00:00:17 - 1d 00:00:00) ]]
+}
+
+@test "verify log record where some (NOT ALL) of the log lines in block 2 are more recent than KSI signature: verify both directions with success" {
+	run ./src/logksi verify test/resource/log_rec_time/log-line-embedded-date-higher-and-lower-from-ksig test/resource/log_rec_time/log-line-embedded-date-changed.logsig --use-stored-hash-on-fail  -dd --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff 80d,-23H24M19
+	[ "$status" -eq 6 ]
+	[[ ! "$output" =~ (do not fit in expected time window) ]]
+	[[ "$output" =~ (Error: 9 hash comparison failures found) ]]
+}
 
 @test "verify that log records in log file are in chronological order: line 2 is more recent than line 3" {
 	run ./src/logksi verify test/resource/log_rec_time/log-line-embedded-date-changed test/resource/log_rec_time/log-line-embedded-date-changed.logsig -d --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -80d --use-stored-hash-on-fail
@@ -114,21 +142,21 @@ export KSI_CONF=test/test.cfg
 	run ./src/logksi verify test/resource/excerpt/log-ok.excerpt -dd --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -78d23H44M21
 	[ "$status" -eq 6 ]
 	[[ "$output" =~ (Verifying block no.   1... ok.).*(Verifying block no.   2... failed.) ]]
-	[[ "$output" =~ (Error: Log lines in block 2)..(-78d 23:45:19)..(do not fit in expected time window)..(-78d 23:44:21)  ]]	
+	[[ "$output" =~ (Error: Log lines in block 2)..(-78d 23:45:19)..(do not fit in expected time window)..(-78d 23:44:21)  ]]
 }
 
 @test "verify log record in excerpt file with negative --time-diff: block 1 nok (last line do not match)" {
 	run ./src/logksi verify test/resource/excerpt/log-ok.excerpt -dd --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -78d23H44M20
 	[ "$status" -eq 6 ]
 	[[ "$output" =~ (Verifying block no.   1... failed.) ]]
-	[[ "$output" =~ (Error: Log lines in block 1)..(-78d 23:44:21)..(do not fit in expected time window)..(-78d 23:44:20)  ]]	
+	[[ "$output" =~ (Error: Log lines in block 1)..(-78d 23:44:21)..(do not fit in expected time window)..(-78d 23:44:20)  ]]
 }
 
 @test "verify log record in excerpt file with negative --time-diff: everything ok" {
 	run ./src/logksi verify test/resource/excerpt/log-ok.excerpt -dd --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -78d23H45M20
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ (Verifying block no.   1... ok.).*(Verifying block no.   2... ok.) ]]
-	[[ ! "$output" =~ (do not fit in expected time window)  ]]	
+	[[ ! "$output" =~ (do not fit in expected time window)  ]]
 }
 
 ##
@@ -136,7 +164,7 @@ export KSI_CONF=test/test.cfg
 ##
 
 @test "verify that log records in log excerpt file are in chronological order: line 2 is more recent than line 1" {
-	run ./src/logksi verify test/resource/log_rec_time/log-line-embedded-date-changed.excerpt test/resource/log_rec_time/log-line-embedded-date-changed.excerpt.logsig -d --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -80d --use-stored-hash-on-fail 
+	run ./src/logksi verify test/resource/log_rec_time/log-line-embedded-date-changed.excerpt test/resource/log_rec_time/log-line-embedded-date-changed.excerpt.logsig -d --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -80d --use-stored-hash-on-fail
 	[ "$status" -eq 6 ]
 	[[ "$output" =~ "Verifying... failed." ]]
 	[[ "$output" =~ "Error: Failed to verify logline no. 1" ]]

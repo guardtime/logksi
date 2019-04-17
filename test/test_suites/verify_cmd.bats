@@ -130,10 +130,29 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(2d-1) ]]
 }
 
-@test "verify CMD test: Check if --time-disordered has the same type as --time-diff" {
+@test "verify CMD test: Try to use invalid --time-diff range (n,m)" {
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/log_repaired -d --time-diff , --time-diff 5, --time-diff ,5 --time-diff 5,4 --time-diff -5,-4 --time-diff -3,2,
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ (Time range should be -<int>,<int>.).*(Parameter).*(--time-diff).*(,) ]]
+	[[ "$output" =~ (Time range should be -<int>,<int>.).*(Parameter).*(--time-diff).*(5,) ]]
+	[[ "$output" =~ (Time range should be -<int>,<int>.).*(Parameter).*(--time-diff).*(,5) ]]
+	[[ "$output" =~ (Time range should be -<int>,<int>.).*(Parameter).*(--time-diff).*(5,4) ]]
+	[[ "$output" =~ (Time range should be -<int>,<int>.).*(Parameter).*(--time-diff).*(-5,-4) ]]
+	[[ "$output" =~ (Time range should be -<int>,<int>.).*(Parameter).*(--time-diff).*(-3,2,) ]]
+}
+
+@test "verify CMD test: Check if --time-disordered has the same type as --time-diff but does not allow comma nor minus" {
 	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/log_repaired -d --time-disordered 1S2
 	[ "$status" -eq 3 ]
 	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-disordered).*(1S2) ]]
+	
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/log_repaired -d --time-disordered 1,1
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ (No comma .,. supported for range).*(Parameter).*(--time-disordered).*(1,1) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/log_repaired -d --time-disordered -5
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ (Only unsigned value allowed).*(Parameter).*(--time-disordered).*(-5) ]]
 }
 
 @test "verify CMD test: Check parsing of --time-diff S" {
@@ -225,4 +244,12 @@ export KSI_CONF=test/test.cfg
 
 	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed  --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -23H59M60S
 	[[ "$output" =~ (expected time window).*(-1d 00:00:00) ]]
+}
+
+@test "verify CMD test: Check parsing of --time-diff with 2 values (range)" {
+	run ./src/logksi verify test/resource/log_rec_time/log-line-embedded-date-higher-and-lower-from-ksig test/resource/log_rec_time/log-line-embedded-date-changed.logsig --use-stored-hash-on-fail --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff 1d,-1d17
+	[[ "$output" =~ (expected time window).*(-1d 00:00:17 - 1d 00:00:00) ]]
+
+	run ./src/logksi verify test/resource/log_rec_time/log-line-embedded-date-higher-and-lower-from-ksig test/resource/log_rec_time/log-line-embedded-date-changed.logsig --use-stored-hash-on-fail --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -1d17,1d
+	[[ "$output" =~ (expected time window).*(-1d 00:00:17 - 1d 00:00:00) ]]
 }

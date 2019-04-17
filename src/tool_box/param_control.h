@@ -88,6 +88,9 @@ enum formatStatus_enum{
 	FORMAT_INVALID_UTC,
 	FORMAT_INVALID_UTC_OUT_OF_RANGE,
 	FORMAT_INVALID_TIME_DIFF_FORMAT,
+	FORMAT_NO_TIME_RANGE_SUPPORTED,
+	FORMAT_INVALID_TIME_RANGE,
+	FORMAT_ONLY_UNSIGNED_VALUE,
 	FORMAT_UNKNOWN_ERROR
 };
 
@@ -114,8 +117,16 @@ int isContentOk_inputFileRestrictPipe(const char* path);
 int isFormatOk_path(const char *path);
 int convertRepair_path(const char* arg, char* buf, unsigned len);
 
+typedef struct MIN_MAX_INT_st {
+	int min;
+	int max;
+	int count;
+} MIN_MAX_INT;
+
 int isFormatOk_timeDiff(const char *time_diff);
+int isFormatOk_timeValue(const char *time_diff);
 int extract_timeDiff(void *extra, const char* str,  void** obj);
+int extract_timeValue(void *extra, const char* time_diff,  void** obj);
 
 int isFormatOk_int(const char *integer);
 int isFormatOk_int_can_be_null(const char *integer);
