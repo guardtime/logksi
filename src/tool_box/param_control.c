@@ -871,7 +871,7 @@ cleanup:
 	return res;
 }
 
-static int is_format_ok_time_seconds(const char *time_diff, int allow2values, int allow_negative) {
+static int is_format_ok_time_seconds(const char *time_diff, int allow2values, int allow_negative, int allow_infinity, int restrict_same_sign) {
 	int res = 0;
 	int i = 0;
 	int base = 0;
@@ -879,21 +879,25 @@ static int is_format_ok_time_seconds(const char *time_diff, int allow2values, in
 	int is_H = 0;
 	int is_M = 0;
 	int is_S = 0;
-	int is_value_extracted = 0;
-	int has_comma = 0;
-	int has_minus = 0;
-
+	int is_value_extracted = 0;	/* Actual value has been extracted (e.g. number, +/-infinity). */
+	int has_comma = 0;			/* A comma has been encountered. */
+	int has_minus = 0;			/* Last value already has a minus.*/
+	int is_minus = 0;			/* Current value has a minus. */
+	int has_infinity = 0;		/* Las value was infinity. */
+	int infinity_counter = 0;	/* Infinity value is being parsed. */
 	char c = 0;
-	int lastWasDigit = 0;
+	int lastWasDigit = 0;		/* Last char was a digit. */
+	int general_error = 0;
 
 	res = isFormatOk_string(time_diff);
 	if (res != FORMAT_OK) return res;
 
 	while (time_diff[base + i]) {
+		int both_values_same_sign = 0;
 		c = time_diff[base + i];
 		if (!allow2values && c ==',') return FORMAT_NO_TIME_RANGE_SUPPORTED;
 		if (!allow_negative && c =='-') return FORMAT_ONLY_UNSIGNED_VALUE;
-
+		if (!allow_infinity && c == 'o') return FORMAT_INVALID_TIME_DIFF_FORMAT;
 
 		/* First value is extracted and a comma is encountered - it must be the second value. */
 		if (c == ',') {
@@ -902,8 +906,11 @@ static int is_format_ok_time_seconds(const char *time_diff, int allow2values, in
 				i++;
 				base = i;
 				i = 0;
+				has_minus = is_minus;
+				is_minus = 0;
 				is_value_extracted = 0;
 				lastWasDigit = 0;
+				infinity_counter = 0;
 				is_d = 0;
 				is_H = 0;
 				is_M = 0;
@@ -915,58 +922,81 @@ static int is_format_ok_time_seconds(const char *time_diff, int allow2values, in
 		}
 
 		/* There can be only 1 negative or 1 positive, but not 2 negative and 2 positive values. */
-		if (c == '-' && i == 0 && !has_minus) {
-			has_minus = 1;
+		if (c == '-' && i == 0 && !is_minus) {
+			is_minus = 1;
 			i++;
 			continue;
 		}
 
+		both_values_same_sign = has_comma && ((!has_minus && !is_minus) || (has_minus && is_minus));
+
 		/* There has been a comma, one of the values must be negative. */
-		if (has_comma && i == 0 && ((!has_minus && c != '-') || (has_minus && c == '-'))) {
+		if (restrict_same_sign && allow_negative && both_values_same_sign) {
 			return FORMAT_INVALID_TIME_RANGE;
+		} else if (has_infinity && infinity_counter > 0 && both_values_same_sign) {
+			return FORMAT_INVALID_INFINIT_TIME_RANGE;
 		}
 
-		if (!isdigit(c)) {
+		/* If infinity is extracted, it can be at the beginning of the string,
+		   there can not follow any characters other than comma. */
+		if ((c == 'o' && (i - is_minus) != infinity_counter) || (infinity_counter > 0 && (is_value_extracted || c != 'o'))) return FORMAT_INVALID_TIME_DIFF_FORMAT_INFINITY;
+
+
+		/* Infinity can occupy 2 + 1. */
+		if (c == 'o') {
+			if (++infinity_counter == 2) {
+				has_infinity = 1;
+				is_value_extracted = 1;
+			}
+		} else if (!isdigit(c)) {
 			if (c == 'd' && lastWasDigit && !is_d ) is_d = 1;
-			else if (c == 'H' && lastWasDigit && !is_H) is_H = 1;
-			else if (c == 'M' && lastWasDigit && !is_M) is_M = 1;
-			else if (c == 'S' && lastWasDigit && !is_S) is_S = 1;
+			else if (toupper(c) == 'H' && lastWasDigit && !is_H) is_H = 1;
+			else if (toupper(c) == 'M' && lastWasDigit && !is_M) is_M = 1;
+			else if (toupper(c) == 'S' && lastWasDigit && !is_S) is_S = 1;
 			else return FORMAT_INVALID_TIME_DIFF_FORMAT;
 			lastWasDigit = 0;
 		} else {
-			lastWasDigit = 1;
-			is_value_extracted = 1;
+			lastWasDigit++;
+			is_value_extracted++;
+			if (is_value_extracted > 10) return FORMAT_TOO_LARGE_VALUE;
 		}
 
 		i++;
 	}
 
+	general_error = allow_infinity ? FORMAT_INVALID_TIME_DIFF_FORMAT_INFINITY : FORMAT_INVALID_TIME_DIFF_FORMAT;
+
 	/* S is specified and last integer does not end with any marker - it must be
 	   double specification of seconds! */
-	if (is_S && isdigit(c)) return FORMAT_INVALID_TIME_DIFF_FORMAT;
+	if (is_S && isdigit(c)) return general_error;
 
 	/* No actual numeric value is extracted. */
-	if (has_comma && !is_value_extracted) return FORMAT_INVALID_TIME_RANGE;
-	if (!is_value_extracted) return FORMAT_INVALID_TIME_DIFF_FORMAT;
+	if (has_comma && !is_value_extracted) return has_infinity ? FORMAT_INVALID_INFINIT_TIME_RANGE : FORMAT_INVALID_TIME_RANGE;
+	if (!is_value_extracted) return general_error;
 
 	return FORMAT_OK;
 }
 
 int isFormatOk_timeDiff(const char *time_diff) {
-	return is_format_ok_time_seconds(time_diff, 1, 1);
+	return is_format_ok_time_seconds(time_diff, 1, 1, 0, 1);
+}
+
+int isFormatOk_timeDiffInfinity(const char *time_diff) {
+	return is_format_ok_time_seconds(time_diff, 1, 1, 1, 0);
 }
 
 int isFormatOk_timeValue(const char *time_diff) {
-	return is_format_ok_time_seconds(time_diff, 0, 0);
+	return is_format_ok_time_seconds(time_diff, 0, 0, 0, 0);
 }
 
-static const char* extract_seconds(const char *str, long *value) {
-	long result = 0;
-	long tmp = 0;
+static const char* extract_seconds(const char *str, int64_t *value, int *isInfinity) {
+	int64_t result = 0;
+	int64_t tmp = 0;
 	int sign = 1;
 	size_t i = 0;
+	int infinity = 0;
 
-	if (str == NULL || value == NULL) return NULL;
+	if (str == NULL || value == NULL || isInfinity == NULL) return NULL;
 
 	while (str[i] != '\0' && str[i] != ',') {
 			int c = str[i];
@@ -977,13 +1007,19 @@ static const char* extract_seconds(const char *str, long *value) {
 				continue;
 			}
 
-			if (c == 'S') {
+			if (c == 'o' && i < 2) {
+				infinity = 1;
+				i++;
+				continue;
+			}
+
+			if (toupper(c) == 'S') {
 				result += tmp;
 				tmp = 0;
-			} else if (c == 'M') {
+			} else if (toupper(c) == 'M') {
 				result += tmp * 60;
 				tmp = 0;
-			} else if (c == 'H') {
+			} else if (toupper(c) == 'H') {
 				result += tmp * 3600;
 				tmp = 0;
 			} else if (c == 'd') {
@@ -996,30 +1032,49 @@ static const char* extract_seconds(const char *str, long *value) {
 			i++;
 	}
 
-	result += tmp;
-	*value = sign * result;
+	if (infinity) {
+		*value = sign;
+		*isInfinity = 1;
+	} else {
+		result += tmp;
+		*value = sign * result;
+		*isInfinity = 0;
+	}
 
 	return (str[i] == '\0') ? NULL : &str[i];
 }
 
 int extract_timeDiff(void *extra, const char* time_diff,  void** obj) {
-	long result_1 = 0;
-	long result_2 = 0;
+	int64_t result_1 = 0;
+	int64_t result_2 = 0;
 	MIN_MAX_INT *pObj = (MIN_MAX_INT*)obj;
 	const char *pStr = time_diff;
+	int infinity_1 = 0;
+	int infinity_2 = 0;
 
 	VARIABLE_IS_NOT_USED(extra);
 	if (obj == NULL) return PST_INVALID_ARGUMENT;
 
 	pObj->count = 0;
-	pStr = extract_seconds(pStr, &result_1);
+	pStr = extract_seconds(pStr, &result_1, &infinity_1);
 	pObj->count++;
+	infinity_1 *= result_1;
 	if (pStr != NULL && *pStr == ',') {
 		pStr++;
 		pObj->count++;
-		extract_seconds(pStr, &result_2);
+		extract_seconds(pStr, &result_2, &infinity_2);
+		infinity_2 *= result_2;
 	}
 
+	/* Limit the size with boundaries with int (time diff ~ +/- 68 years or more).
+	   In case of infinity, value is set to the highest / lowest value possible
+	   and infinity flags are set. */
+	if (result_1 > INT_MAX || infinity_1 == 1) result_1 = INT_MAX;
+	if (result_1 < INT_MIN || infinity_1 == -1) result_1 = INT_MIN;
+	if (result_2 > INT_MAX || infinity_2 == 1) result_2 = INT_MAX;
+	if (result_2 < INT_MIN || infinity_2 == -1) result_2 = INT_MIN;
+
+	/* Which value is max and min. */
 	if (pObj->count == 2) {
 		pObj->min = result_1 < result_2 ? (int)(result_1) : (int)(result_2);
 		pObj->max = result_1 > result_2 ? (int)(result_1) : (int)(result_2);
@@ -1028,15 +1083,22 @@ int extract_timeDiff(void *extra, const char* time_diff,  void** obj) {
 		pObj->max = (int)(result_1);
 	}
 
+	/* Set infinity flags. */
+	pObj->neg_inf = (infinity_1 == -1 || infinity_2 == -1);
+	pObj->pos_inf = (infinity_1 == 1 || infinity_2 == 1);
+
 	return PST_OK;
 }
 
 int extract_timeValue(void *extra, const char* time_diff,  void** obj) {
-	long result = 0;
+	int64_t result = 0;
+	int isInfinity = 0;
 	int *pI = (int*)obj;
 	VARIABLE_IS_NOT_USED(extra);
 	if (obj == NULL) return PST_INVALID_ARGUMENT;
-	extract_seconds(time_diff, &result);
+	extract_seconds(time_diff, &result, &isInfinity);
+	if (result > INT_MAX || (result == 1 && isInfinity)) result = INT_MAX;
+	if (result < INT_MIN || (result == -1 && isInfinity)) result = INT_MIN;
 	*pI = (int)result;
 	return PST_OK;
 }
@@ -1186,9 +1248,12 @@ const char *getParameterErrorString(int res) {
 		case FORMAT_INVALID_UTC: return "Time not formatted as YYYY-MM-DD hh:mm:ss";
 		case FORMAT_INVALID_UTC_OUT_OF_RANGE: return "Time out of range";
 		case FORMAT_INVALID_TIME_DIFF_FORMAT: return "Only digits and 1x d, H, M and S allowed";
+		case FORMAT_INVALID_TIME_DIFF_FORMAT_INFINITY: return "Only digits, oo and 1x d, H, M and S allowed";
 		case FORMAT_ONLY_UNSIGNED_VALUE: return "Only unsigned value allowed";
+		case FORMAT_TOO_LARGE_VALUE: return "Value is too large";
 		case FORMAT_NO_TIME_RANGE_SUPPORTED: return "No comma (,) supported for range";
 		case FORMAT_INVALID_TIME_RANGE: return "Time range should be -<int>,<int>";
+		case FORMAT_INVALID_INFINIT_TIME_RANGE: return "Time range with infinity can be -oo,oo, <int>,oo or -oo,<int>";
 		case PARAM_INVALID: return "Parameter is invalid";
 		case FORMAT_NOT_INTEGER: return "Invalid integer";
 		case HASH_ALG_INVALID_NAME: return "Algorithm name is incorrect";
