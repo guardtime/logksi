@@ -275,3 +275,26 @@ export KSI_CONF=test/test.cfg
 	run ./src/logksi verify test/resource/log_rec_time/log-line-embedded-date-higher-and-lower-from-ksig test/resource/log_rec_time/log-line-embedded-date-changed.logsig --use-stored-hash-on-fail --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -1d17,1d
 	[[ "$output" =~ (expected time window).*(-1d 00:00:17 - 1d 00:00:00) ]]
 }
+
+@test "verify CMD test: Check parsing of --block-time-diff" {
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed -d --block-time-diff 1d1M32S,2
+	[[ "$output" =~ (does not fit into).*(00:00:02 - 1d 00:01:32) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed -d --block-time-diff 2,1d1M32S
+	[[ "$output" =~ (does not fit into).*(00:00:02 - 1d 00:01:32) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed -d --block-time-diff 2,oo
+	[[ "$output" =~ (does not fit into).*(00:00:02 - oo) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed -d --block-time-diff -oo
+	[[ "$output" =~ (does not fit into).*(-oo - 0) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed -d --block-time-diff -5
+	[[ "$output" =~ (does not fit into).*(-00:00:05 - 0) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed -d --block-time-diff -oo,-5
+	[[ "$output" =~ (does not fit into).*(-oo - -00:00:05) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed -d --block-time-diff 2,oo
+	[[ "$output" =~ (does not fit into).*(00:00:02 - oo) ]]
+}
