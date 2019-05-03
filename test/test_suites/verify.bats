@@ -124,3 +124,40 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ "Verifying... ok." ]]
 	[[ "$output" =~ ( o Warning: Client ID in block 2 is not constant:).*(Expecting: .GT :: GT :: GT :: anon.).*(But is:    .GT :: GT :: GT :: sha512.) ]]
 }
+
+@test "verify with --block-time-diff to detect same signing time, ignore negative diff (1,oo)" {
+	run src/logksi verify test/resource/logfiles/unsigned test/resource/logsignatures/unsigned-same-sign-time.logsig --ignore-desc-block-time -d --block-time-diff 1,oo
+	[ "$status" -eq 6 ]
+	[[ "$output" =~ "Verifying... failed." ]]
+	[[ "$output" =~ (Error: Blocks 1.*1540389597.*and 2.*1540389597.*signing times are too close.*00:00:00 does not fit into 00:00:01 - oo) ]]
+}
+
+@test "verify with --block-time-diff to detect blocks that are too apart, ignore negative diff (259d)" {
+	run src/logksi verify test/resource/logfiles/unsigned test/resource/logsignatures/unsigned-same-sign-time.logsig --ignore-desc-block-time -d --block-time-diff 259d
+	[ "$status" -eq 6 ]
+	[[ "$output" =~ "Verifying... failed." ]]
+	[[ "$output" =~ (Error: Blocks 4).*(1517928939).*(and 5).*(1540377483).*(signing times are too apart).*(259d 19:42:24 does not fit into 0 - 259d 00:00:00) ]]
+}
+
+@test "verify with --block-time-diff only negative or 0 diff is accepted (-oo)" {
+	run src/logksi verify test/resource/logfiles/unsigned test/resource/logsignatures/unsigned-same-sign-time.logsig -d --block-time-diff -oo
+	[ "$status" -eq 6 ]
+	[[ "$output" =~ "Verifying... failed." ]]
+	[[ "$output" =~ (Error: Blocks 3).*(1517928938).*(and 4).*(1517928939).*(signing times are too apart).*(00:00:01 does not fit into -oo - 0) ]]
+}
+
+@test "verify with --block-time-diff to detect block that are too apart (exact match), ignore negative diff (259d23H4M19)" {
+	run src/logksi verify test/resource/logfiles/unsigned test/resource/logsignatures/unsigned-same-sign-time.logsig --ignore-desc-block-time -d --block-time-diff 259d23H4M19
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Verifying... ok." ]]
+	[[ ! "$output" =~ (are too apart) ]]
+	[[ ! "$output" =~ (are too close) ]]
+}
+
+@test "verify with --block-time-diff using infinity (-oo,oo)" {
+	run src/logksi verify test/resource/logfiles/unsigned test/resource/logsignatures/unsigned-same-sign-time.logsig -d --block-time-diff -oo,oo
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Verifying... ok." ]]
+	[[ ! "$output" =~ (are too apart) ]]
+	[[ ! "$output" =~ (are too close) ]]
+}

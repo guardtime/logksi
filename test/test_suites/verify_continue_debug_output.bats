@@ -63,6 +63,11 @@ f_failed_to_ver_log_rec_time () {
 	echo "( x Error: Log lines in block $1 do not fit into time window:).(   . Signing time:                              .$2.*UTC.00:00).(   . Time extracted from least recent log line: .$3.*UTC.00:00).(   . Time extracted from most recent log line:  .$4.*UTC.00:00).(   . Block time window:                         $5).(   . Expected time window:                      $6)"
 }
 
+# block_0, block_0, close_apart, sigt_ime_0, sigt_ime_1, time_diff, time_diff_expected
+f_failed_sig_time_diff_check () {
+	echo "( x Error: Blocks $1 and $2 signing times are too $3:).(   . Sig time for block $1: .$4.*UTC.00:00).(   . Sig time for block $2: .$5.*UTC.00:00).(   . Time diff:              $6).(   . Expected time diff:     $7)"
+}
+
 # block, cid, pattern
 f_client_if_fail () {
 	 echo "( x Error: Failed to match KSI signatures client ID for block $1:).(   . Client ID:       '$2').(   . Regexp. pattern: '$3')"
@@ -86,11 +91,17 @@ summary_of_logfile_1hf=`f_summary_of_logfile_hash_fail 4 9 1 1 "SHA-512:7f3dea.*
 summary_of_logfile_1_sig_fail=`f_summary_of_logfile_failure 4 1 9 1 "SHA-512:7f3dea.*ee3141" "SHA-512:f7f5b4.*b2b596"`
 summary_of_logfile_4_sig_fail=`f_summary_of_logfile_failure 4 4 9 1 "SHA-512:7f3dea.*ee3141" "SHA-512:f7f5b4.*b2b596"`
 summary_of_logfile_1_sig_fail_with_log_rec_check=`f_summary_of_logfile_failure_with_log_rec_check 4 1 9 1 1524752285 1524752343  "00:00:58" "SHA-512:7f3dea.*ee3141" "SHA-512:f7f5b4.*b2b596"`
+summary_of_logfile_3_sig_time_fail=`f_summary_of_logfile_failure 4 2 9 1 "SHA-512:7f3dea.*ee3141" "SHA-512:f7f5b4.*b2b596"`
 
 summary_of_block_1_ok=`f_summary_of_block_ok 1 1517928882 "SHA-512:7f3dea.*ee3141" "SHA-512:20cfea.*88944a" 1 3 3`
 summary_of_block_2_ok=`f_summary_of_block_ok 2 1517928883 "SHA-512:20cfea.*88944a" "SHA-512:9c1ea0.*42e444" 4 6 3`
 summary_of_block_3_ok=`f_summary_of_block_ok 3 1517928884 "SHA-512:9c1ea0.*42e444" "SHA-512:1dfeae.*43e987" 7 9 3`
 summary_of_block_2_ok_1_hash_fail="$summary_of_block_2_ok.( . Count of hash failures:      1)"
+
+summary_of_block_1_resigned_ok=`f_summary_of_block_ok 1 1554200224 "SHA-512:7f3dea.*ee3141" "SHA-512:20cfea.*88944a" 1 3 3`
+summary_of_block_2_resigned_ok=`f_summary_of_block_ok 2 1554200225 "SHA-512:20cfea.*88944a" "SHA-512:9c1ea0.*42e444" 4 6 3`
+summary_of_block_3_resigned_ok=`f_summary_of_block_ok 3 1554201464 "SHA-512:9c1ea0.*42e444" "SHA-512:1dfeae.*43e987" 7 9 3`
+summary_of_block_4_resigned_ok=`f_summary_of_block_ok_only_metadata 4 1554202203 "SHA-512:1dfeae.*43e987" "SHA-512:f7f5b4.*b2b596"`
 
 summary_of_block_1_with_logrec_time_check_ok=`f_summary_of_block_rec_time_check_ok 1 1554200224 "SHA-512:7f3dea.*ee3141" "SHA-512:20cfea.*88944a" 1 3 3 1524752285 1524752323 "00:00:38"`
 summary_of_block_2_with_logrec_time_check_ok=`f_summary_of_block_rec_time_check_ok 2 1554200225 "SHA-512:20cfea.*88944a" "SHA-512:9c1ea0.*42e444" 4 6 3 1524752333 1524752334 "00:00:01"`
@@ -109,6 +120,9 @@ log_all_of_lines_more_recent_than_ksig_in_block_1=`f_log_line_more_recent_than_k
 log_all_of_lines_more_recent_than_ksig_in_block_2=`f_log_line_more_recent_than_ksig "All" 2 1517928883 1524752333 1524752334`
 log_all_of_lines_more_recent_than_ksig_in_block_3=`f_log_line_more_recent_than_ksig "All" 3 1517928884 1524752336 1524752343`
 log_some_of_lines_more_recent_than_ksig_in_block_2=`f_log_line_more_recent_than_ksig "Some of" 2 1517928883 1517926733 1517928900`
+
+err_failed_b1_b2_too_close=`f_failed_sig_time_diff_check 1 2 "close" 1554200224 1554200225 "00:00:01" "00:00:10 - 00:15:00"`
+err_failed_b2_b3_too_apart=`f_failed_sig_time_diff_check 2 3 "apart" 1554200225 1554201464 "00:20:39" "00:00:10 - 00:15:00"`
 
 ##
 # Actual tests.
@@ -212,7 +226,7 @@ log_some_of_lines_more_recent_than_ksig_in_block_2=`f_log_line_more_recent_than_
 	run ./src/logksi verify test/resource/logs_and_signatures/totally-resigned -ddd --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff 340d19H58M59 --continue-on-fail
 	[ "$status" -eq 6 ]
 	[[ "$output" =~ (Block no.   1: verifying KSI signature... ok.*ms.).(Block no.   1: signing time: .1554200224.*UTC).(Block no.   1: time extracted from least recent log line: .1524752285.*UTC.00:00).(Block no.   1: time extracted from most recent log line:  .1524752323.*UTC.00:00).(Block no.   1: block time window:  340d 19:58:59).(Block no.   1: checking if time embedded into log lines fits in specified time window relative to the KSI signature... ok.).(Block no.   1: output hash: SHA-512:20cfea.*88944a.).(Block no.   1: Warning: all final tree hashes are missing.).(Block no.   2: processing block header... ok.) ]]
-	[[ "$output" =~ (Block no.   3: signing time: .1554201464.*UTC).(Block no.   3: time extracted from least recent log line: .1524752336.*UTC.00:00).(Block no.   3: time extracted from most recent log line:  .1524752343.*UTC.00:00).(Block no.   3: block time window:  340d 20:18:48).(Block no.   3: checking if time embedded into log lines fits in specified time window relative to the KSI signature... failed.).(Block no.   3: checking signing time with previous block... ok.).(Block no.   3: output hash: SHA-512:1dfeae.*43e987.).(Block no.   3: Warning: all final tree hashes are missing.).(Block no.   3: Error: Log lines do not fit into expected time window .340d 19:58:59.) ]]
+	[[ "$output" =~ (Block no.   3: signing time: .1554201464.*UTC).(Block no.   3: time extracted from least recent log line: .1524752336.*UTC.00:00).(Block no.   3: time extracted from most recent log line:  .1524752343.*UTC.00:00).(Block no.   3: block time window:  340d 20:18:48).(Block no.   3: checking if time embedded into log lines fits in specified time window relative to the KSI signature... failed.).(Block no.   3: time difference relative to previous block: 00:20:39).(Block no.   3: checking signing time with previous block... ok.).(Block no.   3: output hash: SHA-512:1dfeae.*43e987.).(Block no.   3: Warning: all final tree hashes are missing.).(Block no.   3: Error: Log lines do not fit into expected time window .340d 19:58:59.) ]]
 }
 
 @test "verify log record where all the log lines are more recent than KSI signature - debug lvl 2" {
@@ -241,4 +255,23 @@ prev_file_rec_time_check_fail=`f_log_line_from_previous_file_more_recent_than_cu
 	run src/logksi verify --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff 50S -dd --use-stored-hash-on-fail --continue-on-fail -- test/resource/interlink/ok-testlog-interlink-1 test/resource/interlink/testlog-interlink-first-rec-time-changed-2
 	[ "$status" -eq 6 ]
 	[[ "$output" =~ $prev_file_rec_time_check_fail ]]
+}
+
+@test "verify with --block-time-diff to detect all block that are too close and too apart - debug level 1." {
+	run src/logksi verify test/resource/logs_and_signatures/totally-resigned -d --block-time-diff 10,15M --continue-on-fail
+	[ "$status" -eq 6 ]
+	[[ "$output" =~ (Verifying... failed.)..$err_failed_b1_b2_too_close..$err_failed_b2_b3_too_apart..$summary_of_logfile_3_sig_time_fail ]]
+}
+
+@test "verify with --block-time-diff to detect all block that are too close and too apart - debug level 2." {
+	run src/logksi verify test/resource/logs_and_signatures/totally-resigned -dd --block-time-diff 10,15M --continue-on-fail
+	[ "$status" -eq 6 ]
+	[[ "$output" =~ (Verifying block no.   1... ok.)..$summary_of_block_1_resigned_ok..(Verifying block no.   2... failed.)..$err_failed_b1_b2_too_close..$summary_of_block_2_resigned_ok..(Verifying block no.   3... failed.)..$err_failed_b2_b3_too_apart..$summary_of_block_3_resigned_ok..(Verifying block no.   4... ok.)..$summary_of_block_4_resigned_ok...$summary_of_logfile_3_sig_time_fail ]]
+}
+
+@test "verify with --block-time-diff to detect all block that are too close and too apart - debug level 3." {
+	run src/logksi verify test/resource/logs_and_signatures/totally-resigned -ddd --block-time-diff 10,15M --continue-on-fail
+	[ "$status" -eq 6 ]
+	[[ ! "$output" =~ "Block no.   1: checking signing time with previous block" ]]
+	[[ "$output" =~ (Block no.   2: verifying KSI signature... ok.*ms.).(Block no.   2: signing time: .1554200225.*UTC).(Block no.   2: time difference relative to previous block: 00:00:01).(Block no.   2: checking signing time with previous block... failed.).(Block no.   2: output hash: SHA-512:9c1e.*444.).(Block no.   2: Warning: all final tree hashes are missing.).(Block no.   2: Error: signing times difference .00:00:01. relative to previous block out of range .00:00:10 - 00:15:00..).(Block no.   3: processing block header... ok.) ]]
 }

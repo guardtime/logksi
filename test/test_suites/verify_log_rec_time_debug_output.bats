@@ -77,3 +77,9 @@ summary_of_block_2_with_logrec_time_check_unsigned_block=`f_summary_of_block_rec
 	[ "$status" -eq 6 ]
 	[[ "$output" =~ $summary_of_block_2_with_logrec_time_check_unsigned_block ]]
 }
+
+@test "check that block time window is printed without double -" {
+	run ./src/logksi verify test/resource/logs_and_signatures/signed -ddd --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -78d23H24M01
+	[ "$status" -eq 6 ]
+	[[ "$output" =~ "Block no.   1: block time window:  -78d 23:24:01" ]]
+}
