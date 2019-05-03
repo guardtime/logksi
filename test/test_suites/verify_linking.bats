@@ -135,3 +135,28 @@ echo SHA-512:dd4e870e7e0c998f160688b97c7bdeef3d6d01b1c5f02db117018058ad51996777a
 	[ "$status" -eq 6 ]
 	[[ "$output" =~ (Error: Most recent log line from previous file).*(testlog-interlink-n-1-rec-time-changed-1).*(1539771484).*(is more recent than least recent log line from current file).*(testlog-interlink-first-rec-time-changed-2).*(1539771480) ]]
 }
+
+@test "verify inter-linking with --block-time-diff where last block of previous file and first block of current file are too apart" {
+	run ./src/logksi verify --block-time-diff 15 -- test/resource/interlink/ok-testlog-interlink-[12]
+	[ "$status" -eq 6 ]
+	[[ "$output" =~ (Error: Signing times from last block of previous file ..test.resource.interlink.ok-testlog-interlink-1.*1539771487.*and first block of current file ..test.resource.interlink.ok-testlog-interlink-2.*1539771503.*are too apart.*00:00:16 does not fit into 0 - 00:00:15) ]]
+}
+
+@test "verify inter-linking with --block-time-diff where last block of previous file and first block of current file are too close" {
+	run ./src/logksi verify --block-time-diff 1d,oo -- test/resource/interlink/ok-testlog-interlink-[12]
+	[ "$status" -eq 6 ]
+	[[ "$output" =~ (Error: Signing times from last block of previous file ..test.resource.interlink.ok-testlog-interlink-1.*1539771487.*and first block of current file ..test.resource.interlink.ok-testlog-interlink-2.*1539771503.*are too close.*00:00:16 does not fit into 1d 00:00:00 - oo) ]]
+}
+
+@test "verify inter-linking with --block-time-diff where last block of previous file are more recent than expected" {
+	run ./src/logksi verify  --block-time-diff -6d,oo -- test/resource/interlink/ok-testlog-interlink-resigned-1 test/resource/interlink/ok-testlog-interlink-2
+	[ "$status" -eq 6 ]
+	[[ "$output" =~ (Error: Signing times from last block of previous file ..test.resource.interlink.ok-testlog-interlink-resigned-1.*1540301997.*is more recent than expected relative to first block of current file ..test.resource.interlink.ok-testlog-interlink-2.*1539771503.*-6d 03:21:34 does not fit into -6d 00:00:00 - oo.) ]]
+}
+
+@test "verify inter-linking with --block-time-diff where last block of previous file and first block of current file has exactly accepted time diff" {
+	run ./src/logksi verify --block-time-diff 16 -- test/resource/interlink/ok-testlog-interlink-[12]
+	[ "$status" -eq 0 ]
+	[[ ! "$output" =~ (too close) ]]
+	[[ ! "$output" =~ (too apart) ]]
+}

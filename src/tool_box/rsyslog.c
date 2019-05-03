@@ -394,7 +394,7 @@ static uint64_t uint64_diff(uint64_t a, uint64_t b, int *sign) {
 /**
  * a > b ret 1
  * a == b ret 0
- * a < b ret 1
+ * a < b ret -1
  */
 static int uint64_signcmp(int sa, uint64_t a, int sb, uint64_t b) {
 	sa = sa >= 0 ? 1 : -1;
@@ -432,7 +432,6 @@ static int check_log_record_embedded_time_against_ksi_signature_time(PARAM_SET *
 		int isTimeDiffTooLarge_past = 0;
 		int isTimeDiffTooLarge = 0;
 		int neg_sign = 1;
-		const char *diff_calc_sign_str = "";
 		int diff_calc_less_recent_sign = 1;
 		int diff_calc_most_recent_sign = 1;
 		uint64_t diff_calc_most_recent = 0;
@@ -466,7 +465,6 @@ static int check_log_record_embedded_time_against_ksi_signature_time(PARAM_SET *
 			isSigTimeOlderThanRecTime = (blocks->sigTime_1 < blocks->rec_time_min) || (blocks->sigTime_1 < blocks->rec_time_max);
 		}
 
-		if (diff_calc_less_recent_sign < 0) diff_calc_sign_str = "-";
 
 		/* Format some strings for debugging output and error messages. */
 		time_diff_to_string(diff_calc_less_recent, str_diff_calc_past, sizeof(str_diff_calc_past));
@@ -485,7 +483,7 @@ static int check_log_record_embedded_time_against_ksi_signature_time(PARAM_SET *
 
 		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, "Block no. %3zu: time extracted from least recent log line: %s\n", blocks->blockNo, str_rec_time_min);
 		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, "Block no. %3zu: time extracted from most recent log line:  %s\n", blocks->blockNo, str_rec_time_max);
-		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, "Block no. %3zu: block time window:  %s%s\n", blocks->blockNo, diff_calc_sign_str, str_diff_calc);
+		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, "Block no. %3zu: block time window:  %s\n", blocks->blockNo, str_diff_calc);
 
 		print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_LEVEL_3, "Block no. %3zu: checking if time embedded into log lines fits in specified time window relative to the KSI signature... ", blocks->blockNo);
 
@@ -616,37 +614,28 @@ cleanup:
   return res;
 }
 
-static int finalize_block(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
-	int res;
+static int handle_block_signing_time_check(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, BLOCK_INFO *blocks, IO_FILES *files) {
+	int res = KT_UNKNOWN_ERROR;
 	char *dummy = NULL;
-	int checkSigkTime = 0;
+	int checkDescSigkTime = 0;
 	int warnSameSigTime = 0;
+	int checkSigTimeDiff = 0;
+	int hasFailed = 0;
 
-	if (set == NULL || err == NULL || blocks == NULL) {
+	if (set == NULL || mp == NULL || err == NULL || blocks == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
 
-	if (blocks->blockNo > blocks->sigNo) {
-		res = KT_INVALID_INPUT_FORMAT;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: block signature data missing.", blocks->blockNo);
-	}
-
 	res = PARAM_SET_getStr(set, "ignore-desc-block-time", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &dummy);
-	checkSigkTime = !(res == PST_PARAMETER_NOT_FOUND || res == PST_OK);
+	checkDescSigkTime = !(res == PST_PARAMETER_NOT_FOUND || res == PST_OK);
 
-	res = PARAM_SET_getStr(set, "warn-same-block-time", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &dummy);
-	warnSameSigTime = res == PST_OK;
-
-	res = handle_record_time_check_between_files(set, mp, err, blocks, files);
-	if (res != KT_OK) goto cleanup;
-
-	if ((blocks->rec_time_in_file_min == 0 || blocks->rec_time_in_file_min > blocks->rec_time_min) && blocks->rec_time_min > 0) blocks->rec_time_in_file_min = blocks->rec_time_min;
-	if (blocks->rec_time_in_file_max == 0 || blocks->rec_time_in_file_max < blocks->rec_time_max) blocks->rec_time_in_file_max = blocks->rec_time_max;
+	warnSameSigTime = PARAM_SET_isSetByName(set, "warn-same-block-time");
+	checkSigTimeDiff = PARAM_SET_isSetByName(set, "block-time-diff");
 
 
 	/* Check if previous signature is older than the current one. If not, rise the error. */
-	if (checkSigkTime || warnSameSigTime) {
+	if (checkDescSigkTime || warnSameSigTime || checkSigTimeDiff) {
 		char buf[256];
 		char strT0[256];
 		char strT1[256];
@@ -658,13 +647,158 @@ static int finalize_block(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI
 		/* When sigTime_0 is 0 it is the first signature and there is nothing to check.
 		   If sigTime_1 is 0 the last block must have been failed and skipped. */
 		if (blocks->sigTime_0 > 0 && blocks->sigTime_1 > 0) {
+			char str_diff[256] = "<null>";
+			uint64_t diff = 0;
+			int diff_sign = 0;
+			const char *str_diff_sign = "";
+
+			diff = uint64_diff(blocks->sigTime_1, blocks->sigTime_0, &diff_sign);
+			if (diff_sign < 0) str_diff_sign = "-";
 
 			LOGKSI_uint64_toDateString(blocks->sigTime_0, strT0, sizeof(strT0));
 			LOGKSI_uint64_toDateString(blocks->sigTime_1, strT1, sizeof(strT1));
+			time_diff_to_string(diff, str_diff, sizeof(str_diff));
 
+			print_debug_mp(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: time difference relative to previous block: %s%s\n", blocks->blockNo, str_diff_sign, str_diff);
 			print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_LEVEL_3, "Block no. %3zu: checking signing time with previous block... ", blocks->blockNo);
 
-			if (blocks->sigTime_0 > blocks->sigTime_1 && !PARAM_SET_isSetByName(set, "ignore-desc-block-time")) {
+
+			if (checkSigTimeDiff) {
+				int min_sign = 0;
+				int max_sign = 0;
+				int is_too_close = 0;
+				int is_too_apart = 0;
+				int is_too_apart_to_future = 0;
+				MIN_MAX_INT tmp;
+
+
+				res = PARAM_SET_getObj(set, "block-time-diff", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, (void**)&tmp);
+				ERR_CATCH_MSG(err, res, "Error: Unable to extract time base as integer.");
+
+				/* Artificially create another boundary as with single value min and max are equal. */
+				if (tmp.count == 1) {
+					if (tmp.min < 0) {
+						tmp.max = 0;
+					} else {
+						tmp.min = 0;
+					}
+				}
+
+				min_sign = tmp.min >= 0 ? 1 : -1;
+				max_sign = tmp.max >= 0 ? 1 : -1;
+
+
+				/* Two blocks can only be too close if both diff and tmp.min are positive (the "future" is not counted).  */
+				is_too_close = tmp.count == 2 && tmp.min >= 0 && diff_sign > 0 && (uint64_signcmp(diff_sign, diff, min_sign, min_sign * tmp.min) == -1);
+				/* Two blocks can only be too close. */
+				is_too_apart = diff_sign > 0 && ((tmp.neg_inf == 0 && uint64_signcmp(diff_sign, diff, min_sign, min_sign * tmp.min) == -1) || (tmp.pos_inf == 0 && uint64_signcmp(diff_sign, diff, max_sign, max_sign * tmp.max) == 1));
+				is_too_apart_to_future = (diff_sign < 0 && checkDescSigkTime) && tmp.neg_inf == 0 && (uint64_signcmp(diff_sign, diff, min_sign, min_sign * tmp.min) == -1);
+
+				/* A precise Check for negative time diff is performed, disable extra check. */
+				if (min_sign < 0) checkDescSigkTime = 0;
+
+
+				if (is_too_close || is_too_apart || is_too_apart_to_future) {
+					const char *str_range = NULL;
+					const char *reason = is_too_close ? "close" : (is_too_apart_to_future ? "apart in future": "apart");
+					char str_max_diff[256] = "<null>";
+					char str_min_diff[256] = "<null>";
+					char str_tmp_range[256] = "<null>";
+
+					if (tmp.pos_inf == 1) {
+						PST_strncpy(str_max_diff, "oo", sizeof(str_max_diff));
+					} else {
+						int offset = max_sign == -1 ? 1 : 0;
+						str_max_diff[0] = '-';
+						time_diff_to_string(max_sign * tmp.max, str_max_diff + offset, sizeof(str_max_diff) - offset);
+					}
+
+					if (tmp.neg_inf == 1) {
+						PST_strncpy(str_min_diff, "-oo", sizeof(str_min_diff));
+					} else {
+						int offset = min_sign == -1 ? 1 : 0;
+						str_min_diff[0] = '-';
+						time_diff_to_string(min_sign * tmp.min, str_min_diff + offset, sizeof(str_min_diff) - offset);
+					}
+
+
+					if (tmp.count == 2) {
+						PST_snprintf(str_tmp_range, sizeof(str_tmp_range), "%s - %s", str_min_diff, str_max_diff);
+						str_range = str_tmp_range;
+					} else {
+						if (tmp.min == 0) PST_snprintf(str_tmp_range, sizeof(str_tmp_range), "0 - %s", str_max_diff);
+						else PST_snprintf(str_tmp_range, sizeof(str_tmp_range), "%s - 0", str_min_diff);
+						str_range = str_tmp_range;
+					}
+
+					if (!hasFailed) blocks->nofTotalFailedBlocks++;
+					res = KT_VERIFICATION_FAILURE;
+					hasFailed = 1;
+
+					print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
+
+
+
+					print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: signing times difference (%s%s) relative to previous block out of range (%s).\n", blocks->blockNo, str_diff_sign, str_diff, str_range);
+
+
+					if (PARAM_SET_isSetByName(set, "continue-on-fail")) {
+						if (blocks->blockNo == 1) {
+							if (is_too_apart_to_future) {
+								print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Signing times from last block of previous file is more recent than expected relative to first block of current file:\n");
+							} else {
+								print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Signing times from last block of previous file and first block of current file are too %s:\n", reason);
+							}
+							print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3,     "   + Previous file: %s\n"
+																									  "   + Sig time: %s\n"
+																									  "   + Current file:  %s\n"
+																									  "   + Sig time: %s\n"
+																									  "   + Time diff:              %s%s\n"
+																									  "   + Expected time diff:     %s\n",
+																									  files->previousLogFile, strT0,
+																									  io_files_getCurrentLogFilePrintRepresentation(files), strT1,
+																									  str_diff_sign, str_diff,
+																									  str_range);
+						} else {
+							if (is_too_apart_to_future) {
+								print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Blocks %zu signing time is more recent than expected relative to block %zu:\n", blocks->blockNo - 1, blocks->blockNo, reason);
+							} else {
+								print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Blocks %zu and %zu signing times are too %s:\n", blocks->blockNo - 1, blocks->blockNo, reason);
+							}
+							print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3,     "   + Sig time for block %zu: %s\n"
+																									  "   + Sig time for block %zu: %s\n"
+																									  "   + Time diff:              %s%s\n"
+																									  "   + Expected time diff:     %s\n",
+																									  blocks->blockNo - 1, strT0,
+																									  blocks->blockNo, strT1,
+																									  str_diff_sign, str_diff,
+																									  str_range);
+						}
+
+						blocks->quietError = res;
+						res = KT_OK;
+					} else {
+						if (blocks->blockNo == 1) {
+							if (is_too_apart_to_future) {
+								ERR_TRCKR_ADD(err, res, "Error: Signing times from last block of previous file ('%s' - %s) is more recent than expected relative to first block of current file ('%s' - %s). %s%s does not fit into %s.", files->previousLogFile, strT0, io_files_getCurrentLogFilePrintRepresentation(files), strT1, str_diff_sign, str_diff, str_range);
+							} else {
+								ERR_TRCKR_ADD(err, res, "Error: Signing times from last block of previous file ('%s' - %s) and first block of current file ('%s' - %s) are too %s (%s%s does not fit into %s).", files->previousLogFile, strT0, io_files_getCurrentLogFilePrintRepresentation(files), strT1, reason, str_diff_sign, str_diff, str_range);
+							}
+						} else {
+							if (is_too_apart_to_future) {
+								ERR_TRCKR_ADD(err, res, "Error: Signing time of blocks %zu (%s) is more recent than expected relative to block %zu (%s). %s%s does not fit into %s.", blocks->blockNo - 1, strT0, blocks->blockNo, strT1, str_diff_sign, str_diff, str_range);
+							} else {
+								ERR_TRCKR_ADD(err, res, "Error: Blocks %zu (%s) and %zu (%s) signing times are too %s (%s%s does not fit into %s).", blocks->blockNo - 1, strT0, blocks->blockNo, strT1, reason, str_diff_sign, str_diff, str_range);
+							}
+						}
+					}
+
+				goto cleanup;
+				}
+			}
+
+
+			if (blocks->sigTime_0 > blocks->sigTime_1 && checkDescSigkTime) {
 				print_progressResult(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_2, 1);
 				print_progressResult(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_1, 1);
 				blocks->errSignTime = 1;
@@ -680,11 +814,11 @@ static int finalize_block(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI
 																						  "          block no. %3zu %s\n", blocks->blockNo - 1, strT0, (logStdin ? "log from" : "file"), currentLogFile, blocks->blockNo, strT1);
 				}
 
-				blocks->nofTotalFailedBlocks++;
+				if (!hasFailed) blocks->nofTotalFailedBlocks++;
 				print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, 1);
 			}
 
-			if (blocks->sigTime_0 == blocks->sigTime_1 && PARAM_SET_isSetByName(set, "warn-same-block-time")) {
+			if (blocks->sigTime_0 == blocks->sigTime_1 && warnSameSigTime) {
 				if (blocks->blockNo == 1) {
 					print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Warning: Last block from file '%s' and first block from file '%s' has same signing time %s.\n", blocks->blockNo, previousLogFile, currentLogFile, LOGKSI_uint64_toDateString(blocks->sigTime_1, buf, sizeof(buf)));
 					print_debug_mp(mp, MP_ID_LOGFILE_WARNINGS, DEBUG_SMALLER | DEBUG_LEVEL_3, "Warning: Last block from file      '%s'\n"
@@ -700,6 +834,37 @@ static int finalize_block(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI
 		print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_2, 0);
 
 	}
+
+
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
+
+
+static int finalize_block(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files) {
+	int res;
+
+	if (set == NULL || err == NULL || blocks == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	if (blocks->blockNo > blocks->sigNo) {
+		res = KT_INVALID_INPUT_FORMAT;
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: block signature data missing.", blocks->blockNo);
+	}
+
+	res = handle_record_time_check_between_files(set, mp, err, blocks, files);
+	if (res != KT_OK) goto cleanup;
+
+	if ((blocks->rec_time_in_file_min == 0 || blocks->rec_time_in_file_min > blocks->rec_time_min) && blocks->rec_time_min > 0) blocks->rec_time_in_file_min = blocks->rec_time_min;
+	if (blocks->rec_time_in_file_max == 0 || blocks->rec_time_in_file_max < blocks->rec_time_max) blocks->rec_time_in_file_max = blocks->rec_time_max;
+
+	res = handle_block_signing_time_check(set, mp, err, blocks, files);
+	if (res != KT_OK) goto cleanup;
 
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_2, 0);
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, 0);

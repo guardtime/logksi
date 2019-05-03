@@ -130,9 +130,37 @@ export KSI_CONF=test/test.cfg
 	[[ ! "$output" =~ (Error: Verification FAILED but was continued for further analysis)  ]]
 }
 
+##
+# Time check.
+##
+
 @test "verify log record --time-diff: block 1,2 and 4 ok, block 3 nok" {
 	run ./src/logksi verify test/resource/logs_and_signatures/totally-resigned -dd --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff 340d19H58M59 --continue-on-fail
 	[ "$status" -eq 6 ]
 	[[ "$output" =~ (Verifying block no.   1... ok.).*(Verifying block no.   2... ok.).*(Verifying block no.   3... failed.).*(Verifying block no.   4... ok.) ]]
 	[[ "$output" =~ (Error: Verification FAILED but was continued for further analysis)  ]]
+}
+
+@test "verify with --block-time-diff and continue on fail to detect all block that are too close and too apart (1,259d19H42M24)." {
+	run src/logksi verify test/resource/logfiles/unsigned test/resource/logsignatures/unsigned-same-sign-time.logsig --ignore-desc-block-time -d --block-time-diff 1,259d19H42M24 --continue-on-fail
+	[ "$status" -eq 6 ]
+	[[ "$output" =~ "Verifying... failed." ]]
+	[[ "$output" =~ (x Error: Blocks 1 and 2 signing times are too close) ]]
+	[[ "$output" =~ (x Error: Blocks 24 and 25 signing times are too apart) ]]
+	[[ "$output" =~ (Count of failures:           2) ]]
+}
+
+@test "verify with --block-time-diff and continue on fail to detect all resigned blocks that are too recent (-259d19H42M29,oo)." {
+	run src/logksi verify test/resource/logfiles/unsigned test/resource/logsignatures/unsigned-same-sign-time.logsig -d --block-time-diff -259d19H42M29,oo --continue-on-fail
+	[ "$status" -eq 6 ]
+	[[ "$output" =~ "Verifying... failed." ]]
+	[[ "$output" =~ (x Error: Blocks 2 signing time is more recent than expected relative to block 3:) ]]
+	[[ "$output" =~ (x Error: Blocks 17 signing time is more recent than expected relative to block 18:) ]]
+	[[ "$output" =~ (Count of failures:           2) ]]
+}
+
+@test "verify with --block-time-diff and continue on fail and check that time check for unsigned block is skipped." {
+	run src/logksi verify test/resource/logs_and_signatures/unsigned  -d --block-time-diff 1 --ignore-desc-block-time --continue-on-fail
+	[ "$status" -eq 6 ]
+	[[ "$output" =~ (Verifying... failed.)..( x Error: Block 5 is unsigned!)..( x Error: Skipping block 5!)..( x Error: Block 6 is unsigned!)..( x Error: Skipping block 6!)..( x Error: Block 25 is unsigned!)..( x Error: Skipping block 25!)..(Summary of logfile) ]]
 }

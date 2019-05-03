@@ -4,6 +4,7 @@
 (LOGKSI-94) * FEATURE: New option --time-form and --time-base to extract log record time embedded into log line.
 (LOGKSI-94) * FEATURE: New option --time-diff to verify log record embedded time against KSI signature signing time.
 (LOGKSI-94) * FEATURE: New option --time-disordered to allow log records that are not listed in chronological order.
+(LOGKSI-87) * FEATURE: New option --block-time-diff to verify time difference of consecutive blocks.
 (LOGKSI-88) * FEATURE: New option --client-id to match KSI signatures client ID against regular expression.
 (LOGKSI-88) * FEATURE: New option --warn-client-id-change that will warn user when KSI signatures client ID is not constant value.
 (LOGKSI-78) * FEATURE: New option --continue-on-fail that tries to continue verification when verification fails.
