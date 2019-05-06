@@ -300,7 +300,7 @@ static int process_magic_number(PARAM_SET* set, MULTI_PRINTER* mp, ERR_TRCKR *er
 		res = SMART_FILE_write(files->files.outSig, (unsigned char*)logSignatureHeaders[blocks->version], strlen(logSignatureHeaders[blocks->version]), &count);
 		ERR_CATCH_MSG(err, res, "Error: Could not copy magic number to log signature file.");
 	} else if (files->files.outProof) {
-		res = SMART_FILE_write(files->files.outProof, (unsigned char*)proofFileHeaders[blocks->version], strlen(proofFileHeaders[blocks->version]), &count);
+		res = SMART_FILE_write(files->files.outProof, (unsigned char*)proofFileHeaders[blocks->version % 2], strlen(proofFileHeaders[blocks->version % 2]), &count);
 		ERR_CATCH_MSG(err, res, "Error: Could not write magic number to integrity proof file.");
 	}
 
