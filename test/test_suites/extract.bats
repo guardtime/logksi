@@ -309,3 +309,10 @@ cp -r test/resource/logfiles/legacy_extract test/out
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: Extract position 205 out of range - not enough loglines." ]]
 }
+
+@test "Try to extract from excerpt file." {
+	run ./src/logksi extract test/resource/excerpt/log-ok.excerpt -o test/out/dummy.excerpt -r 1,3-5 -d
+	[ "$status" -eq 1 ]
+	[[ "$output" =~ "Extracting records... failed." ]]
+	[[ "$output" =~ "Extracting from excerpt file not possible! Only log signature file can be extracted to produce excerpt file." ]]
+}

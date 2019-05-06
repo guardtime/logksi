@@ -101,3 +101,10 @@ cp test/resource/logfiles/signed test/out/signed4
 	run diff test/resource/logs_and_signatures/signed.logsig test/out/ext-backup-test.logsig
 	[ "$status" -ne 0 ]
 }
+
+@test "Try to extend excerpt file - not implemented." {
+	run src/logksi extend test/resource/excerpt/log-ok.excerpt  -o test/out/dummy.ksig -d
+	[ "$status" -eq 1 ]
+	[[ "$output" =~ "Extending... failed." ]]
+	[[ "$output" =~ "Extending of excerpt file not yet implemented!" ]]
+}
