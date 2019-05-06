@@ -230,37 +230,94 @@ cleanup:
 	return res;
 }
 
-static size_t find_header_in_file(SMART_FILE *in, char **headers, size_t len) {
-	size_t res = len;
-	size_t i;
-	size_t count;
-	char buf[32];
-	int smart_file_res;
+struct magic_reference_st {
+	const char* name;
+	LOGSIG_VERSION ver;
+};
 
-	if (in == NULL || headers == NULL)
-		return len;
+#define _LGVR(v) {#v, v}
+struct magic_reference_st magic_reference[NOF_VERS] = {_LGVR(LOGSIG11), _LGVR(LOGSIG12), _LGVR(RECSIG11), _LGVR(RECSIG12), _LGVR(LOG12BLK), _LGVR(LOG12SIG)};
+#undef _LGVR
 
-	smart_file_res = SMART_FILE_read(in, (unsigned char*)buf, strlen(headers[0]), &count);
-	if (smart_file_res != SMART_FILE_OK) return res;
+static LOGSIG_VERSION file_version_by_string(const char *str) {
+	int i = 0;
+	if (str == NULL) return UNKN_VER;
 
-	if (count == strlen(headers[0])) {
-		for (i = 0; i < len; i++) {
-			if (strncmp(buf, headers[i], strlen(headers[i])) == 0) {
-				res = i;
-				break;
-			}
-		}
+	for (i = 0; i < NOF_VERS; i++) {
+		if (strcmp(str, magic_reference[i].name) == 0) return magic_reference[i].ver;
 	}
+
+	return UNKN_VER;
+}
+
+static const char* file_version_to_string(LOGSIG_VERSION ver) {
+	int i = 0;
+
+	for (i = 0; i < NOF_VERS; i++) {
+		if (magic_reference[i].ver == ver) return magic_reference[i].name;
+	}
+
+	return "<unknown file version>";
+}
+
+/**
+ * Extracts file type by reading its magic bytes.
+ * \param in		#SMART_FILE object wherefrom the magic bytes are read.
+ * \return File version (#LOGSIG_VERSION) if successful or #UNKN_VER otherwise.
+ */
+static LOGSIG_VERSION get_file_version(SMART_FILE *in) {
+	int res = KT_UNKNOWN_ERROR;
+	char magic_from_file[MAGIC_SIZE + 1];
+	size_t count = 0xff;
+
+	if (in == NULL)	return UNKN_VER;
+
+	res = SMART_FILE_read(in, (unsigned char*)magic_from_file, MAGIC_SIZE, &count);
+	if (res != SMART_FILE_OK || count != MAGIC_SIZE) return UNKN_VER;
+
+	magic_from_file[MAGIC_SIZE] = '\0';
+	return file_version_by_string(magic_from_file);
+}
+
+static LOGSIG_VERSION get_integrity_proof_version(LOGSIG_VERSION ver) {
+	switch(ver) {
+		case LOGSIG11: return RECSIG11;
+		case LOGSIG12: return RECSIG12;
+		default: return UNKN_VER;
+	}
+}
+
+static int check_file_header(SMART_FILE *in, ERR_TRCKR *err, LOGSIG_VERSION *expected_ver, size_t expected_ver_count, const char *human_readable_file_name, LOGSIG_VERSION *ver_out) {
+	int res = KT_UNKNOWN_ERROR;
+	LOGSIG_VERSION ver = UNKN_VER;
+	char permitted_versions[1024] = "<unexpected>";
+	int i = 0;
+	size_t count = 0;
+
+	if (in == NULL || err == NULL) return KT_INVALID_ARGUMENT;
+
+	/* Get the actual version. */
+	ver = get_file_version(in);
+	if (ver_out != NULL) *ver_out = ver;
+
+	/* Check if any of the file types matches. In case of success return with OK */
+	for (i = 0; i < expected_ver_count; i++) {
+		if (expected_ver[i] == ver) return KT_OK;
+		count += PST_snprintf(permitted_versions + count, sizeof(permitted_versions) - count, "%s%s", (i > 0 ? ", " : ""), file_version_to_string(expected_ver[i]));
+	}
+
+    /* Format error messages.*/
+	res = KT_INVALID_INPUT_FORMAT;
+	if (expected_ver_count > 1) ERR_TRCKR_ADD(err, res, "Error: Expected file types {%s} but got %s!", permitted_versions, file_version_to_string(ver));
+	else ERR_TRCKR_ADD(err, res, "Error: Expected file type %s but got %s!", permitted_versions, file_version_to_string(ver));
+	ERR_TRCKR_ADD(err, res, "Error: Log signature file identification magic number not found.");
+	ERR_TRCKR_ADD(err, res, "Error: Unable to parse %s file '%s'.", human_readable_file_name, SMART_FILE_getFname(in));
+
 	return res;
 }
 
 static int process_magic_number(PARAM_SET* set, MULTI_PRINTER* mp, ERR_TRCKR *err, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
-	size_t count = 0;
-	char *logSignatureHeaders[] = {"LOGSIG11", "LOGSIG12", "RECSIG11", "RECSIG12"};
-	char *blocksFileHeaders[] = {"LOG12BLK"};
-	char *signaturesFileHeaders[] = {"LOG12SIG"};
-	char *proofFileHeaders[] = {"RECSIG11", "RECSIG12"};
 	SMART_FILE *in = NULL;
 
 	if (err == NULL || files == NULL) {
@@ -279,28 +336,27 @@ static int process_magic_number(PARAM_SET* set, MULTI_PRINTER* mp, ERR_TRCKR *er
 	res = KT_INVALID_INPUT_FORMAT;
 
 	if (files->files.partsBlk) {
-		if (find_header_in_file(files->files.partsBlk, blocksFileHeaders, SOF_ARRAY(blocksFileHeaders)) == SOF_ARRAY(blocksFileHeaders)) {
-			ERR_TRCKR_ADD(err, res, "Error: Log signature blocks file identification magic number not found.");
-			ERR_CATCH_MSG(err, res, "Error: Unable to parse blocks file '%s'.", files->internal.partsBlk);
-		}
-		if (find_header_in_file(files->files.partsSig, signaturesFileHeaders, SOF_ARRAY(signaturesFileHeaders)) == SOF_ARRAY(signaturesFileHeaders)) {
-			ERR_TRCKR_ADD(err, res, "Error: Log signature file identification magic number not found.");
-			ERR_CATCH_MSG(err, res, "Error: Unable to parse signature file '%s'.", files->internal.partsSig);
-		}
+		LOGSIG_VERSION exp_ver_blk[] = {LOG12BLK};
+		LOGSIG_VERSION exp_ver_sig[] = {LOG12SIG};
+
+		res = check_file_header(files->files.partsBlk, err, exp_ver_blk, SOF_ARRAY(exp_ver_blk), "block", NULL);
+		if (res != KT_OK) goto cleanup;
+
+		res = check_file_header(files->files.partsSig, err, exp_ver_sig, SOF_ARRAY(exp_ver_sig), "signature", NULL);
+		if (res != KT_OK) goto cleanup;
+
 		blocks->version = LOGSIG12;
 	} else {
-		blocks->version = find_header_in_file(files->files.inSig, logSignatureHeaders, SOF_ARRAY(logSignatureHeaders));
-		if (blocks->version == SOF_ARRAY(logSignatureHeaders)) {
-			ERR_TRCKR_ADD(err, res, "Error: Log signature file identification magic number not found.");
-			ERR_CATCH_MSG(err, res, "Error: Unable to parse signature file '%s'.", files->internal.inSig);
-		}
+		LOGSIG_VERSION exp_ver[] = {LOGSIG11, LOGSIG12, RECSIG11, RECSIG12};
+		res = check_file_header(files->files.inSig, err, exp_ver, SOF_ARRAY(exp_ver), "signature", &blocks->version);
+		if (res != KT_OK) goto cleanup;
 	}
 
 	if (files->files.outSig) {
-		res = SMART_FILE_write(files->files.outSig, (unsigned char*)logSignatureHeaders[blocks->version], strlen(logSignatureHeaders[blocks->version]), &count);
+		res = SMART_FILE_write(files->files.outSig, (unsigned char*)file_version_to_string(blocks->version), MAGIC_SIZE, NULL);
 		ERR_CATCH_MSG(err, res, "Error: Could not copy magic number to log signature file.");
 	} else if (files->files.outProof) {
-		res = SMART_FILE_write(files->files.outProof, (unsigned char*)proofFileHeaders[blocks->version % 2], strlen(proofFileHeaders[blocks->version % 2]), &count);
+		res = SMART_FILE_write(files->files.outProof, (unsigned char*)file_version_to_string(get_integrity_proof_version(blocks->version)), MAGIC_SIZE, NULL);
 		ERR_CATCH_MSG(err, res, "Error: Could not write magic number to integrity proof file.");
 	}
 
