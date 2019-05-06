@@ -31,6 +31,7 @@ extern "C" {
 #endif
 
 #define MAX_TREE_HEIGHT 31
+#define MAGIC_SIZE 8
 
 typedef enum {
 	LEFT_LINK = 0,
@@ -63,10 +64,14 @@ typedef struct {
 } EXTRACT_INFO;
 
 typedef enum {
-	LOGSIG11 = 0,
-	LOGSIG12 = 1,
-	RECSIG11 = 2,
-	RECSIG12 = 3
+	LOGVRNON = 0,
+	LOGSIG11 = 1,
+	LOGSIG12 = 2,
+	RECSIG11 = 3,
+	RECSIG12 = 4,
+	LOG12BLK = 5,
+	LOG12SIG = 6,
+	UNKN_VER = 0xff
 } LOGSIG_VERSION;
 
 typedef struct {
@@ -111,7 +116,7 @@ typedef struct {
 	EXTRACT_INFO *extractInfo;
 	unsigned char treeHeight;
 	unsigned char balanced;
-	LOGSIG_VERSION version;
+	LOGSIG_VERSION version;			/* Version of the log signature. */
 	char warningLegacy;
 	char keepRecordHashes;			/* This is set to 1, when (meta-)record hash is read from file. Indicates that rsyslog keeps record hashes. */
 	char keepTreeHashes;			/* This is set to 1, when tree hash is read from file. Indicates that rsyslog keeps tree hashes. */

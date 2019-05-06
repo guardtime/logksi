@@ -1,6 +1,7 @@
 (LOGKSI-78) * IMPROVEMENT: Wording of hash comparison failure error messages improved.
 (LOGKSI-63) * IMPROVEMENT: Improved error messages when integrating invalid or broken log signature files.
 (LOGKSI-111) * IMPROVEMENT: Improved debug output (-d) in case of integrating is not needed and output already exists as result of synchronous signing.
+(LOGKSI-123) * IMPROVEMENT: Handling of magic bytes refactored.
 (LOGKSI-94) * FEATURE: New option --time-form and --time-base to extract log record time embedded into log line.
 (LOGKSI-94) * FEATURE: New option --time-diff to verify log record embedded time against KSI signature signing time.
 (LOGKSI-94) * FEATURE: New option --time-disordered to allow log records that are not listed in chronological order.

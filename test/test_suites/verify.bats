@@ -2,6 +2,25 @@
 
 export KSI_CONF=test/test.cfg
 
+@test "Try to verify parts files as log signature." {
+	run src/logksi verify test/resource/logsignatures/signed.logsig.parts/blocks.dat test/resource/logsignatures/signed.logsig.parts/block-signatures.dat
+	[ "$status" -eq 4 ]
+	[[ "$output" =~ "Error: Log signature file identification magic number not found." ]]
+	[[ "$output" =~ "Error: Expected file types {LOGSIG11, LOGSIG12, RECSIG11, RECSIG12} but got LOG12SIG!" ]]
+
+	run src/logksi verify test/resource/logsignatures/signed.logsig.parts/block-signatures.dat test/resource/logsignatures/signed.logsig.parts/blocks.dat
+	[ "$status" -eq 4 ]
+	[[ "$output" =~ "Error: Log signature file identification magic number not found." ]]
+	[[ "$output" =~ "Error: Expected file types {LOGSIG11, LOGSIG12, RECSIG11, RECSIG12} but got LOG12BLK!" ]]
+}
+
+@test "Try to verify log file as log signature." {
+	run src/logksi verify test/resource/logs_and_signatures/unsigned test/resource/logs_and_signatures/unsigned
+	[ "$status" -eq 4 ]
+	[[ "$output" =~ "Error: Log signature file identification magic number not found." ]]
+	[[ "$output" =~ "Error: Expected file types {LOGSIG11, LOGSIG12, RECSIG11, RECSIG12} but got <unknown file version>!" ]]
+}
+
 @test "verify log_repaired.logsig" {
 	run ./src/logksi verify test/resource/logs_and_signatures/log_repaired -ddd --ignore-desc-block-time
 	[ "$status" -eq 0 ]

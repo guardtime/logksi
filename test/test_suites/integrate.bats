@@ -4,6 +4,16 @@ export KSI_CONF=test/test.cfg
 
 cp -r test/resource/logsignatures/signed.logsig.parts test/out
 
+@test "try to integrate parts files where file types do not match." {
+	run ./src/logksi integrate test/resource/logsignatures/unknow-blocks-file-types -o test/out/dummy.ksig --force-overwrite -d
+	[ "$status" -eq 4 ]
+	[[ "$output" =~ "Error: Expected file type LOG12BLK but got <unknown file version>!" ]]
+
+	run ./src/logksi integrate test/resource/logsignatures/unknow-sig-file-types  -o test/out/dummy.ksig --force-overwrite -d
+	[ "$status" -eq 4 ]
+	[[ "$output" =~ "Error: Expected file type LOG12SIG but got <unknown file version>!" ]]
+}
+
 @test "integrate signed.parts" {
 	run ./src/logksi integrate test/out/signed -ddd
 	[ "$status" -eq 0 ]
