@@ -267,7 +267,7 @@ static const char* file_version_to_string(LOGSIG_VERSION ver) {
  */
 static LOGSIG_VERSION get_file_version(SMART_FILE *in) {
 	int res = KT_UNKNOWN_ERROR;
-	char magic_from_file[16];
+	char magic_from_file[MAGIC_SIZE + 1];
 	size_t count = 0xff;
 
 	if (in == NULL)	return UNKN_VER;
