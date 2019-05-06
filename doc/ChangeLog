@@ -19,6 +19,7 @@
 (LOGKSI-117) * BUGFIX: Warning about same signing time with debug level 1 is not mixed up with other messages.
 (LOGKSI-117) * BUGFIX: Warning about same signing time with debug level 3 prints correct block number and file name.
 (LOGKSI-118) * BUGFIX: Verification debug output (-d and -dd) for excerpt file displays information instead of nonsense.
+(LOGKSI-121) * BUGFIX: Using signing, extending or extracting on excerpt file will fail with meaningful error message.
 (LOGKSI-110) * IMPROVEMENT: Internal file handling refactored.
 
 Version 1.4

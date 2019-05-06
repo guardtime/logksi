@@ -2959,8 +2959,13 @@ int logsignature_extend(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 	processors.extend_signature = extend_signature;
 
 	res = process_magic_number(set, mp, err, &blocks, files);
-
 	if (res != KT_OK) goto cleanup;
+
+	if (blocks.version == RECSIG11 || blocks.version == RECSIG12) {
+		res = KT_VERIFICATION_SKIPPED;
+		ERR_TRCKR_ADD(err, res, "Extending of excerpt file not yet implemented!");
+		goto cleanup;
+	}
 
 	while (!SMART_FILE_isEof(files->files.inSig)) {
 		MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
@@ -3396,6 +3401,12 @@ int logsignature_extract(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_
 	res = process_magic_number(set, mp, err, &blocks, files);
 	if (res != KT_OK) goto cleanup;
 
+	if (blocks.version == RECSIG11 || blocks.version == RECSIG12) {
+		res = KT_VERIFICATION_SKIPPED;
+		ERR_TRCKR_ADD(err, res, "Extracting from excerpt file not possible! Only log signature file can be extracted to produce excerpt file.");
+		goto cleanup;
+	}
+
 	while (!SMART_FILE_isEof(files->files.inSig)) {
 		MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
 
@@ -3580,6 +3591,12 @@ int logsignature_sign(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX
 
 	res = process_magic_number(set, mp, err, &blocks, files);
 	if (res != KT_OK) goto cleanup;
+
+	if (blocks.version == RECSIG11 || blocks.version == RECSIG12) {
+		res = KT_VERIFICATION_SKIPPED;
+		ERR_TRCKR_ADD(err, res, "Signing of excerpt file not possible! Only log signature file can be signed.");
+		goto cleanup;
+	}
 
 	if (SMART_FILE_isStream(files->files.inSig)) {
 		progress = (PARAM_SET_isSetByName(set, "d")&& PARAM_SET_isSetByName(set, "show-progress"));

@@ -72,3 +72,10 @@ export KSI_CONF=test/test.cfg
 	run diff test/resource/logs_and_signatures/only-1-unsigned.logsig test/out/only-1-unsigned.logsig
 	[ "$status" -ne 0 ]
 }
+
+@test "Try to sign excerpt file." {
+	run src/logksi sign test/resource/excerpt/log-ok.excerpt -d
+	[ "$status" -eq 1 ]
+	[[ "$output" =~ "Signing... failed." ]]
+	[[ "$output" =~ "Signing of excerpt file not possible! Only log signature file can be signed." ]]
+}
