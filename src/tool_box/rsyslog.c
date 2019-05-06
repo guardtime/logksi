@@ -236,16 +236,15 @@ struct magic_reference_st {
 };
 
 #define _LGVR(v) {#v, v}
-struct magic_reference_st magic_reference[] = {_LGVR(LOGSIG11), _LGVR(LOGSIG12), _LGVR(RECSIG11), _LGVR(RECSIG12), _LGVR(LOG12BLK), _LGVR(LOG12SIG), {NULL, LOGVRNON}};
+struct magic_reference_st magic_reference[NOF_VERS] = {_LGVR(LOGSIG11), _LGVR(LOGSIG12), _LGVR(RECSIG11), _LGVR(RECSIG12), _LGVR(LOG12BLK), _LGVR(LOG12SIG)};
 #undef _LGVR
 
 static LOGSIG_VERSION file_version_by_string(const char *str) {
 	int i = 0;
-	if (str == NULL) return LOGVRNON;
+	if (str == NULL) return UNKN_VER;
 
-	while (magic_reference[i].name) {
+	for (i = 0; i < NOF_VERS; i++) {
 		if (strcmp(str, magic_reference[i].name) == 0) return magic_reference[i].ver;
-		i++;
 	}
 
 	return UNKN_VER;
@@ -254,9 +253,8 @@ static LOGSIG_VERSION file_version_by_string(const char *str) {
 static const char* file_version_to_string(LOGSIG_VERSION ver) {
 	int i = 0;
 
-	while (magic_reference[i].name) {
+	for (i = 0; i < NOF_VERS; i++) {
 		if (magic_reference[i].ver == ver) return magic_reference[i].name;
-		i++;
 	}
 
 	return "<unknown file version>";
@@ -265,19 +263,17 @@ static const char* file_version_to_string(LOGSIG_VERSION ver) {
 /**
  * Extracts file type by reading its magic bytes.
  * \param in		#SMART_FILE object wherefrom the magic bytes are read.
- * \return File version (#LOGSIG_VERSION) if successful or #LOGVRNON when it was
- * not possible to check the file version or #UNKN_VER when the magic bytes do
- * no match.
+ * \return File version (#LOGSIG_VERSION) if successful or #UNKN_VER otherwise.
  */
 static LOGSIG_VERSION get_file_version(SMART_FILE *in) {
 	int res = KT_UNKNOWN_ERROR;
 	char magic_from_file[16];
 	size_t count = 0xff;
 
-	if (in == NULL)	return LOGVRNON;
+	if (in == NULL)	return UNKN_VER;
 
 	res = SMART_FILE_read(in, (unsigned char*)magic_from_file, MAGIC_SIZE, &count);
-	if (res != SMART_FILE_OK || count != MAGIC_SIZE) return LOGVRNON;
+	if (res != SMART_FILE_OK || count != MAGIC_SIZE) return UNKN_VER;
 
 	magic_from_file[MAGIC_SIZE] = '\0';
 	return file_version_by_string(magic_from_file);
@@ -287,14 +283,13 @@ static LOGSIG_VERSION get_integrity_proof_version(LOGSIG_VERSION ver) {
 	switch(ver) {
 		case LOGSIG11: return RECSIG11;
 		case LOGSIG12: return RECSIG12;
-		case LOGVRNON: return ver;
 		default: return UNKN_VER;
 	}
 }
 
 static int check_file_header(SMART_FILE *in, ERR_TRCKR *err, LOGSIG_VERSION *expected_ver, size_t expected_ver_count, const char *human_readable_file_name, LOGSIG_VERSION *ver_out) {
 	int res = KT_UNKNOWN_ERROR;
-	LOGSIG_VERSION ver = LOGVRNON;
+	LOGSIG_VERSION ver = UNKN_VER;
 	char permitted_versions[1024] = "<unexpected>";
 	int i = 0;
 	size_t count = 0;

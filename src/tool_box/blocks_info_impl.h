@@ -64,13 +64,13 @@ typedef struct {
 } EXTRACT_INFO;
 
 typedef enum {
-	LOGVRNON = 0,
-	LOGSIG11 = 1,
-	LOGSIG12 = 2,
-	RECSIG11 = 3,
-	RECSIG12 = 4,
-	LOG12BLK = 5,
-	LOG12SIG = 6,
+	LOGSIG11 = 0,
+	LOGSIG12 = 1,
+	RECSIG11 = 2,
+	RECSIG12 = 3,
+	LOG12BLK = 4,
+	LOG12SIG = 5,
+	NOF_VERS,
 	UNKN_VER = 0xff
 } LOGSIG_VERSION;
 
