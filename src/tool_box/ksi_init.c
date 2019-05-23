@@ -164,12 +164,13 @@ static int tool_init_pdu(KSI_CTX *ksi, ERR_TRCKR *err, PARAM_SET *set) {
 		goto cleanup;
 	}
 
-	/* Check if PDU version type is specified. */
-	res = PARAM_SET_getStr(set, "aggr-pdu-v", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &aggr_pdu_version);
-	if (res != PST_OK && res != PST_PARAMETER_EMPTY && res !=PST_PARAMETER_NOT_FOUND) goto cleanup;
+	if (PARAM_SET_isSetByName(set, "aggr-pdu-v")) {
+		ERR_TRCKR_addWarning(err, "  * Warning: --aggr-pdu-v has no effect and will be removed in the future.");
+	}
 
-	res = PARAM_SET_getStr(set, "ext-pdu-v", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &ext_pdu_version);
-	if (res != PST_OK && res != PST_PARAMETER_EMPTY && res !=PST_PARAMETER_NOT_FOUND) goto cleanup;
+	if (PARAM_SET_isSetByName(set, "ext-pdu-v")) {
+		ERR_TRCKR_addWarning(err, "  * Warning: --ext-pdu-v has no effect and will be removed in the future.");
+	}
 
 
 	if (aggr_pdu_version != NULL) {

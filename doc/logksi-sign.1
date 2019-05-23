@@ -46,10 +46,6 @@ Specify the HMAC key for signing service.
 Hash algorithm to be used for computing HMAC on outgoing messages towards KSI aggregator. If not set, default algorithm is used. Use \fBlogksi -h \fRto get the list of supported hash algorithms.
 .\"
 .TP
-\fB--aggr-pdu-v \fIstr\fR
-Specify the KSIAP (KSI Aggregation Protocol) PDU version. Valid values are \fIv1\fR and \fIv2\fR. Note that use of \fIv1\fR is \fBdeprecated\fR and use of \fIv2\fR is recommended.
-.\"
-.TP
 \fB--insert-missing-hashes\fR
 Repair the log signature by inserting missing final tree hashes. Final tree hashes might be missing if the Merkle tree is not perfectly balanced. If the option is not used, a warning message is printed about missing hashes with a recommendation to run \fBlogksi sign\fR again with the \fB--insert-missing-hashes\fR option. Inserting missing hashes improves verifiablity, but a log signature without final tree hashes is verifiable as well.
 .\"

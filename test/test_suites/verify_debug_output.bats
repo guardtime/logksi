@@ -138,3 +138,9 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ (Block no.   2: verifying KSI signature... ok.*ms.).(Block no.   2: signing time: .1553672948.*UTC).(Block no.   2: .r.).(Block no.   2: Warning: Client ID is not constant. Expecting .GT :: GT :: GT :: anon.. but is .GT :: GT :: GT :: sha512..).(Finalizing log signature... ok.) ]]
 	[[ ! "$output" =~ " o Warning: Client ID in block 2 is not constant" ]]
 }
+
+@test "check if --ext-pdu-v rises the warning" {
+	run src/logksi verify test/resource/logs_and_signatures/log_repaired --ignore-desc-block-time -d --ext-pdu-v v2
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Warning: --ext-pdu-v has no effect and will be removed in the future." ]]
+}

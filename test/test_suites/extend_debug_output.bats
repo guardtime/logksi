@@ -32,4 +32,8 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ (Receiving publications file... ok.*ms.).(Verifying publications file... ok.*ms.).(Processing magic number... ok.).(Block no.   1: processing block header... ok.).(Block no.   1: .r.r..r..).(Block no.   1: processing block signature data... ok.).(Block no.   1: lines processed 1 - 3 .3.).(Block no.   1: verifying KSI signature... ok.*ms.).(Block no.   1: Searching for a publication record from publications file... ok.).(Block no.   1: extending KSI signature to the specified publication: 2018.07.15 00.00.00 UTC .1531612800.... ok.*ms.) ]]
 }
 
-#.(Block no.   1: signing time: .1517928882.).*(Block no.   1: Warning: all final tree hashes are missing.).(Block no.   2: processing block header... ok.)
+@test "check if --ext-pdu-v rises the warning" {
+	run src/logksi extend test/resource/logs_and_signatures/signed -o test/out/dummy.ksig -d --ext-pdu-v v2
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Warning: --ext-pdu-v has no effect and will be removed in the future." ]]
+}
