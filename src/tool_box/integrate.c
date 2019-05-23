@@ -141,10 +141,9 @@ cleanup:
 	if (res != KT_OK || integrate_res != KT_OK) {
 		if (ERR_TRCKR_getErrCount(err) == 0) {ERR_TRCKR_ADD(err, res, NULL);}
 		LOGKSI_KSI_ERRTrace_LOG(ksi);
-
 		print_errors("\n");
-		ERR_TRCKR_print(err, d);
 	}
+	ERR_TRCKR_print(err, d);
 
 	BLOCK_INFO_freeAndClearInternals(&blocks);
 	SMART_FILE_close(logfile);

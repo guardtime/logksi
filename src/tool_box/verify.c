@@ -254,10 +254,9 @@ cleanup:
 	if (res != KT_OK) {
 		if (ERR_TRCKR_getErrCount(err) == 0) {ERR_TRCKR_ADD(err, res, NULL);}
 		LOGKSI_KSI_ERRTrace_LOG(ksi);
-
 		print_errors("\n");
-		ERR_TRCKR_print(err, d);
 	}
+	ERR_TRCKR_print(err, d);
 
 	KSI_DataHash_free(inputHash);
 	KSI_DataHash_free(outputHash);

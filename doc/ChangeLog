@@ -1,3 +1,4 @@
+(LOGKSI-126) * IMPROVEMENT: Support for legacy and unused PDU v1 removed.
 (LOGKSI-78) * IMPROVEMENT: Wording of hash comparison failure error messages improved.
 (LOGKSI-63) * IMPROVEMENT: Improved error messages when integrating invalid or broken log signature files.
 (LOGKSI-111) * IMPROVEMENT: Improved debug output (-d) in case of integrating is not needed and output already exists as result of synchronous signing.

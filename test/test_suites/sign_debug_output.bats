@@ -52,3 +52,9 @@ f_blk_fail () {
 	[ "$status" -eq 1 ]
 	[[ "$output" =~ .(Block no.   5: processing block header... ok.).(Block no.   5: .r.r..r..).(Block no.   5: processing partial signature data... ok.).(Block no.   5: creating missing KSI signature... failed.*ms.).(Block no.   5: writing block signature to file... ok.).(Block no.   5: lines processed 13 . 15 .3.).(Block no.   5: Warning: all final tree hashes are missing.).(Block no.   5: Error: Signing is continued and unsigned block will be kept.).(Block no.   6: processing block header... ok.) ]]
 }
+
+@test "check if --aggr-pdu-v rises the warning" {
+	run src/logksi sign test/resource/logs_and_signatures/unsigned -o test/out/dummy.ksig -d --aggr-pdu-v v2
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Warning: --aggr-pdu-v has no effect and will be removed in the future." ]]
+}

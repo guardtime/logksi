@@ -140,9 +140,6 @@ int CONF_initialize_set_functions(PARAM_SET *conf, const char *flags) {
 
 		res = PARAM_SET_addControl(conf, "{aggr-user}{aggr-key}", isFormatOk_userPass, NULL, NULL, NULL);
 		if (res != PST_OK) goto cleanup;
-
-		res = PARAM_SET_addControl(conf, "{aggr-pdu-v}", isFormatOk_string, isContentOk_pduVersion, NULL, NULL);
-		if (res != PST_OK) goto cleanup;
 	}
 
 	if (is_X) {
@@ -153,9 +150,6 @@ int CONF_initialize_set_functions(PARAM_SET *conf, const char *flags) {
 		if (res != PST_OK) goto cleanup;
 
 		res = PARAM_SET_addControl(conf, "{ext-key}{ext-user}", isFormatOk_userPass, NULL, NULL, NULL);
-		if (res != PST_OK) goto cleanup;
-
-		res = PARAM_SET_addControl(conf, "{ext-pdu-v}", isFormatOk_string, isContentOk_pduVersion, NULL, NULL);
 		if (res != PST_OK) goto cleanup;
 	}
 
