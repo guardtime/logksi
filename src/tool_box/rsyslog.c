@@ -137,19 +137,15 @@ static int block_info_calculate_hash_of_logline_and_store_logline_check_log_time
 					LOGKSI_uint64_toDateString(t, str_current_time, sizeof(str_current_time));
 					blocks->nofTotalFailedBlocks++;
 
-					if (PARAM_SET_isSetByName(set, "continue-on-fail")) {
-
-							print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Log line %zu (%s) is more recent than log line %zu (%s).\n", blocks->blockNo, line_nr_0, str_last_time, line_nr_1, str_current_time);
-							print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Log line %zu in block %zu is more recent than log line %zu:\n"
+					print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Log line %zu (%s) is more recent than log line %zu (%s).\n", blocks->blockNo, line_nr_0, str_last_time, line_nr_1, str_current_time);
+					print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Log line %zu in block %zu is more recent than log line %zu:\n"
 																						  "   + Time for log line %zu: %s\n"
 																						  "   + Time for log line %zu: %s\n"
 																						  ,  line_nr_0, blocks->blockNo, line_nr_1, line_nr_0, str_last_time, line_nr_1, str_current_time);
-						blocks->quietError = res;
-						res = KT_OK;
-						goto cleanup;
-					} else {
-							ERR_CATCH_MSG(err, res, "Error: Block no. %zu: Log line %zu (%s) is more recent than log line %zu (%s).", blocks->blockNo, line_nr_0, str_last_time, line_nr_1, str_current_time);
-					}
+					blocks->quietError = res;
+					if (PARAM_SET_isSetByName(set, "continue-on-fail")) res = KT_OK;
+					else ERR_TRCKR_ADD(err, res, "Error: Log line %zu in block %zu is more recent than log line %zu!", line_nr_0, blocks->blockNo, line_nr_1);
+					goto cleanup;
 				}
 			}
 		}
@@ -572,7 +568,6 @@ static int check_log_record_embedded_time_against_ksi_signature_time(PARAM_SET *
 
 		/* In case of failures format final error messages.*/
 		if (isSigTimeOlderThanRecTime) {
-			if (PARAM_SET_isSetByName(set, "continue-on-fail")) {
 				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: %s the log lines are more recent than KSI signature.\n", blocks->blockNo, (blocks->sigTime_1 < blocks->rec_time_min ? "All" : "Some of"));
 				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: %s the log lines in block %zu are more recent than KSI signature:\n"
 																					  "   + Signing time:                              %s\n"
@@ -580,29 +575,22 @@ static int check_log_record_embedded_time_against_ksi_signature_time(PARAM_SET *
 																					  "   + Time extracted from most recent log line:  %s\n"
 																					  ,  (blocks->sigTime_1 < blocks->rec_time_min ? "All" : "Some of"), blocks->blockNo, str_sigTime1, str_rec_time_min, str_rec_time_max);
 			blocks->quietError = res;
-			res = KT_OK;
+			if (PARAM_SET_isSetByName(set, "continue-on-fail")) res = KT_OK;
+			else ERR_TRCKR_ADD(err, res, "Error: %s the log lines in block %zu are more recent than KSI signature!", (blocks->sigTime_1 < blocks->rec_time_min ? "All" : "Some of"), blocks->blockNo);
 			goto cleanup;
-			} else {
-				ERR_CATCH_MSG(err, res, "Error: %s the log lines in block %zu are more recent than KSI signature. KSI Signature - %s. The most recent log line - %s.", (blocks->sigTime_1 < blocks->rec_time_min ? "All" : "Some of"), blocks->blockNo, str_sigTime1, str_rec_time_max);
-			}
 		} else if (isTimeDiffTooLarge) {
-				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Log lines do not fit into expected time window (%s).\n", blocks->blockNo, str_allowed_diff);
-			if (PARAM_SET_isSetByName(set, "continue-on-fail")) {
-				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Log lines in block %zu do not fit into time window:\n"
-																					  "   + Signing time:                              %s\n"
-																					  "   + Time extracted from least recent log line: %s\n"
-																					  "   + Time extracted from most recent log line:  %s\n"
-																					  "   + Block time window:                         %s\n"
-																					  "   + Expected time window:                      %s\n"
-																					  , blocks->blockNo, str_sigTime1, str_rec_time_min, str_rec_time_max, str_diff_calc, str_allowed_diff);
-				blocks->quietError = res;
-				res = KT_OK;
-				goto cleanup;
-			} else {
-				ERR_CATCH_MSG(err, res, "Error: Log lines in block %zu (%s) do not fit in expected time window (%s).", blocks->blockNo, str_diff_calc, str_allowed_diff);
-				res = KT_VERIFICATION_FAILURE;
-			}
-
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Log lines do not fit into expected time window (%s).\n", blocks->blockNo, str_allowed_diff);
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Log lines in block %zu do not fit into time window:\n"
+																				  "   + Signing time:                              %s\n"
+																				  "   + Time extracted from least recent log line: %s\n"
+																				  "   + Time extracted from most recent log line:  %s\n"
+																				  "   + Block time window:                         %s\n"
+																				  "   + Expected time window:                      %s\n"
+																				  , blocks->blockNo, str_sigTime1, str_rec_time_min, str_rec_time_max, str_diff_calc, str_allowed_diff);
+			blocks->quietError = res;
+			if (PARAM_SET_isSetByName(set, "continue-on-fail")) res = KT_OK;
+			else ERR_TRCKR_ADD(err, res, "Error: Log lines in block %zu do not fit into time window!", blocks->blockNo);
+			goto cleanup;
 		}
 
 		if (res != KT_OK) goto cleanup;
@@ -645,21 +633,18 @@ static int handle_record_time_check_between_files(PARAM_SET *set, MULTI_PRINTER*
 			LOGKSI_uint64_toDateString(blocks->rec_time_in_file_max, str_last_time, sizeof(str_last_time));
 			LOGKSI_uint64_toDateString(blocks->rec_time_min, str_current_time, sizeof(str_current_time));
 
-			if (PARAM_SET_isSetByName(set, "continue-on-fail")) {
-				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Last log line (%s) from previous file is more recent than first log line (%s) from current file.\n", blocks->blockNo, str_last_time, str_current_time);
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Last log line (%s) from previous file is more recent than first log line (%s) from current file.\n", blocks->blockNo, str_last_time, str_current_time);
 
-				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Most recent log line from previous file is more recent than least recent log line from current file:\n"
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Most recent log line from previous file is more recent than least recent log line from current file:\n"
 																			  "   + Previous log file:              %s\n"
 																			  "   + Time for most recent log line:  %s\n"
 																			  "   + Current log file:               %s\n"
 																			  "   + Time for least recent log line: %s\n"
 																			  ,files->previousLogFile , str_last_time, io_files_getCurrentLogFilePrintRepresentation(files), str_current_time);
-					blocks->quietError = res;
-					res = KT_OK;
-					goto cleanup;
-			} else {
-				ERR_CATCH_MSG(err, res, "Error: Most recent log line from previous file ('%s' - %s) is more recent than least recent log line from current file ('%s' - %s).", files->previousLogFile, str_last_time, io_files_getCurrentLogFilePrintRepresentation(files), str_current_time);
-			}
+			blocks->quietError = res;
+			if (PARAM_SET_isSetByName(set, "continue-on-fail")) res = KT_OK;
+			else ERR_TRCKR_ADD(err, res, "Error: Most recent log line from previous file is more recent than least recent log line from current file!");
+			goto cleanup;
 		}
 	}
 
@@ -794,62 +779,45 @@ static int handle_block_signing_time_check(PARAM_SET *set, MULTI_PRINTER* mp, ER
 					print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 
 
-
 					print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: signing times difference (%s%s) relative to previous block out of range (%s).\n", blocks->blockNo, str_diff_sign, str_diff, str_range);
 
-
-					if (PARAM_SET_isSetByName(set, "continue-on-fail")) {
-						if (blocks->blockNo == 1) {
-							if (is_too_apart_to_future) {
-								print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Signing times from last block of previous file is more recent than expected relative to first block of current file:\n");
-							} else {
-								print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Signing times from last block of previous file and first block of current file are too %s:\n", reason);
-							}
-							print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3,     "   + Previous file: %s\n"
-																									  "   + Sig time: %s\n"
-																									  "   + Current file:  %s\n"
-																									  "   + Sig time: %s\n"
-																									  "   + Time diff:              %s%s\n"
-																									  "   + Expected time diff:     %s\n",
-																									  files->previousLogFile, strT0,
-																									  io_files_getCurrentLogFilePrintRepresentation(files), strT1,
-																									  str_diff_sign, str_diff,
-																									  str_range);
+					if (blocks->blockNo == 1) {
+						if (is_too_apart_to_future) {
+							print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Signing times from last block of previous file is more recent than expected relative to first block of current file:\n");
 						} else {
-							if (is_too_apart_to_future) {
-								print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Blocks %zu signing time is more recent than expected relative to block %zu:\n", blocks->blockNo - 1, blocks->blockNo, reason);
-							} else {
-								print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Blocks %zu and %zu signing times are too %s:\n", blocks->blockNo - 1, blocks->blockNo, reason);
-							}
-							print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3,     "   + Sig time for block %zu: %s\n"
-																									  "   + Sig time for block %zu: %s\n"
-																									  "   + Time diff:              %s%s\n"
-																									  "   + Expected time diff:     %s\n",
-																									  blocks->blockNo - 1, strT0,
-																									  blocks->blockNo, strT1,
-																									  str_diff_sign, str_diff,
-																									  str_range);
+							print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Signing times from last block of previous file and first block of current file are too %s:\n", reason);
 						}
-
-						blocks->quietError = res;
-						res = KT_OK;
+						print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3,     "   + Previous file: %s\n"
+																								  "   + Sig time: %s\n"
+																								  "   + Current file:  %s\n"
+																								  "   + Sig time: %s\n"
+																								  "   + Time diff:              %s%s\n"
+																								  "   + Expected time diff:     %s\n",
+																								  files->previousLogFile, strT0,
+																								  io_files_getCurrentLogFilePrintRepresentation(files), strT1,
+																								  str_diff_sign, str_diff,
+																								  str_range);
 					} else {
-						if (blocks->blockNo == 1) {
-							if (is_too_apart_to_future) {
-								ERR_TRCKR_ADD(err, res, "Error: Signing times from last block of previous file ('%s' - %s) is more recent than expected relative to first block of current file ('%s' - %s). %s%s does not fit into %s.", files->previousLogFile, strT0, io_files_getCurrentLogFilePrintRepresentation(files), strT1, str_diff_sign, str_diff, str_range);
-							} else {
-								ERR_TRCKR_ADD(err, res, "Error: Signing times from last block of previous file ('%s' - %s) and first block of current file ('%s' - %s) are too %s (%s%s does not fit into %s).", files->previousLogFile, strT0, io_files_getCurrentLogFilePrintRepresentation(files), strT1, reason, str_diff_sign, str_diff, str_range);
-							}
+						if (is_too_apart_to_future) {
+							print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Blocks %zu signing time is more recent than expected relative to block %zu:\n", blocks->blockNo - 1, blocks->blockNo, reason);
 						} else {
-							if (is_too_apart_to_future) {
-								ERR_TRCKR_ADD(err, res, "Error: Signing time of blocks %zu (%s) is more recent than expected relative to block %zu (%s). %s%s does not fit into %s.", blocks->blockNo - 1, strT0, blocks->blockNo, strT1, str_diff_sign, str_diff, str_range);
-							} else {
-								ERR_TRCKR_ADD(err, res, "Error: Blocks %zu (%s) and %zu (%s) signing times are too %s (%s%s does not fit into %s).", blocks->blockNo - 1, strT0, blocks->blockNo, strT1, reason, str_diff_sign, str_diff, str_range);
-							}
+							print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Blocks %zu and %zu signing times are too %s:\n", blocks->blockNo - 1, blocks->blockNo, reason);
 						}
+						print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3,     "   + Sig time for block %zu: %s\n"
+																								  "   + Sig time for block %zu: %s\n"
+																								  "   + Time diff:              %s%s\n"
+																								  "   + Expected time diff:     %s\n",
+																								  blocks->blockNo - 1, strT0,
+																								  blocks->blockNo, strT1,
+																								  str_diff_sign, str_diff,
+																								  str_range);
 					}
 
-				goto cleanup;
+					blocks->quietError = res;
+					if (PARAM_SET_isSetByName(set, "continue-on-fail")) res = KT_OK;
+					else ERR_TRCKR_ADD(err, res, "Error: Abnormal signing time difference for consecutive blocks!");
+
+					goto cleanup;
 				}
 			}
 
@@ -1267,7 +1235,7 @@ static int process_record_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err
 			res = block_info_calculate_hash_of_logline_and_store_logline_check_log_time(set, err, mp, blocks, files, &hash);
 			if (res == KT_IO_ERROR) {
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: record hash no. %zu does not have a matching logline, end of logfile reached.", blocks->blockNo, get_nof_lines(blocks));
-			}
+			} else if (res != KT_OK) goto cleanup;
 
 			res = logksi_datahash_compare(err, mp, blocks, 1, hash, recordHash, NULL, "Record hash computed from logline:", "Record hash stored in log signature file:");
 			res = continue_on_hash_fail(res, set, mp, blocks, hash, recordHash, &replacement);
@@ -1428,7 +1396,7 @@ static int process_tree_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, 
 					res = block_info_calculate_hash_of_logline_and_store_logline_check_log_time(set, err, mp, blocks, files, &recordHash);
 					if (res == KT_IO_ERROR) {
 						ERR_CATCH_MSG(err, res, "Error: Block no. %zu: tree hash does not have a matching logline no. %zu, end of logfile reached.", blocks->blockNo, get_nof_lines(blocks));
-					}
+					} else if (res != KT_OK) goto cleanup;
 
 					res = block_info_add_record_hash_to_merkle_tree(blocks, err, ksi, 0, recordHash);
 					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add record hash to Merkle tree.", blocks->blockNo);
@@ -1617,7 +1585,7 @@ static int process_metarecord(PARAM_SET* set, MULTI_PRINTER *mp, ERR_TRCKR *err,
 			res = block_info_calculate_hash_of_logline_and_store_logline_check_log_time(set, err, mp, blocks, files, &hash);
 			if (res == KT_IO_ERROR) {
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: at least %zu loglines expected up to metarecord index %zu, end of logfile reached.", blocks->blockNo, get_nof_lines(blocks), metarecord_index);
-			}
+			} else if (res != KT_OK) goto cleanup;
 
 			res = block_info_add_record_hash_to_merkle_tree(blocks, err, ksi, 0, hash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
@@ -1760,22 +1728,18 @@ static int check_log_signature_client_id(PARAM_SET *set, MULTI_PRINTER* mp, ERR_
 		res = REGEXP_processString(blocks->client_id_match, strClientId, NULL);
 		if (res != REGEXP_OK) {
 			blocks->nofTotalFailedBlocks++;
-			print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
-			if (PARAM_SET_isSetByName(set, "continue-on-fail") && (blocks->version == LOGSIG11 || blocks->version == LOGSIG12)) {
+			res = KT_VERIFICATION_FAILURE;
+			blocks->quietError = res;
+			print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 
-				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Failed to match KSI signatures client ID for block %zu:\n"
-																					  "   + Client ID:       '%s'\n"
-																					  "   + Regexp. pattern: '%s'\n", blocks->blockNo, strClientId, REGEXP_getPattern(blocks->client_id_match));
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Failed to match KSI signatures client ID for block %zu:\n"
+																				  "   + Client ID:       '%s'\n"
+																				  "   + Regexp. pattern: '%s'\n", blocks->blockNo, strClientId, REGEXP_getPattern(blocks->client_id_match));
 
-				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Client ID mismatch '%s'.\n", blocks->blockNo, strClientId);
-				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Not matching pattern '%s'.\n", blocks->blockNo, REGEXP_getPattern(blocks->client_id_match));
-			} else {
-				ERR_TRCKR_ADD(err, res, "Error: Not matching pattern '%s'.", REGEXP_getPattern(blocks->client_id_match));
-				ERR_TRCKR_ADD(err, res, "Error: Client ID mismatch '%s'.", strClientId);
-				goto cleanup;
-			}
-
-		res = KT_VERIFICATION_FAILURE;
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Client ID mismatch '%s'.\n", blocks->blockNo, strClientId);
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Not matching pattern '%s'.\n", blocks->blockNo, REGEXP_getPattern(blocks->client_id_match));
+		if (PARAM_SET_isSetByName(set, "continue-on-fail")) res = KT_OK;
+		else ERR_TRCKR_ADD(err, res, "Error: Failed to match KSI signatures client ID for block %zu!", blocks->blockNo);
 		goto cleanup;
 		}
 	}
@@ -1874,13 +1838,13 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 	if (tlvUnsig != NULL) {
 		res = KT_VERIFICATION_FAILURE;
 		blocks->curBlockNotSigned = 1;
-
+		blocks->quietError = res;
+		print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
+		print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Block %zu is unsigned!\n", blocks->blockNo);
+		print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Block is unsigned!\n", blocks->blockNo);
 		/* Don't use ERR_CATCH_MSG when --continue-on-fail is set, as the amount of errors
 		   produced will easily exceed the limits of ERR_TRCKR. */
-		if (PARAM_SET_isSetByName(set, "continue-on-fail")) {
-			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Block %zu is unsigned!\n", blocks->blockNo);
-			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Block is unsigned!\n", blocks->blockNo);
-		} else {
+		if (!PARAM_SET_isSetByName(set, "continue-on-fail")) {
 			ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion: Make sure that block signature is actually the original output\n"
 											 "                and KSI signature is not replaced with unsigned marker!\n"
 											 "                If that's correct, use logksi sign to sign unsigned blocks.\n");
@@ -1917,7 +1881,7 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 				res = block_info_calculate_hash_of_logline_and_store_logline_check_log_time(set, err, mp, blocks, files, &hash);
 				if (res == KT_IO_ERROR) {
 					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: at least %zu loglines expected, end of logfile reached.", blocks->blockNo, get_nof_lines(blocks));
-				}
+				} else if (res != KT_OK) goto cleanup;
 
 				res = block_info_add_record_hash_to_merkle_tree(blocks, err, ksi, 0, hash);
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add hash to Merkle tree.", blocks->blockNo);
@@ -1972,17 +1936,17 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 		res = processors->verify_signature(set, mp, err, ksi, blocks, files, sig, (KSI_DataHash*)context.documentHash, context.docAggrLevel, &verificationResult);
 		if (res != KSI_OK) {
 			blocks->nofTotalFailedBlocks++;
+			blocks->quietError = res;
 
-			if (PARAM_SET_isSetByName(set, "continue-on-fail")) {
-				print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
-				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Verification of block %zu KSI signature failed!\n", blocks->blockNo);
-				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Verification of KSI signature failed!\n", blocks->blockNo);
-				res = KT_VERIFICATION_FAILURE;
-				goto cleanup;
-			} else {
+			print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Verification of block %zu KSI signature failed!\n", blocks->blockNo);
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Verification of KSI signature failed!\n", blocks->blockNo);
+
+			if (!PARAM_SET_isSetByName(set, "continue-on-fail")) {
 				ERR_TRCKR_ADD(err, res, "Error: Block no. %zu: KSI signature verification failed.", blocks->blockNo);
-				goto cleanup;
 			}
+
+			goto cleanup;
 		}
 
 		/* TODO: add dumping of verification results. */
@@ -2321,7 +2285,7 @@ static int process_record_chain(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *er
 			res = block_info_calculate_hash_of_logline_and_store_logline_check_log_time(set, err, mp, blocks, files, &hash);
 			if (res == KT_IO_ERROR) {
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: record hash no. %zu does not have a matching logline, end of logfile reached.", blocks->blockNo, get_nof_lines(blocks));
-			}
+			} else if (res != KT_OK) goto cleanup;
 
 			res = logksi_datahash_compare(err, mp, blocks, 1, hash, recordHash, NULL, "Record hash computed from logline:", "Record hash stored in integrity proof file:");
 			res = continue_on_hash_fail(res, set, mp, blocks, hash, recordHash, &replacement);
@@ -3147,8 +3111,8 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 	SIGNATURE_PROCESSORS processors;
 	int isFirst = 1;
 	int skipCurrentBlock = 0;
-	int lastError = KT_OK;
 	int printHeader = 0;
+	int isContinuedOnFail = 0;
 	REGEXP *tmp_regxp = NULL;
 
 	if (set == NULL || err == NULL || ksi == NULL || blocks == NULL || verify_signature == NULL || files == NULL) {
@@ -3175,6 +3139,7 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 		tmp_regxp = NULL;
 	}
 
+	isContinuedOnFail = PARAM_SET_isSetByName(set, "continue-on-fail");
 
 	while (!SMART_FILE_isEof(files->files.inSig)) {
 		MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
@@ -3196,12 +3161,13 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 							res = process_log_signature_with_block_signature(set, mp, err, ksi, NULL, blocks, files, &processors);
 							if (res != KT_OK) {
 								/* In case of verification failure and --continue-on-fail option, verification is continued. */
-								if ((res == KT_VERIFICATION_FAILURE || res == KSI_VERIFICATION_FAILURE) && PARAM_SET_isSetByName(set, "continue-on-fail")) {
+								if ((res == KT_VERIFICATION_FAILURE || res == KSI_VERIFICATION_FAILURE) && isContinuedOnFail) {
 									print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 									print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_2, res);
 									print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
 
-									lastError = KT_VERIFICATION_FAILURE;
+									blocks->quietError = KT_VERIFICATION_FAILURE;
+
 									skipCurrentBlock = 1;
 									blocks->lastBlockWasSkipped = 1;
 
@@ -3405,9 +3371,9 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 
 cleanup:
 
-	if (lastError != KT_OK || blocks->quietError != KT_OK) {
-		res = lastError != KT_OK ? lastError : blocks->quietError;
-		ERR_TRCKR_ADD(err, res, "Error: Verification FAILED but was continued for further analysis.");
+	if (blocks->quietError != KT_OK) {
+		res = blocks->quietError;
+		ERR_TRCKR_ADD(err, res, isContinuedOnFail ? "Error: Verification FAILED but was continued for further analysis." : "Error: Verification FAILED and was stopped.");
 	}
 
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_2, res);

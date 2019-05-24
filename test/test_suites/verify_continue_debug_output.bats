@@ -111,10 +111,10 @@ summary_of_block_4_with_logrec_time_check_ok=`f_summary_of_block_ok_only_metadat
 summary_of_block_3_expected_in_hash_fail=`f_summary_of_block_hash_fail 3 "".1517928884..*UTC.00.00"" "SHA-512:9c1ea0.*42e444" "SHA-512:1dfeae.*43e987" 7 9 3 1`
 summary_of_block_4_ok=`f_summary_of_block_ok_only_metadata 4 1517928885 "SHA-512:1dfeae.*43e987" "SHA-512:f7f5b4.*b2b596" `
 
-cli_id_fail_1="`f_client_if_fail 1 "GT :: GT :: GT :: anon" "XX"`..( x Error: Skipping block 1!)"
-cli_id_fail_2="`f_client_if_fail 2 "GT :: GT :: GT :: anon" "XX"`..( x Error: Skipping block 2!)"
-cli_id_fail_3="`f_client_if_fail 3 "GT :: GT :: GT :: anon" "XX"`..( x Error: Skipping block 3!)"
-cli_id_fail_4="`f_client_if_fail 4 "GT :: GT :: GT :: anon" "XX"`..( x Error: Skipping block 4!)"
+cli_id_fail_1="`f_client_if_fail 1 "GT :: GT :: GT :: anon" "XX"`"
+cli_id_fail_2="`f_client_if_fail 2 "GT :: GT :: GT :: anon" "XX"`"
+cli_id_fail_3="`f_client_if_fail 3 "GT :: GT :: GT :: anon" "XX"`"
+cli_id_fail_4="`f_client_if_fail 4 "GT :: GT :: GT :: anon" "XX"`"
 
 log_all_of_lines_more_recent_than_ksig_in_block_1=`f_log_line_more_recent_than_ksig "All" 1 1517928882 1524752285 1524752323`
 log_all_of_lines_more_recent_than_ksig_in_block_2=`f_log_line_more_recent_than_ksig "All" 2 1517928883 1524752333 1524752334`
@@ -207,7 +207,7 @@ err_failed_b2_b3_too_apart=`f_failed_sig_time_diff_check 2 3 "apart" 1554200225 
 @test "Debug output for continuated verification: Client ID mismatch. Debug level 3." {
 	run src/logksi verify test/resource/continue-verification/log test/resource/continue-verification/log-ok.logsig -ddd --continue-on-fail --client-id "XX"
 	[ "$status" -eq 6 ]
-	[[ "$output" =~ (Block no.   1: verifying KSI signature... ok.*ms.).(Block no.   1: signing time: .1517928882.*UTC).(Block no.   1: Verifying Client ID... failed.).(Block no.   1: output hash: SHA-512:20cfea.*88944a.).(Block no.   1: Warning: all final tree hashes are missing.).(Block no.   1: Error: Client ID mismatch .GT :: GT :: GT :: anon..).(Block no.   1: Error: Not matching pattern .XX..).(Block no.   1: Error: Block is skipped.).(Block no.   2: processing block header... ok.) ]]
+	[[ "$output" =~ (Block no.   1: verifying KSI signature... ok.*ms.).(Block no.   1: signing time: .1517928882.*UTC).(Block no.   1: Verifying Client ID... failed.).(Block no.   1: output hash: SHA-512:20cfea.*88944a.).(Block no.   1: Warning: all final tree hashes are missing.).(Block no.   1: Error: Client ID mismatch .GT :: GT :: GT :: anon..).(Block no.   1: Error: Not matching pattern .XX..).(Block no.   2: processing block header... ok.) ]]
 }
 
 @test "Debug output for continuated verification. Verify log record --time-diff: block 1,2 and 4 ok, block 3 nok. Debug level 1." {
