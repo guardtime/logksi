@@ -17,6 +17,9 @@
  * reserves and retains all trademark rights.
  */
 
+/* To make function strptime prototype available. */
+#define _XOPEN_SOURCE
+
 #include <stdlib.h>
 #include <string.h>
 #include <ksi/ksi.h>
