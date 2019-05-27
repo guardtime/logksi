@@ -93,22 +93,24 @@ export KSI_CONF=test/test.cfg
 
 @test "verify log signature with unexpected client ID" {
 	run src/logksi verify test/resource/logs_and_signatures/signed -d --client-id "GT :: KT :: GT :: anon"
-	[ "$status" -eq 1 ]
-	[[ "$output" =~ (Error: Client ID mismatch).*(GT :: GT :: GT :: anon).*(Error: Not matching pattern).*(GT :: KT :: GT :: anon) ]]
+	[ "$status" -eq 6 ]
+	[[ "$output" =~ (x Error: Failed to match KSI signatures client ID for block 1).*(Client ID).*(GT :: GT :: GT :: anon).*(Regexp. pattern).*(GT :: KT :: GT :: anon) ]]
+	[[ "$output" =~ (Error: Verification FAILED and was stopped.) ]]
+	[[ "$output" =~ (Error: Failed to match KSI signatures client ID for block 1) ]]
 }
 
 @test "verify log signature with unexpected client ID using more complex client ID pattern" {
 	run src/logksi verify test/resource/continue-verification/log test/resource/continue-verification/log-ok-one-sig-diff-client-id.logsig  -d --client-id "GT :: GT :: GT :: (anon|Xsha512X)" --ignore-desc-block-time
-	[ "$status" -eq 1 ]
+	[ "$status" -eq 6 ]
 	[[ "$output" =~ "Verifying... failed." ]]
-	[[ "$output" =~ (Error: Client ID mismatch).*(GT :: GT :: GT :: sha512).*(Error: Not matching pattern).*(GT :: GT :: GT :: .anon|Xsha512X.) ]]
+	[[ "$output" =~ (Error: Failed to match KSI signatures client ID for block 2).*(Client ID).*(GT :: GT :: GT :: sha512).*(Regexp. pattern).*(GT :: GT :: GT :: .anon|Xsha512X.) ]]
 }
 
 @test "verify log signature with unexpected client ID using more complex client ID pattern and enabled warnings" {
 	run src/logksi verify test/resource/continue-verification/log test/resource/continue-verification/log-ok-one-sig-diff-client-id.logsig  -d --client-id "GT :: GT :: GT :: (anon|Xsha512X)" --ignore-desc-block-time --warn-client-id-change
-	[ "$status" -eq 1 ]
+	[ "$status" -eq 6 ]
 	[[ "$output" =~ "Verifying... failed." ]]
-	[[ "$output" =~ (Error: Client ID mismatch).*(GT :: GT :: GT :: sha512).*(Error: Not matching pattern).*(GT :: GT :: GT :: .anon|Xsha512X.) ]]
+	[[ "$output" =~ (Error: Failed to match KSI signatures client ID for block 2).*(Client ID).*(GT :: GT :: GT :: sha512).*(Regexp. pattern).*(GT :: GT :: GT :: .anon|Xsha512X.) ]]
 	[[ ! "$output" =~ "o Warning: Client ID in block.*is not constant" ]]
 }
 
@@ -133,9 +135,9 @@ export KSI_CONF=test/test.cfg
 
 @test "verify excerpt file with unexpected client ID" {
 	run src/logksi verify test/resource/excerpt/log-ok.excerpt -d --client-id "GT :: KT :: GT :: anon"
-	[ "$status" -eq 1 ]
+	[ "$status" -eq 6 ]
 	[[ "$output" =~ "Verifying... failed." ]]
-	[[ "$output" =~ (Error: Client ID mismatch).*(GT :: GT :: GT :: anon).*(Error: Not matching pattern).*(GT :: KT :: GT :: anon) ]]
+	[[ "$output" =~ (Error: Failed to match KSI signatures client ID for block 1).*(Client ID).*(GT :: GT :: GT :: anon).*(Regexp. pattern).*(GT :: KT :: GT :: anon) ]]
 }
 
 @test "verify excerpt file with changing client ID and with enabled warnings" {
@@ -149,21 +151,25 @@ export KSI_CONF=test/test.cfg
 	run src/logksi verify test/resource/logfiles/unsigned test/resource/logsignatures/unsigned-same-sign-time.logsig --ignore-desc-block-time -d --block-time-diff 1,oo
 	[ "$status" -eq 6 ]
 	[[ "$output" =~ "Verifying... failed." ]]
-	[[ "$output" =~ (Error: Blocks 1.*1540389597.*and 2.*1540389597.*signing times are too close.*00:00:00 does not fit into 00:00:01 - oo) ]]
+	[[ "$output" =~ ( x Error: Blocks 1 and 2 signing times are too close:).*(Sig time for block 1).*(1540389597).*(Sig time for block 2).*(1540389597).*(Time diff).*(00:00:00).*(Expected time diff).*(00:00:01 - oo) ]]
+	[[ "$output" =~ "Error: Verification FAILED and was stopped." ]]
+	[[ "$output" =~ "Error: Abnormal signing time difference for consecutive blocks!" ]]
 }
 
 @test "verify with --block-time-diff to detect blocks that are too apart, ignore negative diff (259d)" {
 	run src/logksi verify test/resource/logfiles/unsigned test/resource/logsignatures/unsigned-same-sign-time.logsig --ignore-desc-block-time -d --block-time-diff 259d
 	[ "$status" -eq 6 ]
 	[[ "$output" =~ "Verifying... failed." ]]
-	[[ "$output" =~ (Error: Blocks 4).*(1517928939).*(and 5).*(1540377483).*(signing times are too apart).*(259d 19:42:24 does not fit into 0 - 259d 00:00:00) ]]
+	[[ "$output" =~ (Error: Blocks 4 and 5 signing times are too apart:).*(Sig time for block 4).*(1517928939).*(Sig time for block 5).*(1540377483).*(Time diff).*(259d 19:42:24).*(Expected time diff).*(0 - 259d 00:00:00) ]]
+	[[ "$output" =~ "Error: Verification FAILED and was stopped." ]]
+	[[ "$output" =~ "Error: Abnormal signing time difference for consecutive blocks!" ]]
 }
 
 @test "verify with --block-time-diff only negative or 0 diff is accepted (-oo)" {
 	run src/logksi verify test/resource/logfiles/unsigned test/resource/logsignatures/unsigned-same-sign-time.logsig -d --block-time-diff -oo
 	[ "$status" -eq 6 ]
 	[[ "$output" =~ "Verifying... failed." ]]
-	[[ "$output" =~ (Error: Blocks 3).*(1517928938).*(and 4).*(1517928939).*(signing times are too apart).*(00:00:01 does not fit into -oo - 0) ]]
+	[[ "$output" =~ (Error: Blocks 3 and 4 signing times are too apart:).*(Sig time for block 3).*(1517928938).*(Sig time for block 4).*(1517928939).*(Time diff).*(00:00:01).*(Expected time diff).*(-oo - 0) ]]
 }
 
 @test "verify with --block-time-diff to detect block that are too apart (exact match), ignore negative diff (259d23H4M19)" {
