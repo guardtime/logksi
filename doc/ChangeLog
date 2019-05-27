@@ -1,4 +1,4 @@
-(LOGKSI-125) * IMPROVEMENT: In case of verification failure, extended and error message may be displayed before error trace.
+(LOGKSI-125) * IMPROVEMENT: In case of verification failure, extended error message may be displayed before error trace.
 (LOGKSI-126) * IMPROVEMENT: Support for legacy and unused PDU v1 removed.
 (LOGKSI-78) * IMPROVEMENT: Wording of hash comparison failure error messages improved.
 (LOGKSI-63) * IMPROVEMENT: Improved error messages when integrating invalid or broken log signature files.
