@@ -610,10 +610,10 @@ static int open_input_and_output_files(PARAM_SET *set, ERR_TRCKR *err, IO_FILES 
 
 	if (files->internal.inSig) {
 		res = SMART_FILE_open(files->internal.inSig, "rbs", &tmp.files.inSig);
-		if (res != KT_OK) goto cleanup;
+		ERR_CATCH_MSG(err, res, "Error: Could not open input signature file '%s'.", files->internal.inSig);
 	} else {
 		res = SMART_FILE_open("-", "rbs", &tmp.files.inSig);	/* A buffered (nameless temporary file) stream. */
-		if (res != KT_OK) goto cleanup;
+		ERR_CATCH_MSG(err, res, "Error: Could not open input signature stream.");
 	}
 
 	res = SMART_FILE_open(files->internal.outSig, overWrite ? "wbTs" : "wbBTs", &tmp.files.outSig);

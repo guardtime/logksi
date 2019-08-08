@@ -883,18 +883,18 @@ static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files) {
 
 	if (files->internal.inLog) {
 		res = SMART_FILE_open(files->internal.inLog, "rb", &tmp.files.inLog);
-		ERR_CATCH_MSG(err, res, "Unable to open input log.")
+		ERR_CATCH_MSG(err, res, "Unable to open input log file '%s'.", files->internal.inLog)
 	} else {
 		res = SMART_FILE_open("-", "rbs", &tmp.files.inLog);
-		ERR_CATCH_MSG(err, res, "Unable to open input log.")
+		ERR_CATCH_MSG(err, res, "Unable to open input log stream.")
 	}
 
 	if (files->internal.inSig) {
 		res = SMART_FILE_open(files->internal.inSig, "rb", &tmp.files.inSig);
-		ERR_CATCH_MSG(err, res, "Unable to open input signature.")
+		ERR_CATCH_MSG(err, res, "Unable to open input signature file '%s'.", files->internal.inSig)
 	} else {
 		res = SMART_FILE_open("-", "rbs", &tmp.files.inSig);
-		ERR_CATCH_MSG(err, res, "Unable to open input sig.")
+		ERR_CATCH_MSG(err, res, "Unable to open input signature stream.")
 	}
 
 	files->files = tmp.files;

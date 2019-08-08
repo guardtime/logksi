@@ -30,6 +30,12 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ (File does not exist).*(Parameter).*(--input).*(i_do_not_exist_2) ]]
 }
 
+@test "extend CMD test: try to use not existing log signature file"  {
+	run src/logksi extend test/resource/logfiles/legacy_extract  -o test/out/dummy.ksig -d
+	[ "$status" -eq 9 ]
+	[[ "$output" =~ (Error: Could not open input signature file).*(legacy_extract.logsig).*(File does not exist) ]]
+}
+
 @test "extend CMD test: try to use one unexpected but existing extra input file"  {
 	run src/logksi extend test/resource/logs_and_signatures/signed test/resource/logs_and_signatures/signed -o test/out/dummy.ksig
 	[ "$status" -eq 3 ]

@@ -2,6 +2,18 @@
 
 export KSI_CONF=test/test.cfg
 
+@test "extract CMD: attempt to open not existing log file" {
+	run src/logksi extract notexist -r 1
+	[ "$status" -eq 9 ]
+	[[ "$output" =~ (Error: Could not open input log file).*(notexist) ]]
+}
+
+@test "extract CMD: attempt to open not existing log signature file" {
+	run src/logksi extract test/resource/logfiles/legacy_extract -r 1
+	[ "$status" -eq 9 ]
+	[[ "$output" =~ (Error: Could not open input sig file).*(legacy_extract.logsig) ]]
+}
+
 @test "extract CMD: attempt to redirect both outputs to stdout via -o -" {
 	run bash -c "./src/logksi extract test/resource/logs_and_signatures/log_repaired -o - -r 1"
 	[ "$status" -eq 3 ]

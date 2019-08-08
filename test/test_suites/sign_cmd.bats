@@ -20,3 +20,9 @@ export KSI_CONF=test/test.cfg
 	[ "$status" -eq 3 ]
 	[[ "$output" =~ (Algorithm name is incorrect).*(Parameter.*CMD.*aggr-hmac-alg).*(dummy) ]]
 }
+
+@test "sign CMD test: try to sign not existing log signature file" {
+	run src/logksi sign -o test/out/dummy.ksig dummy.not.existing
+	[ "$status" -eq 9 ]
+	[[ "$output" =~  (Error: Could not open input signature file).*(dummy.not.existing.logsig) ]]
+}

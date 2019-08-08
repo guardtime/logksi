@@ -18,7 +18,7 @@ cp -r test/resource/logsignatures/signed.logsig.parts test/out/dummy.logsig.part
 
 @test "integrate CMD test: try to use log signature parts that do not exist" {
 	run ./src/logksi integrate i_do_not_exist
-	[[ "$output" =~ "Error: Unable to find input blocks file i_do_not_exist.logsig.parts/blocks.dat" ]]
+	[[ "$output" =~ "Error: Unable to find input blocks file 'i_do_not_exist.logsig.parts/blocks.dat'" ]]
 	[ "$status" -eq 6 ]
 }
 
