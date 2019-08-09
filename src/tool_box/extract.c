@@ -382,10 +382,10 @@ static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files) {
 
 	if (files->user.bStdinLog) {
 		res = SMART_FILE_open("-", "rbs", &tmp.files.inLog);
-		ERR_CATCH_MSG(err, res, "Error: Could not open input log file.");
+		ERR_CATCH_MSG(err, res, "Error: Could not open input log stream.");
 	} else {
 		res = SMART_FILE_open(files->internal.inLog, "rb", &tmp.files.inLog);
-		ERR_CATCH_MSG(err, res, "Error: Could not open input log file.");
+		ERR_CATCH_MSG(err, res, "Error: Could not open input log file '%s'.", files->internal.inLog);
 	}
 
 	if (files->user.bStdinSig) {
@@ -393,7 +393,7 @@ static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files) {
 		ERR_CATCH_MSG(err, res, "Error: Could not open input sig file.");
 	} else {
 		res = SMART_FILE_open(files->internal.inSig, "rb", &tmp.files.inSig);
-		ERR_CATCH_MSG(err, res, "Error: Could not open input sig file.");
+		ERR_CATCH_MSG(err, res, "Error: Could not open input sig file '%s'.", files->internal.inSig);
 	}
 
 	res = SMART_FILE_open(files->internal.outLog, "wbTs", &tmp.files.outLog);

@@ -406,7 +406,7 @@ static int open_input_and_output_files(PARAM_SET *set, ERR_TRCKR *err, IO_FILES 
 		} else {
 			if (res == SMART_FILE_DOES_NOT_EXIST) {
 				res = KT_KSI_SIG_VER_IMPOSSIBLE;
-				ERR_CATCH_MSG(err, res, "Error: Unable to find input blocks file %s.", files->internal.partsBlk);
+				ERR_CATCH_MSG(err, res, "Error: Unable to find input blocks file '%s'.", files->internal.partsBlk);
 			} else {
 				res = KT_IO_ERROR;
 				ERR_CATCH_MSG(err, res, "Error: Could not open output log signature file %s in read mode.", files->internal.inSig);
@@ -415,9 +415,9 @@ static int open_input_and_output_files(PARAM_SET *set, ERR_TRCKR *err, IO_FILES 
 	} else {
 		res = KT_KSI_SIG_VER_IMPOSSIBLE;
 		if (!SMART_FILE_doFileExist(files->internal.partsBlk)) {
-			ERR_CATCH_MSG(err, res, "Error: Unable to %s blocks file %s.", partsBlkErr == ENOENT ? "find ": "open", files->internal.partsBlk);
+			ERR_CATCH_MSG(err, res, "Error: Unable to %s blocks file '%s'.", partsBlkErr == ENOENT ? "find ": "open", files->internal.partsBlk);
 		} else {
-			ERR_CATCH_MSG(err, res, "Error: Unable to %s signatures file %s.", partsSigErr == ENOENT ? "find ": "open", files->internal.partsSig);
+			ERR_CATCH_MSG(err, res, "Error: Unable to %s signatures file '%s'.", partsSigErr == ENOENT ? "find ": "open", files->internal.partsSig);
 		}
 	}
 
