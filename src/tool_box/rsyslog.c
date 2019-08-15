@@ -1729,6 +1729,24 @@ static int check_log_signature_client_id(PARAM_SET *set, MULTI_PRINTER* mp, ERR_
 		LOGKSI_signerIdentityToString(sig, strClientId, sizeof(strClientId));
 
 		res = REGEXP_processString(blocks->client_id_match, strClientId, NULL);
+		if (res != REGEXP_NO_MATCH && res != REGEXP_OK) {
+			ERR_TRCKR_ADD(err, res, "Error: Unexpected regular expression error: %i!", res);
+			goto cleanup;
+		}
+
+		/* Verify that match is full match! */
+		if (res == REGEXP_OK) {
+			char match[0xffff] = "";
+
+			res = REGEXP_getMatchingGroup(blocks->client_id_match, 0, match, sizeof(match));
+			if (res != REGEXP_OK) {
+				ERR_TRCKR_ADD(err, res, "Error: Unexpected regular expression error: %i!", res);
+				goto cleanup;
+			}
+
+			if (strcmp(strClientId, match) != 0) res = REGEXP_NO_MATCH;
+		}
+
 		if (res != REGEXP_OK) {
 			blocks->nofTotalFailedBlocks++;
 			res = KT_VERIFICATION_FAILURE;

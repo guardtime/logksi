@@ -99,6 +99,16 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ (Error: Failed to match KSI signatures client ID for block 1) ]]
 }
 
+@test "verify log signature with client ID, where pattern does not match the full string" {
+	run src/logksi verify test/resource/logs_and_signatures/signed -d --client-id "GT :: GT :: GT :: ano"
+	[ "$status" -eq 6 ]
+	[[ "$output" =~ (x Error: Failed to match KSI signatures client ID for block 1).*(Client ID).*(GT :: GT :: GT :: anon).*(Regexp. pattern).*(GT :: GT :: GT :: ano) ]]
+
+	run src/logksi verify test/resource/logs_and_signatures/signed -d --client-id "T :: GT :: GT :: anon"
+	[ "$status" -eq 6 ]
+	[[ "$output" =~ (x Error: Failed to match KSI signatures client ID for block 1).*(Client ID).*(GT :: GT :: GT :: anon).*(Regexp. pattern).*(T :: GT :: GT :: anon) ]]
+}
+
 @test "verify log signature with unexpected client ID using more complex client ID pattern" {
 	run src/logksi verify test/resource/continue-verification/log test/resource/continue-verification/log-ok-one-sig-diff-client-id.logsig  -d --client-id "GT :: GT :: GT :: (anon|Xsha512X)" --ignore-desc-block-time
 	[ "$status" -eq 6 ]
