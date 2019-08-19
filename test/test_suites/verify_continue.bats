@@ -11,9 +11,8 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ (Error: Skipping block 2)  ]]	
 	[[ ! "$output" =~ (Error: Skipping block 3)  ]]	
 	[[ ! "$output" =~ (Error: Skipping block 4)  ]]	
-	[[ "$output" =~ (3[\)]).*(Error: Verification FAILED but was continued for further analysis).*(Log signature verification failed)  ]]
-	[[ "$output" =~ (2[\)]).*(Error: 2 hash comparison failures found).*(Log signature verification failed)  ]]
-	[[ "$output" =~ (1[\)]).*(Error: Block no. 2: record hashes not equal for logline no. 4).*(Log signature verification failed)  ]]
+	[[ "$output" =~ (2[\)]).*(Error: Verification FAILED but was continued for further analysis).*(Log signature verification failed)  ]]
+	[[ "$output" =~ (1[\)]).*(Error: 2 hash comparison failures found).*(Log signature verification failed)  ]]
 }
 
 @test "Log line nr.4 modified. Rec. hashes present. Stored hashes are used and verification is continued." {
@@ -43,10 +42,8 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ (Verifying... failed).*(Error: Failed to verify logline no. 5).*(Error: Skipping block 2).*(Error: Output hash of block 2 differs from input hash of block 3).*(Verification is continued).*(Error: Failed to verify logline no. 6).*(Error: Skipping block 3).*(Error: Output hash of block 3 differs from input hash of block 4).*(Verification is continued).*(Count of hash failures:      4) ]]
 	[[ ! "$output" =~ (Error: Skipping block 1)  ]]	
 	[[ ! "$output" =~ (Error: Skipping block 4)  ]]	
-	[[ "$output" =~ (4[\)]).*(Error: Verification FAILED but was continued for further analysis).*(verification failed)  ]]
-	[[ "$output" =~ (3[\)]).*(Error: Block no. 4: end of log file contains unexpected records).*(verification failed)  ]]
-	[[ "$output" =~ (2[\)]).*(Error: Block no. 3: record hashes not equal for logline no. 6).*(verification failed)  ]]
-	[[ "$output" =~ (1[\)]).*(Error: Block no. 2: record hashes not equal for logline no. 5).*(verification failed)  ]]
+	[[ "$output" =~ (2[\)]).*(Error: Verification FAILED but was continued for further analysis).*(verification failed)  ]]
+	[[ "$output" =~ (1[\)]).*(Error: Block no. 4: end of log file contains unexpected records).*(verification failed)  ]]
 }
 
 @test "Log rec nr.4 changed in log signature file. Rec. hashes present." {
