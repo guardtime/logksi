@@ -11,6 +11,7 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ (Error: Skipping block 2)  ]]	
 	[[ ! "$output" =~ (Error: Skipping block 3)  ]]	
 	[[ ! "$output" =~ (Error: Skipping block 4)  ]]	
+	[[ ! "$output" =~ (Error: Block no. 2: record hashes not equal for logline no. 4) ]]
 	[[ "$output" =~ (2[\)]).*(Error: Verification FAILED but was continued for further analysis).*(Log signature verification failed)  ]]
 	[[ "$output" =~ (1[\)]).*(Error: 2 hash comparison failures found).*(Log signature verification failed)  ]]
 }

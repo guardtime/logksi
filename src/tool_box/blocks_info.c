@@ -487,6 +487,7 @@ void BLOCK_INFO_freeAndClearInternals(BLOCK_INFO *blocks) {
 		blocks->client_id_match = NULL;
 		blocks->client_id_last[0] = '\0';
 
+		blocks->isContinuedOnFail = 0;
 		blocks->blockNo = 0;
 		blocks->sigNo = 0;
 		blocks->blockCount = 0;
