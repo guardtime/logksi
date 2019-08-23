@@ -399,21 +399,21 @@ Time line:
 .\"
 .TP 3
 \fB11
-To verify time embedded into log lines against KSI signature signing time, where some of the log lines are more recent than KSI signature, a time window in both directions must be specified. For verification '\fB--time-form\fR [%Y-%m-%d %H:%M:%S' and '\fB--time-diff\fR -23H58M24,1M35' (or larger time window) must be used.
+To verify time embedded into log lines against KSI signature signing time, where some of the log lines are more recent than KSI signature, a time window in both directions must be specified. For verification '\fB--time-form\fR %Y-%m-%d %H:%M:%S' and '\fB--time-diff\fR -23H58M24,1M35' (or larger time window) must be used.
 .LP
 .RS 4
 .EX
 Time extract pattern (reformatted to align example log lines):
-  [  %Y-%m-%d %H:%M:%S
+    %Y-%m-%d %H:%M:%S
 .EE
 .LP
 .EX
 Log file log2019-1:
-  [2019-04-22 00:00:00] log line 1.
-  [2019-04-22 00:01:34] log line 2.
-  [2019-04-22 00:01:54] log line 3.
+  2019-04-22 00:00:00 log line 1.
+  2019-04-22 00:01:34 log line 2.
+  2019-04-22 00:01:54 log line 3.
   ...
-  [2019-04-22 23:59:59] log line N.
+  2019-04-22 23:59:59 log line N.
 .EE
 .LP
 .EX
