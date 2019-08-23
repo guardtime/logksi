@@ -344,7 +344,7 @@ char *verify_help_toString(char *buf, size_t len) {
 		"             of the log line to be matched with KSI signature signing time. Fmt\n"
 		"             is specified by function strptime and its documentation can be read\n"
 		"             for more details.\n"
-		" --time-base <regexp>\n"
+		" --time-base <year>\n"
 		"           - Specify the year (e.g. 2019) when it can not be extracted with\n"
 		"             --time-form.\n"
 		" --time-diff <time>\n"

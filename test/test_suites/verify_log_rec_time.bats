@@ -30,6 +30,12 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ (Error: Log lines in block 1 do not fit into time window).*(Block time window).*(340d 19:58:59).*(Expected time window).*(-340d 19:58:59)  ]]
 }
 
+@test "verify log record --time-diff that does not match" {
+	run ./src/logksi verify test/resource/logs_and_signatures/totally-resigned -dd --time-form "[%B %d %H:%M:%S" --time-base 2018 --time-diff 340d20H18M48
+	[ "$status" -eq 4 ]
+	[[ "$output" =~ "Error: Block no. 1: unable to extract time stamp from the logline no. 1." ]]
+}
+
 ##
 # Note that these tests use log file that has abnormal time difference between KSI signature and timestamp embedded into log lines.
 # The KSI signature seems to be created before the loglines - it is probably the cause of invalid machine system clock.

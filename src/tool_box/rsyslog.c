@@ -73,6 +73,7 @@ static size_t max_tree_hashes(size_t nof_records) {
 static int block_info_calculate_hash_of_logline_and_store_logline_check_log_time(PARAM_SET* set, ERR_TRCKR *err, MULTI_PRINTER *mp, BLOCK_INFO *blocks, IO_FILES *files, KSI_DataHash **hash) {
 	int res = KT_UNKNOWN_ERROR;
 	uint64_t last_time = 0;
+	const char *ret = NULL;
 
 	if (set == NULL || err == NULL || mp == NULL || blocks == NULL || files == NULL || hash == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -91,7 +92,18 @@ static int block_info_calculate_hash_of_logline_and_store_logline_check_log_time
 		res = PARAM_SET_getStr(set, "time-form", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &format);
 		ERR_CATCH_MSG(err, res, "Error: Unable to get time format string.");
 
-		strptime(blocks->logLine, format, &tmp_time);
+		ret = strptime(blocks->logLine, format, &tmp_time);
+		if (ret == NULL) {
+			res = KT_INVALID_INPUT_FORMAT;
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Unable to extract timestamp (%s) from log line %zu: %.*s.\n", blocks->blockNo, format, get_nof_lines(blocks), (strlen(blocks->logLine) - 1), blocks->logLine);
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Unable to extract time stamp from log line %zu in block %zu:\n"
+																						  "   + Log line:    '%.*s'\n"
+																						  "   + Time format: '%s'\n"
+																						  ,  get_nof_lines(blocks), blocks->blockNo, (strlen(blocks->logLine) - 1), blocks->logLine, format);
+
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to extract time stamp from the logline no. %zu.", blocks->blockNo, get_nof_lines(blocks))
+		}
+
 
 		if (PARAM_SET_isSetByName(set, "time-base")) {
 			int timeBase = 0;
