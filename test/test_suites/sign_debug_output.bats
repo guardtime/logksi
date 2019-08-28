@@ -58,3 +58,9 @@ f_blk_fail () {
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Warning: --aggr-pdu-v has no effect and will be removed in the future." ]]
 }
+
+@test "sign output with debug level 3 and --hex-to-str" {
+	run src/logksi sign test/resource/logs_and_signatures/signed -o test/out/dummy.ksig --hex-to-str -ddd
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Block no.   4: Meta-record value: 'Block closed due to file closure.\\00'." ]]
+}

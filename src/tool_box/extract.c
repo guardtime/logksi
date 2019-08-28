@@ -70,7 +70,7 @@ int extract_run(int argc, char **argv, char **envp) {
 	 * Extract command line parameters and also add configuration specific parameters.
 	 */
 	res = PARAM_SET_new(
-			CONF_generate_param_set_desc("{input}{log-from-stdin}{sig-from-stdin}{o}{out-log}{out-proof}{r}{d}{log}{h|help}", "", buf, sizeof(buf)),
+			CONF_generate_param_set_desc("{input}{log-from-stdin}{sig-from-stdin}{o}{out-log}{out-proof}{r}{d}{log}{h|help}{hex-to-str}", "", buf, sizeof(buf)),
 			&set);
 	if (res != KT_OK) goto cleanup;
 
@@ -210,7 +210,7 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	 */
 	PARAM_SET_addControl(set, "{log}{out-log}{out-proof}{o}", isFormatOk_path, NULL, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{input}", isFormatOk_inputFile, NULL, convertRepair_path, NULL);
-	PARAM_SET_addControl(set, "{log-from-stdin}{sig-from-stdin}{d}", isFormatOk_flag, NULL, NULL, NULL);
+	PARAM_SET_addControl(set, "{log-from-stdin}{sig-from-stdin}{d}{hex-to-str}", isFormatOk_flag, NULL, NULL, NULL);
 	PARAM_SET_addControl(set, "{r}", isFormatOk_string, NULL, NULL, NULL);
 
 	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);

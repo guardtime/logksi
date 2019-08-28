@@ -73,7 +73,7 @@ int sign_run(int argc, char** argv, char **envp) {
 	 * Extract command line parameters.
 	 */
 	res = PARAM_SET_new(
-			CONF_generate_param_set_desc("{input}{o}{sig-from-stdin}{insert-missing-hashes}{d}{show-progress}{log}{conf}{h|help}{continue-on-fail}", "S", buf, sizeof(buf)),
+			CONF_generate_param_set_desc("{input}{o}{sig-from-stdin}{insert-missing-hashes}{d}{show-progress}{log}{conf}{h|help}{continue-on-fail}{hex-to-str}", "S", buf, sizeof(buf)),
 			&set);
 	if (res != KT_OK) goto cleanup;
 
@@ -222,7 +222,7 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	PARAM_SET_addControl(set, "{conf}", isFormatOk_inputFile, isContentOk_inputFileRestrictPipe, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{o}{log}", isFormatOk_path, NULL, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{input}", isFormatOk_path, NULL, convertRepair_path, NULL);
-	PARAM_SET_addControl(set, "{sig-from-stdin}{insert-missing-hashes}{d}{show-progress}{continue-on-fail}", isFormatOk_flag, NULL, NULL, NULL);
+	PARAM_SET_addControl(set, "{sig-from-stdin}{insert-missing-hashes}{d}{show-progress}{continue-on-fail}{hex-to-str}", isFormatOk_flag, NULL, NULL, NULL);
 
 
 	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);

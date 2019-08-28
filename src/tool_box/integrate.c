@@ -73,7 +73,7 @@ int integrate_run(int argc, char **argv, char **envp) {
 	 * Extract command line parameters.
 	 */
 	res = PARAM_SET_new(
-			CONF_generate_param_set_desc("{input}{o}{out-log}{insert-missing-hashes}{force-overwrite}{use-computed-hash-on-fail}{use-stored-hash-on-fail}{recover}{d}{log}{h|help}", "", buf, sizeof(buf)),
+			CONF_generate_param_set_desc("{input}{o}{out-log}{insert-missing-hashes}{force-overwrite}{use-computed-hash-on-fail}{use-stored-hash-on-fail}{recover}{d}{log}{h|help}{hex-to-str}", "", buf, sizeof(buf)),
 			&set);
 	if (res != KT_OK) goto cleanup;
 
@@ -217,7 +217,7 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	 */
 	PARAM_SET_addControl(set, "{input}", isFormatOk_inputFile, NULL, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{log}{o}{out-log}", isFormatOk_path, NULL, convertRepair_path, NULL);
-	PARAM_SET_addControl(set, "{insert-missing-hashes}{force-overwrite}{use-computed-hash-on-fail}{use-stored-hash-on-fail}{d}{recover}", isFormatOk_flag, NULL, NULL, NULL);
+	PARAM_SET_addControl(set, "{insert-missing-hashes}{force-overwrite}{use-computed-hash-on-fail}{use-stored-hash-on-fail}{d}{recover}{hex-to-str}", isFormatOk_flag, NULL, NULL, NULL);
 
 	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
 

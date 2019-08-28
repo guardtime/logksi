@@ -37,3 +37,9 @@ export KSI_CONF=test/test.cfg
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Warning: --ext-pdu-v has no effect and will be removed in the future." ]]
 }
+
+@test "extend output with debug level 3 and --hex-to-str" {
+	run src/logksi extend test/resource/logs_and_signatures/signed -o test/out/dummy.ksig --hex-to-str -ddd
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Block no.   4: Meta-record value: 'Block closed due to file closure.\\00'." ]]
+}

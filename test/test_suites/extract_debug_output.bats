@@ -20,3 +20,9 @@ export KSI_CONF=test/test.cfg
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ (Block no.   2: processing block header... ok.).(Block no.   2: .r.r..r..).(Block no.   2: processing block signature data... ok.).(Block no.   2: lines processed 4 . 6 .3.).(Block no.   2: verifying KSI signature... ok.*ms.).(Block no.   2: extracting log records .line   4.... ok.).(Block no.   2: extracting log records .line   5.... ok.).(Block no.   2: signing time: .1517928937.*UTC).(Block no.   2: Warning: all final tree hashes are missing.) ]]
 }
+
+@test "extract record output with debug level 3 and --hex-to-str" {
+	run ./src/logksi extract test/resource/logs_and_signatures/signed -o test/out/dummy.excerpt --hex-to-str -r 1,3-5 -ddd
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Block no.   4: Meta-record value: 'Block closed due to file closure.\\00'." ]]
+}

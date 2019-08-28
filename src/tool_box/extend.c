@@ -85,7 +85,7 @@ int extend_run(int argc, char** argv, char **envp) {
 	 * Extract command line parameters.
 	 */
 	res = PARAM_SET_new(
-			CONF_generate_param_set_desc("{input}{o}{sig-from-stdin}{enable-rfc3161-conversion}{d}{x}{T}{pub-str}{conf}{log}{h|help}", "XP", buf, sizeof(buf)),
+			CONF_generate_param_set_desc("{input}{o}{sig-from-stdin}{enable-rfc3161-conversion}{d}{x}{T}{pub-str}{conf}{log}{h|help}{hex-to-str}", "XP", buf, sizeof(buf)),
 			&set);
 	if (res != KT_OK) goto cleanup;
 
@@ -447,7 +447,7 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	PARAM_SET_addControl(set, "{log}{o}", isFormatOk_path, NULL, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{input}", isFormatOk_inputFile, isContentOk_inputFileWithPipe, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{T}", isFormatOk_utcTime, isContentOk_utcTime, NULL, extract_utcTime);
-	PARAM_SET_addControl(set, "{sig-from-stdin}{enable-rfc3161-conversion}{d}", isFormatOk_flag, NULL, NULL, NULL);
+	PARAM_SET_addControl(set, "{sig-from-stdin}{enable-rfc3161-conversion}{d}{hex-to-str}", isFormatOk_flag, NULL, NULL, NULL);
 	PARAM_SET_addControl(set, "{pub-str}", isFormatOk_pubString, NULL, NULL, extract_pubString);
 
 	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);

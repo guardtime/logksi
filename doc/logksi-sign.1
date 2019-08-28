@@ -58,6 +58,10 @@ This option can be used to continue signing in case of signing error. Other erro
 Print detailed information about processes and errors to \fIstderr\fR. To make output more verbose increase debug level with \fB-dd\fR or \fB-ddd\fR. With debug level 1 a summary of log file is displayed. With debug level 2 a summary of each block and the log file is displayed. Debug level 3 will display the whole parsing of the log signature file. The parsing of \fIrecord hashes (r)\fR, \fItree hashes (.)\fR, \fIfinal tree hashes (:)\fR and \fImeta-records (M)\fR is displayed inside curly brackets in following manner \fI{r.Mr..:}\fR. In case of a failure \fI(X)\fR is displayed and closing curly bracket is omitted.
 .\"
 .TP
+\fB--hex-to-str\fR
+Will encode applicable hex encoded data fields to ASCII string (e.g. meta-record value). Non-printable characters are displayed in hex with leading backslash (e.g. 'Text\\00').
+.\"
+.TP
 \fB--show-progress\fR
 Print signing progress. Only valid with -d and debug level 1.\fR
 .\"
