@@ -66,7 +66,7 @@ int integrate_run(int argc, char **argv, char **envp) {
 	MULTI_PRINTER *mp = NULL;
 
 
-	BLOCK_INFO_reset(&blocks);
+	BLOCK_INFO_clearAll(&blocks);
 	IO_FILES_init(&files);
 
 	/**

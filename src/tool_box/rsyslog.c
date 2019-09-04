@@ -3020,7 +3020,7 @@ int logsignature_extend(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 		goto cleanup;
 	}
 
-	BLOCK_INFO_reset(&blocks);
+	BLOCK_INFO_clearAll(&blocks);
 	blocks.ftlv_raw = ftlv_raw;
 	blocks.taskId = TASK_EXTEND;
 	memset(&processors, 0, sizeof(processors));
@@ -3454,7 +3454,7 @@ int logsignature_extract(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_
 		goto cleanup;
 	}
 
-	BLOCK_INFO_reset(&blocks);
+	BLOCK_INFO_clearAll(&blocks);
 	blocks.ftlv_raw = ftlv_raw;
 	blocks.taskId = TASK_EXTRACT;
 	memset(&processors, 0, sizeof(processors));
@@ -3659,7 +3659,7 @@ int logsignature_sign(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX
 		goto cleanup;
 	}
 
-	BLOCK_INFO_reset(&blocks);
+	BLOCK_INFO_clearAll(&blocks);
 	blocks.ftlv_raw = ftlv_raw;
 	blocks.taskId = TASK_SIGN;
 	memset(&processors, 0, sizeof(processors));

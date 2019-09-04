@@ -502,10 +502,12 @@ void BLOCK_INFO_freeAndClearInternals(BLOCK_INFO *blocks) {
 		blocks->rec_time_in_file_max = 0;
 		blocks->rec_time_min = 0;
 		blocks->rec_time_max = 0;
+
+		BLOCK_INFO_clearAll(blocks);
 	}
 }
 
-void BLOCK_INFO_reset(BLOCK_INFO *block) {
+void BLOCK_INFO_clearAll(BLOCK_INFO *block) {
 	if (block != NULL) {
 		memset(block, 0, sizeof(BLOCK_INFO));
 	}

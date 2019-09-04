@@ -39,7 +39,7 @@ int block_info_calculate_hash_of_logline_and_store_logline(BLOCK_INFO *blocks, I
 int block_info_calculate_new_tree_hash(BLOCK_INFO *blocks, KSI_DataHash *leftHash, KSI_DataHash *rightHash, unsigned char level, KSI_DataHash **nodeHash);
 int block_info_calculate_hash_of_metarecord_and_store_metarecord(BLOCK_INFO *blocks, KSI_TlvElement *tlv, KSI_DataHash **hash);
 
-void BLOCK_INFO_reset(BLOCK_INFO *block);
+void BLOCK_INFO_clearAll(BLOCK_INFO *block);
 void BLOCK_INFO_freeAndClearInternals(BLOCK_INFO *blocks);
 
 #ifdef	__cplusplus

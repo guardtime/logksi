@@ -105,7 +105,7 @@ int verify_run(int argc, char **argv, char **envp) {
 	MULTI_PRINTER *mp = NULL;
 	uint64_t las_rec_time = 0;
 
-	BLOCK_INFO_reset(&blocks);
+	BLOCK_INFO_clearAll(&blocks);
 	IO_FILES_init(&files);
 	/**
 	 * Extract command line parameters and also add configuration specific parameters.
