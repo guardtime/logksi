@@ -36,3 +36,9 @@ test_check="(Log signature parts not found:).( test\/resource\/logsignatures\/do
 	[[ "$output" =~ $test_check ]]
 	[ "$status" -eq 0 ]
 }
+
+@test "integrate output with debug level 3 and --hex-to-str" {
+	run ./src/logksi integrate test/resource/logsignatures/signed -o test/out/dummy.ksig --force-overwrite --hex-to-str -ddd
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Block no.   4: Meta-record value: 'Block closed due to file closure.\\00'." ]]
+}
