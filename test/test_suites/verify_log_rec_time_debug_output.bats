@@ -87,3 +87,15 @@ err_l2_morerecent_l3=`f_failed_logl_more_recent 1 2 3 1524752330 1524752323`
 	[ "$status" -eq 6 ]
 	[[ "$output" =~ "Block no.   1: block time window:  -78d 23:24:01" ]]
 }
+
+@test "check that invalid time format is correctly displayed, debug level 2" {
+	run ./src/logksi verify test/resource/logs_and_signatures/totally-resigned -dd --time-form "[%B %d %H:%M:%S" --time-base 2018 --time-diff 340d20H18M48
+	[ "$status" -eq 4 ]
+	[[ "$output" =~ (Verifying block no.   1... failed.)..( x Error: Unable to extract time stamp from log line 1 in block 1:).(   . Log line:    .Apr 26 14:18:05).*(   . Time format: .[[]%B %d %H:%M:%S.)....(1.*unable to extract time stamp from the logline no) ]]
+}
+
+@test "check that invalid time format is correctly displayed, debug level 3" {
+	run ./src/logksi verify test/resource/logs_and_signatures/totally-resigned -ddd --time-form "[%B %d %H:%M:%S" --time-base 2018 --time-diff 340d20H18M48
+	[ "$status" -eq 4 ]
+	[[ "$output" =~ (Block no.   1: .r X).(Block no.   1: Error: Unable to extract timestamp .[[]%B %d %H:%M:%S. from log line 1: Apr 26 14:18:05) ]]
+}

@@ -492,7 +492,7 @@ static int MULTI_PRINTER_CHANNEL_print(MULTI_PRINTER_CHANNEL *chn) {
 		goto cleanup;
 	}
 
-	chn->print(chn->buf, chn->buf_char_count);
+	chn->print("%.*s", chn->buf_char_count, chn->buf);
 	chn->buf[0] = '\0';
 	chn->buf_char_count = 0;
 
