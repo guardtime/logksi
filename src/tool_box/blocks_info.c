@@ -502,8 +502,6 @@ void BLOCK_INFO_freeAndClearInternals(BLOCK_INFO *blocks) {
 		blocks->rec_time_in_file_max = 0;
 		blocks->rec_time_min = 0;
 		blocks->rec_time_max = 0;
-
-		BLOCK_INFO_clearAll(blocks);
 	}
 }
 
