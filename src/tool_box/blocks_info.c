@@ -487,6 +487,7 @@ void BLOCK_INFO_freeAndClearInternals(BLOCK_INFO *blocks) {
 		blocks->client_id_match = NULL;
 		blocks->client_id_last[0] = '\0';
 
+		blocks->isContinuedOnFail = 0;
 		blocks->blockNo = 0;
 		blocks->sigNo = 0;
 		blocks->blockCount = 0;
@@ -504,7 +505,7 @@ void BLOCK_INFO_freeAndClearInternals(BLOCK_INFO *blocks) {
 	}
 }
 
-void BLOCK_INFO_reset(BLOCK_INFO *block) {
+void BLOCK_INFO_clearAll(BLOCK_INFO *block) {
 	if (block != NULL) {
 		memset(block, 0, sizeof(BLOCK_INFO));
 	}

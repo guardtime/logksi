@@ -158,7 +158,8 @@ static int block_info_calculate_hash_of_logline_and_store_logline_check_log_time
 																						  "   + Time for log line %zu: %s\n"
 																						  ,  line_nr_0, blocks->blockNo, line_nr_1, line_nr_0, str_last_time, line_nr_1, str_current_time);
 					blocks->quietError = res;
-					if (PARAM_SET_isSetByName(set, "continue-on-fail")) res = KT_OK;
+					if (blocks->isContinuedOnFail) res = KT_OK;
+
 					else ERR_TRCKR_ADD(err, res, "Error: Log line %zu in block %zu is more recent than log line %zu!", line_nr_0, blocks->blockNo, line_nr_1);
 					goto cleanup;
 				}
@@ -590,7 +591,7 @@ static int check_log_record_embedded_time_against_ksi_signature_time(PARAM_SET *
 																					  "   + Time extracted from most recent log line:  %s\n"
 																					  ,  (blocks->sigTime_1 < blocks->rec_time_min ? "All" : "Some of"), blocks->blockNo, str_sigTime1, str_rec_time_min, str_rec_time_max);
 			blocks->quietError = res;
-			if (PARAM_SET_isSetByName(set, "continue-on-fail")) res = KT_OK;
+			if (blocks->isContinuedOnFail) res = KT_OK;
 			else ERR_TRCKR_ADD(err, res, "Error: %s the log lines in block %zu are more recent than KSI signature!", (blocks->sigTime_1 < blocks->rec_time_min ? "All" : "Some of"), blocks->blockNo);
 			goto cleanup;
 		} else if (isTimeDiffTooLarge) {
@@ -603,7 +604,7 @@ static int check_log_record_embedded_time_against_ksi_signature_time(PARAM_SET *
 																				  "   + Expected time window:                      %s\n"
 																				  , blocks->blockNo, str_sigTime1, str_rec_time_min, str_rec_time_max, str_diff_calc, str_allowed_diff);
 			blocks->quietError = res;
-			if (PARAM_SET_isSetByName(set, "continue-on-fail")) res = KT_OK;
+			if (blocks->isContinuedOnFail) res = KT_OK;
 			else ERR_TRCKR_ADD(err, res, "Error: Log lines in block %zu do not fit into time window!", blocks->blockNo);
 			goto cleanup;
 		}
@@ -657,7 +658,7 @@ static int handle_record_time_check_between_files(PARAM_SET *set, MULTI_PRINTER*
 																			  "   + Time for least recent log line: %s\n"
 																			  ,files->previousLogFile , str_last_time, io_files_getCurrentLogFilePrintRepresentation(files), str_current_time);
 			blocks->quietError = res;
-			if (PARAM_SET_isSetByName(set, "continue-on-fail")) res = KT_OK;
+			if (blocks->isContinuedOnFail) res = KT_OK;
 			else ERR_TRCKR_ADD(err, res, "Error: Most recent log line from previous file is more recent than least recent log line from current file!");
 			goto cleanup;
 		}
@@ -829,7 +830,7 @@ static int handle_block_signing_time_check(PARAM_SET *set, MULTI_PRINTER* mp, ER
 					}
 
 					blocks->quietError = res;
-					if (PARAM_SET_isSetByName(set, "continue-on-fail")) res = KT_OK;
+					if (blocks->isContinuedOnFail) res = KT_OK;
 					else ERR_TRCKR_ADD(err, res, "Error: Abnormal signing time difference for consecutive blocks!");
 
 					goto cleanup;
@@ -1095,8 +1096,7 @@ static int process_block_header(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *er
 
 		res = logksi_datahash_compare(err, mp, blocks, 0, blocks->prevLeaf, hash, description, "Last hash computed from previous block data:", "Input hash stored in current block header:");
 		res = continue_on_hash_fail(res, set, mp, blocks, blocks->prevLeaf, hash, &replacement);
-
-		if (res != KT_OK && PARAM_SET_isSetByName(set, "continue-on-fail") && blocks->taskId == TASK_VERIFY) {
+		if (res != KT_OK && blocks->isContinuedOnFail && blocks->taskId == TASK_VERIFY) {
 			char debugMessage[1024] = "";
 
 			if (blocks->lastBlockWasSkipped) {
@@ -1237,8 +1237,11 @@ static int process_record_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err
 		/* This is a metarecord hash. */
 		res = logksi_datahash_compare(err, mp, blocks, 0, blocks->metarecordHash, recordHash, description, "Metarecord hash computed from metarecord:", "Metarecord hash stored in log signature file:");
 		res = continue_on_hash_fail(res, set, mp, blocks, blocks->metarecordHash, recordHash, &replacement);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: metarecord hashes not equal.", blocks->blockNo);
+		if (!blocks->isContinuedOnFail || blocks->taskId != TASK_VERIFY) {
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: metarecord hashes not equal.", blocks->blockNo);
+		}
 
+		if (res != KT_OK) goto cleanup;
 		res = block_info_add_record_hash_to_merkle_tree(blocks, err, ksi, 1, replacement);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add metarecord hash to Merkle tree.", blocks->blockNo);
 
@@ -1254,7 +1257,7 @@ static int process_record_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err
 
 			res = logksi_datahash_compare(err, mp, blocks, 1, hash, recordHash, NULL, "Record hash computed from logline:", "Record hash stored in log signature file:");
 			res = continue_on_hash_fail(res, set, mp, blocks, hash, recordHash, &replacement);
-			if (!PARAM_SET_isSetByName(set, "continue-on-fail")) {
+			if (!blocks->isContinuedOnFail || blocks->taskId != TASK_VERIFY) {
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: record hashes not equal for logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
 			}
 
@@ -1443,7 +1446,7 @@ static int process_tree_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, 
 
 			res = logksi_datahash_compare(err, mp, blocks, 0, blocks->notVerified[i], treeHash, description, "Tree hash computed from record hashes:", "Tree hash stored in log signature file:");
 			res = continue_on_hash_fail(res, set, mp, blocks, blocks->notVerified[i], treeHash, &replacement);
-			if (!PARAM_SET_isSetByName(set, "continue-on-fail")) {
+			if (!blocks->isContinuedOnFail || blocks->taskId != TASK_VERIFY) {
 				if (blocks->keepRecordHashes) {
 					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: tree hashes not equal for logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
 				}
@@ -1497,7 +1500,11 @@ static int process_tree_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, 
 
 			res = logksi_datahash_compare(err, mp, blocks, 0, blocks->notVerified[i], treeHash, description, "Tree hash computed from record hashes:", "Tree hash stored in log signature file:");
 			res = continue_on_hash_fail(res, set, mp, blocks, blocks->notVerified[i], treeHash, &replacement);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: tree hashes not equal for logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
+			if (!blocks->isContinuedOnFail || blocks->taskId != TASK_VERIFY) {
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: tree hashes not equal for logline no. %zu.", blocks->blockNo, get_nof_lines(blocks));
+			}
+
+			if (res != KT_OK) goto cleanup;
 		}
 	}
 
@@ -1779,7 +1786,7 @@ static int check_log_signature_client_id(PARAM_SET *set, MULTI_PRINTER* mp, ERR_
 
 			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Client ID mismatch '%s'.\n", blocks->blockNo, strClientId);
 			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Not matching pattern '%s'.\n", blocks->blockNo, REGEXP_getPattern(blocks->client_id_match));
-		if (PARAM_SET_isSetByName(set, "continue-on-fail")) res = KT_OK;
+		if (blocks->isContinuedOnFail) res = KT_OK;
 		else ERR_TRCKR_ADD(err, res, "Error: Failed to match KSI signatures client ID for block %zu!", blocks->blockNo);
 		goto cleanup;
 		}
@@ -1885,7 +1892,7 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 		print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Block is unsigned!\n", blocks->blockNo);
 		/* Don't use ERR_CATCH_MSG when --continue-on-fail is set, as the amount of errors
 		   produced will easily exceed the limits of ERR_TRCKR. */
-		if (!PARAM_SET_isSetByName(set, "continue-on-fail")) {
+		if (!blocks->isContinuedOnFail || blocks->taskId != TASK_VERIFY) {
 			ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion: Make sure that block signature is actually the original output\n"
 											 "                and KSI signature is not replaced with unsigned marker!\n"
 											 "                If that's correct, use logksi sign to sign unsigned blocks.\n");
@@ -1983,7 +1990,7 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Verification of block %zu KSI signature failed!\n", blocks->blockNo);
 			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Verification of KSI signature failed!\n", blocks->blockNo);
 
-			if (!PARAM_SET_isSetByName(set, "continue-on-fail")) {
+			if (!blocks->isContinuedOnFail || blocks->taskId != TASK_VERIFY) {
 				ERR_TRCKR_ADD(err, res, "Error: Block no. %zu: KSI signature verification failed.", blocks->blockNo);
 			}
 
@@ -2318,7 +2325,11 @@ static int process_record_chain(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *er
 		/* This is a metarecord hash. */
 		res = logksi_datahash_compare(err, mp, blocks, 0, blocks->metarecordHash, recordHash, description, "Metarecord hash computed from metarecord:", "Metarecord hash stored in integrity proof file:");
 		res = continue_on_hash_fail(res, set, mp, blocks, blocks->metarecordHash, recordHash, &replacement);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: metarecord hashes not equal.", blocks->blockNo);
+		if (!blocks->isContinuedOnFail) {
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: metarecord hashes not equal.", blocks->blockNo);
+		}
+
+		if (res != KT_OK) goto cleanup;
 	} else {
 		/* This is a logline record hash. */
 
@@ -2330,7 +2341,11 @@ static int process_record_chain(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *er
 
 			res = logksi_datahash_compare(err, mp, blocks, 1, hash, recordHash, NULL, "Record hash computed from logline:", "Record hash stored in integrity proof file:");
 			res = continue_on_hash_fail(res, set, mp, blocks, hash, recordHash, &replacement);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: record hashes not equal.", blocks->blockNo);
+			if (!blocks->isContinuedOnFail) {
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: record hashes not equal.", blocks->blockNo);
+			}
+
+			if (res != KT_OK) goto cleanup;
 		} else {
 			replacement = KSI_DataHash_ref(recordHash);
 		}
@@ -2364,7 +2379,11 @@ static int process_record_chain(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *er
 		KSI_DataHash_free(replacement);
 		replacement = NULL;
 		res = continue_on_hash_fail(res, set, mp, blocks, root, blocks->rootHash, &replacement);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: root hashes not equal.", blocks->blockNo);
+		if (!blocks->isContinuedOnFail) {
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: root hashes not equal.", blocks->blockNo);
+		}
+
+		if (res != KT_OK) goto cleanup;
 	} else {
 		res = KT_INVALID_INPUT_FORMAT;
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to get sub TLVs from record chain.", blocks->blockNo);
@@ -2596,7 +2615,7 @@ static int process_partial_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCK
 			print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_LEVEL_3, "Block no. %3zu: creating missing KSI signature... ", blocks->blockNo);
 
 			res = processors->create_signature(set, mp, err, ksi, blocks, files, hash, block_info_get_aggregation_level(blocks), &sig);
-			if (res != KT_OK && PARAM_SET_isSetByName(set, "continue-on-fail")) {
+			if (res != KT_OK && blocks->isContinuedOnFail) {
 				sign_err = KT_SIGNING_FAILURE;
 				print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 
@@ -3013,11 +3032,13 @@ int logsignature_extend(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 		goto cleanup;
 	}
 
-	BLOCK_INFO_reset(&blocks);
+	BLOCK_INFO_clearAll(&blocks);
 	blocks.ftlv_raw = ftlv_raw;
 	blocks.taskId = TASK_EXTEND;
 	memset(&processors, 0, sizeof(processors));
 	processors.extend_signature = extend_signature;
+
+	blocks.isContinuedOnFail = PARAM_SET_isSetByName(set, "continue-on-fail");
 
 	res = process_magic_number(set, mp, err, &blocks, files);
 	if (res != KT_OK) goto cleanup;
@@ -3153,7 +3174,6 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 	int isFirst = 1;
 	int skipCurrentBlock = 0;
 	int printHeader = 0;
-	int isContinuedOnFail = 0;
 	REGEXP *tmp_regxp = NULL;
 
 	if (set == NULL || err == NULL || ksi == NULL || blocks == NULL || verify_signature == NULL || files == NULL) {
@@ -3165,6 +3185,8 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 	blocks->taskId = TASK_VERIFY;
 	memset(&processors, 0, sizeof(processors));
 	processors.verify_signature = verify_signature;
+
+	blocks->isContinuedOnFail = PARAM_SET_isSetByName(set, "continue-on-fail");
 
 	res = process_magic_number(set, mp, err, blocks, files);
 	if (res != KT_OK) goto cleanup;
@@ -3180,7 +3202,6 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 		tmp_regxp = NULL;
 	}
 
-	isContinuedOnFail = PARAM_SET_isSetByName(set, "continue-on-fail");
 
 	while (!SMART_FILE_isEof(files->files.inSig)) {
 		MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
@@ -3202,7 +3223,7 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 							res = process_log_signature_with_block_signature(set, mp, err, ksi, NULL, blocks, files, &processors);
 							if (res != KT_OK) {
 								/* In case of verification failure and --continue-on-fail option, verification is continued. */
-								if ((res == KT_VERIFICATION_FAILURE || res == KSI_VERIFICATION_FAILURE) && isContinuedOnFail) {
+								if ((res == KT_VERIFICATION_FAILURE || res == KSI_VERIFICATION_FAILURE) && blocks->isContinuedOnFail) {
 									print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 									print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_2, res);
 									print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
@@ -3414,7 +3435,7 @@ cleanup:
 
 	if (blocks->quietError != KT_OK) {
 		res = blocks->quietError;
-		ERR_TRCKR_ADD(err, res, isContinuedOnFail ? "Error: Verification FAILED but was continued for further analysis." : "Error: Verification FAILED and was stopped.");
+		ERR_TRCKR_ADD(err, res, blocks->isContinuedOnFail ? "Error: Verification FAILED but was continued for further analysis." : "Error: Verification FAILED and was stopped.");
 	}
 
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_2, res);
@@ -3445,7 +3466,7 @@ int logsignature_extract(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_
 		goto cleanup;
 	}
 
-	BLOCK_INFO_reset(&blocks);
+	BLOCK_INFO_clearAll(&blocks);
 	blocks.ftlv_raw = ftlv_raw;
 	blocks.taskId = TASK_EXTRACT;
 	memset(&processors, 0, sizeof(processors));
@@ -3453,6 +3474,8 @@ int logsignature_extract(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_
 
 	res = PARAM_SET_getStr(set, "r", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &blocks.records);
 	if (res != KT_OK) goto cleanup;
+
+	blocks.isContinuedOnFail = PARAM_SET_isSetByName(set, "continue-on-fail");
 
 	res = block_info_extract_verify_positions(err, blocks.records);
 	if (res != KT_OK) goto cleanup;
@@ -3532,6 +3555,8 @@ int logsignature_integrate(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KS
 	blocks->ftlv_raw = ftlv_raw;
 	blocks->taskId = TASK_INTEGRATE;
 	memset(&processors, 0, sizeof(processors));
+
+	blocks->isContinuedOnFail = PARAM_SET_isSetByName(set, "continue-on-fail");
 
 	res = process_magic_number(set, mp, err, blocks, files);
 	if (res != KT_OK) goto cleanup;
@@ -3623,7 +3648,7 @@ static int wrapper_LOGKSI_createSignature(PARAM_SET *set, MULTI_PRINTER *mp, ERR
 
 	/* If --continue-on-fail is set, do not add errors to ERR_TRCKR as the amount of errors
 	   will easily exceed its limits. */
-	noErrTrckr = PARAM_SET_isSetByName(set, "continue-on-fail");
+	noErrTrckr = blocks->isContinuedOnFail;
 
 	print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_EQUAL | DEBUG_LEVEL_2, "Signing Block no. %3zu... ", blocks->blockNo);
 	res = LOGKSI_createSignature((noErrTrckr ? NULL : err), ksi, hash, rootLevel, sig);
@@ -3646,11 +3671,13 @@ int logsignature_sign(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX
 		goto cleanup;
 	}
 
-	BLOCK_INFO_reset(&blocks);
+	BLOCK_INFO_clearAll(&blocks);
 	blocks.ftlv_raw = ftlv_raw;
 	blocks.taskId = TASK_SIGN;
 	memset(&processors, 0, sizeof(processors));
 	processors.create_signature = wrapper_LOGKSI_createSignature;
+
+	blocks.isContinuedOnFail = PARAM_SET_isSetByName(set, "continue-on-fail");
 
 	res = process_magic_number(set, mp, err, &blocks, files);
 	if (res != KT_OK) goto cleanup;
