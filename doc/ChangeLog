@@ -26,6 +26,7 @@
 (LOGKSI-121) * BUGFIX: When trying to extract from excerpt file memory is not accessed out of boundaries.
 (LOGKSI-129) * BUGFIX: When opening of input file fails, file name is displayed in error message.
 (LOGKSI-110) * IMPROVEMENT: Internal file handling refactored.
+(LOGKSI-130) * IMPROVEMENT: Verification on hash algorithm ID refactored.
 
 Version 1.4
 
