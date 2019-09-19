@@ -394,6 +394,8 @@ int extract_hashAlg(void *extra, const char* str, void** obj) {
 	KSI_HashAlgorithm *hash_id = (KSI_HashAlgorithm*)obj;
 	KSI_HashAlgorithm tmp = KSI_HASHALG_INVALID_VALUE;
 
+	if (obj == NULL) return KT_INVALID_ARGUMENT;
+
 	if (extra);
 	hash_alg_name = str != NULL ? (str) : ("default");
 
