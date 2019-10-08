@@ -34,6 +34,7 @@
 
 #ifdef HAVE_CONFIG_H
 #  include "config.h"
+#include "param_set/parameter.h"
 #endif
 
 const char *TOOL_getVersion(void) {
@@ -157,7 +158,7 @@ int main(int argc, char** argv, char **envp) {
 	/**
 	 * Define parameter and task set.
 	 */
-	res = PARAM_SET_new("{h|help}{version}{d}", &set);
+	res = PARAM_SET_new("{h|help}{version}{d}{time-diff}{block-time-diff}", &set);
 	if (res != PST_OK) goto cleanup;
 
 	res = TASK_SET_new(&tasks);
@@ -180,8 +181,13 @@ int main(int argc, char** argv, char **envp) {
 	 */
 	PARAM_SET_add(set_task_name, argv[1], NULL, NULL, 0);
 
+	/* As those options may hold values similar to -9h, parser may interpret it as
+	   concatenated flags unknown -9 and -h as request for help. The workaround
+	   is to consume those values. */
+	res = PARAM_SET_setParseOptions(set, "time-diff,block-time-diff", PST_PRSCMD_HAS_VALUE | PST_PRSCMD_NO_TYPOS);
+
 	if (argc > 1) {
-		PARAM_SET_readFromCMD(set, argc, argv, NULL, 0);
+		PARAM_SET_parseCMD(set, argc, argv, NULL, 0);
 	}
 
 	/**

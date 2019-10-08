@@ -48,10 +48,6 @@ Specify the HMAC key for extending service.
 Hash algorithm to be used for computing HMAC on outgoing messages towards KSI extender. If not set, default algorithm is used. Use \fBlogksi -h \fRto get the list of supported hash algorithms.
 .\"
 .TP
-\fB--ext-pdu-v \fIstr\fR
-Specify the KSIEP (KSI Extension Protocol) PDU version. Valid values are \fIv1\fR and \fIv2\fR. Note that use of \fIv1\fR is \fBdeprecated\fR and use of \fIv2\fR is recommended.
-.\"
-.TP
 \fB-P \fIURL\fR
 Specify the publications file URL (or file with URI scheme 'file://').
 .\"
@@ -86,6 +82,10 @@ Enable conversion, extending and replacing of RFC3161 timestamps with KSI signat
 .TP
 \fB-d\fR
 Print detailed information about processes and errors to \fIstderr\fR. To make output more verbose increase debug level with \fB-dd\fR or \fB-ddd\fR. With debug level 1 a summary of log file is displayed. With debug level 2 a summary of each block and the log file is displayed. Debug level 3 will display the whole parsing of the log signature file. The parsing of \fIrecord hashes (r)\fR, \fItree hashes (.)\fR, \fIfinal tree hashes (:)\fR and \fImeta-records (M)\fR is displayed inside curly brackets in following manner \fI{r.Mr..:}\fR. In case of a failure \fI(X)\fR is displayed and closing curly bracket is omitted.
+.\"
+.TP
+\fB--hex-to-str\fR
+Will encode applicable hex encoded data fields to ASCII string (e.g. meta-record value). Non-printable characters are displayed in hex with leading backslash (e.g. 'Text\\00').
 .\"
 .TP
 \fB--conf \fIfile\fR

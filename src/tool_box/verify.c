@@ -40,6 +40,8 @@
 #include "conf_file.h"
 #include "tool.h"
 #include "rsyslog.h"
+#include "blocks_info.h"
+#include "io_files.h"
 
 enum {
 	/* Trust anchor based verification. */
@@ -100,15 +102,16 @@ int verify_run(int argc, char **argv, char **envp) {
 	char *logFileNameCpy = NULL;
 	char *sigFileNameCpy = NULL;
 	BLOCK_INFO blocks;
-	BLOCK_INFO_reset(&blocks);
 	MULTI_PRINTER *mp = NULL;
+	uint64_t las_rec_time = 0;
 
+	BLOCK_INFO_clearAll(&blocks);
 	IO_FILES_init(&files);
 	/**
 	 * Extract command line parameters and also add configuration specific parameters.
 	 */
 	res = PARAM_SET_new(
-			CONF_generate_param_set_desc("{warn-same-block-time}{ignore-desc-block-time}{multiple_logs}{input}{input-hash}{output-hash}{log-from-stdin}{x}{d}{pub-str}{ver-int}{ver-cal}{ver-key}{ver-pub}{use-computed-hash-on-fail}{use-stored-hash-on-fail}{conf}{log}{h|help}", "XP", buf, sizeof(buf)),
+			CONF_generate_param_set_desc("{warn-same-block-time}{warn-client-id-change}{ignore-desc-block-time}{multiple_logs}{input}{input-hash}{client-id}{output-hash}{log-from-stdin}{x}{d}{pub-str}{ver-int}{ver-cal}{ver-key}{ver-pub}{use-computed-hash-on-fail}{use-stored-hash-on-fail}{continue-on-fail}{conf}{time-form}{time-base}{time-diff}{time-disordered}{block-time-diff}{log}{h|help}{hex-to-str}", "XP", buf, sizeof(buf)),
 			&set);
 	if (res != KT_OK) goto cleanup;
 
@@ -208,9 +211,10 @@ int verify_run(int argc, char **argv, char **envp) {
 			print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, "%sLog file '%s'.\n", (i == 0 ? "" : "\n"), files.internal.inLog);
 		}
 
+		blocks.rec_time_in_file_max = las_rec_time;
 
 		print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_EQUAL | DEBUG_LEVEL_1, "Verifying... ");
-		res = logsignature_verify(set, mp, err, ksi, &blocks, inputHash, verify_signature, &files, &outputHash);
+		res = logsignature_verify(set, mp, err, ksi, &blocks, inputHash, verify_signature, &files, &outputHash, &las_rec_time);
 		print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 		if (res != KT_OK) goto cleanup;
 
@@ -250,10 +254,9 @@ cleanup:
 	if (res != KT_OK) {
 		if (ERR_TRCKR_getErrCount(err) == 0) {ERR_TRCKR_ADD(err, res, NULL);}
 		LOGKSI_KSI_ERRTrace_LOG(ksi);
-
 		print_errors("\n");
-		ERR_TRCKR_print(err, d);
 	}
+	ERR_TRCKR_print(err, d);
 
 	KSI_DataHash_free(inputHash);
 	KSI_DataHash_free(outputHash);
@@ -298,13 +301,13 @@ char *verify_help_toString(char *buf, size_t len) {
 		" <logfile>\n"
 		"           - Log file to be verified.\n"
 		" <logfile.logsig>\n"
-		"             Log signature file to be verified. If omitted, the log signature file name is\n"
+		"           - Log signature file to be verified. If omitted, the log signature file name is\n"
 		"             derived by adding either '.logsig' or '.gtsig' to '<logfile>'. The file is expected\n"
 		"             to be found in the same folder as the '<logfile>'.\n"
 		" <logfile.excerpt>\n"
 		"           - Excerpt file to be verified.\n"
 		" <logfile.excerpt.logsig>\n"
-		"             Record integrity proof file to be verified. If omitted, the file name is\n"
+		"           - Record integrity proof file to be verified. If omitted, the file name is\n"
 		"             derived by adding '.logsig' to '<logfile>.excerpt'. It is expected to be found in the\n"
 		"             same folder as the '<logfile>.excerpt'\n"
 		" --log-from-stdin\n"
@@ -330,13 +333,48 @@ char *verify_help_toString(char *buf, size_t len) {
 		"             see how to verify that log signature is bound with this log signature\n"
 		"             (where from the output hash was extracted). When used together with\n"
 		"             '--', only the output hash of the last log file is returned.\n"
-		"--ignore-desc-block-time\n"
+		" --ignore-desc-block-time\n"
 		"           - Skip signing time verification where more recent log blocks must have\n"
 		"             more recent (or equal) signing time than previous blocks.\n"
-		"--warn-same-block-time\n"
+		" --client-id <regexp>\n"
+		"           - Verifies if KSI signatures client ID is matching regular expression\n"
+		"             specified.\n"
+		" --time-form <fmt>\n"
+		"           - Format string fmt is used to extract time stamp from the beginning\n"
+		"             of the log line to be matched with KSI signature signing time. Fmt\n"
+		"             is specified by function strptime and its documentation can be read\n"
+		"             for more details.\n"
+		" --time-base <year>\n"
+		"           - Specify the year (e.g. 2019) when it can not be extracted with\n"
+		"             --time-form.\n"
+		" --time-diff <time>\n"
+		"           - A specified time difference that with the signing time of the KSI\n"
+		"             signature forms a valid time window where all the log records must\n"
+		"             fit. Also the chronological order of the log records is checked.\n"
+		"             The difference can be specified as seconds (e.g 86400) or using\n"
+		"             integers followed by markers (e.g. 10d2H3M1S), where d, H, M and S\n"
+		"             stand for day, hour, minute and second accordingly.\n"
+		" --time-disordered <time>\n"
+		"          -  Will permit log records to be disordered within specified range\n"
+		"             (e.g. with value 1 following sequence of time values is correct:\n"
+		"             1, 3, 2, 4).\n"
+		" --warn-client-id-change\n"
+		"           - Will warn the user if KSI signatures client ID is not constant over\n"
+		"             all the blocks.\n"
+		" --warn-same-block-time\n"
 		"           - Prints a warning when two consecutive blocks have same signing time.\n"
 		"             When multiple log files are verified the last block from the previous\n"
 		"             file is compared with the first block from the current file.\n"
+		" --continue-on-fail\n"
+		"           - Can be used to continue verification to improve\n"
+		"             debugging of verification errors. Other errors (e.g. IO error) will\n"
+		"             terminated verification.\n"
+		" --use-stored-hash-on-fail\n"
+		"           - Can be used to debug hash comparison failures, by\n"
+		"             using stored hash values to continue verification process.\n"
+		" --use-computed-hash-on-fail\n"
+		"           - Can be used to debug hash comparison failures, by\n"
+		"             using computed hash values to continue verification process.\n"
 		" -x\n"
 		"           - Permit to use extender for publication-based verification.\n"
 		" -X <URL>\n"
@@ -362,6 +400,10 @@ char *verify_help_toString(char *buf, size_t len) {
 		" -d\n"
 		"           - Print detailed information about processes and errors to stderr.\n"
 		"             To make output more verbose use -dd or -ddd.\n"
+		" --hex-to-str\n"
+		"           - Will encode applicable hex encoded data fields to ASCII string\n"
+		"             (e.g. meta-record value). Non-printable characters are displayed in\n"
+		"             hex with leading backslash (e.g. 'Text\\00').\n"
 		" --conf <file>\n"
 		"             Read configuration options from the given file.\n"
 		"             Configuration options given explicitly on command line will\n"
@@ -404,17 +446,22 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	PARAM_SET_addControl(set, "{log}{output-hash}", isFormatOk_path, NULL, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{input}{multiple_logs}", isFormatOk_inputFile, isContentOk_inputFileWithPipe, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{input-hash}", isFormatOk_inputHash, isContentOk_inputHash, convertRepair_path, extract_inputHashFromImprintOrImprintInFile);
-	PARAM_SET_addControl(set, "{log-from-stdin}{d}{x}{ver-int}{ver-cal}{ver-key}{ver-pub}{use-computed-hash-on-fail}{use-stored-hash-on-fail}", isFormatOk_flag, NULL, NULL, NULL);
+	PARAM_SET_addControl(set, "{log-from-stdin}{d}{x}{ver-int}{ver-cal}{ver-key}{ver-pub}{use-computed-hash-on-fail}{use-stored-hash-on-fail}{continue-on-fail}{hex-to-str}", isFormatOk_flag, NULL, NULL, NULL);
 	PARAM_SET_addControl(set, "{pub-str}", isFormatOk_pubString, NULL, NULL, extract_pubString);
+	PARAM_SET_addControl(set, "client-id,time-form", isFormatOk_string, NULL, NULL, NULL);
+	PARAM_SET_addControl(set, "time-base", isFormatOk_int, isContentOk_uint, NULL, extract_int);
+	PARAM_SET_addControl(set, "time-diff", isFormatOk_timeDiff, NULL, NULL, extract_timeDiff);
+	PARAM_SET_addControl(set, "block-time-diff", isFormatOk_timeDiffInfinity, NULL, NULL, extract_timeDiff);
+	PARAM_SET_addControl(set, "time-disordered", isFormatOk_timeValue, NULL, NULL, extract_timeValue);
 
 	PARAM_SET_setParseOptions(set, "m", PST_PRSCMD_HAS_MULTIPLE_INSTANCES | PST_PRSCMD_BREAK_VALUE_WITH_EXISTING_PARAMETER_MATCH);
+	PARAM_SET_setParseOptions(set, "time-form,time-base,time-diff,time-disordered,block-time-diff", PST_PRSCMD_HAS_VALUE);
 
 	/* Make input also collect same values as multiple_logs. It simplifies task handling. */
 	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_COLLECT_WHEN_PARSING_IS_CLOSED |PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
 	PARAM_SET_setParseOptions(set, "multiple_logs", PST_PRSCMD_CLOSE_PARSING | PST_PRSCMD_COLLECT_WHEN_PARSING_IS_CLOSED | PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
 	PARAM_SET_setParseOptions(set, "d,x", PST_PRSCMD_HAS_NO_VALUE | PST_PRSCMD_NO_TYPOS);
-	PARAM_SET_setParseOptions(set, "warn-same-block-time,ignore-desc-block-time,log-from-stdin,ver-int,ver-cal,ver-key,ver-pub,use-computed-hash-on-fail,use-stored-hash-on-fail", PST_PRSCMD_HAS_NO_VALUE);
-
+	PARAM_SET_setParseOptions(set, "warn-client-id-change,warn-same-block-time,ignore-desc-block-time,log-from-stdin,ver-int,ver-cal,ver-key,ver-pub,use-computed-hash-on-fail,use-stored-hash-on-fail", PST_PRSCMD_HAS_NO_VALUE);
 	/*						ID						DESC								MAN							ATL		FORBIDDEN											IGN	*/
 	TASK_SET_add(task_set,	ANC_BASED_DEFAULT,		"Verify, from file.",				"input",						NULL,	"log-from-stdin,ver-int,ver-cal,ver-key,ver-pub,P,cnstr,pub-str",	NULL);
 	TASK_SET_add(task_set,	ANC_BASED_DEFAULT_STDIN,"Verify, from standard input",		"input,log-from-stdin",			NULL,	"ver-int,ver-cal,ver-key,ver-pub,P,cnstr,pub-str",	NULL);
@@ -835,14 +882,20 @@ static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files) {
 	}
 
 	if (files->internal.inLog) {
-		res = logksi_file_check_and_open(err, files->internal.inLog, &tmp.files.inLog);
-		if (res != KT_OK) goto cleanup;
+		res = SMART_FILE_open(files->internal.inLog, "rb", &tmp.files.inLog);
+		ERR_CATCH_MSG(err, res, "Unable to open input log file '%s'.", files->internal.inLog)
 	} else {
-		tmp.files.inLog = stdin;
+		res = SMART_FILE_open("-", "rbs", &tmp.files.inLog);
+		ERR_CATCH_MSG(err, res, "Unable to open input log stream.")
 	}
 
-	res = logksi_file_check_and_open(err, files->internal.inSig, &tmp.files.inSig);
-	if (res != KT_OK) goto cleanup;
+	if (files->internal.inSig) {
+		res = SMART_FILE_open(files->internal.inSig, "rb", &tmp.files.inSig);
+		ERR_CATCH_MSG(err, res, "Unable to open input signature file '%s'.", files->internal.inSig)
+	} else {
+		res = SMART_FILE_open("-", "rbs", &tmp.files.inSig);
+		ERR_CATCH_MSG(err, res, "Unable to open input signature stream.")
+	}
 
 	files->files = tmp.files;
 	memset(&tmp.files, 0, sizeof(tmp.files));
@@ -898,7 +951,7 @@ static int save_output_hash(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *ioFiles, K
 		res = SMART_FILE_open(fname, "ws", &out);
 		ERR_CATCH_MSG(err, res, "Error: Unable to open file '%s'.", fname);
 
-		res = SMART_FILE_write(out, buf, count, &write_count);
+		res = SMART_FILE_write(out, (unsigned char*)buf, count, &write_count);
 		ERR_CATCH_MSG(err, res, "Error: Unable to write to file '%s'.", fname);
 
 		if (write_count != count) {

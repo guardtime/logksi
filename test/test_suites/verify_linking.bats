@@ -108,3 +108,57 @@ echo SHA-512:dd4e870e7e0c998f160688b97c7bdeef3d6d01b1c5f02db117018058ad51996777a
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ .*(Warning).*(Last block).*(from file).*(ok-testlog-interlink-same-sig-time-1).*(and).*(first block).*(from file).*(ok-testlog-interlink-same-sig-time-2).*(has same signing time).*(1540454662).* ]]
 }
+
+##
+# Check chronological order.
+##
+
+@test "verify inter-linking and log record embedded time chronological order - fail" {
+	run src/logksi verify --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff 50S -dd --use-stored-hash-on-fail  -- test/resource/interlink/ok-testlog-interlink-1 test/resource/interlink/testlog-interlink-first-rec-time-changed-2
+	[ "$status" -eq 6 ]
+	[[ "$output" =~ (Log file .*ok-testlog-interlink-1..).(Verifying block no.   1... ok.).*(Log file .*testlog-interlink-first-rec-time-changed-2..).(Verifying block no.   1... failed.) ]]
+	[[ "$output" =~ (x Error: Most recent log line from previous file is more recent than least recent log line from current file:).*(Previous log file).*(ok-testlog-interlink-1).*(Time for most recent log line).*(1539771483).*(Current log file).*(testlog-interlink-first-rec-time-changed-2).*(Time for least recent log line).*(1539771480) ]]
+	[[ ! "$output" =~ "unable to calculate hash of logline no" ]]
+	[[ "$output" =~ (Error: Verification FAILED and was stopped.).*(Error: Unable to finalize last block).*(Error: Most recent log line from previous file is more recent than least recent log line from current file) ]]
+}
+
+@test "verify inter-linking and log record embedded time chronological order - ok" {
+	run ./src/logksi verify --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff 5S -dd -- test/resource/interlink/ok-testlog-interlink-[12]
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ (Log file .*ok-testlog-interlink-1..).(Verifying block no.   1... ok.).*(Log file .*ok-testlog-interlink-2..).(Verifying block no.   1... ok.) ]]
+}
+
+# This tests checks that actually the most recent block from the previous file is used for testing and not always the last log line in log file,
+# as the chronological order may be corrupted due to the network latency or invalid system clock during the creation of the log line.
+
+@test "verify inter-linking and log record embedded time chronological order - check most recent value from previous block" {
+	run src/logksi verify  -d --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff 50S --use-stored-hash-on-fail --time-disordered 3  -- test/resource/interlink/testlog-interlink-n-1-rec-time-changed-1 test/resource/interlink/testlog-interlink-first-rec-time-changed-2
+	[ "$status" -eq 6 ]
+	[[ "$output" =~ (Error: Most recent log line from previous file is more recent than least recent log line from current file:).*(Previous log file).*(testlog-interlink-n-1-rec-time-changed-1).*(Time for most recent log line).*(1539771484).*(Current log file).*(testlog-interlink-first-rec-time-changed-2).*(Time for least recent log line).*(1539771480) ]]
+}
+
+@test "verify inter-linking with --block-time-diff where last block of previous file and first block of current file are too apart" {
+	run ./src/logksi verify --block-time-diff 15 -- test/resource/interlink/ok-testlog-interlink-[12]
+	[ "$status" -eq 6 ]
+	[[ "$output" =~ (Error: Signing times from last block of previous file and first block of current file are too apart).*(Previous file).*(ok-testlog-interlink-1).*(Sig time).*(1539771487).*(Current file).*(ok-testlog-interlink-2).*(Sig time).*(1539771503).*(Time diff).*(00:00:16).*(Expected time diff).*(0 - 00:00:15) ]]
+	[[ "$output" =~ "Error: Abnormal signing time difference for consecutive blocks!" ]]
+}
+
+@test "verify inter-linking with --block-time-diff where last block of previous file and first block of current file are too close" {
+	run ./src/logksi verify --block-time-diff 1d,oo -- test/resource/interlink/ok-testlog-interlink-[12]
+	[ "$status" -eq 6 ]
+	[[ "$output" =~ (Error: Signing times from last block of previous file and first block of current file are too close).*(Previous file).*(ok-testlog-interlink-1).*(Sig time).*(1539771487).*(Current file).*(ok-testlog-interlink-2).*(Sig time).*(1539771503).*(Time diff).*(00:00:16).*(Expected time diff).*(1d 00:00:00 - oo) ]]
+}
+
+@test "verify inter-linking with --block-time-diff where last block of previous file are more recent than expected" {
+	run ./src/logksi verify  --block-time-diff -6d,oo -- test/resource/interlink/ok-testlog-interlink-resigned-1 test/resource/interlink/ok-testlog-interlink-2
+	[ "$status" -eq 6 ]
+		[[ "$output" =~ (Error: Signing times from last block of previous file is more recent than expected relative to first block of current file).*(Previous file).*(ok-testlog-interlink-resigned-1).*(Sig time).*(1540301997).*(Current file).*(ok-testlog-interlink-2).*(Sig time).*(1539771503).*(Time diff).*(-6d 03:21:34).*(Expected time diff).*(-6d 00:00:00 - oo) ]]
+}
+
+@test "verify inter-linking with --block-time-diff where last block of previous file and first block of current file has exactly accepted time diff" {
+	run ./src/logksi verify --block-time-diff 16 -- test/resource/interlink/ok-testlog-interlink-[12]
+	[ "$status" -eq 0 ]
+	[[ ! "$output" =~ (too close) ]]
+	[[ ! "$output" =~ (too apart) ]]
+}

@@ -21,13 +21,8 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ (Algorithm name is incorrect).*(Parameter.*CMD.*aggr-hmac-alg).*(dummy) ]]
 }
 
-@test "sign CMD test: try to use invalid PDU version" {
-	run src/logksi sign test/resource/logs_and_signatures/unsigned -o test/out/dummy.ksig --aggr-pdu-v 1v --aggr-pdu-v 2v --aggr-pdu-v v3
-	[ "$status" -eq 3 ]
-	[[ "$output" =~ (Invalid version).*(Parameter.*CMD.*aggr-pdu-v).*(1v) ]]
-	[[ "$output" =~ (Invalid version).*(Parameter.*CMD.*aggr-pdu-v).*(2v) ]]
-	[[ "$output" =~ (Invalid version).*(Parameter.*CMD.*aggr-pdu-v).*(v3) ]]
+@test "sign CMD test: try to sign not existing log signature file" {
+	run src/logksi sign -o test/out/dummy.ksig dummy.not.existing
+	[ "$status" -eq 9 ]
+	[[ "$output" =~  (Error: Could not open input signature file).*(dummy.not.existing.logsig) ]]
 }
-
-
-

@@ -25,6 +25,7 @@
 #include "param_set/param_set.h"
 #include "smart_file.h"
 #include "api_wrapper.h"
+#include "regexpwrap.h"
 
 static int logksi_ErrToExitcode(int error_code) {
 	switch (error_code) {
@@ -35,6 +36,7 @@ static int logksi_ErrToExitcode(int error_code) {
 		case KT_INVALID_ARGUMENT:
 		case KT_INDEX_OVF:
 		case KT_UNKNOWN_ERROR:
+		case KT_SIGNING_FAILURE:
 			return EXIT_FAILURE;
 		case KT_IO_ERROR:
 			return EXIT_IO_ERROR;
@@ -97,6 +99,17 @@ static int smart_file_ErrToExitcode(int error_code) {
 	}
 }
 
+static int regexp_wrapper_ErrToExitcode(int error_code) {
+	switch (error_code) {
+		case REGEXP_OK:
+			return EXIT_SUCCESS;
+		case REGEXP_OUT_OF_MEMORY:
+			return EXIT_OUT_OF_MEMORY;
+		default:
+			return EXIT_FAILURE;
+	}
+}
+
 static const char* logksiErrToString(int error_code) {
 	switch (error_code) {
 		case KSI_OK:
@@ -119,8 +132,14 @@ static const char* logksiErrToString(int error_code) {
 			return "User has no privileges.";
 		case KT_KSI_SIG_VER_IMPOSSIBLE:
 			return "Verification can't be performed.";
+		case KT_INVALID_CONF:
+			return "Invalid configuration file.";
 		case KT_VERIFICATION_FAILURE:
 			return "Log signature verification failed.";
+		case KT_SIGNING_FAILURE:
+			return "Log signature signing failed.";
+		case KT_VERIFICATION_SKIPPED:
+			return "Verification skipped.";
 		case KT_PUBFILE_HAS_NO_PUBREC_TO_EXTEND_TO:
 			return "No publication record found to extend to.";
 		case KT_RFC3161_EXT_IMPOSSIBLE:
@@ -129,13 +148,16 @@ static const char* logksiErrToString(int error_code) {
 			return "The hash length is not even number.";
 		case KT_INVALID_HEX_CHAR:
 			return "The hex data contains invalid characters.";
+		case KT_CHANNEL_NOT_FOUND:
+			return "Multi printer channel does not exist.";
+		case KT_INTEGRATION_PURPOSELY_STOPPED:
+			return "Integration purposely stopped.";
 		case KT_UNKNOWN_ERROR:
 			return "Unknown error.";
 		default:
 			return "Unknown error.";
 	}
 }
-
 
 int LOGKSI_errToExitCode(int error) {
 	int exit;
@@ -146,8 +168,10 @@ int LOGKSI_errToExitCode(int error) {
 		exit = logksi_ErrToExitcode(error);
 	else if (error >= PARAM_SET_ERROR_BASE && error < SMART_FILE_ERROR_BASE)
 		exit = param_set_ErrToExitcode(error);
-	else
+	else if (error >= SMART_FILE_ERROR_BASE && error < REGEXP_ERR_BASE)
 		exit = smart_file_ErrToExitcode(error);
+	else
+		exit = regexp_wrapper_ErrToExitcode(error);
 
 	return exit;
 }
@@ -161,8 +185,10 @@ const char* LOGKSI_errToString(int error) {
 		str = logksiErrToString(error);
 	else if (error >= PARAM_SET_ERROR_BASE && error < SMART_FILE_ERROR_BASE)
 		str = PARAM_SET_errorToString(error);
-	else
+	else if (error >= SMART_FILE_ERROR_BASE && error < REGEXP_ERR_BASE)
 		str = SMART_FILE_errorToString(error);
+	else
+		str = REGEXP_errToString(error);
 
 	return str;
 }

@@ -647,6 +647,69 @@ cleanup:
 	return ret;
 }
 
+char* LOGKSI_signature_sigTimeToString(const KSI_Signature* sig, char *buf, size_t buf_len) {
+	int res = KT_UNKNOWN_ERROR;
+	KSI_Integer *sigTime = NULL;
+
+	if (sig == NULL || buf == NULL || buf_len == 0) return NULL;
+
+	res = KSI_Signature_getSigningTime(sig, &sigTime);
+	if (res != KSI_OK) return NULL;
+
+
+	return KSI_Integer_toDateString(sigTime, buf, buf_len);;
+}
+
+char* LOGKSI_signerIdentityToString(KSI_Signature *sig, char *buf, size_t buf_len) {
+	int res = KSI_UNKNOWN_ERROR;
+	KSI_HashChainLinkIdentityList *identityList = NULL;
+	size_t count = 0;
+
+	if (sig == NULL || buf == NULL || buf_len == 0) goto cleanup;
+
+	res = KSI_Signature_getAggregationHashChainIdentity(sig, &identityList);
+	if (res != KSI_OK) goto cleanup;
+
+
+	if (identityList != NULL) {
+		size_t k;
+
+		for (k = 0; k < KSI_HashChainLinkIdentityList_length(identityList); k++) {
+			KSI_HashChainLinkIdentity *identity = NULL;
+			KSI_Utf8String *clientId = NULL;
+
+			res = KSI_HashChainLinkIdentityList_elementAt(identityList, k, &identity);
+			if (res != KSI_OK) goto cleanup;
+
+			res = KSI_HashChainLinkIdentity_getClientId(identity, &clientId);
+			if (res != KSI_OK) goto cleanup;
+			count += KSI_snprintf(buf + count, buf_len - count, "%s%s", (k > 0 ? " :: " : ""), KSI_Utf8String_cstr(clientId));
+		}
+	}
+
+cleanup:
+
+	KSI_HashChainLinkIdentityList_free(identityList);
+
+	return (res == KT_OK) ? buf : NULL;
+}
+
+char* LOGKSI_uint64_toDateString(uint64_t time, char *buf, size_t buf_len) {
+	int res = KT_UNKNOWN_ERROR;
+	KSI_Integer *t = NULL;
+	char tmp[256];
+
+	if (buf == NULL || buf_len == 0) return NULL;
+
+	res = KSI_Integer_new(NULL, time, &t);
+	if (res != KSI_OK) return NULL;
+
+	KSI_snprintf(buf, buf_len, "(%llu) %s+00:00", (unsigned long long)time, KSI_Integer_toDateString(t, tmp, sizeof(tmp)));
+
+	KSI_Integer_free(t);
+	return buf;
+}
+
 static const char *level2str(int level) {
 	switch (level) {
 		case KSI_LOG_DEBUG: return "DEBUG";
@@ -677,7 +740,7 @@ int LOGKSI_LOG_SmartFile(void *logCtx, int logLevel, const char *message) {
 	if (f != NULL) {
 		strftime(time_buf, sizeof(time_buf), "%d.%m.%Y %H:%M:%S", tm_info);
 		count = KSI_snprintf(buf, sizeof(buf), "%s [%s] - %s\n", level2str(logLevel), time_buf, message);
-		SMART_FILE_write(f, buf, count, &dummy);
+		SMART_FILE_write(f, (unsigned char*)buf, count, &dummy);
 	}
 
 	return KSI_OK;

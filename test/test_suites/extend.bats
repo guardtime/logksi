@@ -85,3 +85,26 @@ cp test/resource/logfiles/signed test/out/signed4
 	[[ "$output" =~ (Block no.   [1-9]: extending KSI signature to the specified publication: 2018.11.15 00:00:00 UTC.*){9} ]]
 	[[ "$output" =~ (Block no.  [1-3][0-9]: extending KSI signature to the specified publication: 2018.11.15 00:00:00 UTC.*){21} ]]
 }
+
+@test "extend and check if backup is really backup" {
+	run cp  test/resource/logs_and_signatures/signed test/out/ext-backup-test
+	run cp  test/resource/logs_and_signatures/signed.logsig test/out/ext-backup-test.logsig
+	run ./src/logksi extend test/out/ext-backup-test -dd
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ (Summary of block 1).*(Extended to).*(1518652800).*(Summary of block 4).*(Extended to).*(1518652800) ]]
+	run test -f test/out/ext-backup-test.logsig
+	[ "$status" -eq 0 ]
+	run test -f test/out/ext-backup-test.logsig.bak
+	[ "$status" -eq 0 ]
+	run diff test/resource/logs_and_signatures/signed.logsig test/out/ext-backup-test.logsig.bak
+	[ "$status" -eq 0 ]
+	run diff test/resource/logs_and_signatures/signed.logsig test/out/ext-backup-test.logsig
+	[ "$status" -ne 0 ]
+}
+
+@test "Try to extend excerpt file - not implemented." {
+	run src/logksi extend test/resource/excerpt/log-ok.excerpt  -o test/out/dummy.ksig -d
+	[ "$status" -eq 1 ]
+	[[ "$output" =~ "Extending... failed." ]]
+	[[ "$output" =~ "Extending of excerpt file not yet implemented!" ]]
+}

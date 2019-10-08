@@ -95,3 +95,206 @@ export KSI_CONF=test/test.cfg
 	[ "$status" -eq 3 ]
 	[[ "$output" =~ (OID is invalid).*(Parameter).*(--cnstr).*(dummy=nothing) ]]
 }
+
+@test "verify CMD test: Try to use invalid --time-diff 1" {
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/log_repaired -d --time-diff "" --time-diff " " --time-diff S --time-diff M --time-diff H --time-diff d --time-diff s --time-diff m --time-diff h --time-diff D --time-diff - --time-diff o
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ (Parameter has no content).*(Parameter).*(--time-diff).*(\'\') ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(\' \') ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(\'S\') ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(\'M\') ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(\'H\') ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(\'d\') ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(\'s\') ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(\'m\') ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(\'h\') ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(\'D\') ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(\'-\') ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(\'o\') ]]
+}
+
+@test "verify CMD test: Try to use invalid --time-diff 2" {
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/log_repaired -d --time-diff 1S2 --time-diff 1S3S --time-diff 1M3M  --time-diff 1H3H  --time-diff 1d3d --time-diff "2 2" --time-diff dHMS --time-diff S5 --time-diff M6 --time-diff H7 --time-diff d8 --time-diff --2 --time-diff 2d-1 --time-diff 2D
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(1S2) ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(1S3S) ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(1M3M) ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(1H3H) ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(1d3d) ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(2 2) ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(dHMS) ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(S5) ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(M6) ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(H7) ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(d8) ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(--2) ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(2d-1) ]]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-diff).*(2D) ]]
+}
+
+@test "verify CMD test: Try to use invalid --time-diff range (n,m)" {
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/log_repaired -d --time-diff , --time-diff 5, --time-diff ,5 --time-diff 5,4 --time-diff -5,-4 --time-diff -3,2, --time-diff 5,oo --time-diff -oo,oo
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ (Time range should be -<int>,<int>.).*(Parameter).*(--time-diff).*(,) ]]
+	[[ "$output" =~ (Time range should be -<int>,<int>.).*(Parameter).*(--time-diff).*(5,) ]]
+	[[ "$output" =~ (Time range should be -<int>,<int>.).*(Parameter).*(--time-diff).*(,5) ]]
+	[[ "$output" =~ (Time range should be -<int>,<int>.).*(Parameter).*(--time-diff).*(5,4) ]]
+	[[ "$output" =~ (Time range should be -<int>,<int>.).*(Parameter).*(--time-diff).*(-5,-4) ]]
+	[[ "$output" =~ (Time range should be -<int>,<int>.).*(Parameter).*(--time-diff).*(-3,2,) ]]
+	[[ "$output" =~ (Time range should be -<int>,<int>.).*(Parameter).*(--time-diff).*(5,oo) ]]
+	[[ "$output" =~ (Time range should be -<int>,<int>.).*(Parameter).*(--time-diff).*(-oo,oo) ]]
+}
+
+@test "verify CMD test: Try to use invalid --block-time-diff range" {
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/log_repaired -d  --block-time-diff -oo,-oo --block-time-diff oo,oo --block-time-diff ,oo --block-time-diff oo, --block-time-diff o --block-time-diff -o --block-time-diff 5,o --block-time-diff o,5 --block-time-diff o,o
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ (Time range with infinity can be -oo,oo, <int>,oo or -oo,<int>).*(Parameter).*(--block-time-diff).*(-oo,-oo) ]]
+	[[ "$output" =~ (Time range with infinity can be -oo,oo, <int>,oo or -oo,<int>).*(Parameter).*(--block-time-diff).*(oo,oo) ]]
+	[[ "$output" =~ (Time range should be -<int>,<int>).*(Parameter).*(--block-time-diff).*(,oo) ]]
+	[[ "$output" =~ (Time range with infinity can be -oo,oo, <int>,oo or -oo,<int>).*(Parameter).*(--block-time-diff).*(oo,) ]]
+	[[ "$output" =~ (Only digits, oo and 1x d, H, M and S allowed).*(Parameter).*(--block-time-diff).*(o) ]]
+	[[ "$output" =~ (Only digits, oo and 1x d, H, M and S allowed).*(Parameter).*(--block-time-diff).*(-o) ]]
+	[[ "$output" =~ (Only digits, oo and 1x d, H, M and S allowed).*(Parameter).*(--block-time-diff).*(5,o) ]]
+	[[ "$output" =~ (Only digits, oo and 1x d, H, M and S allowed).*(Parameter).*(--block-time-diff).*(o,5) ]]
+	[[ "$output" =~ (Only digits, oo and 1x d, H, M and S allowed).*(Parameter).*(--block-time-diff).*(o,o) ]]
+}
+
+@test "verify CMD test: Check if --time-disordered has the same type as --time-diff but does not allow comma nor minus nor infinity" {
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/log_repaired -d --time-disordered 1S2
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowed).*(Parameter).*(--time-disordered).*(1S2) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/log_repaired -d --time-disordered 1,1
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ (No comma .,. supported for range).*(Parameter).*(--time-disordered).*(1,1) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/log_repaired -d --time-disordered -5
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ (Only unsigned value allowed).*(Parameter).*(--time-disordered).*(-5) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/log_repaired -d --time-disordered oo
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ (Only digits and 1x d, H, M and S allowe).*(Parameter).*(--time-disordered).*(oo) ]]
+}
+
+@test "verify CMD test: Check parsing of --time-diff S" {
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed  --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -2
+	[[ "$output" =~ (Expected time window).*(-00:00:02) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed  --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -2S
+	[[ "$output" =~ (Expected time window).*(-00:00:02) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed  --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -59S
+	[[ "$output" =~ (Expected time window).*(-00:00:59) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed  --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -60S
+	[[ "$output" =~ (Expected time window).*(-00:01:00) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed  --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -121
+	[[ "$output" =~ (Expected time window).*(-00:02:01) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed  --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -3599
+	[[ "$output" =~ (Expected time window).*(-00:59:59) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed  --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -3600
+	[[ "$output" =~ (Expected time window).*(-01:00:00) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed  --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -86400
+	[[ "$output" =~ (Expected time window).*(-1d 00:00:00) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed  --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -6048000
+	[[ "$output" =~ (Expected time window).*(-70d 00:00:00) ]]
+}
+
+@test "verify CMD test: Check parsing of --time-diff M" {
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed  --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -2M
+	[[ "$output" =~ (Expected time window).*(-00:02:00) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed  --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -59M
+	[[ "$output" =~ (Expected time window).*(-00:59:00) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed  --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -60M
+	[[ "$output" =~ (Expected time window).*(-01:00:00) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed  --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -61M
+	[[ "$output" =~ (Expected time window).*(-01:01:00) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed  --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -121M
+	[[ "$output" =~ (Expected time window).*(-02:01:00) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed  --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -1440M
+	[[ "$output" =~ (Expected time window).*(-1d 00:00:00) ]]
+}
+
+@test "verify CMD test: Check parsing of --time-diff H" {
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed  --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -2H
+	[[ "$output" =~ (Expected time window).*(-02:00:00) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed  --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -23H
+	[[ "$output" =~ (Expected time window).*(-23:00:00) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed  --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -24H
+	[[ "$output" =~ (Expected time window).*(-1d 00:00:00) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed  --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -48H
+	[[ "$output" =~ (Expected time window).*(-2d 00:00:00) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed  --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -49H
+	[[ "$output" =~ (Expected time window).*(-2d 01:00:00) ]]
+}
+
+@test "verify CMD test: Check parsing of --time-diff d" {
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed  --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -2d
+	[[ "$output" =~ (Expected time window).*(-2d 00:00:00) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed  --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -70d
+	[[ "$output" =~ (Expected time window).*(-70d 00:00:00) ]]
+}
+
+@test "verify CMD test: Check parsing of --time-diff S M H d" {
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed  --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -0d3H5M0S
+	[[ "$output" =~ (Expected time window).*(-03:05:00) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed  --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -0S0d5M3H
+	[[ "$output" =~ (Expected time window).*(-03:05:00) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed  --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -10d59
+	[[ "$output" =~ (Expected time window).*(-10d 00:00:59) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed  --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -1H59M60S
+	[[ "$output" =~ (Expected time window).*(-02:00:00) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed  --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -23H59M60S
+	[[ "$output" =~ (Expected time window).*(-1d 00:00:00) ]]
+}
+
+@test "verify CMD test: Check parsing of --time-diff with 2 values (range)" {
+	run ./src/logksi verify test/resource/log_rec_time/log-line-embedded-date-higher-and-lower-from-ksig test/resource/log_rec_time/log-line-embedded-date-changed.logsig --use-stored-hash-on-fail --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff 1d,-1d17
+	[[ "$output" =~ (Expected time window).*(-1d 00:00:17 - 1d 00:00:00) ]]
+
+	run ./src/logksi verify test/resource/log_rec_time/log-line-embedded-date-higher-and-lower-from-ksig test/resource/log_rec_time/log-line-embedded-date-changed.logsig --use-stored-hash-on-fail --time-form "%B %d %H:%M:%S" --time-base 2018 --time-diff -1d17,1d
+	[[ "$output" =~ (Expected time window).*(-1d 00:00:17 - 1d 00:00:00) ]]
+}
+
+@test "verify CMD test: Check parsing of --block-time-diff" {
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed -d --block-time-diff 1d1M32S,2
+	[[ "$output" =~ (Expected time diff).*(00:00:02 - 1d 00:01:32) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed -d --block-time-diff 2,1d1M32S
+	[[ "$output" =~ (Expected time diff).*(00:00:02 - 1d 00:01:32) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed -d --block-time-diff 2,oo
+	[[ "$output" =~ (Expected time diff).*(00:00:02 - oo) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed -d --block-time-diff -oo
+	[[ "$output" =~ (Expected time diff).*(-oo - 0) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed -d --block-time-diff -5
+	[[ "$output" =~ (Expected time diff).*(-00:00:05 - 0) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed -d --block-time-diff -oo,-5
+	[[ "$output" =~ (Expected time diff).*(-oo - -00:00:05) ]]
+
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/signed -d --block-time-diff 2,oo
+	[[ "$output" =~ (Expected time diff).*(00:00:02 - oo) ]]
+}

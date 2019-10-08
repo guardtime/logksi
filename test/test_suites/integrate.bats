@@ -4,6 +4,16 @@ export KSI_CONF=test/test.cfg
 
 cp -r test/resource/logsignatures/signed.logsig.parts test/out
 
+@test "try to integrate parts files where file types do not match." {
+	run ./src/logksi integrate test/resource/logsignatures/unknow-blocks-file-types -o test/out/dummy.ksig --force-overwrite -d
+	[ "$status" -eq 4 ]
+	[[ "$output" =~ "Error: Expected file type LOG12BLK but got <unknown file version>!" ]]
+
+	run ./src/logksi integrate test/resource/logsignatures/unknow-sig-file-types  -o test/out/dummy.ksig --force-overwrite -d
+	[ "$status" -eq 4 ]
+	[[ "$output" =~ "Error: Expected file type LOG12SIG but got <unknown file version>!" ]]
+}
+
 @test "integrate signed.parts" {
 	run ./src/logksi integrate test/out/signed -ddd
 	[ "$status" -eq 0 ]
@@ -99,4 +109,46 @@ cp test/resource/logsignatures/synchronous.logsig test/out
 	run src/logksi integrate test/resource/logsignatures/nok-corrupted-metadata -o test/out/dummy.logsig --force-overwrite -d
 	[ "$status" -eq 4 ]
 	[[ "$output" =~ (Error:).*(Block no. 4).*(Unable to get TLV 911.02.01).*(Meta record key) ]]
+}
+
+@test "integrate invalid log signature file that contains only magic byte" {
+	run ./src/logksi integrate test/resource/logsignatures/nok-logsig-only-magick --force-overwrite -o test/out/dummy.logsig -d
+	[[ "$output" =~ (Error).*(Block no).*(1).*(unable to parse KSI signature in signatures file).*(Error).*(Block no).*(1).*(unexpected end of signatures file) ]]
+	[ "$status" -eq 4 ]
+}
+
+@test "integrate invalid log signature file that is empty" {
+	run ./src/logksi integrate test/resource/logsignatures/nok-logsig-empty-file --force-overwrite -o test/out/dummy.logsig -d
+		[[ "$output" =~ (Error).*(Unable to parse signature file).*(Error).*(Log signature file identification magic number not found) ]]
+	[ "$status" -eq 4 ]
+}
+
+@test "integrate invalid log signature file that has a missing mandatory TLV" {
+	run ./src/logksi integrate test/resource/logsignatures/nok-logsig-missing-mandatory-tlv --force-overwrite -o test/out/dummy.logsig -d
+		[[ "$output" =~ (Error).*(unable to parse KSI signature in signatures file).*(Error).*(Mandatory element missing).*(0x800).*(0x801).*(0x3) ]]
+	[ "$status" -eq 4 ]
+}
+
+@test "integrate invalid log signature file that has corrupted TLV structure 1" {
+	run src/logksi integrate test/resource/logsignatures/nok-logsig-invalid-tlv-encoding-1 --force-overwrite -o test/out/dummy.ksig -d
+		[[ "$output" =~ (Error).*(unable to parse KSI signature in signatures file).*(Error).*(Failed to read nested TLV) ]]
+	[ "$status" -eq 4 ]
+}
+
+@test "integrate invalid log signature file that has corrupted TLV structure 2" {
+	run src/logksi integrate test/resource/logsignatures/nok-logsig-invalid-tlv-encoding-2 --force-overwrite -o test/out/dummy.ksig -d
+		[[ "$output" =~ (Error).*(unable to parse KSI signature in signatures file).*(Error).*(incomplete data found in signatures file) ]]
+	[ "$status" -eq 4 ]
+}
+
+@test "integrate invalid log signature file that expects to have more record hashes than there is" {
+	run src/logksi integrate test/resource/logsignatures/too-few-record-hashes --force-overwrite -o test/out/dummy.ksig -d
+		[[ "$output" =~ (Error).*(there are too few record hashes for this block).*(Error).*(expected 5 record hashes, but found 3) ]]
+	[ "$status" -eq 6 ]
+}
+
+@test "integrate invalid log signature file that expects to have less record hashes than there is" {
+	run src/logksi integrate test/resource/logsignatures/too-many-record-hashes --force-overwrite -o test/out/dummy.ksig -d
+		[[ "$output" =~ (Error).*(there are too many record hashes for this block).*(Error).*(expected 2 record hashes, but found 3) ]]
+	[ "$status" -eq 6 ]
 }
