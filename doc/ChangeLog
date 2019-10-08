@@ -1,32 +1,36 @@
-(LOGKSI-125) * IMPROVEMENT: In case of verification failure, extended error message may be displayed before error trace.
-(LOGKSI-126) * IMPROVEMENT: Support for legacy and unused PDU v1 removed.
-(LOGKSI-78) * IMPROVEMENT: Wording of hash comparison failure error messages improved.
-(LOGKSI-63) * IMPROVEMENT: Improved error messages when integrating invalid or broken log signature files.
-(LOGKSI-111) * IMPROVEMENT: Improved debug output (-d) in case of integrating is not needed and output already exists as result of synchronous signing.
-(LOGKSI-123) * IMPROVEMENT: Handling of magic bytes refactored.
-(LOGKSI-94) * FEATURE: New option --time-form and --time-base to extract log record time embedded into log line.
-(LOGKSI-94) * FEATURE: New option --time-diff to verify log record embedded time against KSI signature signing time.
-(LOGKSI-94) * FEATURE: New option --time-disordered to allow log records that are not listed in chronological order.
-(LOGKSI-87) * FEATURE: New option --block-time-diff to verify time difference of consecutive blocks.
-(LOGKSI-88) * FEATURE: New option --client-id to match KSI signatures client ID against regular expression.
-(LOGKSI-88) * FEATURE: New option --warn-client-id-change that will warn user when KSI signatures client ID is not constant value.
-(LOGKSI-78) * FEATURE: New option --continue-on-fail that tries to continue verification when verification fails.
-(LOGKSI-40) * FEATURE: New option --continue-on-fail that tries to continue signing when signing of the block fails.
-(LOGKSI-78) * FEATURE: New option --use-stored-hash-on-fail that continues verification on hash comparison failure with stored hash value.
-(LOGKSI-78) * FEATURE: New option --use-computed-hash-on-fail that continues verification on hash comparison failure with computed hash value.
-(LOGKSI-99) * FEATURE: New option --recover for integrate, to recover useful amount of data from partially corrupted log signatures.
-(LOGKSI-99) * FEATURE: New option --out-log for integrate, to output recovered log lines.
-(LOGKSI-109) * FEATURE: New option --hex-to-str that will encode applicable data fields to ASCII string (e.g. meta-record value).
-(LOGKSI-80) * BUGFIX: When integrating not suitable log signature that expects to have different count of record hashes, a meaningful error message is displayed.
-(LOGKSI-113) * BUGFIX: In case signing does not modify the output file, no identical backup is created.
-(LOGKSI-117) * BUGFIX: Warning about same signing time with debug level 1 is not mixed up with other messages.
-(LOGKSI-117) * BUGFIX: Warning about same signing time with debug level 3 prints correct block number and file name.
-(LOGKSI-118) * BUGFIX: Verification debug output (-d and -dd) for excerpt file displays information instead of nonsense.
-(LOGKSI-121) * BUGFIX: Using signing, extending or extracting on excerpt file will fail with meaningful error message.
-(LOGKSI-121) * BUGFIX: When trying to extract from excerpt file memory is not accessed out of boundaries.
-(LOGKSI-129) * BUGFIX: When opening of input file fails, file name is displayed in error message.
-(LOGKSI-110) * IMPROVEMENT: Internal file handling refactored.
-(LOGKSI-130) * IMPROVEMENT: Verification on hash algorithm ID refactored.
+Version 1.5
+
+2019-10-07 1.5.649
+
+* FEATURE: New option --time-form and --time-base to extract log record time embedded into log line.
+* FEATURE: New option --time-diff to verify log record embedded time against KSI signature signing time.
+* FEATURE: New option --time-disordered to allow log records that are not listed in chronological order.
+* FEATURE: New option --block-time-diff to verify time difference of consecutive blocks.
+* FEATURE: New option --client-id to match KSI signatures client ID against regular expression.
+* FEATURE: New option --warn-client-id-change that will warn user when KSI signatures client ID is not constant value.
+* FEATURE: New option --continue-on-fail that tries to continue verification when verification fails.
+* FEATURE: New option --continue-on-fail that tries to continue signing when signing of the block fails.
+* FEATURE: New option --use-stored-hash-on-fail that continues verification on hash comparison failure with stored hash value.
+* FEATURE: New option --use-computed-hash-on-fail that continues verification on hash comparison failure with computed hash value.
+* FEATURE: New option --recover for integrate, to recover useful amount of data from partially corrupted log signatures.
+* FEATURE: New option --out-log for integrate, to output recovered log lines.
+* FEATURE: New option --hex-to-str that will encode applicable data fields to ASCII string (e.g. meta-record value).
+* IMPROVEMENT: In case of verification failure, extended error message may be displayed before error trace.
+* IMPROVEMENT: Support for legacy and unused PDU v1 removed.
+* IMPROVEMENT: Wording of hash comparison failure error messages improved.
+* IMPROVEMENT: Improved error messages when integrating invalid or broken log signature files.
+* IMPROVEMENT: Improved debug output (-d) in case of integrating is not needed and output already exists as result of synchronous signing.
+* IMPROVEMENT: Handling of magic bytes refactored.
+* IMPROVEMENT: Internal file handling refactored.
+* IMPROVEMENT: Verification on hash algorithm ID refactored.
+* BUGFIX: When integrating not suitable log signature that expects to have different count of record hashes, a meaningful error message is displayed.
+* BUGFIX: In case signing does not modify the output file, no identical backup is created.
+* BUGFIX: Warning about same signing time with debug level 1 is not mixed up with other messages.
+* BUGFIX: Warning about same signing time with debug level 3 prints correct block number and file name.
+* BUGFIX: Verification debug output (-d and -dd) for excerpt file displays information instead of nonsense.
+* BUGFIX: Using signing, extending or extracting on excerpt file will fail with meaningful error message.
+* BUGFIX: When trying to extract from excerpt file memory is not accessed out of boundaries.
+* BUGFIX: When opening of input file fails, file name is displayed in error message.
 
 Version 1.4
 
