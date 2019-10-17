@@ -43,6 +43,8 @@ typedef struct {
 	char *inSig;
 	char *outSig;
 	char *outProof;
+	char *outKSIBase;
+	char *outLineBase;
 	char *outLog;
 	char *partsBlk;
 	char *partsSig;

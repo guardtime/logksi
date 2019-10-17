@@ -84,6 +84,8 @@ void logksi_internal_filenames_free(INTERNAL_FILE_NAMES *internal) {
 		logksi_filename_free(&internal->inSig);
 		logksi_filename_free(&internal->outSig);
 		logksi_filename_free(&internal->outProof);
+		logksi_filename_free(&internal->outKSIBase);
+		logksi_filename_free(&internal->outLineBase);
 		logksi_filename_free(&internal->outLog);
 		logksi_filename_free(&internal->partsBlk);
 		logksi_filename_free(&internal->partsSig);

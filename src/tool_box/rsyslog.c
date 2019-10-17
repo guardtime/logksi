@@ -40,6 +40,7 @@
 #include "rsyslog.h"
 #include "param_control.h"
 #include <time.h>
+#include <ksi/signature_builder.h>
 
 static char* time_diff_to_string(uint64_t time_diff, char *buf, size_t buf_len);
 static const char *io_files_getCurrentLogFilePrintRepresentation(IO_FILES *files);
@@ -1813,6 +1814,278 @@ cleanup:
 	return res;
 }
 
+static int extract_ksi_signature(KSI_CTX *ctx, BLOCK_INFO *blocks, EXTRACT_INFO *inf, const KSI_Signature *sig, KSI_Signature **out) {
+	int res = KT_UNKNOWN_ERROR;
+	KSI_Signature *tmp = NULL;
+	KSI_SignatureBuilder *builder = NULL;
+	KSI_AggregationHashChain *aggrChain = NULL;
+	KSI_HashChainLinkList *chainList;
+	KSI_HashChainLink *link = NULL;
+	KSI_DataHash *hashRef = NULL;
+	KSI_Integer *lvlcrct = NULL;
+	KSI_Integer *hashId = NULL;
+	int i = 0;
+
+	if (ctx == NULL || blocks == NULL || inf == NULL || sig == NULL || out == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	res = KSI_SignatureBuilder_openFromSignature(sig, &builder);
+	if (res != KSI_OK) goto cleanup;
+
+	res = KSI_AggregationHashChain_new(ctx, &aggrChain);
+	if (res != KSI_OK) goto cleanup;
+
+	res = KSI_HashChainLinkList_new(&chainList);
+	if (res != KSI_OK) goto cleanup;
+
+	for (i = 0; i < inf->extractLevel; i++) {
+		if (inf->extractChain[i].sibling == NULL) continue;
+
+		res = KSI_HashChainLink_new(ctx, &link);
+		if (res != KSI_OK) goto cleanup;
+
+		hashRef = KSI_DataHash_ref(inf->extractChain[i].sibling);
+		res = KSI_HashChainLink_setImprint(link, hashRef);
+		if (res != KSI_OK) goto cleanup;
+		hashRef = NULL;
+
+		res = KSI_HashChainLink_setIsLeft(link, (inf->extractChain[i].dir == LEFT_LINK));
+		if (res != KSI_OK) goto cleanup;
+
+		res = KSI_Integer_new(ctx, inf->extractChain[i].corr, &lvlcrct);
+		if (res != KSI_OK) goto cleanup;
+
+		res = KSI_HashChainLink_setLevelCorrection(link, lvlcrct);
+		if (res != KSI_OK) goto cleanup;
+
+		lvlcrct = NULL;
+
+		res = KSI_HashChainLinkList_append(chainList, link);
+		if (res != KSI_OK) goto cleanup;
+
+		link = NULL;
+	}
+
+	res = KSI_AggregationHashChain_setChain(aggrChain, chainList);
+	if (res != KSI_OK) goto cleanup;
+
+	chainList = NULL;
+
+	hashRef = KSI_DataHash_ref(inf->extractRecord);
+	res = KSI_AggregationHashChain_setInputHash(aggrChain, hashRef);
+	if (res != KSI_OK) goto cleanup;
+	hashRef = NULL;
+
+	res = KSI_Integer_new(ctx, blocks->hashAlgo, &hashId);
+	if (res != KSI_OK) goto cleanup;
+
+	res = KSI_AggregationHashChain_setAggrHashId(aggrChain, hashId);
+	if (res != KSI_OK) goto cleanup;
+
+	hashId = NULL;
+
+	res = KSI_SignatureBuilder_createSignatureWithAggregationChain(builder, aggrChain, &tmp);
+	if (res != KSI_OK) goto cleanup;
+
+	*out = tmp;
+	tmp = NULL;
+
+	res = KT_OK;
+
+cleanup:
+
+	KSI_Signature_free(tmp);
+	KSI_SignatureBuilder_free(builder);
+	KSI_AggregationHashChain_free(aggrChain);
+	KSI_Integer_free(lvlcrct);
+	KSI_Integer_free(hashId);
+	KSI_HashChainLink_free(link);
+	KSI_DataHash_free(hashRef);
+
+	return res;
+}
+
+static int store_ksi_signature_and_log_line(PARAM_SET *set, ERR_TRCKR *err, BLOCK_INFO *blocks, IO_FILES *files, char *logLine, size_t lineNr, KSI_Signature *sig) {
+	int res;
+	SMART_FILE *sigFile = NULL;
+	SMART_FILE *logLineFile = NULL;
+
+	char *lineOutName = NULL;
+	char *sigOutName = NULL;
+	size_t bufLen = 0;
+	size_t baseNameLen = 0;
+	size_t bytesWritten = 0;
+	size_t logLineSize = 0;
+	unsigned char *raw = NULL;
+	size_t rawLen = 0;
+	int i = 0;
+
+	if (set == NULL || err == NULL || blocks == NULL || files == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	/* Create file name buffers. */
+	baseNameLen = strlen(files->internal.inLog);
+	bufLen = baseNameLen + 64;
+
+	lineOutName = (char*)malloc(bufLen);
+	sigOutName = (char*)malloc(bufLen);
+	if (lineOutName == NULL || sigOutName == NULL) {
+		res = KT_OUT_OF_MEMORY;
+		goto cleanup;
+	}
+
+	/* Generate file names. */
+	if (strcmp(files->internal.outLineBase, "-") == 0) {
+		KSI_strncpy(lineOutName, files->internal.outLineBase, bufLen);
+	} else {
+		KSI_snprintf(lineOutName, bufLen, "%s.line.%zu", files->internal.outLineBase, lineNr);
+	}
+
+	if (strcmp(files->internal.outKSIBase, "-") == 0) {
+		KSI_strncpy(sigOutName, files->internal.outKSIBase, bufLen);
+	} else {
+		KSI_snprintf(sigOutName, bufLen, "%s.line.%zu.ksig", files->internal.outKSIBase, lineNr);
+	}
+
+	/* Open output files. */
+	res = SMART_FILE_open(lineOutName, "wTfs", &logLineFile);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: line %zu: unable to open file '%s'.", blocks->blockNo, lineNr, lineOutName);
+
+	res = SMART_FILE_open(sigOutName, "wTfs", &sigFile);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: line %zu: unable to open file '%s'.", blocks->blockNo, lineNr, sigOutName);
+
+	logLineSize = strlen(logLine);
+
+	/* Do not include newline character. */
+	for (i = 0; logLineSize > 0 && i < 2; i++) {
+		char c = logLine[logLineSize - 1];
+		if (c != ' ' && c != '\t' && isspace(c)) logLineSize--;
+	}
+
+	/* Write logline into file. */
+	res = SMART_FILE_write(logLineFile, (unsigned char*)logLine, logLineSize, &bytesWritten);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: line %zu: unable to write log line to file '%s'.", blocks->blockNo, lineNr, lineOutName);
+
+	if (bytesWritten != logLineSize) {
+		res = KT_IO_ERROR;
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: line %zu: only %zu log line bytes out of %zu written to file '%s'.", blocks->blockNo, lineNr, bytesWritten, logLineSize, lineOutName);
+	}
+
+	/* Write KSI signature into file. */
+	res = KSI_Signature_serialize(sig, &raw, &rawLen);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: line %zu: unable to serialize KSI signature.", blocks->blockNo, lineNr);
+
+	res = SMART_FILE_write(sigFile, raw, rawLen, &bytesWritten);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: line %zu: unable to write KSI signature to file '%s'.", blocks->blockNo, lineNr, sigOutName);
+
+	if (bytesWritten != rawLen) {
+		res = KT_IO_ERROR;
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: line %zu: only %zu KSI signature bytes out of %zu written to file '%s'.", blocks->blockNo, lineNr, bytesWritten, rawLen, lineOutName);
+	}
+
+	res = SMART_FILE_markConsistent(sigFile);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: line %zu: unable mark file '%s' consistent.", blocks->blockNo, lineNr, lineOutName);
+
+	res = SMART_FILE_markConsistent(logLineFile);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: line %zu: unable mark file '%s' consistent.", blocks->blockNo, lineNr, sigOutName);
+
+	res = KT_OK;
+
+cleanup:
+
+	SMART_FILE_close(sigFile);
+	SMART_FILE_close(logLineFile);
+	free(lineOutName);
+	free(sigOutName);
+	KSI_free(raw);
+
+	return res;
+}
+
+static int store_integrity_proof_and_log_records(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTRACT_INFO *extractInfo, IO_FILES *files) {
+	int res = KT_INVALID_ARGUMENT;
+	KSI_TlvElement *recChain = NULL;
+	KSI_TlvElement *hashStep = NULL;
+	size_t i = 0;
+	unsigned char buf[0xFFFF + 4];
+	size_t len = 0;
+
+
+	if (set == NULL || err == NULL || ksi == NULL || extractInfo == NULL || files == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	/* Construct hash chain for one log record	. */
+	res = KSI_TlvElement_new(&recChain);
+	ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to create record chain.", extractInfo->extractPos);
+	recChain->ftlv.tag = 0x0907;
+
+	/* Store the record hash value. */
+	res = tlv_element_set_hash(recChain, ksi, 0x01, extractInfo->extractRecord);
+	ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to add record hash to record chain.", extractInfo->extractPos);
+
+	/* In case of log line, store it into file.
+	   In case of meta record  store it into record chain TLV. */
+	if (extractInfo->logLine) {
+		res = SMART_FILE_write(files->files.outLog, (unsigned char*)extractInfo->logLine, strlen(extractInfo->logLine), NULL);
+		ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to write log record to log records file.", extractInfo->extractPos);
+	} else if (extractInfo->metaRecord){
+		res = KSI_TlvElement_setElement(recChain, extractInfo->metaRecord);
+		ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to add metarecord to record chain.", extractInfo->extractPos);
+	}
+
+	/* Construct the hash chain. */
+	for (i = 0; i < extractInfo->extractLevel; i++) {
+		if (extractInfo->extractChain[i].sibling) {
+			res = KSI_TlvElement_new(&hashStep);
+			ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to create hash step no. %zu.", extractInfo->extractPos, i + 1);
+
+			if (extractInfo->extractChain[i].dir == LEFT_LINK) {
+				hashStep->ftlv.tag = 0x02;
+			}
+			else {
+				hashStep->ftlv.tag = 0x03;
+			}
+			if (extractInfo->extractChain[i].corr) {
+				res = tlv_element_set_uint(hashStep, ksi, 0x01, extractInfo->extractChain[i].corr);
+				ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to add level correction to hash step no. %zu.", extractInfo->extractPos, i + 1);
+			}
+			res = tlv_element_set_hash(hashStep, ksi, 0x02, extractInfo->extractChain[i].sibling);
+			ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to add sibling hash to hash step no. %zu.", extractInfo->extractPos, i + 1);
+			res = KSI_TlvElement_appendElement(recChain, hashStep);
+			ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to add hash step no. %zu.", extractInfo->extractPos, i + 1);
+
+			KSI_TlvElement_free(hashStep);
+			hashStep = NULL;
+		}
+	}
+
+	/* Serialize hash chain TLV and store into integrity proof file. */
+	res = KSI_TlvElement_serialize(recChain, buf, sizeof(buf), &len, 0);
+	ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to serialize record chain.", extractInfo->extractPos);
+
+	res = SMART_FILE_write(files->files.outProof, buf, len, NULL);
+	ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to write record chain to integrity proof file.", extractInfo->extractPos);
+
+	KSI_TlvElement_free(recChain);
+	recChain = NULL;
+
+
+	res = KT_OK;
+
+cleanup:
+
+	KSI_TlvElement_free(recChain);
+	KSI_TlvElement_free(hashStep);
+
+	return res;
+}
+
 static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, KSI_PublicationsFile *pubFile, SIGNATURE_PROCESSORS *processors, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	KSI_Signature *sig = NULL;
@@ -1824,8 +2097,6 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 	KSI_TlvElement *tlvSig = NULL;
 	KSI_TlvElement *tlvUnsig = NULL;
 	KSI_TlvElement *tlvRfc3161 = NULL;
-	KSI_TlvElement *recChain = NULL;
-	KSI_TlvElement *hashStep = NULL;
 	KSI_Integer *t0 = NULL;
 	size_t j;
 
@@ -2043,17 +2314,12 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 		res = LOGKSI_Signature_parseWithPolicy(err, ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_INTERNAL, &context, &sig);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse KSI signature.", blocks->blockNo);
 
-		if (blocks->nofExtractPositionsInBlock) {
+		if (!PARAM_SET_isSetByName(set, "ksig") && blocks->nofExtractPositionsInBlock) {
 			res = SMART_FILE_write(files->files.outProof, tlvSig->ptr, tlvSig->ftlv.dat_len + tlvSig->ftlv.hdr_len, NULL);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to write KSI signature to integrity proof file.", blocks->blockNo);
 		}
 
-
 		for (j = 0; j < blocks->nofExtractPositionsInBlock; j++) {
-			unsigned char buf[0xFFFF + 4];
-			size_t len = 0;
-			size_t i;
-
 			if (blocks->extractInfo[j].extractOffset && blocks->extractInfo[j].extractOffset <= blocks->nofRecordHashes) {
 				size_t rowNumber = blocks->nofTotalRecordHashes - blocks->nofRecordHashes + blocks->extractInfo[j].extractOffset;
 
@@ -2061,54 +2327,26 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 				print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_LEVEL_3, "Block no. %3zu: extracting log records (line %3zu)... ", blocks->blockNo, rowNumber);
 				print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_EQUAL | DEBUG_LEVEL_2, "Extracting log record from block %3zu (line %3zu)... ", blocks->blockNo, rowNumber);
 
-				res = KSI_TlvElement_new(&recChain);
-				ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to create record chain.", blocks->extractInfo[j].extractPos);
-				recChain->ftlv.tag = 0x0907;
+				if (PARAM_SET_isSetByName(set, "ksig")) {
+					KSI_Signature *ksiSig = NULL;
+					size_t logLine = blocks->extractInfo[j].extractPos;
 
-				if (blocks->extractInfo[j].logLine) {
-					res = SMART_FILE_write(files->files.outLog, (unsigned char*)blocks->extractInfo[j].logLine, strlen(blocks->extractInfo[j].logLine), NULL);
-					ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to write log record to log records file.", blocks->extractInfo[j].extractPos);
-				} else if (blocks->extractInfo[j].metaRecord){
-					res = KSI_TlvElement_setElement(recChain, blocks->extractInfo[j].metaRecord);
-					ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to add metarecord to record chain.", blocks->extractInfo[j].extractPos);
-				}
-				res = tlv_element_set_hash(recChain, ksi, 0x01, blocks->extractInfo[j].extractRecord);
-				ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to add record hash to record chain.", blocks->extractInfo[j].extractPos);
-
-				for (i = 0; i < blocks->extractInfo[j].extractLevel; i++) {
-					if (blocks->extractInfo[j].extractChain[i].sibling) {
-						res = KSI_TlvElement_new(&hashStep);
-						ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to create hash step no. %zu.", blocks->extractInfo[j].extractPos, i + 1);
-
-						if (blocks->extractInfo[j].extractChain[i].dir == LEFT_LINK) {
-							hashStep->ftlv.tag = 0x02;
-						}
-						else {
-							hashStep->ftlv.tag = 0x03;
-						}
-						if (blocks->extractInfo[j].extractChain[i].corr) {
-							res = tlv_element_set_uint(hashStep, ksi, 0x01, blocks->extractInfo[j].extractChain[i].corr);
-							ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to add level correction to hash step no. %zu.", blocks->extractInfo[j].extractPos, i + 1);
-						}
-						res = tlv_element_set_hash(hashStep, ksi, 0x02, blocks->extractInfo[j].extractChain[i].sibling);
-						ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to add sibling hash to hash step no. %zu.", blocks->extractInfo[j].extractPos, i + 1);
-						res = KSI_TlvElement_appendElement(recChain, hashStep);
-						ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to add hash step no. %zu.", blocks->extractInfo[j].extractPos, i + 1);
-
-						KSI_TlvElement_free(hashStep);
-						hashStep = NULL;
+					if (blocks->warningLegacy) {
+						ERR_TRCKR_ADD(err, res = KT_INVALID_INPUT_FORMAT, "Error: It is not possible to extract pure KSI signature from RFC3161 timestamp.");
+						goto cleanup;
 					}
+
+					res = extract_ksi_signature(ksi, blocks, &blocks->extractInfo[j], sig, &ksiSig);
+					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to construct KSI signature for log line %zu.", blocks->blockNo, logLine);
+
+					res = store_ksi_signature_and_log_line(set, err, blocks, files, blocks->extractInfo[j].logLine, logLine, ksiSig);
+					KSI_Signature_free(ksiSig);
+					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to store logline %zu and corresponding KSI signature.", blocks->blockNo, logLine);
+				} else {
+					res = store_integrity_proof_and_log_records(set, err, ksi, &blocks->extractInfo[j], files);
+					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to store integrity proof file and extracted log line.", blocks->blockNo);
 				}
-				res = KSI_TlvElement_serialize(recChain, buf, sizeof(buf), &len, 0);
-				ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to serialize record chain.", blocks->extractInfo[j].extractPos);
-
-				res = SMART_FILE_write(files->files.outProof, buf, len, NULL);
-				ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to write record chain to integrity proof file.", blocks->extractInfo[j].extractPos);
-
-				KSI_TlvElement_free(recChain);
-				recChain = NULL;
 			}
-
 		}
 
 		print_progressResult(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_2, res);
@@ -2150,8 +2388,6 @@ cleanup:
 	KSI_TlvElement_free(tlvUnsig);
 	KSI_TlvElement_free(tlvRfc3161);
 	KSI_TlvElement_free(tlv);
-	KSI_TlvElement_free(hashStep);
-	KSI_TlvElement_free(recChain);
 	KSI_Integer_free(t0);
 	return res;
 }
@@ -2203,7 +2439,6 @@ static int process_ksi_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *e
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: could not open datahasher.", blocks->blockNo);
 		}
 
-		blocks->hashAlgo = algo;
 		if (hasher) {
 			KSI_DataHasher_free(blocks->hasher);
 			blocks->hasher = hasher;

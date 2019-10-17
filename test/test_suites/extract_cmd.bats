@@ -21,6 +21,13 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ "Suggestion:  Use ONLY '--out-log -' OR '--out-proof -' to redirect desired output to stdout." ]]
 }
 
+@test "extract CMD: attempt to redirect both outputs to stdout via -o - --ksig" {
+	run bash -c "./src/logksi extract test/resource/logs_and_signatures/log_repaired -o - -r 1"
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ "Error: Both output files cannot be redirected to stdout." ]]
+	[[ "$output" =~ "Suggestion:  Use ONLY '--out-log -' OR '--out-proof -' to redirect desired output to stdout." ]]
+}
+
 @test "extract CMD: attempt to redirect multiple outputs to stdout 2" {
 	run bash -c "./src/logksi extract test/resource/logs_and_signatures/log_repaired --out-log - --out-proof - -r 1"
 	[ "$status" -eq 3 ]
@@ -34,6 +41,21 @@ export KSI_CONF=test/test.cfg
 	run bash -c "./src/logksi extract test/resource/logs_and_signatures/log_repaired --out-log - --log - -r 1"
 	[ "$status" -eq 3 ]
 	[[ "$output" =~ "Multiple different simultaneous outputs to stdout (--log -, --out-log -)." ]]
+}
+
+@test "extract CMD: attempt to redirect multiple outputs to stdout with --ksig and -r 1,2" {
+	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired --ksig --out-log - --out-proof - -r 1,2
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ "Error: Multiple different simultaneous outputs to stdout (--out-log -, --out-proof -)." ]]
+	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired --ksig --out-log - -o test/out/dummy -r 1,2
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ "Error: Multiple different simultaneous outputs to stdout (--ksig, --out-log -, -r 1,2)." ]]
+	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired --ksig --out-proof - -o test/out/dummy -r 1,2
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ "Error: Multiple different simultaneous outputs to stdout (--ksig, --out-proof -, -r 1,2)." ]]
+	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired --ksig --out-proof - -o test/out/dummy -r 1-2
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ "Error: Multiple different simultaneous outputs to stdout (--ksig, --out-proof -, -r 1-2)." ]]
 }
 
 @test "extract CMD: attempt to read both files from stdin" {

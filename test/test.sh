@@ -3,6 +3,16 @@
 rm -rf test/out
 mkdir -p test/out
 
+if ksi -h > /dev/null; then
+	TEST_DEPENDING_ON_KSI_TOOL="\
+		test/test_suites/extract_ksig.bats"
+	echo Info: Extra tests depending on KSI_TOOL added.
+else
+	TEST_DEPENDING_ON_KSI_TOOL=""
+	echo Warning: KSI tool is not installed. Tests depending on KSI tool are ignored.
+fi
+
+
 bats \
 test/test_suites/integrate.bats \
 test/test_suites/integrate_recover.bats \
@@ -31,7 +41,8 @@ test/test_suites/verify_continue_debug_output.bats \
 test/test_suites/verify_debug_output.bats \
 test/test_suites/verify_cmd.bats \
 test/test_suites/verify_log_rec_time.bats \
-test/test_suites/verify_log_rec_time_debug_output.bats
+test/test_suites/verify_log_rec_time_debug_output.bats \
+$TEST_DEPENDING_ON_KSI_TOOL
 
 exit_code=$?
 
