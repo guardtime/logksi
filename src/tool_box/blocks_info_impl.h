@@ -96,7 +96,7 @@ typedef struct {
 	size_t firstLineInBlock;		/* First line in current block. */
 	size_t currentLine;				/* Current line number in current block. */
 	size_t nofTotalFailedBlocks;
-	KSI_HashAlgorithm hashAlgo;
+	KSI_HashAlgorithm hashAlgo;		/* Hash algorithm used for aggregation. */
 	KSI_OctetString *randomSeed;
 	KSI_DataHash *inputHash;		/* Just a reference for the input hash of a block. */
 	KSI_DataHash *prevLeaf;
