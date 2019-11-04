@@ -27,14 +27,13 @@ export KSI_CONF=test/test.cfg
 @test "Logline nr.4 removed from log file and from block 2. Rec. hashes present, tree hashes removed. Sig verification fails but verification is continued." {
 	run src/logksi verify test/resource/continue-verification/log-line-4-removed -d --continue-on-fail
 	[ "$status" -eq 6 ]
-	[[ "$output" =~ (Verifying... failed).*(Error: Verification of block 2 KSI signature failed) ]]
+	[[ "$output" =~ (Verifying... failed).*(Error: Signature verification according to trust anchor: .GEN-01. Wrong document).*(Error: Verification of block 2 KSI signature failed) ]]
 	[[ ! "$output" =~ (Error: Skipping block 1)  ]]	
 	[[ "$output" =~ (Error: Skipping block 2)  ]]	
 	[[ ! "$output" =~ (Error: Skipping block 3)  ]]	
 	[[ ! "$output" =~ (Error: Skipping block 4)  ]]	
-	[[ "$output" =~ (3[\)]).*(Error: Verification FAILED but was continued for further analysis).*(Log signature verification failed)  ]]
-	[[ "$output" =~ (2[\)]).*(Error: 1 hash comparison failures found).*(Verification failed)  ]]
-	[[ "$output" =~ (1[\)]).*(Error:).*(GEN-01).*(Wrong document. Signature verification according to trust anchor failed.).*(Verification failed)  ]]
+	[[ "$output" =~ (2[\)]).*(Error: Verification FAILED but was continued for further analysis).*(Log signature verification failed)  ]]
+	[[ "$output" =~ (1[\)]).*(Error: 1 hash comparison failures found).*(Log signature verification failed)  ]]
 }
 
 @test "Log rec nr.4 removed from log signature file. Rec. hashes present. Unable to verify almost anything as records and log lines are shifted." {
@@ -50,26 +49,24 @@ export KSI_CONF=test/test.cfg
 @test "Log rec nr.4 changed in log signature file. Rec. hashes present." {
 	run src/logksi verify test/resource/continue-verification/log-rec-4-changed -d --continue-on-fail
 	[ "$status" -eq 6 ]
-	[[ "$output" =~ (Verifying... failed).*(Error: Verification of block 2 KSI signature failed) ]]
-	[[ ! "$output" =~ (Error: Skipping block 1)  ]]	
-	[[ "$output" =~ (Error: Skipping block 2)  ]]	
-	[[ ! "$output" =~ (Error: Skipping block 3)  ]]	
-	[[ ! "$output" =~ (Error: Skipping block 4)  ]]	
-	[[ "$output" =~ (3[\)]).*(Error: Verification FAILED but was continued for further analysis).*(Log signature verification failed)  ]]
-	[[ "$output" =~ (2[\)]).*(Error: 1 hash comparison failures found).*(Verification failed)  ]]
-	[[ "$output" =~ (1[\)]).*(Error:).*(GEN-01).*(Wrong document. Signature verification according to trust anchor failed.).*(Verification failed)  ]]
-}
-
-@test "KSI signature is replaced in block 2. Rec. hashes present. Sig verification fails but verification is continued." {
-	run src/logksi verify test/resource/continue-verification/log test/resource/continue-verification/log-sig-no2-wrong.logsig -d --continue-on-fail
-	[ "$status" -eq 6 ]
-	[[ "$output" =~ (Verifying... failed).*(Error: Verification of block 2 KSI signature failed) ]]
+	[[ "$output" =~ (Verifying... failed).*(Error: Signature verification according to trust anchor: .GEN-01. Wrong document).*(Error: Verification of block 2 KSI signature failed) ]]
 	[[ ! "$output" =~ (Error: Skipping block 1)  ]]	
 	[[ "$output" =~ (Error: Skipping block 2)  ]]	
 	[[ ! "$output" =~ (Error: Skipping block 3)  ]]	
 	[[ ! "$output" =~ (Error: Skipping block 4)  ]]	
 	[[ "$output" =~ (2[\)]).*(Error: Verification FAILED but was continued for further analysis).*(Log signature verification failed)  ]]
-	[[ "$output" =~ (1[\)]).*(Error:).*(GEN-01).*(Wrong document. Signature verification according to trust anchor failed.).*(Verification failed)  ]]
+	[[ "$output" =~ (1[\)]).*(Error: 1 hash comparison failures found).*(Log signature verification failed)  ]]
+}
+
+@test "KSI signature is replaced in block 2. Rec. hashes present. Sig verification fails but verification is continued." {
+	run src/logksi verify test/resource/continue-verification/log test/resource/continue-verification/log-sig-no2-wrong.logsig -d --continue-on-fail
+	[ "$status" -eq 6 ]
+	[[ "$output" =~ (Verifying... failed).*(Error: Signature verification according to trust anchor: .GEN-01. Wrong document).*(Error: Verification of block 2 KSI signature failed) ]]
+	[[ ! "$output" =~ (Error: Skipping block 1)  ]]	
+	[[ "$output" =~ (Error: Skipping block 2)  ]]	
+	[[ ! "$output" =~ (Error: Skipping block 3)  ]]	
+	[[ ! "$output" =~ (Error: Skipping block 4)  ]]	
+	[[ "$output" =~ (1[\)]).*(Error: Verification FAILED but was continued for further analysis).*(Log signature verification failed)  ]]
 }
 
 @test "Verify log signatures that contains unsigned blocks with continuation." {

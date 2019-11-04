@@ -22,6 +22,7 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <ctype.h>
 #include <ksi/ksi.h>
 #include <ksi/compatibility.h>
 #include <ksi/policy.h>
@@ -53,13 +54,13 @@ enum {
 	ANC_BASED_PUB_SRT_X,
 	/* Internal verification. */
 	INT_BASED,
-	/* Calendar based verification. */
+	/* Calendar-based verification. */
 	CAL_BASED,
 	KEY_BASED,
-	/* Publication based verification, use publications file. */
+	/* Publication-based verification, use publications file. */
 	PUB_BASED_FILE,
 	PUB_BASED_FILE_X,
-	/* Publication based verification, use publication string. */
+	/* Publication-based verification, use publication string. */
 	PUB_BASED_STR,
 	PUB_BASED_STR_X
 };
@@ -480,26 +481,52 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 
 	TASK_SET_add(task_set,	INT_BASED,				"Verify internally.",				"ver-int,input",				NULL,	"ver-cal,ver-key,ver-pub,T,x,pub-str",				NULL);
 
-	TASK_SET_add(task_set,	CAL_BASED,				"Calendar based verification.",		"ver-cal,input,X",				NULL,	"ver-int,ver-key,ver-pub,pub-str",					NULL);
+	TASK_SET_add(task_set,	CAL_BASED,				"Calendar-based verification.",		"ver-cal,input,X",				NULL,	"ver-int,ver-key,ver-pub,pub-str",					NULL);
 
-	TASK_SET_add(task_set,	KEY_BASED,				"Key based verification.",			"ver-key,input,P,cnstr",		NULL,	"ver-int,ver-cal,ver-pub,T,x,pub-str",				NULL);
+	TASK_SET_add(task_set,	KEY_BASED,				"Key-based verification.",			"ver-key,input,P,cnstr",		NULL,	"ver-int,ver-cal,ver-pub,T,x,pub-str",				NULL);
 
-	TASK_SET_add(task_set,	PUB_BASED_FILE,			"Publication based verification, "
+	TASK_SET_add(task_set,	PUB_BASED_FILE,			"Publication-based verification, "
 													"use publications file, "
 													"extending is restricted.",			"ver-pub,input,P,cnstr",		NULL,	"ver-int,ver-cal,ver-key,x,T,pub-str",				NULL);
-	TASK_SET_add(task_set,	PUB_BASED_FILE_X,		"Publication based verification, "
+	TASK_SET_add(task_set,	PUB_BASED_FILE_X,		"Publication-based verification, "
 													"use publications file, "
 													"extending is permitted.",			"ver-pub,input,P,cnstr,x,X",	NULL,	"ver-int,ver-cal,ver-key,T,pub-str",				NULL);
 
-	TASK_SET_add(task_set,	PUB_BASED_STR,			"Publication based verification, "
+	TASK_SET_add(task_set,	PUB_BASED_STR,			"Publication-based verification, "
 													"use publications string, "
 													"extending is restricted.",			"ver-pub,input,pub-str",		NULL,	"ver-int,ver-cal,ver-key,x,T",						NULL);
-	TASK_SET_add(task_set,	PUB_BASED_STR_X,		"Publication based verification, "
+	TASK_SET_add(task_set,	PUB_BASED_STR_X,		"Publication-based verification, "
 													"use publications string, "
 													"extending is permitted.",			"ver-pub,input,pub-str,x,X",	NULL,	"ver-int,ver-cal,ver-key,T",						NULL);
 cleanup:
 
 	return res;
+}
+
+enum suggestions_enum {
+	/* Suggest to permit extending as signature has no publication record. */
+	SUGST_PERMIT_EXT = 0x01,
+
+	/* Suggest to re-extend the signature as its publication record is not available in publications file. */
+	SUGST_PERMIT_RE_EXT = 0x02,
+
+	/* Suggest to check if publications file is up to date. */
+	SUGST_PUBFILE_HAS_NOT_YET_PUB = 0x04,
+
+	/* Suggest to check if publications file is up to date as already extend signature contains
+	 * more recent publication record than available in publications file. */
+	SUGST_PUBFILE_OLDER_THAN_PUBREC = 0x08,
+};
+
+static int suggestion_map = SUGST_PERMIT_EXT | SUGST_PERMIT_RE_EXT | SUGST_PUBFILE_HAS_NOT_YET_PUB | SUGST_PUBFILE_OLDER_THAN_PUBREC;
+
+static int do_suggest(int code) {
+	if (suggestion_map & code) {
+		suggestion_map &= ~code;
+		return 1;
+	}
+
+	return 0;
 }
 
 static void signature_set_suggestions_for_publication_based_verification(PARAM_SET *set, ERR_TRCKR *err, int errCode,
@@ -551,26 +578,21 @@ static void signature_set_suggestions_for_publication_based_verification(PARAM_S
 	/* If there is user publication specified get its time. */
 	if (!usePubfile && userPubData != NULL) {
 		res = KSI_PublicationData_getTime(userPubData, &userPubTime);
+		if (res != KSI_OK) return;
 	}
 
 	if (!isExtendedToPublication && usePubfile) {
-		if (possibilityToExtendTo != NULL && !x) {
+		if (possibilityToExtendTo != NULL && !x && do_suggest(SUGST_PERMIT_EXT)) {
 			ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion:  Use -x to permit automatic extending or use logksi extend command to extend the signature.\n");
-		} else if (possibilityToExtendTo == NULL) {
+		} else if (possibilityToExtendTo == NULL && do_suggest(SUGST_PUBFILE_HAS_NOT_YET_PUB)) {
 			ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion:  Check if publications file is up-to-date as there is not (yet) a publication record in the publications file specified to extend the signature to.\n");
 			ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion:  Wait until next publication and try again.\n");
-			if (!x) ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion:  When a suitable publication is available use -x to permit automatic extending or use logksi extend command to extend the signature.\n");
+			if (!x && do_suggest(SUGST_PERMIT_EXT)) ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion:  When a suitable publication is available use -x to permit automatic extending or use logksi extend command to extend the signature.\n");
 		}
-
-		/* Note that signature extended to some random time does not count as it is beyond normal usage. */
-		ERR_TRCKR_ADD(err, errCode, "Error: Signature is not extended.");
 	} else {
-
-
 		if (usePubfile) {
 			KSI_PublicationRecord *pubrecInPubfile = NULL;
 			KSI_Integer *pubTime = NULL;
-			int isPubfileOlderThanSig;
 
 			/* Get the publication time. */
 			res = KSI_Signature_getPublicationRecord(sig, &rec);
@@ -580,17 +602,18 @@ static void signature_set_suggestions_for_publication_based_verification(PARAM_S
 			res = KSI_PublicationData_getTime(pubData, &pubTime);
 			if (res != KSI_OK) return;
 
-			isPubfileOlderThanSig = KSI_Integer_compare(latestPubTimeInPubfile, sigTime) == -1 ? 1 : 0;
 
 			res = KSI_PublicationsFile_getPublicationDataByTime(pubFile, pubTime, &pubrecInPubfile);
 			if (res != KSI_OK) return;
 
 			if (pubrecInPubfile == NULL) {
+				int isPubfileOlderThanPublication = KSI_Integer_compare(latestPubTimeInPubfile, pubTime) == -1 ? 1 : 0;
+
 				ERR_TRCKR_ADD(err, errCode, "Error: Signature is extended to a publication that does not exist in publications file.");
 
-				if (possibilityToExtendTo == NULL && isPubfileOlderThanSig) {
+				if (possibilityToExtendTo == NULL && isPubfileOlderThanPublication && do_suggest(SUGST_PUBFILE_OLDER_THAN_PUBREC)) {
 					ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion:  Check if publications file is up-to-date as the latest publication in the publications file is older than the signatures publication record.\n");
-				} else if (possibilityToExtendTo != NULL && !x) {
+				} else if (possibilityToExtendTo != NULL && !x && do_suggest(SUGST_PERMIT_RE_EXT)) {
 					ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion:  Try to use -x to permit automatic extending or use logksi extend command to re-extend the signature.\n");
 				}
 			}
@@ -598,27 +621,108 @@ static void signature_set_suggestions_for_publication_based_verification(PARAM_S
 			if (KSI_Integer_compare(userPubTime, sigTime) == -1) {
 				ERR_TRCKR_ADD(err, errCode, "Error: User publication string can not be older than the signatures signing time.");
 				return;
-			} else if (!x) {
+			} else if (!x && do_suggest(SUGST_PERMIT_EXT)) {
 				ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion:  Use -x to permit automatic extending.\n");
 			}
 		}
-
 	}
 }
 
-static void handle_verification_result(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ctx, KSI_Signature *sig, KSI_PublicationData *pubData, int res, const char *task_desc, KSI_PolicyVerificationResult *result) {
+static int isUserInputError(KSI_PolicyVerificationResult *result) {
+	if (result == NULL) return 1;
+
+	switch(result->finalResult.status) {
+		case KSI_SERVICE_AUTHENTICATION_FAILURE:
+		case KSI_NETWORK_ERROR:
+		case KSI_IO_ERROR:
+		case KSI_HMAC_MISMATCH:
+			return 1;
+		default:
+			return 0;
+	}
+
+	return 0;
+}
+
+static int handle_verification_result(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ctx, BLOCK_INFO *blocks, KSI_Signature *sig, KSI_PublicationData *pubData, int res, const char *task_desc, KSI_PolicyVerificationResult *result, int isPubBased) {
 	KSI_RuleVerificationResult *verificationResult = NULL;
+	int res_out = res;
+
+	if (isUserInputError(result)) {
+		res_out = KT_USER_INPUT_FAILURE;
+	}
 
 	if (KSI_RuleVerificationResultList_elementAt(
 			result->ruleResults, KSI_RuleVerificationResultList_length(result->ruleResults) - 1,
 			&verificationResult) == KSI_OK && verificationResult != NULL) {
-			signature_set_suggestions_for_publication_based_verification(set, err, res, ctx, sig, verificationResult, pubData);
+			if (isPubBased) signature_set_suggestions_for_publication_based_verification(set, err, res, ctx, sig, verificationResult, pubData);
 
-		ERR_TRCKR_ADD(err, res, "Error: [%s] %s. %s failed.",
+			if (verificationResult->status != KSI_OK && verificationResult->statusMessage != NULL) {
+				size_t str_len = strlen(verificationResult->statusMessage);
+				const char *period = "";
+
+				if (str_len > 0) {
+					char last_c = verificationResult->statusMessage[str_len - 1];
+					period = last_c != 0 && !ispunct(last_c) ? "." : "";
+				}
+
+				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: %s%s", verificationResult->statusMessage, period);
+				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: %s%s", blocks->blockNo, verificationResult->statusMessage, period);
+			}
+
+			print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: %s: [%s] %s.",
+				task_desc,
 				OBJPRINT_getVerificationErrorCode(verificationResult->errorCode),
-				OBJPRINT_getVerificationErrorDescription(verificationResult->errorCode), task_desc);
+				OBJPRINT_getVerificationErrorDescription(verificationResult->errorCode));
+
+
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: %s: [%s] %s.",
+				blocks->blockNo,
+				task_desc,
+				OBJPRINT_getVerificationErrorCode(verificationResult->errorCode),
+				OBJPRINT_getVerificationErrorDescription(verificationResult->errorCode));
 	}
+
+	return res_out;
 }
+
+static int check_resources_verify_general(PARAM_SET *set, ERR_TRCKR *err, KSI_Signature *sig, KSI_PublicationData *pubdata, int extperm) {
+	int res = KT_UNKNOWN_ERROR;
+
+	if (set == NULL || err == NULL || sig == NULL) {
+		ERR_TRCKR_ADD(err, res = KT_INVALID_ARGUMENT, NULL);
+		goto cleanup;
+	}
+
+	if (extperm && !PARAM_SET_isSetByName(set, "X")) {
+		ERR_TRCKR_ADD(err, res = KT_INVALID_CMD_PARAM, "Error: Extending is permitted (-x) but extender is not configured (-X).");
+		goto cleanup;
+	}
+
+	/* First check if user has provided publications */
+	if (pubdata != NULL) {
+		res = KT_OK;
+	} else {
+		/* Get available trust anchor from the signature */
+		if (LOGKSI_Signature_isCalendarAuthRecPresent(sig) && !PARAM_SET_isSetByName(set, "P")) {
+			ERR_TRCKR_ADD(err, res = KT_INVALID_CMD_PARAM, "Error: Publications file (-P) needed for verifying Calendar Authentication Record is not configured!");
+		} else if (LOGKSI_Signature_isPublicationRecordPresent(sig) && !PARAM_SET_isSetByName(set, "P")) {
+			ERR_TRCKR_ADD(err, res = KT_INVALID_CMD_PARAM, "Error: Publications file (-P) needed for verifying signature's Publication Record is not configured!");
+		} else if (!PARAM_SET_isSetByName(set, "X")) {
+			ERR_TRCKR_ADD(err, res = KT_INVALID_CMD_PARAM, "Error: Extender needed for verifying signature against Calendar Data Base is not configured!");
+		} else {
+			res = KT_OK;
+		}
+	}
+	if (res != KT_OK) goto cleanup;
+
+	res = KT_OK;
+
+cleanup:
+	return res;
+}
+
 
 static int signature_verify_general(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files,
 									KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out) {
@@ -645,9 +749,15 @@ static int signature_verify_general(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR
 	 * Verify signature.
 	 */
 	print_progressDesc(mp, MP_ID_BLOCK, d, DEBUG_LEVEL_3, "%s... ", task);
+
+	res = check_resources_verify_general(set, err, sig, pub_data, x);
+	if (res != KT_OK) goto cleanup;
+
 	res = LOGKSI_SignatureVerify_general(err, sig, ksi, hsh, rootLevel, pub_data, x, out);
 	if (res != KSI_OK && *out != NULL) {
-		handle_verification_result(set, err, ksi, sig, pub_data, res, task, *out);
+		int is_pub_based = pub_data != NULL || LOGKSI_Signature_isPublicationRecordPresent(sig);
+
+		res = handle_verification_result(set, mp, err, ksi, blocks, sig, pub_data, res, task, *out, is_pub_based);
 		goto cleanup;
 	} else {
 		ERR_CATCH_MSG(err, res, "Error: %s failed.", task);
@@ -676,7 +786,7 @@ static int signature_verify_internally(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TR
 	print_progressDesc(mp, MP_ID_BLOCK, d, DEBUG_LEVEL_3, "%s... ", task);
 	res = LOGKSI_SignatureVerify_internally(err, sig, ksi, hsh, rootLevel, out);
 	if (res != KSI_OK && *out != NULL) {
-		handle_verification_result(set, err, ksi, sig, NULL, res, task, *out);
+		res = handle_verification_result(set, mp, err, ksi, blocks, sig, NULL, res, task, *out, 0);
 		goto cleanup;
 	} else {
 		ERR_CATCH_MSG(err, res, "Error: %s failed.", task);
@@ -705,7 +815,7 @@ static int signature_verify_key_based(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRC
 	print_progressDesc(mp, MP_ID_BLOCK, d, DEBUG_LEVEL_3, "%s... ", task);
 	res = LOGKSI_SignatureVerify_keyBased(err, sig, ksi, hsh, rootLevel, out);
 	if (res != KSI_OK && *out != NULL) {
-		handle_verification_result(set, err, ksi, sig, NULL, res, task, *out);
+		res = handle_verification_result(set, mp, err, ksi, blocks, sig, NULL, res, task, *out, 0);
 		goto cleanup;
 	} else {
 		ERR_CATCH_MSG(err, res, "Error: %s failed.", task);
@@ -745,7 +855,7 @@ static int signature_verify_publication_based_with_user_pub(PARAM_SET *set, MULT
 	print_progressDesc(mp, MP_ID_BLOCK, d, DEBUG_LEVEL_3, "%s... ", task);
 	res = LOGKSI_SignatureVerify_userProvidedPublicationBased(err, sig, ksi, hsh, rootLevel, pub_data, x, out);
 	if (res != KSI_OK && *out != NULL) {
-		handle_verification_result(set, err, ksi, sig, pub_data, res, task, *out);
+		res = handle_verification_result(set, mp, err, ksi, blocks, sig, pub_data, res, task, *out, 1);
 		goto cleanup;
 	} else {
 		ERR_CATCH_MSG(err, res, "Error: %s failed.", task);
@@ -776,7 +886,7 @@ static int signature_verify_publication_based_with_pubfile(PARAM_SET *set, MULTI
 	print_progressDesc(mp, MP_ID_BLOCK, d, DEBUG_LEVEL_3, "%s... ", task);
 	res = LOGKSI_SignatureVerify_publicationsFileBased(err, sig, ksi, hsh, rootLevel, x, out);
 	if (res != KSI_OK && *out != NULL) {
-		handle_verification_result(set, err, ksi, sig, NULL, res, task, *out);
+		res = handle_verification_result(set, mp, err, ksi, blocks, sig, NULL, res, task, *out, 1);
 		goto cleanup;
 	} else {
 		ERR_CATCH_MSG(err, res, "Error: %s failed.", task);
@@ -805,7 +915,7 @@ static int signature_verify_calendar_based(PARAM_SET *set, MULTI_PRINTER *mp, ER
 	print_progressDesc(mp, MP_ID_BLOCK, d, DEBUG_LEVEL_3, "%s... ", task);
 	res = LOGKSI_SignatureVerify_calendarBased(err, sig, ksi, hsh, rootLevel, out);
 	if (res != KSI_OK && *out != NULL) {
-		handle_verification_result(set, err, ksi, sig, NULL, res, task, *out);
+		res = handle_verification_result(set, mp, err, ksi, blocks, sig, NULL, res, task, *out, 0);
 		goto cleanup;
 	} else {
 		ERR_CATCH_MSG(err, res, "Error: %s failed.", task);

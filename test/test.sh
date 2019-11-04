@@ -42,6 +42,7 @@ test/test_suites/verify_debug_output.bats \
 test/test_suites/verify_cmd.bats \
 test/test_suites/verify_log_rec_time.bats \
 test/test_suites/verify_log_rec_time_debug_output.bats \
+test/test_suites/verify_no_resource.bats \
 $TEST_DEPENDING_ON_KSI_TOOL
 
 exit_code=$?

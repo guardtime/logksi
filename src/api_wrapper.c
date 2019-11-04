@@ -196,7 +196,7 @@ static int verify_signature(KSI_Signature *sig, KSI_CTX *ctx,
 	if (res != KSI_OK) goto cleanup;
 
 	if (*result && (*result)->finalResult.resultCode != KSI_VER_RES_OK) {
-		res = KSI_VERIFICATION_FAILURE;
+		res = KT_VERIFICATION_FAILURE;
 	}
 
 cleanup:
@@ -321,7 +321,6 @@ int LOGKSI_SignatureVerify_internally(ERR_TRCKR *err, KSI_Signature *sig, KSI_CT
 
 	res = verify_signature(sig, ctx, hsh, rootLevel, 0, NULL, NULL, KSI_VERIFICATION_POLICY_INTERNAL, result);
 	if (res != KSI_OK) LOGKSI_KSI_ERRTrace_save(ctx);
-	appendBaseErrorIfPresent(err, res, ctx, __LINE__);
 
 	return res;
 }
@@ -338,10 +337,6 @@ int LOGKSI_SignatureVerify_calendarBased(ERR_TRCKR *err, KSI_Signature *sig, KSI
 	res = verify_signature(sig, ctx, hsh, rootLevel, 1, NULL, NULL, KSI_VERIFICATION_POLICY_CALENDAR_BASED, result);
 	if (res != KSI_OK) LOGKSI_KSI_ERRTrace_save(ctx);
 
-	if (appendBaseErrorIfPresent(err, res, ctx, __LINE__) == 0) {
-		appendNetworkErrors(err, res);
-		appendExtenderErrors(err, res);
-	}
 	return res;
 }
 
@@ -357,9 +352,6 @@ int LOGKSI_SignatureVerify_keyBased(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX 
 	res = verify_signature(sig, ctx, hsh, rootLevel, 0, NULL, NULL, KSI_VERIFICATION_POLICY_KEY_BASED, result);
 	if (res != KSI_OK) LOGKSI_KSI_ERRTrace_save(ctx);
 
-	if (appendBaseErrorIfPresent(err, res, ctx, __LINE__) == 0) {
-		appendPubFileErros(err, res);
-	}
 	return res;
 }
 
@@ -376,11 +368,6 @@ int LOGKSI_SignatureVerify_publicationsFileBased(ERR_TRCKR *err, KSI_Signature *
 	res = verify_signature(sig, ctx, hsh, rootLevel, extperm, NULL, NULL, KSI_VERIFICATION_POLICY_PUBLICATIONS_FILE_BASED, result);
 	if (res != KSI_OK) LOGKSI_KSI_ERRTrace_save(ctx);
 
-	if (appendBaseErrorIfPresent(err, res, ctx, __LINE__) == 0) {
-		appendPubFileErros(err, res);
-		appendNetworkErrors(err, res);
-		appendExtenderErrors(err, res);
-	}
 	return res;
 }
 
@@ -399,10 +386,6 @@ int LOGKSI_SignatureVerify_userProvidedPublicationBased(ERR_TRCKR *err, KSI_Sign
 	res = verify_signature(sig, ctx, hsh, rootLevel, extperm, NULL, pubdata, KSI_VERIFICATION_POLICY_USER_PUBLICATION_BASED, result);
 	if (res != KSI_OK) LOGKSI_KSI_ERRTrace_save(ctx);
 
-	if (appendBaseErrorIfPresent(err, res, ctx, __LINE__) == 0) {
-		appendNetworkErrors(err, res);
-		appendExtenderErrors(err, res);
-	}
 	return res;
 }
 
