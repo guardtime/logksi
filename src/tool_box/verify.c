@@ -700,11 +700,11 @@ static int check_resources_verify_general(PARAM_SET *set, ERR_TRCKR *err, KSI_Si
 		goto cleanup;
 	}
 
-	/* First check if user has provided publications */
+	/* First check if user has provided publications. */
 	if (pubdata != NULL) {
 		res = KT_OK;
 	} else {
-		/* Get available trust anchor from the signature */
+		/* Get available trust anchor from the signature. */
 		if (LOGKSI_Signature_isCalendarAuthRecPresent(sig) && !PARAM_SET_isSetByName(set, "P")) {
 			ERR_TRCKR_ADD(err, res = KT_INVALID_CMD_PARAM, "Error: Publications file (-P) needed for verifying Calendar Authentication Record is not configured!");
 		} else if (LOGKSI_Signature_isPublicationRecordPresent(sig) && !PARAM_SET_isSetByName(set, "P")) {
