@@ -103,7 +103,7 @@ export KSI_CONF=""
 	[ "$status" -eq 1 ]
 	[[ "$output" =~ "Verifying... failed." ]]
 	[[ "$output" =~ "Error: Verification FAILED and was stopped." ]]
-	[[ "$output" =~ "Error: Could not resolve host: this-extender-url-must-not-exist" ]]
+	[[ "$output" =~ "Error: Could not resolve host: this-extender-url-must-not-exist"|"Error: Couldn't resolve host 'this-extender-url-must-not-exist'" ]]
 }
 
 @test "key-based verification: unknown publications file url and --continue-on-fail" {
@@ -111,9 +111,8 @@ export KSI_CONF=""
 	[ "$status" -eq 1 ]
 	[[ "$output" =~ "Verifying... failed." ]]
 	[[ "$output" =~ "Error: Verification FAILED and was stopped." ]]
-	[[ "$output" =~ "Error: Could not resolve host: this-pubfile-url-must-not-exist" ]]
+	[[ "$output" =~ "Error: Could not resolve host: this-pubfile-url-must-not-exist"|"Error: Couldn't resolve host 'this-pubfile-url-must-not-exist'" ]]
 }
-
 
 # err_message
 f_error_response_message () {
