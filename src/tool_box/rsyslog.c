@@ -3470,6 +3470,7 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 
 									print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Skipping block %zu!\n", blocks->blockNo);
 									print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Block is skipped!\n", blocks->blockNo);
+									res = KT_OK;
 									continue;
 								}
 								goto cleanup;
@@ -3669,8 +3670,9 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 cleanup:
 
 	if (blocks->quietError != KT_OK) {
+		int isContinued = blocks->isContinuedOnFail && (res != KT_INVALID_CMD_PARAM) && (res != KT_USER_INPUT_FAILURE);
 		res = blocks->quietError;
-		ERR_TRCKR_ADD(err, res, blocks->isContinuedOnFail ? "Error: Verification FAILED but was continued for further analysis." : "Error: Verification FAILED and was stopped.");
+		ERR_TRCKR_ADD(err, res, isContinued ? "Error: Verification FAILED but was continued for further analysis." : "Error: Verification FAILED and was stopped.");
 	}
 
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_2, res);

@@ -37,6 +37,7 @@ static int logksi_ErrToExitcode(int error_code) {
 		case KT_INDEX_OVF:
 		case KT_UNKNOWN_ERROR:
 		case KT_SIGNING_FAILURE:
+		case KT_USER_INPUT_FAILURE:
 			return EXIT_FAILURE;
 		case KT_IO_ERROR:
 			return EXIT_IO_ERROR;
@@ -138,6 +139,8 @@ static const char* logksiErrToString(int error_code) {
 			return "Log signature verification failed.";
 		case KT_SIGNING_FAILURE:
 			return "Log signature signing failed.";
+		case KT_USER_INPUT_FAILURE:
+			return "User input error.";
 		case KT_VERIFICATION_SKIPPED:
 			return "Verification skipped.";
 		case KT_PUBFILE_HAS_NO_PUBREC_TO_EXTEND_TO:
