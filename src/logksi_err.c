@@ -138,7 +138,7 @@ static const char* logksiErrToString(int error_code) {
 			return "Invalid configuration file.";
 		case KT_VERIFICATION_FAILURE:
 			return "Log signature verification failed.";
-        case KT_VERIFICATION_NA:
+		case KT_VERIFICATION_NA:
 			return "Log signature verification inconclusive.";
 		case KT_SIGNING_FAILURE:
 			return "Log signature signing failed.";
