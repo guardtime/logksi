@@ -148,6 +148,7 @@ static int block_info_calculate_hash_of_logline_and_store_logline_check_log_time
 					}
 
 					res = KT_VERIFICATION_FAILURE;
+					BLOCK_INFO_setErrorLevel(blocks, LOGKSI_VER_RES_FAIL);
 					print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 					LOGKSI_uint64_toDateString(last_time, str_last_time, sizeof(str_last_time));
 					LOGKSI_uint64_toDateString(t, str_current_time, sizeof(str_current_time));
@@ -198,6 +199,8 @@ static int logksi_datahash_compare(ERR_TRCKR *err, MULTI_PRINTER *mp, BLOCK_INFO
 		size_t minSize = 0;
 
 		res = KT_VERIFICATION_FAILURE;
+		BLOCK_INFO_setErrorLevel(blocks, LOGKSI_VER_RES_FAIL);
+
 		print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 		MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
 		differentHashAlg = KSI_DataHash_getHashAlg(left, &leftId) == KSI_OK && KSI_DataHash_getHashAlg(right, &rightId) == KSI_OK && leftId != rightId;
@@ -559,6 +562,7 @@ static int check_log_record_embedded_time_against_ksi_signature_time(PARAM_SET *
 		/* In case of failure leave a mark and format some more strings. */
 		if (isSigTimeOlderThanRecTime || isTimeDiffTooLarge) {
 			res = KT_VERIFICATION_FAILURE;
+			BLOCK_INFO_setErrorLevel(blocks, LOGKSI_VER_RES_FAIL);
 			blocks->nofTotalFailedBlocks++;
 			print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 
@@ -646,6 +650,7 @@ static int handle_record_time_check_between_files(PARAM_SET *set, MULTI_PRINTER*
 
 			/* Check if deviation in current range is accepted. */
 			res = KT_VERIFICATION_FAILURE;
+			BLOCK_INFO_setErrorLevel(blocks, LOGKSI_VER_RES_FAIL);
 			print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 			LOGKSI_uint64_toDateString(blocks->rec_time_in_file_max, str_last_time, sizeof(str_last_time));
 			LOGKSI_uint64_toDateString(blocks->rec_time_min, str_current_time, sizeof(str_current_time));
@@ -791,6 +796,7 @@ static int handle_block_signing_time_check(PARAM_SET *set, MULTI_PRINTER* mp, ER
 
 					if (!hasFailed) blocks->nofTotalFailedBlocks++;
 					res = KT_VERIFICATION_FAILURE;
+					BLOCK_INFO_setErrorLevel(blocks, LOGKSI_VER_RES_FAIL);
 					hasFailed = 1;
 
 					print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
@@ -843,6 +849,8 @@ static int handle_block_signing_time_check(PARAM_SET *set, MULTI_PRINTER* mp, ER
 				print_progressResult(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_2, 1);
 				print_progressResult(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_1, 1);
 				blocks->errSignTime = 1;
+				res = KT_VERIFICATION_FAILURE;
+				BLOCK_INFO_setErrorLevel(blocks, LOGKSI_VER_RES_FAIL);
 
 				if (blocks->blockNo == 1) {
 
@@ -1206,6 +1214,7 @@ static int is_record_hash_expected(ERR_TRCKR *err, BLOCK_INFO *blocks) {
 	res = KT_OK;
 
 cleanup:
+	if (res == KT_VERIFICATION_FAILURE) BLOCK_INFO_setErrorLevel(blocks, LOGKSI_VER_RES_FAIL);
 
 	return res;
 }
@@ -1365,6 +1374,8 @@ static int is_tree_hash_expected(ERR_TRCKR *err, BLOCK_INFO *blocks) {
 
 cleanup:
 
+	if (res == KT_VERIFICATION_FAILURE) BLOCK_INFO_setErrorLevel(blocks, LOGKSI_VER_RES_FAIL);
+
 	return res;
 }
 
@@ -1512,6 +1523,7 @@ static int process_tree_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, 
 	res = KT_OK;
 
 cleanup:
+	if (res == KT_VERIFICATION_FAILURE) BLOCK_INFO_setErrorLevel(blocks, LOGKSI_VER_RES_FAIL);
 
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
 	KSI_DataHash_free(treeHash);
@@ -1737,6 +1749,8 @@ static int is_block_signature_expected(ERR_TRCKR *err, BLOCK_INFO *blocks) {
 
 cleanup:
 
+	if (res == KT_VERIFICATION_FAILURE) BLOCK_INFO_setErrorLevel(blocks, LOGKSI_VER_RES_FAIL);
+
 	return res;
 }
 
@@ -1778,6 +1792,7 @@ static int check_log_signature_client_id(PARAM_SET *set, MULTI_PRINTER* mp, ERR_
 		if (res != REGEXP_OK) {
 			blocks->nofTotalFailedBlocks++;
 			res = KT_VERIFICATION_FAILURE;
+			BLOCK_INFO_setErrorLevel(blocks, LOGKSI_VER_RES_FAIL);
 			blocks->quietError = res;
 			print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 
@@ -2086,6 +2101,15 @@ cleanup:
 	return res;
 }
 
+static const char *error_level_to_string(BLOCK_INFO *blocks) {
+	switch (blocks->errorLevel) {
+		case LOGKSI_VER_RES_OK: return "ok";
+		case LOGKSI_VER_RES_NA: return "inconclusive";
+		case LOGKSI_VER_RES_FAIL: return "failed";
+		default: return "<unexpected verification result>";
+	}
+}
+
 static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, KSI_PublicationsFile *pubFile, SIGNATURE_PROCESSORS *processors, BLOCK_INFO *blocks, IO_FILES *files) {
 	int res;
 	KSI_Signature *sig = NULL;
@@ -2115,6 +2139,7 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 	blocks->sigNo++;
 	if (blocks->sigNo > blocks->blockNo) {
 		res = KT_VERIFICATION_FAILURE;
+		BLOCK_INFO_setErrorLevel(blocks, LOGKSI_VER_RES_FAIL);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: block signature data without preceding block header found.", blocks->sigNo);
 	}
 
@@ -2155,7 +2180,8 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 
 	/* If block is unsigned, return verification error. If signature data is missing, return format error. */
 	if (tlvUnsig != NULL) {
-		res = KT_VERIFICATION_FAILURE;
+		res = KT_VERIFICATION_NA;
+		BLOCK_INFO_setErrorLevel(blocks, LOGKSI_VER_RES_NA);
 		blocks->curBlockNotSigned = 1;
 		blocks->quietError = res;
 		print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
@@ -2220,6 +2246,7 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 	 * their count must match the record count in block signature. */
 	if (blocks->nofRecordHashes && blocks->nofRecordHashes != blocks->recordCount) {
 		res = KT_VERIFICATION_FAILURE;
+		BLOCK_INFO_setErrorLevel(blocks, LOGKSI_VER_RES_FAIL);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: expected %zu record hashes, but found %zu.", blocks->blockNo, blocks->recordCount, blocks->nofRecordHashes);
 	}
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
@@ -2258,8 +2285,8 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 			blocks->quietError = res;
 
 			print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
-			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Verification of block %zu KSI signature failed!\n", blocks->blockNo);
-			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Verification of KSI signature failed!\n", blocks->blockNo);
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Verification of block %zu KSI signature %s!\n", blocks->blockNo, error_level_to_string(blocks));
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Verification of KSI signature %s!\n", blocks->blockNo), error_level_to_string(blocks);
 
 			if (!blocks->isContinuedOnFail || blocks->taskId != TASK_VERIFY) {
 				ERR_TRCKR_ADD(err, res, "Error: Block no. %zu: KSI signature verification failed.", blocks->blockNo);
@@ -3027,6 +3054,7 @@ static int finalize_log_signature(PARAM_SET* set, MULTI_PRINTER* mp, ERR_TRCKR *
 
 cleanup:
 
+	if (res == KT_VERIFICATION_FAILURE) BLOCK_INFO_setErrorLevel(blocks, LOGKSI_VER_RES_FAIL);
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 
 	print_debug_mp(mp, MP_ID_LOGFILE_SUMMARY, DEBUG_SMALLER | DEBUG_LEVEL_3, "\nSummary of logfile:\n");
@@ -3458,12 +3486,14 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 							res = process_log_signature_with_block_signature(set, mp, err, ksi, NULL, blocks, files, &processors);
 							if (res != KT_OK) {
 								/* In case of verification failure and --continue-on-fail option, verification is continued. */
-								if ((res == KT_VERIFICATION_FAILURE || res == KSI_VERIFICATION_FAILURE) && blocks->isContinuedOnFail) {
+								if ((res == KT_VERIFICATION_FAILURE || res == KSI_VERIFICATION_FAILURE || res == KT_VERIFICATION_NA) && blocks->isContinuedOnFail) {
 									print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 									print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_2, res);
 									print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
 
-									blocks->quietError = KT_VERIFICATION_FAILURE;
+									/* Set quietError as failure if there has been at least clear failure. */
+									if (blocks->errorLevel == LOGKSI_VER_RES_NA) blocks->quietError = KT_VERIFICATION_NA;
+									else blocks->quietError = KT_VERIFICATION_FAILURE;
 
 									skipCurrentBlock = 1;
 									blocks->lastBlockWasSkipped = 1;
@@ -3672,7 +3702,10 @@ cleanup:
 	if (blocks->quietError != KT_OK) {
 		int isContinued = blocks->isContinuedOnFail && (res != KT_INVALID_CMD_PARAM) && (res != KT_USER_INPUT_FAILURE);
 		res = blocks->quietError;
-		ERR_TRCKR_ADD(err, res, isContinued ? "Error: Verification FAILED but was continued for further analysis." : "Error: Verification FAILED and was stopped.");
+		if (isContinued && blocks->errorLevel == LOGKSI_VER_RES_NA) ERR_TRCKR_ADD(err, res, "Error: Verification inconclusive but was continued for further analysis.");
+		else if (blocks->errorLevel == LOGKSI_VER_RES_NA) ERR_TRCKR_ADD(err, res, "Error: Verification inconclusive and was stopped.");
+		else if (isContinued && blocks->errorLevel == LOGKSI_VER_RES_FAIL) ERR_TRCKR_ADD(err, res, "Error: Verification FAILED but was continued for further analysis.");
+		else ERR_TRCKR_ADD(err, res, "Error: Verification FAILED and was stopped.");
 	}
 
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_2, res);

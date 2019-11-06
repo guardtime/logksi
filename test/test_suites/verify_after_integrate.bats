@@ -29,20 +29,20 @@ cp -r test/resource/logfiles/unsigned test/out
 
 @test "try verifying integrated unsigned.logsig" {
 	run ./src/logksi verify test/out/unsigned -ddd
-	[ "$status" -ne 0 ]
+	[ "$status" -eq 1 ]
 	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
 	[[ "$output" =~ "Block no.   5: Error: Block is unsigned!" ]]
 	[[ "$output" =~ "Error: Block no. 5 is unsigned and missing KSI signature in block signature." ]]
-	[[ "$output" =~ "Error: Verification FAILED and was stopped." ]]
+	[[ "$output" =~ "Error: Verification inconclusive and was stopped." ]]
 	[[ "$output" =~ (Suggestion: Make sure that block signature is actually the original output).*(use logksi sign to sign unsigned blocks) ]]
 }
 
 @test "try verifying integrated unsigned_all_final_hashes.logsig" {
 	run ./src/logksi verify test/out/unsigned test/out/unsigned_all_final_hashes.logsig -ddd
-	[ "$status" -ne 0 ]
+	[ "$status" -eq 1 ]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
 	[[ "$output" =~ "Block no.   5: Error: Block is unsigned!" ]]
 	[[ "$output" =~ "Error: Block no. 5 is unsigned and missing KSI signature in block signature." ]]
-	[[ "$output" =~ "Error: Verification FAILED and was stopped." ]]
+	[[ "$output" =~ "Error: Verification inconclusive and was stopped." ]]
 	[[ "$output" =~ (Suggestion: Make sure that block signature is actually the original output).*(use logksi sign to sign unsigned blocks) ]]
 }

@@ -1,4 +1,6 @@
 (LOGKSI-131) * FEATURE: New option --ksi to extract pure KSI signature for log line.
+(LOGKSI-133) * IMPROVEMENT: Wording for inconclusive verification result message improved.
+(LOGKSI-133) * IMPROVEMENT: Inconclusive verification result will return 1 as exit code.
 (LOGKSI-132) * IMPROVEMENT: Detailed verification errors are displayed before error trace.
 (LOGKSI-132) * BUGFIX: When verifying and --continue-on-fail is set, error trace is not crowded with detailed error messages.
 (LOGKSI-132) * BUGFIX: When during verification resource is not available due to user error, verification is stopped.

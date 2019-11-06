@@ -34,6 +34,7 @@ static int logksi_ErrToExitcode(int error_code) {
 		case KT_OUT_OF_MEMORY:
 			return EXIT_OUT_OF_MEMORY;
 		case KT_INVALID_ARGUMENT:
+		case KT_VERIFICATION_NA:
 		case KT_INDEX_OVF:
 		case KT_UNKNOWN_ERROR:
 		case KT_SIGNING_FAILURE:
@@ -137,6 +138,8 @@ static const char* logksiErrToString(int error_code) {
 			return "Invalid configuration file.";
 		case KT_VERIFICATION_FAILURE:
 			return "Log signature verification failed.";
+        case KT_VERIFICATION_NA:
+			return "Log signature verification inconclusive.";
 		case KT_SIGNING_FAILURE:
 			return "Log signature signing failed.";
 		case KT_USER_INPUT_FAILURE:
