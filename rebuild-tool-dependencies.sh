@@ -21,9 +21,9 @@
 set -e
 
 libksi_git="https://github.com/guardtime/libksi.git"
-libksi_version=v3.19.2939
+libksi_version=v3.20.3025
 libgtrfc3161_git="https://github.com/guardtime/libgtrfc3161.git"
-libgtrfc3161_version=4def4646c17939c049a1da550e50c49fbf5b7f75
+libgtrfc3161_version=v1.1.78
 
 
 tmp_build_dir_name="tmp_dep_build"
@@ -60,7 +60,7 @@ cd $tmp_build_dir_name
 
   cd $libgtrfc3161_dir_name
     git checkout $libgtrfc3161_version
-    ./rebuild.sh LDFLAGS=-L$(pwd)/../libksi/src/ksi/.libs/ CPPFLAGS=-I$(pwd)/../libksi/src/ || $ignore_exit_code
+    ./rebuild.sh -l $(pwd)/../libksi/src/ksi/.libs/ -i $(pwd)/../libksi/src/ || $ignore_exit_code
   cd ..
 cd ..
 

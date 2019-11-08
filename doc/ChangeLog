@@ -3,6 +3,7 @@
 (LOGKSI-132) * BUGFIX: When verifying and --continue-on-fail is set, error trace is not crowded with detailed error messages.
 (LOGKSI-132) * BUGFIX: When during verification resource is not available due to user error, verification is stopped.
 (LOGKSI-132) * BUGFIX: Duplicate suggestions messages are not displayed.
+(LOGKSI-136) * BUGFIX: rebuild.sh --get-dep-online fixed.
 
 Version 1.5
 
