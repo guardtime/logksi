@@ -41,7 +41,7 @@
 #include "tool.h"
 #include "param_set/parameter.h"
 #include "../tool_box.h"
-#include "param_set/param_set_obj_impl.h"
+//#include "param_set/param_set_obj_impl.h"
 #include "param_set/strn.h"
 #include "rsyslog.h"
 #include "blocks_info.h"

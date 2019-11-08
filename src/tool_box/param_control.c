@@ -213,21 +213,27 @@ int convertRepair_url(const char* arg, char* buf, unsigned len) {
 	unsigned i = 0;
 	int isFile;
 
-	if (arg == NULL || buf == NULL) return 0;
+	if (arg == NULL) return PST_PARAM_CONVERT_NOT_PERFORMED;
+	if (buf == NULL) return PST_INVALID_ARGUMENT;
 	scheme = strstr(arg, "://");
 	isFile = (strstr(arg, "file://") == arg);
 
 	if (scheme == NULL) {
 		KSI_strncpy(buf, "http://", len-1);
 		if (strlen(buf)+strlen(arg) < len)
-			strncat(buf, arg, strlen(arg));
+			strcat(buf, arg);
 		else
-			return 0;
+			return PST_PARAM_CONVERT_NOT_PERFORMED;
 	} else {
 		while (arg[i] && i < len - 1) {
 			if (&arg[i] < scheme) {
 				buf[i] = (char)tolower(arg[i]);
+#ifdef _WIN32
+			} else if (arg[i] == '\\' && isFile) {
+				buf[i] = '/';
+#else
 				VARIABLE_IS_NOT_USED(isFile);
+#endif
 			} else {
 				buf[i] = arg[i];
 			}
@@ -236,7 +242,7 @@ int convertRepair_url(const char* arg, char* buf, unsigned len) {
 		}
 		buf[i] = 0;
 	}
-	return 1;
+	return PST_OK;
 }
 
 
@@ -300,11 +306,11 @@ int isContentOk_int(const char* integer) {
 	return PARAM_OK;
 }
 
-int extract_int(void *extra, const char* str,  void** obj){
+int extract_int(void **extra, const char* str, void** obj){
 	long tmp;
 	int *pI = (int*)obj;
 	VARIABLE_IS_NOT_USED(extra);
-	tmp = strtol(str, NULL, 10);
+	tmp = str != NULL ? strtol(str, NULL, 10) : 0;
 	if (tmp < INT_MIN || tmp > INT_MAX) return KT_INVALID_CMD_PARAM;
 	*pI = (int)tmp;
 	return PST_OK;
@@ -359,7 +365,8 @@ int isContentOk_inputFileRestrictPipe(const char* path){
 int convertRepair_path(const char* arg, char* buf, unsigned len){
 	char *toBeReplaced = NULL;
 
-	if (arg == NULL || buf == NULL) return 0;
+	if (arg == NULL) return PST_PARAM_CONVERT_NOT_PERFORMED;
+	if (buf == NULL) return PST_INVALID_ARGUMENT;
 	KSI_strncpy(buf, arg, len - 1);
 
 
@@ -369,7 +376,7 @@ int convertRepair_path(const char* arg, char* buf, unsigned len){
 		toBeReplaced++;
 	}
 
-	return 1;
+	return PST_OK;
 }
 
 int isFormatOk_path(const char *path) {
@@ -389,20 +396,16 @@ int isContentOk_hashAlg(const char *alg){
 	else return HASH_ALG_INVALID_NAME;
 }
 
-int extract_hashAlg(void *extra, const char* str, void** obj) {
+int extract_hashAlg(void **extra, const char* str, void** obj) {
 	const char *hash_alg_name = NULL;
 	KSI_HashAlgorithm *hash_id = (KSI_HashAlgorithm*)obj;
-	KSI_HashAlgorithm tmp = KSI_HASHALG_INVALID_VALUE;
+	VARIABLE_IS_NOT_USED(extra);
 
-	if (obj == NULL) return KT_INVALID_ARGUMENT;
-
-	if (extra);
 	hash_alg_name = str != NULL ? (str) : ("default");
+	*hash_id = KSI_getHashAlgorithmByName(hash_alg_name);
 
-	tmp = KSI_getHashAlgorithmByName(hash_alg_name);
-	if (!KSI_isHashAlgorithmSupported(tmp)) return KT_UNKNOWN_HASH_ALG;
+	if (!KSI_isHashAlgorithmSupported(*hash_id)) return KT_UNKNOWN_HASH_ALG;
 
-	*hash_id = tmp;
 	return PST_OK;
 }
 
@@ -637,7 +640,7 @@ cleanup:
 	return res;
 }
 
-int extract_imprint(void *extra, const char* str, void** obj) {
+int extract_imprint(void **extra, const char* str, void** obj) {
 	int res;
 	void **extra_array = (void**)extra;
 	COMPOSITE *comp = NULL;
@@ -785,7 +788,7 @@ cleanup:
 }
 
 
-static int extract_input_hash(void *extra, const char* str, void** obj, int no_imprint, int no_stream) {
+static int extract_input_hash(void **extra, const char* str, void** obj, int no_imprint, int no_stream) {
 	int res;
 	void **extra_array = (void**)extra;
 	COMPOSITE *comp = (COMPOSITE*)(extra_array[1]);
@@ -820,7 +823,7 @@ cleanup:
 	return res;
 }
 
-int extract_inputHashFromImprintOrImprintInFile(void *extra, const char* str, void** obj) {
+int extract_inputHashFromImprintOrImprintInFile(void **extra, const char* str, void** obj) {
 	return extract_input_hash(extra, str, obj, 0, 0);
 }
 
@@ -840,7 +843,7 @@ int isFormatOk_pubString(const char *str) {
 	return FORMAT_OK;
 }
 
-int extract_pubString(void *extra, const char* str, void** obj) {
+int extract_pubString(void **extra, const char* str, void** obj) {
 	int res;
 	void **extra_array = extra;
 	COMPOSITE *comp = (COMPOSITE*)(extra_array[1]);
@@ -1040,7 +1043,7 @@ static const char* extract_seconds(const char *str, int64_t *value, int *isInfin
 	return (str[i] == '\0') ? NULL : &str[i];
 }
 
-int extract_timeDiff(void *extra, const char* time_diff,  void** obj) {
+int extract_timeDiff(void **extra, const char* time_diff,  void** obj) {
 	int64_t result_1 = 0;
 	int64_t result_2 = 0;
 	MIN_MAX_INT *pObj = (MIN_MAX_INT*)obj;
@@ -1086,7 +1089,7 @@ int extract_timeDiff(void *extra, const char* time_diff,  void** obj) {
 	return PST_OK;
 }
 
-int extract_timeValue(void *extra, const char* time_diff,  void** obj) {
+int extract_timeValue(void **extra, const char* time_diff,  void** obj) {
 	int64_t result = 0;
 	int isInfinity = 0;
 	int *pI = (int*)obj;
@@ -1120,7 +1123,7 @@ int isContentOk_utcTime(const char *time) {
 	}
 }
 
-int extract_utcTime(void *extra, const char* str, void** obj) {
+int extract_utcTime(void **extra, const char* str, void** obj) {
 	int res;
 	void **extra_array = extra;
 	COMPOSITE *comp = (COMPOSITE*)(extra_array[1]);
@@ -1215,19 +1218,22 @@ int convertRepair_constraint(const char* arg, char* buf, unsigned len) {
 	char *value = NULL;
 	const char *oid = NULL;
 
-	if (arg == NULL || buf == NULL) return 0;
-	KSI_strncpy(buf, arg, len-1);
+	if (arg == NULL) return PST_PARAM_CONVERT_NOT_PERFORMED;
+	if (buf == NULL) return PST_INVALID_ARGUMENT;
 
 	value = strchr(arg, '=');
-	if (value == NULL) return 0;
+	if (value == NULL) return PST_PARAM_CONVERT_NOT_PERFORMED;
 	else value++;
 
 	oid = OID_getFromString(arg);
 
-	if (oid != NULL && value != NULL)
+	if (oid != NULL && value != NULL) {
 		KSI_snprintf(buf, len, "%s=%s", oid, value);
+	} else {
+		return PST_PARAM_CONVERT_NOT_PERFORMED;
+	}
 
-	return 1;
+	return PST_OK;
 }
 
 

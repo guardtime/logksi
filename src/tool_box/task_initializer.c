@@ -53,7 +53,7 @@ int TASK_INITIALIZER_check_analyze_report(PARAM_SET *set, TASK_SET *task_set, do
 	 * Check for typos and unknown parameters.
 	 */
 	if (PARAM_SET_isTypoFailure(set)) {
-			print_errors("%s\n", PARAM_SET_typosToString(set, PST_TOSTR_DOUBLE_HYPHEN, NULL, buf, sizeof(buf)));
+			print_errors("%s\n", PARAM_SET_typosToString(set, NULL, buf, sizeof(buf)));
 			res = KT_INVALID_CMD_PARAM;
 			goto cleanup;
 	} else if (PARAM_SET_isUnknown(set)){
@@ -133,8 +133,8 @@ int TASK_INITIALIZER_getServiceInfo(PARAM_SET *set, int argc, char **argv, char 
 	 * Read conf from command line.
      */
 	res = PARAM_SET_parseCMD(set, argc, argv, "CMD", PRIORITY_CMD);
-	if (res != KT_OK) {
-		print_errors("Error: Unable to parse command-line.\n");
+	if (res != PST_OK) {
+		print_errors("Error: Unable to parse command-line %x.\n", res);
 		goto cleanup;
 	}
 

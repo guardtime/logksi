@@ -44,7 +44,8 @@ BuildRoot: %{_tmppath}/%{name_package}-%{version}-build
 @KSI_RPM_RUN_DEPENDENCY@
 @GTRFC3161_RPM_BUILD_DEPENDENCY@
 @GTRFC3161_RPM_RUN_DEPENDENCY@
-
+@PST_RPM_RUN_DEPENDENCY@
+@PST_RPM_BUILD_DEPENDENCY@
 
 %description
 Log signature command-line tool for KSI blockchain. Provides the
