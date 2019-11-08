@@ -196,17 +196,17 @@ static int verify_signature(KSI_Signature *sig, KSI_CTX *ctx,
 	if (res != KSI_OK) goto cleanup;
 
 
-     res = KT_VERIFICATION_NA;
+	res = KT_VERIFICATION_NA;
 
-     if (*result) {
-             KSI_VerificationResultCode resCode = (*result)->finalResult.resultCode;
+	if (*result) {
+		KSI_VerificationResultCode resCode = (*result)->finalResult.resultCode;
 
-             if (resCode == KSI_VER_RES_OK) {
-                     res = KT_OK;
-             } else if (resCode == KSI_VER_RES_FAIL) {
-                     res = KT_VERIFICATION_FAILURE;
-             }
-     }
+		if (resCode == KSI_VER_RES_OK) {
+			res = KT_OK;
+		} else if (resCode == KSI_VER_RES_FAIL) {
+			res = KT_VERIFICATION_FAILURE;
+		}
+	}
 
 cleanup:
 

@@ -76,12 +76,19 @@ typedef enum {
 
 
 enum LOGSIG_VER_enum {
-	/** Verification succeeded, which means there's a way to prove the correctness of the signature. */
-	LOGKSI_VER_RES_OK = 0x00,
-	/** Verification not possible, which means there is not enough data to prove or disprove the correctness of the signature. */
-	LOGKSI_VER_RES_NA = 0x01,
-	/** Verification failed, which means the signature is definitely invalid or the document does not match with the signature. */
-	LOGKSI_VER_RES_FAIL = 0x02,
+	/* Invalid value. */
+	LOGKSI_VER_RES_INVALID = 0,
+	/** Verification succeeded, which means there's a way to prove the correctness of the log signature. */
+	LOGKSI_VER_RES_OK,
+	/** Verification not possible, which means there is not enough data to prove or disprove the correctness of the log signature. */
+	LOGKSI_VER_RES_NA,
+	/** Verification failed, which means the log signature is definitely invalid or the log lines does not match with the log signature.
+	  * This result is also returned when some additional checks do fails (e.g. client id or signing time difference do not match with the
+	  * configured values)
+	  */
+	LOGKSI_VER_RES_FAIL,
+	/* Count of possible values. */
+	LOGKSI_VER_RES_COUNT,
 };
 
 typedef struct {
@@ -145,7 +152,7 @@ typedef struct {
 	char signatureTLVReached;		/* This is set if signature TLV is reached (in process_block_signature, process_ksi_signature or process_partial_signature) and is cleared in init_next_block.*/
 	char isContinuedOnFail;			/* Option --continue-on-failure is set. */
 	int quietError;					/* In case of failure and --continue-on-fail, this option will keep the error code and block is not skipped. */
-	int errorLevel;					/* State moving only in one direction: LOGKSI_VER_RES_OK -> LOGKSI_VER_RES_NA -> LOGKSI_VER_RES_FAIL. */
+	int logksiVerRes;				/* State moving only in one direction: LOGKSI_VER_RES_OK -> LOGKSI_VER_RES_NA -> LOGKSI_VER_RES_FAIL. */
 	size_t nofTotaHashFails;		/* Overall count of hahs failures inside log signature. */
 	size_t nofHashFails;			/* Count of hahs failures inside log block. */
 	uint64_t rec_time_in_file_min;	/* The lowest record time value in the log file, extracted from the log line. */

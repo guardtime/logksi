@@ -2102,7 +2102,7 @@ cleanup:
 }
 
 static const char *error_level_to_string(BLOCK_INFO *blocks) {
-	switch (blocks->errorLevel) {
+	switch (blocks->logksiVerRes) {
 		case LOGKSI_VER_RES_OK: return "ok";
 		case LOGKSI_VER_RES_NA: return "inconclusive";
 		case LOGKSI_VER_RES_FAIL: return "failed";
@@ -3492,7 +3492,7 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 									print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
 
 									/* Set quietError as failure if there has been at least clear failure. */
-									if (blocks->errorLevel == LOGKSI_VER_RES_NA) blocks->quietError = KT_VERIFICATION_NA;
+									if (blocks->logksiVerRes == LOGKSI_VER_RES_NA) blocks->quietError = KT_VERIFICATION_NA;
 									else blocks->quietError = KT_VERIFICATION_FAILURE;
 
 									skipCurrentBlock = 1;
@@ -3702,9 +3702,9 @@ cleanup:
 	if (blocks->quietError != KT_OK) {
 		int isContinued = blocks->isContinuedOnFail && (res != KT_INVALID_CMD_PARAM) && (res != KT_USER_INPUT_FAILURE);
 		res = blocks->quietError;
-		if (isContinued && blocks->errorLevel == LOGKSI_VER_RES_NA) ERR_TRCKR_ADD(err, res, "Error: Verification inconclusive but was continued for further analysis.");
-		else if (blocks->errorLevel == LOGKSI_VER_RES_NA) ERR_TRCKR_ADD(err, res, "Error: Verification inconclusive and was stopped.");
-		else if (isContinued && blocks->errorLevel == LOGKSI_VER_RES_FAIL) ERR_TRCKR_ADD(err, res, "Error: Verification FAILED but was continued for further analysis.");
+		if (isContinued && blocks->logksiVerRes == LOGKSI_VER_RES_NA) ERR_TRCKR_ADD(err, res, "Error: Verification inconclusive but was continued for further analysis.");
+		else if (blocks->logksiVerRes == LOGKSI_VER_RES_NA) ERR_TRCKR_ADD(err, res, "Error: Verification inconclusive and was stopped.");
+		else if (isContinued && blocks->logksiVerRes == LOGKSI_VER_RES_FAIL) ERR_TRCKR_ADD(err, res, "Error: Verification FAILED but was continued for further analysis.");
 		else ERR_TRCKR_ADD(err, res, "Error: Verification FAILED and was stopped.");
 	}
 

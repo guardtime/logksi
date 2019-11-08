@@ -439,8 +439,8 @@ cleanup:
 }
 
 int BLOCK_INFO_setErrorLevel(BLOCK_INFO *blocks, int lvl) {
-	if (blocks == NULL || lvl > LOGKSI_VER_RES_FAIL) return KT_INVALID_ARGUMENT;
-	if (blocks->errorLevel < lvl) blocks->errorLevel = lvl;
+	if (blocks == NULL || lvl == LOGKSI_VER_RES_INVALID || lvl >= LOGKSI_VER_RES_COUNT) return KT_INVALID_ARGUMENT;
+	if (blocks->logksiVerRes < lvl) blocks->logksiVerRes = lvl;
 	return KT_OK;
 }
 
@@ -508,7 +508,7 @@ void BLOCK_INFO_freeAndClearInternals(BLOCK_INFO *blocks) {
 		blocks->rec_time_in_file_max = 0;
 		blocks->rec_time_min = 0;
 		blocks->rec_time_max = 0;
-		blocks->errorLevel = 0;
+		blocks->logksiVerRes = LOGKSI_VER_RES_INVALID;
 	}
 }
 

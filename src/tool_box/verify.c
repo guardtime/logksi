@@ -644,6 +644,16 @@ static int isUserInputError(KSI_PolicyVerificationResult *result) {
 	return 0;
 }
 
+static int mapToLogksiVerRes(KSI_RuleVerificationResult *verificationResult) {
+	if (verificationResult == NULL) return LOGKSI_VER_RES_INVALID;
+	switch (verificationResult->resultCode) {
+		case KSI_VER_RES_OK: return LOGKSI_VER_RES_OK;
+		case KSI_VER_RES_FAIL: return LOGKSI_VER_RES_FAIL;
+		case KSI_VER_RES_NA: return LOGKSI_VER_RES_NA;
+		default: return LOGKSI_VER_RES_INVALID;
+	}
+}
+
 static int handle_verification_result(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ctx, BLOCK_INFO *blocks, KSI_Signature *sig, KSI_PublicationData *pubData, int res_in, const char *task_desc, KSI_PolicyVerificationResult *result, int isPubBased) {
 	KSI_RuleVerificationResult *verificationResult = NULL;
 	int res_out = res_in;
@@ -658,7 +668,7 @@ static int handle_verification_result(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRC
 			int res = KT_UNKNOWN_ERROR;
 			if (isPubBased) signature_set_suggestions_for_publication_based_verification(set, err, res_in, ctx, sig, verificationResult, pubData);
 
-			res = BLOCK_INFO_setErrorLevel(blocks, verificationResult->resultCode);
+			res = BLOCK_INFO_setErrorLevel(blocks, mapToLogksiVerRes(verificationResult));
 			if (res != KT_OK) return res;
 
 			if (verificationResult->status != KSI_OK && verificationResult->statusMessage != NULL) {
