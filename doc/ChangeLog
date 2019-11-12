@@ -4,6 +4,7 @@
 (LOGKSI-135) * IMPROVEMENT: Directory src/param_set removed from logksi source code.
 (LOGKSI-135) * IMPROVEMENT: logksi uses libparamset to handle command-line parameter handling.
 (LOGKSI-135) * IMPROVEMENT: logksi needs libparamset 1.1.
+(LOGKSI-124) * IMPROVEMENT: Usage of ksi+ (e.g. ksi+http) URL schemes documented.
 (LOGKSI-132) * BUGFIX: When verifying and --continue-on-fail is set, error trace is not crowded with detailed error messages.
 (LOGKSI-132) * BUGFIX: When during verification resource is not available due to user error, verification is stopped.
 (LOGKSI-132) * BUGFIX: Duplicate suggestions messages are not displayed.

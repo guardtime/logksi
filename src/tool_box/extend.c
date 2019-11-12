@@ -294,8 +294,7 @@ static int extend_to_nearest_publication(PARAM_SET *set, MULTI_PRINTER *mp, ERR_
 	}
 
 
-	LOGKSI_Signature_extend(err, sig, ksi, pubRec, context, &tmp);
-
+	res = LOGKSI_Signature_extend(err, sig, ksi, pubRec, context, &tmp);
 	ERR_CATCH_MSG(err, res, "Error: Unable to extend signature.");
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 
