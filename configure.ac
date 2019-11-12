@@ -55,7 +55,7 @@ AC_PROG_LN_S
 AC_CHECK_LIB([crypto], [SHA256_Init], [], [AC_MSG_FAILURE([Could not find OpenSSL 0.9.8+ libraries.])])
 AC_CHECK_LIB([curl], [curl_easy_init], [], [AC_MSG_FAILURE([Could not find Curl libraries.])])
 
-LIBKSI_VER="3.18"
+LIBKSI_VER="3.20"
 LIBGTRFC3161_VER="1.0"
 
 AC_ARG_ENABLE(static-build,
