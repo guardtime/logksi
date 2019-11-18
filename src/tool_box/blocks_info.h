@@ -29,6 +29,8 @@
 extern "C" {
 #endif
 
+void BLOCK_INFO_initialize(BLOCK_INF *inf);
+
 /* Functions for "more internal" use. */
 int block_info_merge_one_level(BLOCK_INFO *blocks, KSI_CTX *ksi, KSI_DataHash **hash);
 int block_info_calculate_root_hash(BLOCK_INFO *blocks, KSI_CTX *ksi, KSI_DataHash **hash);

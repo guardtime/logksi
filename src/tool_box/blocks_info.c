@@ -30,6 +30,24 @@
 
 static int block_info_calculate_new_leaf_hash(BLOCK_INFO *blocks, KSI_CTX *ksi, KSI_DataHash *recordHash, int isMetaRecordHash, KSI_DataHash **leafHash);
 
+void EXTRACT_INFO_clean(EXTRACT_INFO *obj);
+void EXTRACT_INFO_freeAndClearInternals(EXTRACT_INFO *obj);
+
+void EXTRACT_TASK_clean(EXTRACT_TASK *obj);
+void EXTRACT_TASK_freeAndClearInternals(EXTRACT_TASK *obj);
+
+void SIGN_TASK_clean(SIGN_TASK *obj);
+void SIGN_TASK_freeAndClearInternals(SIGN_TASK *obj);
+
+void VERIFY_TASK_clean(VERIFY_TASK *obj);
+void VERIFY_TASK_freeAndClearInternals(VERIFY_TASK *obj);
+
+void EXTEND_TASK_freeAndClearInternals(EXTEND_TASK *obj);
+void EXTEND_TASK_clean(EXTEND_TASK *obj);
+
+void INTEGRATE_TASK_freeAndClearInternals(INTEGRATE_TASK *obj);
+void INTEGRATE_TASK_clean(INTEGRATE_TASK *obj);
+
 int block_info_merge_one_level(BLOCK_INFO *blocks, KSI_CTX *ksi, KSI_DataHash **hash) {
 	int res;
 	unsigned char i = 0;
@@ -125,11 +143,11 @@ cleanup:
 int block_info_get_aggregation_level(BLOCK_INFO *blocks) {
 	int level = 0;
 	if (blocks != NULL) {
-		if (blocks->version == LOGSIG11) {
+		if (blocks->file.version == LOGSIG11) {
 			/* To be backward compatible with a bug in LOGSIG11 implementation of rsyslog-ksi,
 			 * we must sign tree hashes with level 0 regardless of the tree height. */
 			level = 0;
-		} else if (blocks->recordCount){
+		} else if (blocks->binf.recordCount){
 			/* LOGSIG12 implementation:
 			 * Calculate the aggregation level from the number of records in the block (tree).
 			 * Level is log2 dependent on the number of records,
@@ -138,7 +156,7 @@ int block_info_get_aggregation_level(BLOCK_INFO *blocks) {
 			 *      level = 5 for 9..16 records etc.
 			 * Level for the single node tree that uses blinding masks is 1. */
 			level = 1;
-			size_t c = blocks->recordCount - 1;
+			size_t c = blocks->binf.recordCount - 1;
 			while (c) {
 				level++;
 				c = c / 2;
@@ -213,9 +231,9 @@ int block_info_add_record_hash_to_merkle_tree(BLOCK_INFO *blocks, ERR_TRCKR *err
 
 	/* Do not allow meta records to be extracted. */
 	if (isMetaRecordHash) {
-		blocks->nofTotalMetarecors++;
-		blocks->nofMetaRecords++;
-		blocks->nofTotalRecordHashes--;
+		blocks->file.nofTotalMetarecords++;
+		blocks->binf.nofMetaRecords++;
+		blocks->file.nofTotalRecordHashes--;
 	}
 
 	res = block_info_calculate_new_leaf_hash(blocks, ksi, hash, isMetaRecordHash, &lastHash);
@@ -322,8 +340,8 @@ static int block_info_store_metarecord(BLOCK_INFO *blocks, KSI_TlvElement *tlv) 
 	res = KSI_TlvElement_serialize(tlv, buf, len, &len, 0);
 	if (res != KSI_OK) goto cleanup;
 
-	free(blocks->metaRecord);
-	blocks->metaRecord = buf;
+	free(blocks->task.extract.metaRecord);
+	blocks->task.extract.metaRecord = buf;
 	buf = NULL;
 
 	res = KT_OK;
@@ -416,8 +434,8 @@ static int block_info_calculate_new_leaf_hash(BLOCK_INFO *blocks, KSI_CTX *ksi, 
 	res = KSI_DataHasher_close(blocks->hasher, &mask);
 	if (res != KSI_OK) goto cleanup;
 
-	KSI_DataHash_free(blocks->extractMask);
-	blocks->extractMask = KSI_DataHash_ref(mask);
+	KSI_DataHash_free(blocks->task.extract.extractMask);
+	blocks->task.extract.extractMask = KSI_DataHash_ref(mask);
 
 	if (isMetaRecordHash) {
 		res = block_info_calculate_new_tree_hash(blocks, recordHash, mask, 1, &tmp);
@@ -440,7 +458,6 @@ cleanup:
 
 void BLOCK_INFO_freeAndClearInternals(BLOCK_INFO *blocks) {
 	unsigned char i = 0;
-	size_t j;
 
 	if (blocks) {
 		KSI_DataHash_free(blocks->prevLeaf);
@@ -452,56 +469,33 @@ void BLOCK_INFO_freeAndClearInternals(BLOCK_INFO *blocks) {
 			blocks->notVerified[i] = NULL;
 			i++;
 		}
-		KSI_DataHash_free(blocks->rootHash);
-		KSI_DataHash_free(blocks->metarecordHash);
-		KSI_DataHash_free(blocks->extractMask);
-		for (j = 0; j < blocks->nofExtractPositionsInBlock; j++) {
-			KSI_DataHash_free(blocks->extractInfo[j].extractRecord);
-			free(blocks->extractInfo[j].logLine);
-			KSI_TlvElement_free(blocks->extractInfo[j].metaRecord);
-			for (i = 0; i < blocks->extractInfo[j].extractLevel; i++) {
-				KSI_DataHash_free(blocks->extractInfo[j].extractChain[i].sibling);
-			}
-		}
-		free(blocks->extractPositions);
-		free(blocks->extractInfo);
-		free(blocks->logLine);
-		free(blocks->metaRecord);
-		KSI_DataHasher_free(blocks->hasher);
-		KSI_DataHash_free(blocks->inputHash);
 
-		REGEXP_free(blocks->client_id_match);
+		EXTRACT_TASK_freeAndClearInternals(&blocks->task.extract);
+		SIGN_TASK_freeAndClearInternals(&blocks->task.sign);
+		VERIFY_TASK_freeAndClearInternals(&blocks->task.verify);
+		INTEGRATE_TASK_freeAndClearInternals(&blocks->task.integrate);
+		EXTEND_TASK_freeAndClearInternals(&blocks->task.extend);
+
+		free(blocks->logLine);
+		KSI_DataHasher_free(blocks->hasher);
+
 
 		/* Set objects to NULL. */
 		blocks->prevLeaf = NULL;
 		blocks->randomSeed = NULL;
-		blocks->rootHash = NULL;
-		blocks->metarecordHash = NULL;
-		blocks->extractMask = NULL;
-		blocks->extractPositions = NULL;
-		blocks->extractInfo = NULL;
 		blocks->logLine = NULL;
-		blocks->metaRecord = NULL;
 		blocks->hasher = NULL;
-		blocks->inputHash = NULL;
-		blocks->client_id_match = NULL;
-		blocks->client_id_last[0] = '\0';
 
 		blocks->isContinuedOnFail = 0;
 		blocks->blockNo = 0;
 		blocks->sigNo = 0;
-		blocks->blockCount = 0;
-		blocks->noSigCreated = 0;
-		blocks->nofTotalMetarecors = 0;
-		blocks->nofTotalRecordHashes = 0;
-		blocks->extendedToTime = 0;
-		blocks->outSigModified = 0;
 		blocks->taskId = TASK_NONE;
 		blocks->quietError = 0;
-		blocks->rec_time_in_file_min = 0;
-		blocks->rec_time_in_file_max = 0;
-		blocks->rec_time_min = 0;
-		blocks->rec_time_max = 0;
+
+		blocks->file.nofTotalMetarecords = 0;
+		blocks->file.nofTotalRecordHashes = 0;
+		blocks->file.rec_time_in_file_min = 0;
+		blocks->file.rec_time_in_file_max = 0;
 	}
 }
 
@@ -509,4 +503,135 @@ void BLOCK_INFO_clearAll(BLOCK_INFO *block) {
 	if (block != NULL) {
 		memset(block, 0, sizeof(BLOCK_INFO));
 	}
+}
+
+void BLOCK_INFO_initialize(BLOCK_INF *inf) {
+	if (inf == NULL) return;
+
+	memset(inf, 0, sizeof(BLOCK_INF));
+
+	inf->inputHash = NULL;
+	inf->rootHash = NULL;
+	inf->metarecordHash = NULL;
+
+	return;
+}
+
+void EXTRACT_INFO_clean(EXTRACT_INFO *obj) {
+	int i = 0;
+	if (obj == NULL) return;
+	memset(obj, 0, sizeof(EXTRACT_INFO));
+
+	obj->extractRecord = NULL;
+	obj->metaRecord = NULL;
+	obj->logLine = NULL;
+
+	for (i = 0; i < MAX_TREE_HEIGHT; i++) {
+		obj->extractChain[i].sibling = NULL;
+		obj->extractChain[i].dir = LEFT_LINK;
+	}
+
+	return;
+}
+
+void EXTRACT_INFO_freeAndClearInternals(EXTRACT_INFO *obj) {
+	int i = 0;
+	if (obj == NULL) return;
+
+	KSI_DataHash_free(obj->extractRecord);
+	KSI_TlvElement_free(obj->metaRecord);
+	free(obj->logLine);
+
+	for (i = 0; i < obj->extractLevel; i++) {
+		KSI_DataHash_free(obj->extractChain[i].sibling);
+	}
+
+	EXTRACT_INFO_clean(obj);
+//	free(obj);
+
+	return;
+}
+
+
+void SIGN_TASK_clean(SIGN_TASK *obj) {
+	if (obj == NULL) return;
+	memset(obj, 0, sizeof(SIGN_TASK));
+	return;
+}
+
+void SIGN_TASK_freeAndClearInternals(SIGN_TASK *obj) {
+	if (obj == NULL) return;
+	SIGN_TASK_clean(obj);
+	return;
+}
+
+void EXTEND_TASK_clean(EXTEND_TASK *obj) {
+	if (obj == NULL) return;
+	memset(obj, 0, sizeof(EXTEND_TASK));
+	return;
+}
+
+void EXTEND_TASK_freeAndClearInternals(EXTEND_TASK *obj) {
+	if (obj == NULL) return;
+	EXTEND_TASK_clean(obj);
+	return;
+}
+
+void INTEGRATE_TASK_clean(INTEGRATE_TASK *obj) {
+	if (obj == NULL) return;
+	memset(obj, 0, sizeof(INTEGRATE_TASK));
+	return;
+}
+
+void INTEGRATE_TASK_freeAndClearInternals(INTEGRATE_TASK *obj) {
+	if (obj == NULL) return;
+	INTEGRATE_TASK_clean(obj);
+	return;
+}
+
+void EXTRACT_TASK_clean(EXTRACT_TASK *obj) {
+	if (obj == NULL) return;
+	memset(obj, 0, sizeof(EXTRACT_TASK));
+
+	obj->extractPositions = NULL;
+	obj->extractMask = NULL;
+	obj->metaRecord = NULL;
+	obj->extractInfo = NULL;
+
+	return;
+}
+
+void EXTRACT_TASK_freeAndClearInternals(EXTRACT_TASK *obj) {
+	int i = 0;
+
+	if (obj == NULL) return;
+
+	free(obj->extractPositions);
+	KSI_DataHash_free(obj->extractMask);
+	free(obj->metaRecord);
+
+	for (i = 0; i < obj->nofExtractPositionsInBlock; i++) {
+		EXTRACT_INFO_freeAndClearInternals(&obj->extractInfo[i]);
+	}
+
+	free(obj->extractInfo);
+
+	EXTRACT_TASK_clean(obj);
+
+	return;
+}
+
+void VERIFY_TASK_clean(VERIFY_TASK *obj) {
+	if (obj == NULL) return;
+	memset(obj, 0, sizeof(VERIFY_TASK));
+	obj->client_id_match = NULL;
+	obj->client_id_last[0] = '\0';
+	return;
+}
+
+void VERIFY_TASK_freeAndClearInternals(VERIFY_TASK *obj) {
+	if (obj == NULL) return;
+	REGEXP_free(obj->client_id_match);
+	VERIFY_TASK_clean(obj);
+	return;
 }

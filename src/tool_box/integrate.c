@@ -491,7 +491,7 @@ static int recover_procedure(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, 
 		/* Check if there is a need and possibility to do something. */
 		if (resIn == KT_OK) {
 			print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, 0);
-			print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, "All blocks (%zu) have successfully integrated - no recovery process needed.\n", blocks->partNo);
+			print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, "All blocks (%zu) have successfully integrated - no recovery process needed.\n", blocks->task.integrate.partNo);
 			returnCode = KT_OK;
 			goto cleanup;
 		} else if (blocks->blockNo < 2) {
@@ -519,7 +519,7 @@ static int recover_procedure(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, 
 			goto cleanup;
 		}
 
-		for (i = 0; i < blocks->firstLineInBlock - 1; i++) {
+		for (i = 0; i < blocks->binf.firstLineInBlock - 1; i++) {
 			/* Maximum line size is 64K characters, without newline character. */
 			size_t count = 0;
 			char buf[0x10000 + 2];
@@ -540,7 +540,7 @@ static int recover_procedure(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, 
 		ERR_CATCH_MSG(err, res, "Error: Could not close output log file %s.", files->internal.outLog);
 
 		print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, 0);
-		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, "It was possible to recover %zu blocks (lines 1 - %zu).\n", blocks->blockNo - 1, blocks->firstLineInBlock - 1);
+		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, "It was possible to recover %zu blocks (lines 1 - %zu).\n", blocks->blockNo - 1, blocks->binf.firstLineInBlock - 1);
 		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, "Recovered log signature saved to '%s'\n", files->internal.outSig);
 		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, "Recovered Log file saved to '%s'\n", files->internal.outLog);
 

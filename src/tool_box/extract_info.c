@@ -28,6 +28,7 @@
 #include "smart_file.h"
 #include "api_wrapper.h"
 #include"rsyslog.h"
+#include "extract_info.h"
 
 static int add_hash_to_record_chain(EXTRACT_INFO *extracts, LINK_DIRECTION dir, KSI_DataHash *hash, int corr);
 static int expand_extract_info(BLOCK_INFO *blocks);
@@ -43,18 +44,18 @@ int block_info_extract_update_record_chain(BLOCK_INFO *blocks, unsigned char lev
 		goto cleanup;
 	}
 
-	for (j = 0; j < blocks->nofExtractPositionsInBlock; j++) {
-		if (blocks->extractInfo[j].extractOffset <= blocks->nofRecordHashes) {
+	for (j = 0; j < blocks->task.extract.nofExtractPositionsInBlock; j++) {
+		if (blocks->task.extract.extractInfo[j].extractOffset <= blocks->binf.nofRecordHashes) {
 			if (finalize) {
-				condition = (level + 1 >= blocks->extractInfo[j].extractLevel);
+				condition = (level + 1 >= blocks->task.extract.extractInfo[j].extractLevel);
 			} else {
-				condition = (level + 1 == blocks->extractInfo[j].extractLevel);
+				condition = (level + 1 == blocks->task.extract.extractInfo[j].extractLevel);
 			}
 			if (condition) {
-				if (((blocks->extractInfo[j].extractOffset - 1) >> level) & 1L) {
-					res = add_hash_to_record_chain(blocks->extractInfo + j, RIGHT_LINK, blocks->MerkleTree[level], level + 1 - blocks->extractInfo[j].extractLevel);
+				if (((blocks->task.extract.extractInfo[j].extractOffset - 1) >> level) & 1L) {
+					res = add_hash_to_record_chain(blocks->task.extract.extractInfo + j, RIGHT_LINK, blocks->MerkleTree[level], level + 1 - blocks->task.extract.extractInfo[j].extractLevel);
 				} else {
-					res = add_hash_to_record_chain(blocks->extractInfo + j, LEFT_LINK, leftLink, level + 1 - blocks->extractInfo[j].extractLevel);
+					res = add_hash_to_record_chain(blocks->task.extract.extractInfo + j, LEFT_LINK, leftLink, level + 1 - blocks->task.extract.extractInfo[j].extractLevel);
 				}
 				if (res != KT_OK) goto cleanup;
 			}
@@ -174,15 +175,20 @@ int block_info_extract_update(BLOCK_INFO *blocks, ERR_TRCKR *err, int isMetaReco
 		goto cleanup;
 	}
 
-	if (blocks->nofExtractPositionsFound < blocks->nofExtractPositions && blocks->extractPositions[blocks->nofExtractPositionsFound] - blocks->nofTotalRecordHashes == blocks->nofRecordHashes) {
+	/*
+	 * Enter only if not all extract positions are found AND
+	 * Current record hash is at desired position
+	 */
+	if (blocks->task.extract.nofExtractPositionsFound < blocks->task.extract.nofExtractPositions &&
+		blocks->task.extract.extractPositions[blocks->task.extract.nofExtractPositionsFound] - blocks->file.nofTotalRecordHashes == blocks->binf.nofRecordHashes) {
 		/* make room in extractInfo */
 		res = expand_extract_info(blocks);
 		if (res != KT_OK) goto cleanup;
 
-		extractInfo = &blocks->extractInfo[blocks->nofExtractPositionsInBlock - 1];
+		extractInfo = &blocks->task.extract.extractInfo[blocks->task.extract.nofExtractPositionsInBlock - 1];
 
-		extractInfo->extractPos = blocks->extractPositions[blocks->nofExtractPositionsFound];
-		extractInfo->extractOffset = blocks->extractPositions[blocks->nofExtractPositionsFound] - blocks->nofTotalRecordHashes;
+		extractInfo->extractPos = blocks->task.extract.extractPositions[blocks->task.extract.nofExtractPositionsFound];
+		extractInfo->extractOffset = blocks->binf.nofRecordHashes;
 		extractInfo->extractRecord = KSI_DataHash_ref(hash);
 		if (!isMetaRecordHash) {
 			extractInfo->metaRecord = NULL;
@@ -193,22 +199,22 @@ int block_info_extract_update(BLOCK_INFO *blocks, ERR_TRCKR *err, int isMetaReco
 			}
 		} else {
 			extractInfo->logLine = NULL;
-			res = KSI_TlvElement_parse(blocks->metaRecord, 0xffff, &extractInfo->metaRecord);
+			res = KSI_TlvElement_parse(blocks->task.extract.metaRecord, 0xffff, &extractInfo->metaRecord);
 			if (res != KT_OK) goto cleanup;
 		}
-		blocks->nofExtractPositionsFound++;
+		blocks->task.extract.nofExtractPositionsFound++;
 
 		if (isMetaRecordHash) {
-			res = add_hash_to_record_chain(extractInfo, LEFT_LINK, blocks->extractMask, 0);
+			res = add_hash_to_record_chain(extractInfo, LEFT_LINK, blocks->task.extract.extractMask, 0);
 		} else {
-			res = add_hash_to_record_chain(extractInfo, RIGHT_LINK, blocks->extractMask, 0);
+			res = add_hash_to_record_chain(extractInfo, RIGHT_LINK, blocks->task.extract.extractMask, 0);
 		}
 		if (res != KT_OK) goto cleanup;
 
 	}
 
-	if (blocks->records && blocks->nofExtractPositionsFound == blocks->nofExtractPositions) {
-		res = block_info_extract_next_position(blocks, err, blocks->records);
+	if (blocks->task.extract.records && blocks->task.extract.nofExtractPositionsFound == blocks->task.extract.nofExtractPositions) {
+		res = block_info_extract_next_position(blocks, err, blocks->task.extract.records);
 		if (res != KT_OK) goto cleanup;
 	}
 
@@ -255,17 +261,17 @@ static int add_position(ERR_TRCKR *err, long int n, BLOCK_INFO *blocks) {
 		goto cleanup;
 	}
 
-	if (blocks->nofExtractPositions) {
-		if (n <= blocks->extractPositions[blocks->nofExtractPositions - 1]) {
+	if (blocks->task.extract.nofExtractPositions) {
+		if (n <= blocks->task.extract.extractPositions[blocks->task.extract.nofExtractPositions - 1]) {
 			res = KT_INVALID_CMD_PARAM;
 			ERR_CATCH_MSG(err, res, "Error: List of positions must be given in strictly ascending order.");
 		}
 	}
 
-	if (blocks->extractPositions == NULL) {
+	if (blocks->task.extract.extractPositions == NULL) {
 		tmp = (size_t*)malloc(sizeof(size_t));
 	} else {
-		tmp = (size_t*)realloc(blocks->extractPositions, sizeof(size_t) * (blocks->nofExtractPositions + 1));
+		tmp = (size_t*)realloc(blocks->task.extract.extractPositions, sizeof(size_t) * (blocks->task.extract.nofExtractPositions + 1));
 	}
 
 	if (tmp == NULL) {
@@ -273,10 +279,10 @@ static int add_position(ERR_TRCKR *err, long int n, BLOCK_INFO *blocks) {
 		goto cleanup;
 	}
 
-	blocks->extractPositions = tmp;
+	blocks->task.extract.extractPositions = tmp;
 	tmp = NULL;
-	blocks->extractPositions[blocks->nofExtractPositions] = n;
-	blocks->nofExtractPositions++;
+	blocks->task.extract.extractPositions[blocks->task.extract.nofExtractPositions] = n;
+	blocks->task.extract.nofExtractPositions++;
 	res = KT_OK;
 
 
@@ -293,10 +299,11 @@ static int expand_extract_info(BLOCK_INFO *blocks) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
-	if (blocks->extractInfo == NULL) {
+
+	if (blocks->task.extract.extractInfo == NULL) {
 		tmp = (EXTRACT_INFO*)malloc(sizeof(EXTRACT_INFO));
 	} else {
-		tmp = (EXTRACT_INFO*)realloc(blocks->extractInfo, sizeof(EXTRACT_INFO) * (blocks->nofExtractPositionsInBlock + 1));
+		tmp = (EXTRACT_INFO*)realloc(blocks->task.extract.extractInfo, sizeof(EXTRACT_INFO) * (blocks->task.extract.nofExtractPositionsInBlock + 1));
 	}
 
 	if (tmp == NULL) {
@@ -304,10 +311,11 @@ static int expand_extract_info(BLOCK_INFO *blocks) {
 		goto cleanup;
 	}
 
-	blocks->extractInfo = tmp;
+	blocks->task.extract.extractInfo = tmp;
+
 	tmp = NULL;
-	memset(blocks->extractInfo + blocks->nofExtractPositionsInBlock, 0, sizeof(EXTRACT_INFO));
-	blocks->nofExtractPositionsInBlock++;
+	memset(blocks->task.extract.extractInfo + blocks->task.extract.nofExtractPositionsInBlock, 0, sizeof(EXTRACT_INFO));
+	blocks->task.extract.nofExtractPositionsInBlock++;
 	res = KT_OK;
 
 cleanup:

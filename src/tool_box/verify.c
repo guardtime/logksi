@@ -212,7 +212,7 @@ int verify_run(int argc, char **argv, char **envp) {
 			print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, "%sLog file '%s'.\n", (i == 0 ? "" : "\n"), files.internal.inLog);
 		}
 
-		blocks.rec_time_in_file_max = las_rec_time;
+		blocks.file.rec_time_in_file_max = las_rec_time;
 
 		print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_EQUAL | DEBUG_LEVEL_1, "Verifying... ");
 		res = logsignature_verify(set, mp, err, ksi, &blocks, inputHash, verify_signature, &files, &outputHash, &las_rec_time);
