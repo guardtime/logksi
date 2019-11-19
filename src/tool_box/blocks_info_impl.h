@@ -153,7 +153,7 @@ typedef struct BLOCK_INF_st {
 	char finalTreeHashesLeaf;		/* This is set to 1, when block is closed prematurely with a metarecord, indicating to process the current tree hash as a mandatory leaf hash.*/
 	char curBlockNotSigned;
 	char signatureTLVReached;		/* This is set if signature TLV is reached (in process_block_signature, process_ksi_signature or process_partial_signature) and is cleared in init_next_block.*/
-} BLOCK_INF;
+} BLOCK_INFO;
 
 typedef struct {
 	KSI_FTLV ftlv;
@@ -164,7 +164,7 @@ typedef struct {
 	TASK_SPECIFIC task;
 
 	FILE_INFO file;
-	BLOCK_INF binf;
+	BLOCK_INFO block;
 
 	size_t blockNo;					/* Index of current block (incremented if block header or KSI signature in excerpt file is processed). */
 	size_t sigNo;					/* Index of block-signatures + ksi signatures + partial signatures. */
@@ -190,7 +190,7 @@ typedef struct {
 	unsigned char balanced;
 	KSI_DataHasher *hasher;
 
-} BLOCK_INFO;
+} LOGKSI;
 
 #ifdef	__cplusplus
 }
