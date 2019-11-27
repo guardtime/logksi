@@ -214,7 +214,7 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	PARAM_SET_addControl(set, "{log}{out-log}{out-proof}{o}", isFormatOk_path, NULL, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{input}", isFormatOk_inputFile, NULL, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{log-from-stdin}{sig-from-stdin}{d}{hex-to-str}{ksig}", isFormatOk_flag, NULL, NULL, NULL);
-	PARAM_SET_addControl(set, "{r}", isFormatOk_string, NULL, NULL, NULL);
+	PARAM_SET_addControl(set, "{r}", isFormatOk_RecordExtract, NULL, NULL, NULL);
 
 	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
 	PARAM_SET_setParseOptions(set, "d", PST_PRSCMD_HAS_NO_VALUE | PST_PRSCMD_NO_TYPOS);

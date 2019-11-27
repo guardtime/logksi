@@ -94,6 +94,9 @@ enum formatStatus_enum{
 	FORMAT_INVALID_INFINIT_TIME_RANGE,
 	FORMAT_ONLY_UNSIGNED_VALUE,
 	FORMAT_TOO_LARGE_VALUE,
+	FORMAT_RECORD_WHITESPACE,
+	FORMAT_INVALID_RECORD,
+	FORMAT_RECORD_DESC_ORDER,
 	FORMAT_UNKNOWN_ERROR
 };
 
@@ -158,6 +161,8 @@ int extract_utcTime(void *extra, const char* str, void** obj);
 int isFormatOk_flag(const char *flag);
 int isFormatOk_constraint(const char *constraint);
 int isFormatOk_userPass(const char *uss_pass);
+
+int isFormatOk_RecordExtract(const char *rec);
 
 int convertRepair_constraint(const char* arg, char* buf, unsigned len);
 

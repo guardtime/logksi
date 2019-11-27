@@ -178,6 +178,70 @@ cleanup:
 	return res;
 }
 
+int isFormatOk_RecordExtract(const char *rec) {
+	long last = -1;
+	int expectingInteger = 1;
+	int expectingSeparator = 0;
+	int isRangeOpen = 0;
+	int isRangeJustClosed = 0;
+	const char *pRec = rec;
+	size_t i = 0;
+
+
+	if (rec == NULL) return FORMAT_NULLPTR;
+	if (strlen(rec) == 0) return FORMAT_NOCONTENT;
+
+	/* Check character set. */
+	while(rec[i]) {
+		if (isspace(rec[i])) return FORMAT_RECORD_WHITESPACE;
+		if (!isdigit(rec[i]) && rec[i] != '-' && rec[i] != ',') return FORMAT_INVALID_RECORD;
+		i++;
+	}
+
+	/* Check parsebility. */
+	while(*pRec) {
+		if (expectingInteger) {
+			long next = 0;
+			char *pEnd = NULL;
+
+			next = strtol(pRec, &pEnd, 10);
+
+			if (next <= 0) return FORMAT_INVALID_RECORD;
+			if (pRec == pEnd) return FORMAT_INVALID_RECORD;
+			if (last >= next) return FORMAT_RECORD_DESC_ORDER;
+
+			last = next;
+			pRec = pEnd;
+			expectingSeparator = 1;
+			expectingInteger = 0;
+
+			if (isRangeOpen) {
+				isRangeOpen = 0;
+				isRangeJustClosed = 1;
+			}
+			continue;
+		}
+
+		if (expectingSeparator) {
+			expectingSeparator = 0;
+			expectingInteger = 1;
+			if (*pRec == ',') {
+				isRangeJustClosed = 0;
+			} else if (*pRec == '-' && !isRangeJustClosed) {
+				isRangeOpen = 1;
+			} else {
+				return FORMAT_INVALID_RECORD;
+			}
+		}
+
+		pRec++;
+	}
+
+	if (isRangeOpen || expectingInteger || last == -1) return FORMAT_INVALID_RECORD;
+
+	return FORMAT_OK;
+}
+
 int isInteger(const char *str) {
 	int i = 0;
 	int C;
@@ -1273,6 +1337,9 @@ const char *getParameterErrorString(int res) {
 		case FUNCTION_INVALID_ARG_1: return "Argument 1 is invalid";
 		case FUNCTION_INVALID_ARG_2: return "Argument 2 is invalid";
 		case INVALID_VERSION: return "Invalid version";
+		case FORMAT_RECORD_WHITESPACE: return "List of positions must not contain whitespace. Use ',' and '-' as separators";
+		case FORMAT_INVALID_RECORD: return "Positions must be represented by positive decimal integers, using a list of comma-separated ranges";
+		case FORMAT_RECORD_DESC_ORDER: return "List of positions must be given in strictly ascending order";
 		default: return "Unknown error";
 	}
 }
