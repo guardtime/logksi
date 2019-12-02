@@ -25,18 +25,15 @@
 #include <ksi/fast_tlv.h>
 #include <ksi/tlv_element.h>
 #include "regexpwrap.h"
+#include "merkle_tree.h"
+#include "err_trckr.h"
+#include "extract_info.h"
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-#define MAX_TREE_HEIGHT 31
 #define MAGIC_SIZE 8
-
-typedef enum {
-	LEFT_LINK = 0,
-	RIGHT_LINK = 1
-} LINK_DIRECTION;
 
 typedef enum {
 	TASK_NONE = 0x00,
@@ -46,22 +43,6 @@ typedef enum {
 	TASK_SIGN,
 	TASK_INTEGRATE,
 } LOGKSI_TASK_ID;
-
-typedef struct {
-	LINK_DIRECTION dir;
-	KSI_DataHash *sibling;
-	size_t corr;
-} REC_CHAIN;
-
-typedef struct {
-	size_t extractPos;							/* Position of the current record (log line number). */
-	size_t extractOffset;						/* Record position in tree (count of record hashes and meta record hashes). */
-	size_t extractLevel;						/* Level of the record chain root. */
-	char *logLine;								/* Log line thats record chain is extracted. */
-	KSI_TlvElement *metaRecord;
-	KSI_DataHash *extractRecord;				/* Hash value thats record chain is extracted. */
-	REC_CHAIN extractChain[MAX_TREE_HEIGHT];	/* Record chain. */
-} EXTRACT_INFO;
 
 typedef enum {
 	LOGSIG11 = 0,
@@ -90,14 +71,9 @@ typedef struct INTEGRATE_TASK_st {
 } INTEGRATE_TASK;
 
 typedef struct EXTRACT_TASK_st {
-	char *records;					/* Reference to PARAM_SET value. Maybe rename or make as const. */
-	size_t nofExtractPositions;
-	size_t *extractPositions;
-	size_t nofExtractPositionsFound;
-	size_t nofExtractPositionsInBlock;	/* Count of extractInfo elements in array. */
-	EXTRACT_INFO *extractInfo;
-	KSI_DataHash *extractMask;
+	EXTRACT_INFO *info;
 	unsigned char *metaRecord;
+	size_t metaRecord_len;
 } EXTRACT_TASK;
 
 typedef struct EXTEND_TASK_st {
@@ -156,6 +132,8 @@ typedef struct BLOCK_INF_st {
 } BLOCK_INFO;
 
 typedef struct {
+	ERR_TRCKR *err;
+
 	KSI_FTLV ftlv;
 	unsigned char *ftlv_raw;
 	size_t ftlv_len;
@@ -174,22 +152,7 @@ typedef struct {
 	int quietError;					/* In case of failure and --continue-on-fail, this option will keep the error code and block is not skipped. */
 	uint64_t sigTime_0;
 
-	KSI_OctetString *randomSeed;
-	KSI_DataHash *prevLeaf;
-	KSI_DataHash *MerkleTree[MAX_TREE_HEIGHT];
-
-
-	/**
-	 * Cleaned in the beginning of a block.
-	 * process_tree_hash
-	 *    is_tree_hash_expected - appends values.
-	 *    followed by verification of tree hash with computed value.
-	 */
-	KSI_DataHash *notVerified[MAX_TREE_HEIGHT];
-	unsigned char treeHeight;
-	unsigned char balanced;
-	KSI_DataHasher *hasher;
-
+	MERKLE_TREE *tree;
 } LOGKSI;
 
 #ifdef	__cplusplus

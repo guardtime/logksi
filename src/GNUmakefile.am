@@ -36,6 +36,8 @@ logksi_SOURCES = \
 	smart_file.h \
 	tlv_object.c \
 	tlv_object.h \
+	tool_box/merkle_tree.c \
+	tool_box/merkle_tree.h \
 	tool_box/blocks_info.c \
 	tool_box/blocks_info.h \
 	tool_box/io_files.c \

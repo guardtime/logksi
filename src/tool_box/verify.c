@@ -106,7 +106,7 @@ int verify_run(int argc, char **argv, char **envp) {
 	MULTI_PRINTER *mp = NULL;
 	uint64_t las_rec_time = 0;
 
-	LOGKSI_clearAll(&logksi);
+	LOGKSI_initialize(&logksi);
 	IO_FILES_init(&files);
 	/**
 	 * Extract command line parameters and also add configuration specific parameters.

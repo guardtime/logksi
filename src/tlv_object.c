@@ -293,3 +293,65 @@ cleanup:
 	KSI_TlvElement_free(tmp);
 	return res;
 }
+
+struct fold_wrapper_st {
+	KSI_TlvElement *recChain;
+	KSI_CTX *ksi;
+};
+
+/* Function for RECORD_INFO_foldl. */
+static int foldl(void *acc, LINK_DIRECTION dir, KSI_DataHash *sibling, size_t corr) {
+	int res = KT_UNKNOWN_ERROR;
+	KSI_TlvElement *recChain = NULL;
+	KSI_TlvElement *hashStep = NULL;
+	struct fold_wrapper_st *wrap = NULL;
+
+	if (acc == NULL || sibling == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	wrap = acc;
+	recChain = wrap->recChain;
+
+
+	res = KSI_TlvElement_new(&hashStep);
+	if (res != KT_OK) goto cleanup;
+
+	hashStep->ftlv.tag = dir == LEFT_LINK ? 0x02 : 0x03;
+
+	if (corr) {
+		res = tlv_element_set_uint(hashStep, wrap->ksi, 0x01, corr);
+		if (res != KT_OK) goto cleanup;
+	}
+	res = tlv_element_set_hash(hashStep, wrap->ksi, 0x02, sibling);
+	if (res != KT_OK) goto cleanup;
+
+	res = KSI_TlvElement_appendElement(recChain, hashStep);
+	if (res != KT_OK) goto cleanup;
+
+	hashStep = NULL;
+
+	res = KT_OK;
+
+cleanup:
+
+	KSI_TlvElement_free(hashStep);
+
+	return KT_OK;
+}
+
+int tlv_element_set_record_hash_chain(KSI_TlvElement *parentTlv, KSI_CTX *ksi, RECORD_INFO *record) {
+	int res = KT_INVALID_ARGUMENT;
+	struct fold_wrapper_st acc;
+
+	if (ksi == NULL || record == NULL || parentTlv == NULL) res = KT_INVALID_ARGUMENT;
+
+	acc.recChain = parentTlv;
+	acc.ksi = ksi;
+
+	res = RECORD_INFO_foldl(record, &acc, foldl);
+	if (res != KT_OK) return res;
+
+	return KT_OK;
+}

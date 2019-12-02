@@ -66,7 +66,7 @@ int integrate_run(int argc, char **argv, char **envp) {
 	MULTI_PRINTER *mp = NULL;
 
 
-	LOGKSI_clearAll(&logksi);
+	LOGKSI_initialize(&logksi);
 	IO_FILES_init(&files);
 
 	/**

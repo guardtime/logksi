@@ -29,6 +29,7 @@ extern "C" {
 #include <ksi/fast_tlv.h>
 #include "err_trckr.h"
 #include "smart_file.h"
+#include "tool_box/extract_info.h"
 
 int tlv_element_get_uint(KSI_TlvElement *tlv, KSI_CTX *ksi, unsigned tag, size_t *out);
 int tlv_element_get_octet_string(KSI_TlvElement *tlv, KSI_CTX *ksi, unsigned tag, KSI_OctetString **out);
@@ -36,6 +37,7 @@ int tlv_element_get_hash(ERR_TRCKR *err, KSI_TlvElement *tlv, KSI_CTX *ksi, unsi
 int tlv_element_set_uint(KSI_TlvElement *tlv, KSI_CTX *ksi, unsigned tag, KSI_uint64_t val);
 int tlv_element_set_hash(KSI_TlvElement *tlv, KSI_CTX *ksi, unsigned tag, KSI_DataHash *hash);
 int tlv_element_set_signature(KSI_TlvElement *tlv, KSI_CTX *ksi, unsigned tag, KSI_Signature *sig);
+int tlv_element_set_record_hash_chain(KSI_TlvElement *parentTlv, KSI_CTX *ksi, RECORD_INFO *record);
 int tlv_element_create_hash(KSI_DataHash *hash, unsigned tag, KSI_TlvElement **tlv);
 int tlv_element_write_hash(KSI_DataHash *hash, unsigned tag, SMART_FILE *out);
 int tlv_element_parse_and_check_sub_elements(ERR_TRCKR *err, KSI_CTX *ksi, unsigned char *dat, size_t dat_len, size_t hdr_len, KSI_TlvElement **out);

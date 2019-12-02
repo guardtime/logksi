@@ -29,21 +29,15 @@
 extern "C" {
 #endif
 
-void BLOCK_INFO_freeAndClearInternals(BLOCK_INFO *inf);
-void BLOCK_INFO_initialize(BLOCK_INFO *inf);
+void LOGKSI_initialize(LOGKSI *block);
+void LOGKSI_freeAndClearInternals(LOGKSI *logksi);
+void LOGKSI_resetBlockInfo(LOGKSI *logksi);
 
-/* Functions for "more internal" use. */
-int block_info_merge_one_level(LOGKSI *logksi, KSI_CTX *ksi, KSI_DataHash **hash);
-int block_info_calculate_root_hash(LOGKSI *logksi, KSI_CTX *ksi, KSI_DataHash **hash);
 int block_info_get_aggregation_level(LOGKSI *logksi);
-int block_info_add_leaf_hash_to_merkle_tree(LOGKSI *logksi, KSI_CTX *ksi, KSI_DataHash *hash, int isMetaRecordHash);
-int block_info_add_record_hash_to_merkle_tree(LOGKSI *logksi, ERR_TRCKR *err, KSI_CTX *ksi, int isMetaRecordHash, KSI_DataHash *hash);
 int block_info_calculate_hash_of_logline_and_store_logline(LOGKSI *logksi, IO_FILES *files, KSI_DataHash **hash);
-int block_info_calculate_new_tree_hash(LOGKSI *blocks, KSI_DataHash *leftHash, KSI_DataHash *rightHash, unsigned char level, KSI_DataHash **nodeHash);
 int block_info_calculate_hash_of_metarecord_and_store_metarecord(LOGKSI *logksi, KSI_TlvElement *tlv, KSI_DataHash **hash);
 
-void LOGKSI_clearAll(LOGKSI *block);
-void LOGKSI_freeAndClearInternals(LOGKSI *logksi);
+
 
 #ifdef	__cplusplus
 }

@@ -20,8 +20,8 @@
 /* To make function strptime prototype available. */
 #define _XOPEN_SOURCE
 
-#include <stdlib.h>
 #include <string.h>
+#include <stdlib.h>
 #include <ksi/ksi.h>
 #include <ksi/tlv_element.h>
 #include <gtrfc3161/tsconvert.h>
@@ -44,6 +44,12 @@
 
 static char* time_diff_to_string(uint64_t time_diff, char *buf, size_t buf_len);
 static const char *io_files_getCurrentLogFilePrintRepresentation(IO_FILES *files);
+
+
+static int logksi_new_record_chain(MERKLE_TREE *tree, void *ctx, int isMetaRecordHash, KSI_DataHash *hash);
+static int logksi_extract_record_chain(MERKLE_TREE *tree, void *ctx, unsigned char level, KSI_DataHash *leftLink);
+static int logksi_add_record_hash_to_merkle_tree(LOGKSI *logksi, int isMetaRecordHash, KSI_DataHash *hash);
+static int logksi_set_extract_record(LOGKSI *logksi, RECORD_INFO *recordInfo, int isMetaRecordHash, KSI_DataHash *hash);
 
 #define SOF_ARRAY(x) (sizeof(x) / sizeof((x)[0]))
 
@@ -691,7 +697,6 @@ static int handle_block_signing_time_check(PARAM_SET *set, MULTI_PRINTER* mp, ER
 	warnSameSigTime = PARAM_SET_isSetByName(set, "warn-same-block-time");
 	checkSigTimeDiff = PARAM_SET_isSetByName(set, "block-time-diff");
 
-
 	/* Check if previous signature is older than the current one. If not, rise the error. */
 	if (checkDescSigkTime || warnSameSigTime || checkSigTimeDiff) {
 		char buf[256];
@@ -887,6 +892,7 @@ cleanup:
 
 static int finalize_block(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, LOGKSI *logksi, IO_FILES *files) {
 	int res;
+	KSI_DataHash *prevLeaf = NULL;
 
 	if (set == NULL || err == NULL || logksi == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -910,6 +916,9 @@ static int finalize_block(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_2, 0);
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, 0);
 
+	res = MERKLE_TREE_getPrevLeaf(logksi->tree, &prevLeaf);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to get previous leaf.", logksi->blockNo);
+
 	if (logksi->blockNo > 0) {
 		char strT1[256] = "<no signature data available>";
 		char strExtTo[256] = "<null>";
@@ -930,15 +939,14 @@ static int finalize_block(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI
 		}
 
 		LOGKSI_DataHash_toString(logksi->block.inputHash, inHash, sizeof(inHash));
-		LOGKSI_DataHash_toString(logksi->prevLeaf, outHash, sizeof(outHash));
+		LOGKSI_DataHash_toString(prevLeaf, outHash, sizeof(outHash));
 
 		isSignTask = logksi->taskId == TASK_SIGN;
 		isExtractTask = logksi->taskId == TASK_EXTRACT;
 		isExtendTask = logksi->taskId == TASK_EXTEND;
 
-
 		if (logksi->file.version != RECSIG11 && logksi->file.version != RECSIG12 &&
-			((isSignTask && logksi->task.sign.curBlockJustReSigned) || (isExtractTask && logksi->task.extract.nofExtractPositionsInBlock) || (!isSignTask && !isExtractTask))) {
+			((isSignTask && logksi->task.sign.curBlockJustReSigned) || (isExtractTask && EXTRACT_INFO_getPositionsInBlock(logksi->task.extract.info)) || (!isSignTask && !isExtractTask))) {
 			print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, "\nSummary of block %zu:\n", logksi->blockNo);
 
 			if (isSignTask || isExtractTask || isExtendTask) {
@@ -984,16 +992,16 @@ static int finalize_block(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI
 
 			if (logksi->block.nofMetaRecords > 0) print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%zu\n", longIndentation, "Count of meta-records:", logksi->block.nofMetaRecords);
 			if (logksi->block.nofHashFails > 0) print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%zu\n", longIndentation, "Count of hash failures:", logksi->block.nofHashFails);
-			if (logksi->task.extract.nofExtractPositionsInBlock > 0) print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%zu\n", longIndentation, "Records extracted:", logksi->task.extract.nofExtractPositionsInBlock);
+			if (EXTRACT_INFO_getPositionsInBlock(logksi->task.extract.info) > 0) print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%zu\n", longIndentation, "Records extracted:", EXTRACT_INFO_getPositionsInBlock(logksi->task.extract.info));
 
 			print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, "\n", outHash);
 		}
 	}
 
 	/* Print Output hash of previous block. */
-	if (logksi->prevLeaf != NULL && logksi->taskId == TASK_VERIFY && logksi->block.signatureTLVReached) {
+	if (prevLeaf != NULL && logksi->taskId == TASK_VERIFY && logksi->block.signatureTLVReached) {
 		char buf[256];
-		LOGKSI_DataHash_toString(logksi->prevLeaf, buf, sizeof(buf));
+		LOGKSI_DataHash_toString(prevLeaf, buf, sizeof(buf));
 		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, "Block no. %3zu: output hash: %s.\n", logksi->blockNo, buf);
 	}
 
@@ -1015,26 +1023,26 @@ cleanup:
 	MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
 	MULTI_PRINTER_printByID(mp, MP_ID_BLOCK_ERRORS);
 	MULTI_PRINTER_printByID(mp, MP_ID_BLOCK_SUMMARY);
+	KSI_DataHash_free(prevLeaf);
 
 	return res;
 }
 
+/* Called right before process_block_header. */
 static int init_next_block(LOGKSI *logksi) {
 	if (logksi == NULL) return KT_INVALID_ARGUMENT;
 
 	logksi->blockNo++;
 
 	/* Previous and current (next) signature time. Note that 0 indicates not set. */
-	logksi->sigTime_0 = logksi->block.sigTime_1;
+	if (logksi->block.sigTime_1 > 0 || logksi->block.curBlockNotSigned) {
+		logksi->sigTime_0 = logksi->block.sigTime_1;
+		logksi->block.sigTime_1 = 0;
+	}
 
-	BLOCK_INFO2_freeAndClearInternals(&logksi->block);
+	LOGKSI_resetBlockInfo(logksi);
 
 	logksi->block.firstLineInBlock = logksi->file.nofTotalRecordHashes + 1;
-
-	logksi->task.integrate.unsignedRootHash = 0;
-	logksi->task.sign.curBlockJustReSigned = 0;
-	logksi->block.signatureTLVReached = 0;
-	logksi->task.extend.extendedToTime = 0;
 
 	return KT_OK;
 }
@@ -1044,11 +1052,11 @@ static int process_block_header(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *er
 	int res;
 	KSI_DataHash *hash = NULL;
 	KSI_DataHash *replacement = NULL;
-	unsigned char i = 0;
+	KSI_DataHash *prevLeaf = NULL;
 	KSI_TlvElement *tlv = NULL;
 	size_t algo;
-	size_t j;
-	KSI_DataHasher *hasher = NULL;
+	KSI_OctetString *randomSeed = NULL;
+
 
 	if (err == NULL || ksi == NULL || files == NULL || logksi == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -1065,14 +1073,7 @@ static int process_block_header(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *er
 	res = tlv_element_get_uint(tlv, ksi, 0x01, &algo);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing hash algorithm in block header.", logksi->blockNo);
 
-	if (logksi->hasher == NULL || logksi->block.hashAlgo != algo) {
-		res = KSI_DataHasher_open(ksi, algo, &hasher);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: could not open datahasher.", logksi->blockNo);
-	}
-
-	KSI_OctetString_free(logksi->randomSeed);
-	logksi->randomSeed = NULL;
-	res = tlv_element_get_octet_string(tlv, ksi, 0x02, &logksi->randomSeed);
+	res = tlv_element_get_octet_string(tlv, ksi, 0x02, &randomSeed);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing random seed in block header.", logksi->blockNo);
 
 	res = tlv_element_get_hash(err, tlv, ksi, 0x03, &hash);
@@ -1081,12 +1082,15 @@ static int process_block_header(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *er
 	KSI_DataHash_free(logksi->block.inputHash);
 	logksi->block.inputHash = KSI_DataHash_ref(hash);
 
-	if (logksi->prevLeaf != NULL) {
+	res = MERKLE_TREE_getPrevLeaf(logksi->tree, &prevLeaf);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable get previous leaf.", logksi->blockNo);
+
+	if (prevLeaf != NULL) {
 		char description[1024];
 		PST_snprintf(description, sizeof(description), "Output hash of block %zu differs from input hash of block %zu", logksi->blockNo - 1, logksi->blockNo);
 
-		res = logksi_datahash_compare(err, mp, logksi, 0, logksi->prevLeaf, hash, description, "Last hash computed from previous block data:", "Input hash stored in current block header:");
-		res = continue_on_hash_fail(res, set, mp, logksi, logksi->prevLeaf, hash, &replacement);
+		res = logksi_datahash_compare(err, mp, logksi, 0, prevLeaf, hash, description, "Last hash computed from previous block data:", "Input hash stored in current block header:");
+		res = continue_on_hash_fail(res, set, mp, logksi, prevLeaf, hash, &replacement);
 		if (res != KT_OK && logksi->isContinuedOnFail && logksi->taskId == TASK_VERIFY) {
 			char debugMessage[1024] = "";
 
@@ -1114,49 +1118,15 @@ static int process_block_header(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *er
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to copy block header.", logksi->blockNo);
 	}
 
+	res = MERKLE_TREE_reset(logksi->tree, algo,
+										replacement,
+										randomSeed);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to reset MERKLE_TREE.", logksi->blockNo);
+
+	replacement = NULL;
+	randomSeed = NULL;
+
 	logksi->block.hashAlgo = algo;
-	if (hasher) {
-		KSI_DataHasher_free(logksi->hasher);
-		logksi->hasher = hasher;
-		hasher = NULL;
-	}
-	KSI_DataHash_free(logksi->prevLeaf);
-	logksi->prevLeaf = replacement;
-
-	while (i < logksi->treeHeight) {
-		KSI_DataHash_free(logksi->MerkleTree[i]);
-		logksi->MerkleTree[i] = NULL;
-		KSI_DataHash_free(logksi->notVerified[i]);
-		logksi->notVerified[i] = NULL;
-		i++;
-	}
-	logksi->treeHeight = 0;
-	logksi->balanced = 0;
-	KSI_DataHash_free(logksi->block.rootHash);
-	logksi->block.rootHash = NULL;
-	KSI_DataHash_free(logksi->block.metarecordHash);
-	logksi->block.metarecordHash = NULL;
-	free(logksi->task.extract.metaRecord);
-	logksi->task.extract.metaRecord = NULL;
-
-	KSI_DataHash_free(logksi->task.extract.extractMask);
-	logksi->task.extract.extractMask = NULL;
-	for (j = 0; j < logksi->task.extract.nofExtractPositionsInBlock; j++) {
-		for (i = 0; i < logksi->task.extract.extractInfo[j].extractLevel; i++) {
-			KSI_DataHash_free(logksi->task.extract.extractInfo[j].extractChain[i].sibling);
-			logksi->task.extract.extractInfo[j].extractChain[i].sibling = NULL;
-		}
-		logksi->task.extract.extractInfo[j].extractLevel = 0;
-		KSI_DataHash_free(logksi->task.extract.extractInfo[j].extractRecord);
-		logksi->task.extract.extractInfo[j].extractRecord = NULL;
-		free(logksi->task.extract.extractInfo[j].logLine);
-		logksi->task.extract.extractInfo[j].logLine = NULL;
-		KSI_TlvElement_free(logksi->task.extract.extractInfo[j].metaRecord);
-		logksi->task.extract.extractInfo[j].metaRecord = NULL;
-	}
-	free(logksi->task.extract.extractInfo);
-	logksi->task.extract.extractInfo = NULL;
-	logksi->task.extract.nofExtractPositionsInBlock = 0;
 
 	res = KT_OK;
 
@@ -1165,7 +1135,10 @@ cleanup:
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
 	KSI_DataHash_free(hash);
 	KSI_TlvElement_free(tlv);
-	KSI_DataHasher_free(hasher);
+	KSI_DataHash_free(prevLeaf);
+	KSI_DataHash_free(replacement);
+	KSI_OctetString_free(randomSeed);
+
 	return res;
 }
 
@@ -1233,7 +1206,8 @@ static int process_record_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err
 		}
 
 		if (res != KT_OK) goto cleanup;
-		res = block_info_add_record_hash_to_merkle_tree(logksi, err, ksi, 1, replacement);
+
+		res = logksi_add_record_hash_to_merkle_tree(logksi, 1, replacement);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add metarecord hash to Merkle tree.", logksi->blockNo);
 
 		KSI_DataHash_free(logksi->block.metarecordHash);
@@ -1257,7 +1231,7 @@ static int process_record_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err
 			replacement = KSI_DataHash_ref(recordHash);
 		}
 
-		res = block_info_add_record_hash_to_merkle_tree(logksi, err, ksi, 0, replacement);
+		res = logksi_add_record_hash_to_merkle_tree(logksi, 0, replacement);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add hash to Merkle tree.", logksi->blockNo);
 	}
 
@@ -1279,32 +1253,26 @@ static int max_final_hashes(LOGKSI *logksi) {
 	int finalHashes = 0;
 	int i;
 	if (logksi) {
-		for (i = 0; i < logksi->treeHeight; i++) {
-			if (logksi->MerkleTree[i]) {
+		for (i = 0; i < MERKLE_TREE_getHeight(logksi->tree); i++) {
+			KSI_DataHash *hsh = NULL;
+			int res = KT_UNKNOWN_ERROR;
+
+			res = MERKLE_TREE_get(logksi->tree, i, &hsh);
+			if (res != KT_OK) return finalHashes;
+
+			if (hsh != NULL) {
 				finalHashes++;
 			}
+
+			KSI_DataHash_free(hsh);
 		}
 		finalHashes--;
 	}
 	return finalHashes;
 }
 
-static size_t nof_unverified_hashes(LOGKSI *logksi) {
-	size_t count = 0;
-	size_t i;
-
-	for (i = 0; i < logksi->treeHeight; i++) {
-		if (logksi->notVerified[i]) {
-			count++;
-		}
-	}
-
-	return count;
-}
-
 static int is_tree_hash_expected(ERR_TRCKR *err, LOGKSI *logksi) {
 	int res;
-	int i;
 
 	if (err == NULL || logksi == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -1327,7 +1295,7 @@ static int is_tree_hash_expected(ERR_TRCKR *err, LOGKSI *logksi) {
 		/* All the tree hashes that can be computed from the received record hashes have been received.
 		 * However, another tree hash was just received, so either the preceding record hash is missing or
 		 * the tree hash is used in finalizing the unbalanced tree. */
-		if (logksi->balanced) {
+		if (MERKLE_TREE_isBalenced(logksi->tree)) {
 			/* The tree is balanced, so no finalizing is needed. Thus the tree hash is unexpected, probably due to a missing record hash. */
 			res = KT_VERIFICATION_FAILURE;
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing record hash for logline no. %zu.", logksi->blockNo, get_nof_lines(logksi) + 1);
@@ -1339,9 +1307,9 @@ static int is_tree_hash_expected(ERR_TRCKR *err, LOGKSI *logksi) {
 			/* Assuming that no record hashes are missing, let's start the finalizing process. */
 			logksi->block.finalTreeHashesSome = 1;
 			/* Prepare tree hashes for verification of finalizing. */
-			for (i = 0; i < logksi->treeHeight; i++) {
-				logksi->notVerified[i] = KSI_DataHash_ref(logksi->MerkleTree[i]);
-			}
+
+			res = MERKLE_TREE_setFinalHashesForVerification(logksi->tree);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: Unable to get tree hash for verification.", logksi->blockNo);
 		}
 	}
 
@@ -1360,6 +1328,7 @@ cleanup:
 
 static int process_tree_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, LOGKSI *logksi, IO_FILES *files, int *finalHash) {
 	int res;
+	KSI_DataHash *unverified = NULL;
 	KSI_DataHash *treeHash = NULL;
 	KSI_DataHash *recordHash = NULL;
 	KSI_DataHash *tmpRoot = NULL;
@@ -1400,7 +1369,7 @@ static int process_tree_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, 
 			logksi->block.nofRecordHashes++;
 			if (files->files.inLog) {
 				if (logksi->block.metarecordHash) {
-					res = block_info_add_record_hash_to_merkle_tree(logksi, err, ksi, 1, logksi->block.metarecordHash);
+					res = logksi_add_record_hash_to_merkle_tree(logksi, 1, logksi->block.metarecordHash);
 					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add metarecord hash to Merkle tree.", logksi->blockNo);
 
 					KSI_DataHash_free(logksi->block.metarecordHash);
@@ -1411,32 +1380,34 @@ static int process_tree_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, 
 						ERR_CATCH_MSG(err, res, "Error: Block no. %zu: tree hash does not have a matching logline no. %zu, end of logfile reached.", logksi->blockNo, get_nof_lines(logksi));
 					} else if (res != KT_OK) goto cleanup;
 
-					res = block_info_add_record_hash_to_merkle_tree(logksi, err, ksi, 0, recordHash);
+					res = logksi_add_record_hash_to_merkle_tree(logksi, 0, recordHash);
 					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add record hash to Merkle tree.", logksi->blockNo);
+
 					KSI_DataHash_free(recordHash);
 					recordHash = NULL;
 				}
 			} else {
 				/* No log file available so build the Merkle tree from tree hashes alone. */
-				res = block_info_add_leaf_hash_to_merkle_tree(logksi, ksi, treeHash, 0);
+				res = MERKLE_TREE_add_leaf_hash_to_merkle_tree(logksi->tree, treeHash, 0);
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add leaf hash to Merkle tree.", logksi->blockNo);
 			}
 		}
 		if (logksi->block.nofRecordHashes) {
+			unsigned char position = 0;
 			char description[1024];
 			PST_snprintf(description, sizeof(description), "Tree hash mismatch in block %zu", logksi->blockNo);
 
 			/* Find the corresponding tree hash from the Merkle tree. */
-			for (i = 0; i < logksi->treeHeight; i++) {
-				if (logksi->notVerified[i] != NULL) break;
-			}
-			if (i == logksi->treeHeight) {
+			res = MERKLE_TREE_popUnverifed(logksi->tree, &position, &unverified);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to pop unverified tree node from the  Merkle tree.", logksi->blockNo);
+
+			if (position == MERKLE_TREE_getHeight(logksi->tree)) {
 				res = KT_VERIFICATION_FAILURE;
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unexpected tree hash for logline no. %zu.", logksi->blockNo, get_nof_lines(logksi));
 			}
 
-			res = logksi_datahash_compare(err, mp, logksi, 0, logksi->notVerified[i], treeHash, description, "Tree hash computed from record hashes:", "Tree hash stored in log signature file:");
-			res = continue_on_hash_fail(res, set, mp, logksi, logksi->notVerified[i], treeHash, &replacement);
+			res = logksi_datahash_compare(err, mp, logksi, 0, unverified, treeHash, description, "Tree hash computed from record hashes:", "Tree hash stored in log signature file:");
+			res = continue_on_hash_fail(res, set, mp, logksi, unverified, treeHash, &replacement);
 			if (!logksi->isContinuedOnFail || logksi->taskId != TASK_VERIFY) {
 				if (logksi->block.keepRecordHashes) {
 					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: tree hashes not equal for logline no. %zu.", logksi->blockNo, get_nof_lines(logksi));
@@ -1447,18 +1418,19 @@ static int process_tree_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, 
 
 			if (res != KT_OK) goto cleanup;
 
-			KSI_DataHash_free(logksi->notVerified[i]);
-			logksi->notVerified[i] = NULL;
+			KSI_DataHash_free(unverified);
+			unverified = NULL;
 		}
-		if (logksi->block.finalTreeHashesLeaf && !nof_unverified_hashes(logksi)) {
+		if (logksi->block.finalTreeHashesLeaf && !MERKLE_TREE_nof_unverified_hashes(logksi->tree)) {
 			/* This was the last mandatory tree hash. From this point forward all tree hashes must be interpreted as optional final tree hashes. */
 			logksi->block.finalTreeHashesSome = 1;
-			for (i = 0; i < logksi->treeHeight; i++) {
-				logksi->notVerified[i] = KSI_DataHash_ref(logksi->MerkleTree[i]);
-			}
+
+			res = MERKLE_TREE_setFinalHashesForVerification(logksi->tree);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: Unable to get tree hash for verification.", logksi->blockNo);
 		}
 	} else {
 		if (logksi->block.nofRecordHashes) {
+			KSI_DataHash *tmp = NULL;
 			char description[1024];
 			PST_snprintf(description, sizeof(description), "Tree hash mismatch in block %zu", logksi->blockNo);
 
@@ -1466,31 +1438,27 @@ static int process_tree_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, 
 			print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_LEVEL_3, "Block no. %3zu: interpreting tree hash no. %3zu as a final hash... ", logksi->blockNo, logksi->block.nofTreeHashes);
 			/* Find the corresponding tree hash from the Merkle tree. */
 			i = 0;
-			while (i < logksi->treeHeight) {
-				if (root == NULL) {
-					root = KSI_DataHash_ref(logksi->notVerified[i]);
-					KSI_DataHash_free(logksi->notVerified[i]);
-					logksi->notVerified[i] = NULL;
-					i++;
-					continue;
-				}
-				if (logksi->notVerified[i]) {
-					res = block_info_calculate_new_tree_hash(logksi, logksi->notVerified[i], root, i + 2, &tmpRoot);
-					if (res != KT_OK) goto cleanup;
 
-					KSI_DataHash_free(logksi->notVerified[i]);
-					logksi->notVerified[i] = KSI_DataHash_ref(tmpRoot);
-					break;
-				}
-				i++;
-			}
-			if (i == logksi->treeHeight) {
+
+			res = MERKLE_TREE_popUnverifed(logksi->tree, NULL, &root);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: Unable to pop unverified root tree node.", logksi->blockNo);
+
+			res = MERKLE_TREE_popUnverifed(logksi->tree, &i, &tmp);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: Unable to pop unverified root tree node.", logksi->blockNo);
+
+			res = MERKLE_TREE_calculate_new_tree_hash(logksi->tree, tmp, root, i + 2, &tmpRoot);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: Unable pop unverified root tree node.", logksi->blockNo);
+
+			res = MERKLE_TREE_insertUnverified(logksi->tree, i, tmpRoot);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: Unable to insert unverified root tree node.", logksi->blockNo);
+
+			if (i == MERKLE_TREE_getHeight(logksi->tree)) {
 				res = KT_VERIFICATION_FAILURE;
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unexpected tree hash for logline no. %zu.", logksi->blockNo, get_nof_lines(logksi));
 			}
 
-			res = logksi_datahash_compare(err, mp, logksi, 0, logksi->notVerified[i], treeHash, description, "Tree hash computed from record hashes:", "Tree hash stored in log signature file:");
-			res = continue_on_hash_fail(res, set, mp, logksi, logksi->notVerified[i], treeHash, &replacement);
+			res = logksi_datahash_compare(err, mp, logksi, 0, tmpRoot, treeHash, description, "Tree hash computed from record hashes:", "Tree hash stored in log signature file:");
+			res = continue_on_hash_fail(res, set, mp, logksi, tmpRoot, treeHash, &replacement);
 			if (!logksi->isContinuedOnFail || logksi->taskId != TASK_VERIFY) {
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: tree hashes not equal for logline no. %zu.", logksi->blockNo, get_nof_lines(logksi));
 			}
@@ -1504,6 +1472,7 @@ static int process_tree_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, 
 cleanup:
 
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
+	KSI_DataHash_free(unverified);
 	KSI_DataHash_free(treeHash);
 	KSI_DataHash_free(recordHash);
 	KSI_DataHash_free(tmpRoot);
@@ -1592,7 +1561,8 @@ static int process_metarecord(PARAM_SET* set, MULTI_PRINTER *mp, ERR_TRCKR *err,
 		if (logksi->block.metarecordHash != NULL) {
 			/* Add the previous metarecord to Merkle tree. */
 			logksi->block.nofRecordHashes++;
-			res = block_info_add_record_hash_to_merkle_tree(logksi, err, ksi, 1, logksi->block.metarecordHash);
+
+			res = logksi_add_record_hash_to_merkle_tree(logksi, 1, logksi->block.metarecordHash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add metarecord hash to Merkle tree.", logksi->blockNo);
 		}
 
@@ -1608,8 +1578,9 @@ static int process_metarecord(PARAM_SET* set, MULTI_PRINTER *mp, ERR_TRCKR *err,
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: at least %zu loglines expected up to metarecord index %zu, end of logfile reached.", logksi->blockNo, get_nof_lines(logksi), metarecord_index);
 			} else if (res != KT_OK) goto cleanup;
 
-			res = block_info_add_record_hash_to_merkle_tree(logksi, err, ksi, 0, hash);
+			res = logksi_add_record_hash_to_merkle_tree(logksi, 0, hash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add metarecord hash to Merkle tree.", logksi->blockNo);
+
 			KSI_DataHash_free(hash);
 			hash = NULL;
 		}
@@ -1675,7 +1646,7 @@ static int is_block_signature_expected(ERR_TRCKR *err, LOGKSI *logksi) {
 	}
 
 	if (logksi->block.keepTreeHashes) {
-		if (!logksi->block.keepRecordHashes && !logksi->balanced && !logksi->block.finalTreeHashesSome) {
+		if (!logksi->block.keepRecordHashes && !MERKLE_TREE_isBalenced(logksi->tree) && !logksi->block.finalTreeHashesSome) {
 			/* If LOGSIG12 format is used, metarecords are mandatory for closing unbalanced blocks. */
 			if (logksi->file.version == LOGSIG12) {
 				res = KT_VERIFICATION_FAILURE;
@@ -1805,19 +1776,13 @@ cleanup:
 	return res;
 }
 
-static int extract_ksi_signature(KSI_CTX *ctx, LOGKSI *logksi, EXTRACT_INFO *inf, const KSI_Signature *sig, KSI_Signature **out) {
+static int extract_ksi_signature(KSI_CTX *ctx, LOGKSI *logksi, RECORD_INFO *record, const KSI_Signature *sig, KSI_Signature **out) {
 	int res = KT_UNKNOWN_ERROR;
 	KSI_Signature *tmp = NULL;
 	KSI_SignatureBuilder *builder = NULL;
 	KSI_AggregationHashChain *aggrChain = NULL;
-	KSI_HashChainLinkList *chainList;
-	KSI_HashChainLink *link = NULL;
-	KSI_DataHash *hashRef = NULL;
-	KSI_Integer *lvlcrct = NULL;
-	KSI_Integer *hashId = NULL;
-	int i = 0;
 
-	if (ctx == NULL || logksi == NULL || inf == NULL || sig == NULL || out == NULL) {
+	if (ctx == NULL || logksi == NULL || record == NULL || sig == NULL || out == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
@@ -1825,64 +1790,14 @@ static int extract_ksi_signature(KSI_CTX *ctx, LOGKSI *logksi, EXTRACT_INFO *inf
 	res = KSI_SignatureBuilder_openFromSignature(sig, &builder);
 	if (res != KSI_OK) goto cleanup;
 
-	res = KSI_AggregationHashChain_new(ctx, &aggrChain);
+	res = RECORD_INFO_getAggregationHashChain(record, ctx, &aggrChain);
 	if (res != KSI_OK) goto cleanup;
-
-	res = KSI_HashChainLinkList_new(&chainList);
-	if (res != KSI_OK) goto cleanup;
-
-	for (i = 0; i < inf->extractLevel; i++) {
-		if (inf->extractChain[i].sibling == NULL) continue;
-
-		res = KSI_HashChainLink_new(ctx, &link);
-		if (res != KSI_OK) goto cleanup;
-
-		hashRef = KSI_DataHash_ref(inf->extractChain[i].sibling);
-		res = KSI_HashChainLink_setImprint(link, hashRef);
-		if (res != KSI_OK) goto cleanup;
-		hashRef = NULL;
-
-		res = KSI_HashChainLink_setIsLeft(link, (inf->extractChain[i].dir == LEFT_LINK));
-		if (res != KSI_OK) goto cleanup;
-
-		res = KSI_Integer_new(ctx, inf->extractChain[i].corr, &lvlcrct);
-		if (res != KSI_OK) goto cleanup;
-
-		res = KSI_HashChainLink_setLevelCorrection(link, lvlcrct);
-		if (res != KSI_OK) goto cleanup;
-
-		lvlcrct = NULL;
-
-		res = KSI_HashChainLinkList_append(chainList, link);
-		if (res != KSI_OK) goto cleanup;
-
-		link = NULL;
-	}
-
-	res = KSI_AggregationHashChain_setChain(aggrChain, chainList);
-	if (res != KSI_OK) goto cleanup;
-
-	chainList = NULL;
-
-	hashRef = KSI_DataHash_ref(inf->extractRecord);
-	res = KSI_AggregationHashChain_setInputHash(aggrChain, hashRef);
-	if (res != KSI_OK) goto cleanup;
-	hashRef = NULL;
-
-	res = KSI_Integer_new(ctx, logksi->block.hashAlgo, &hashId);
-	if (res != KSI_OK) goto cleanup;
-
-	res = KSI_AggregationHashChain_setAggrHashId(aggrChain, hashId);
-	if (res != KSI_OK) goto cleanup;
-
-	hashId = NULL;
 
 	res = KSI_SignatureBuilder_createSignatureWithAggregationChain(builder, aggrChain, &tmp);
 	if (res != KSI_OK) goto cleanup;
 
 	*out = tmp;
 	tmp = NULL;
-
 	res = KT_OK;
 
 cleanup:
@@ -1890,10 +1805,6 @@ cleanup:
 	KSI_Signature_free(tmp);
 	KSI_SignatureBuilder_free(builder);
 	KSI_AggregationHashChain_free(aggrChain);
-	KSI_Integer_free(lvlcrct);
-	KSI_Integer_free(hashId);
-	KSI_HashChainLink_free(link);
-	KSI_DataHash_free(hashRef);
 
 	return res;
 }
@@ -1997,71 +1908,60 @@ cleanup:
 	return res;
 }
 
-static int store_integrity_proof_and_log_records(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, EXTRACT_INFO *extractInfo, IO_FILES *files) {
+static int store_integrity_proof_and_log_records(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, RECORD_INFO *record, IO_FILES *files) {
 	int res = KT_INVALID_ARGUMENT;
 	KSI_TlvElement *recChain = NULL;
 	KSI_TlvElement *hashStep = NULL;
-	size_t i = 0;
 	unsigned char buf[0xFFFF + 4];
 	size_t len = 0;
+	size_t lineNumber = 0;
+	char *logLine;
+	KSI_DataHash *recordHash = NULL;
+	KSI_TlvElement *metadata = NULL;
 
 
-	if (set == NULL || err == NULL || ksi == NULL || extractInfo == NULL || files == NULL) {
+	if (set == NULL || err == NULL || ksi == NULL || record == NULL || files == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
 
+	res = RECORD_INFO_getLine(record, &lineNumber, &logLine);
+	ERR_CATCH_MSG(err, res, "Error: Unable to get record line information.");
+
+	res = RECORD_INFO_getRecordHash(record, &recordHash);
+	ERR_CATCH_MSG(err, res, "Error: Unable to get record hash.");
+
+	res = RECORD_INFO_getMetadata(record, &metadata);
+	ERR_CATCH_MSG(err, res, "Error: Unable to get metadata TLV.");
+
 	/* Construct hash chain for one log record	. */
 	res = KSI_TlvElement_new(&recChain);
-	ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to create record chain.", extractInfo->extractPos);
+	ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to create record chain.", lineNumber);
 	recChain->ftlv.tag = 0x0907;
 
 	/* Store the record hash value. */
-	res = tlv_element_set_hash(recChain, ksi, 0x01, extractInfo->extractRecord);
-	ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to add record hash to record chain.", extractInfo->extractPos);
+	res = tlv_element_set_hash(recChain, ksi, 0x01, recordHash);
+	ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to add record hash to record chain.", lineNumber);
 
 	/* In case of log line, store it into file.
 	   In case of meta record  store it into record chain TLV. */
-	if (extractInfo->logLine) {
-		res = SMART_FILE_write(files->files.outLog, (unsigned char*)extractInfo->logLine, strlen(extractInfo->logLine), NULL);
-		ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to write log record to log records file.", extractInfo->extractPos);
-	} else if (extractInfo->metaRecord){
-		res = KSI_TlvElement_setElement(recChain, extractInfo->metaRecord);
-		ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to add metarecord to record chain.", extractInfo->extractPos);
+	if (logLine) {
+		res = SMART_FILE_write(files->files.outLog, (unsigned char*)logLine, strlen(logLine), NULL);
+		ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to write log record to log records file.", lineNumber);
+	} else if (metadata){
+		res = KSI_TlvElement_setElement(recChain, metadata);
+		ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to add metarecord to record chain.", lineNumber);
 	}
 
-	/* Construct the hash chain. */
-	for (i = 0; i < extractInfo->extractLevel; i++) {
-		if (extractInfo->extractChain[i].sibling) {
-			res = KSI_TlvElement_new(&hashStep);
-			ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to create hash step no. %zu.", extractInfo->extractPos, i + 1);
-
-			if (extractInfo->extractChain[i].dir == LEFT_LINK) {
-				hashStep->ftlv.tag = 0x02;
-			}
-			else {
-				hashStep->ftlv.tag = 0x03;
-			}
-			if (extractInfo->extractChain[i].corr) {
-				res = tlv_element_set_uint(hashStep, ksi, 0x01, extractInfo->extractChain[i].corr);
-				ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to add level correction to hash step no. %zu.", extractInfo->extractPos, i + 1);
-			}
-			res = tlv_element_set_hash(hashStep, ksi, 0x02, extractInfo->extractChain[i].sibling);
-			ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to add sibling hash to hash step no. %zu.", extractInfo->extractPos, i + 1);
-			res = KSI_TlvElement_appendElement(recChain, hashStep);
-			ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to add hash step no. %zu.", extractInfo->extractPos, i + 1);
-
-			KSI_TlvElement_free(hashStep);
-			hashStep = NULL;
-		}
-	}
+	res = tlv_element_set_record_hash_chain(recChain, ksi, record);
+	ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to construct record hash chain TLV.", lineNumber);
 
 	/* Serialize hash chain TLV and store into integrity proof file. */
 	res = KSI_TlvElement_serialize(recChain, buf, sizeof(buf), &len, 0);
-	ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to serialize record chain.", extractInfo->extractPos);
+	ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to serialize record chain.", lineNumber);
 
 	res = SMART_FILE_write(files->files.outProof, buf, len, NULL);
-	ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to write record chain to integrity proof file.", extractInfo->extractPos);
+	ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to write record chain to integrity proof file.", lineNumber);
 
 	KSI_TlvElement_free(recChain);
 	recChain = NULL;
@@ -2073,6 +1973,8 @@ cleanup:
 
 	KSI_TlvElement_free(recChain);
 	KSI_TlvElement_free(hashStep);
+	KSI_TlvElement_free(metadata);
+	KSI_DataHash_free(recordHash);
 
 	return res;
 }
@@ -2089,7 +1991,6 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 	KSI_TlvElement *tlvUnsig = NULL;
 	KSI_TlvElement *tlvRfc3161 = NULL;
 	KSI_Integer *t0 = NULL;
-	size_t j;
 
 	KSI_VerificationContext_init(&context, ksi);
 
@@ -2178,7 +2079,8 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 		if (logksi->block.metarecordHash) {
 			/* Add the previous metarecord to Merkle tree. */
 			logksi->block.nofRecordHashes++;
-			res = block_info_add_record_hash_to_merkle_tree(logksi, err, ksi, 1, logksi->block.metarecordHash);
+
+			res = logksi_add_record_hash_to_merkle_tree(logksi, 1, logksi->block.metarecordHash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add metarecord hash to Merkle tree.", logksi->blockNo);
 		}
 
@@ -2193,19 +2095,15 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: at least %zu loglines expected, end of logfile reached.", logksi->blockNo, get_nof_lines(logksi));
 				} else if (res != KT_OK) goto cleanup;
 
-				res = block_info_add_record_hash_to_merkle_tree(logksi, err, ksi, 0, hash);
+				res = logksi_add_record_hash_to_merkle_tree(logksi, 0, hash);
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add hash to Merkle tree.", logksi->blockNo);
+
 				KSI_DataHash_free(hash);
 				hash = NULL;
 			}
 		}
 	}
 
-	/* If no record hashes were computed or encountered, previous leaf hashes must not be compared. */
-	if (logksi->block.nofRecordHashes == 0) {
-		KSI_DataHash_free(logksi->prevLeaf);
-		logksi->prevLeaf = NULL;
-	}
 
 	/* If we have any record hashes directly from log signature file or indirectly from log file,
 	 * their count must match the record count in block signature. */
@@ -2231,8 +2129,7 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 
 	print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_LEVEL_3, "Block no. %3zu: verifying KSI signature... ", logksi->blockNo);
 
-
-	res = block_info_calculate_root_hash(logksi, ksi, (KSI_DataHash**)&context.documentHash);
+	res = MERKLE_TREE_calculate_root_hash(logksi->tree, (KSI_DataHash**)&context.documentHash);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to get root hash for verification.", logksi->blockNo);
 
 	context.docAggrLevel = block_info_get_aggregation_level(logksi);
@@ -2302,41 +2199,48 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 		context.documentHash = NULL;
 		KSI_VerificationContext_clean(&context);
 	} else if (processors->extract_signature) {
+		size_t j = 0;
+
 		res = LOGKSI_Signature_parseWithPolicy(err, ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_INTERNAL, &context, &sig);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse KSI signature.", logksi->blockNo);
 
-		if (!PARAM_SET_isSetByName(set, "ksig") && logksi->task.extract.nofExtractPositionsInBlock) {
+		if (!PARAM_SET_isSetByName(set, "ksig") && EXTRACT_INFO_getPositionsInBlock(logksi->task.extract.info)) {
 			res = SMART_FILE_write(files->files.outProof, tlvSig->ptr, tlvSig->ftlv.dat_len + tlvSig->ftlv.hdr_len, NULL);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to write KSI signature to integrity proof file.", logksi->blockNo);
 		}
 
-		for (j = 0; j < logksi->task.extract.nofExtractPositionsInBlock; j++) {
-			if (logksi->task.extract.extractInfo[j].extractOffset && logksi->task.extract.extractInfo[j].extractOffset <= logksi->block.nofRecordHashes) {
-				size_t rowNumber = logksi->file.nofTotalRecordHashes - logksi->block.nofRecordHashes + logksi->task.extract.extractInfo[j].extractOffset;
+		for (j = 0; j < EXTRACT_INFO_getPositionsInBlock(logksi->task.extract.info); j++) {
+			RECORD_INFO *record = NULL;
+			size_t lineNumber = 0;
+			char *logLine = NULL;
 
-				print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_2, res);
-				print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_LEVEL_3, "Block no. %3zu: extracting log records (line %3zu)... ", logksi->blockNo, rowNumber);
-				print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_EQUAL | DEBUG_LEVEL_2, "Extracting log record from block %3zu (line %3zu)... ", logksi->blockNo, rowNumber);
+			res = EXTRACT_INFO_getRecord(logksi->task.extract.info, j, &record);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to get extract record.", logksi->blockNo);
 
-				if (PARAM_SET_isSetByName(set, "ksig")) {
-					KSI_Signature *ksiSig = NULL;
-					size_t logLine = logksi->task.extract.extractInfo[j].extractPos;
+			res = RECORD_INFO_getLine(record, &lineNumber, &logLine);
+			ERR_CATCH_MSG(err, res, "Error: Unable to get record line information.");
 
-					if (logksi->file.warningLegacy) {
-						ERR_TRCKR_ADD(err, res = KT_INVALID_INPUT_FORMAT, "Error: It is not possible to extract pure KSI signature from RFC3161 timestamp.");
-						goto cleanup;
-					}
+			print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_2, res);
+			print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_LEVEL_3, "Block no. %3zu: extracting log records (line %3zu)... ", logksi->blockNo, lineNumber);
+			print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_EQUAL | DEBUG_LEVEL_2, "Extracting log record from block %3zu (line %3zu)... ", logksi->blockNo, lineNumber);
 
-					res = extract_ksi_signature(ksi, logksi, &logksi->task.extract.extractInfo[j], sig, &ksiSig);
-					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to construct KSI signature for log line %zu.", logksi->blockNo, logLine);
+			if (PARAM_SET_isSetByName(set, "ksig")) {
+				KSI_Signature *ksiSig = NULL;
 
-					res = store_ksi_signature_and_log_line(set, err, logksi, files, logksi->task.extract.extractInfo[j].logLine, logLine, ksiSig);
-					KSI_Signature_free(ksiSig);
-					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to store logline %zu and corresponding KSI signature.", logksi->blockNo, logLine);
-				} else {
-					res = store_integrity_proof_and_log_records(set, err, ksi, &logksi->task.extract.extractInfo[j], files);
-					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to store integrity proof file and extracted log line.", logksi->blockNo);
+				if (logksi->file.warningLegacy) {
+					ERR_TRCKR_ADD(err, res = KT_INVALID_INPUT_FORMAT, "Error: It is not possible to extract pure KSI signature from RFC3161 timestamp.");
+					goto cleanup;
 				}
+
+				res = extract_ksi_signature(ksi, logksi, record, sig, &ksiSig);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to construct KSI signature for log line %zu.", logksi->blockNo, lineNumber);
+
+				res = store_ksi_signature_and_log_line(set, err, logksi, files, logLine, lineNumber, ksiSig);
+				KSI_Signature_free(ksiSig);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to store logline %zu and corresponding KSI signature.", logksi->blockNo, lineNumber);
+			} else {
+				res = store_integrity_proof_and_log_records(set, err, ksi, record, files);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to store integrity proof file and extracted log line.", logksi->blockNo);
 			}
 		}
 
@@ -2389,7 +2293,6 @@ static int process_ksi_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *e
 	KSI_PolicyVerificationResult *verificationResult = NULL;
 	KSI_DataHash *hash = NULL;
 	KSI_TlvElement *tlvSig = NULL;
-	KSI_DataHasher *hasher = NULL;
 	KSI_HashAlgorithm algo;
 
 	if (set == NULL || err == NULL || ksi == NULL || processors == NULL || files == NULL || logksi == NULL) {
@@ -2425,16 +2328,12 @@ static int process_ksi_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *e
 		res = KSI_DataHash_getHashAlg(hash, &algo);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to get algorithm ID from root hash.", logksi->blockNo);
 
-		if (logksi->hasher == NULL || logksi->block.hashAlgo != algo) {
-			res = KSI_DataHasher_open(ksi, algo, &hasher);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: could not open datahasher.", logksi->blockNo);
-		}
-
-		if (hasher) {
-			KSI_DataHasher_free(logksi->hasher);
-			logksi->hasher = hasher;
-			hasher = NULL;
-		}
+		/* Configure merkle tree internal hash algorithm, that is used
+		   to hash the record chain.  */
+		res = MERKLE_TREE_reset(logksi->tree, algo,
+								NULL,
+								NULL);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to reset MERKLE_TREE.", logksi->blockNo);
 
 		KSI_DataHash_free(logksi->block.rootHash);
 		logksi->block.rootHash = KSI_DataHash_ref(hash);
@@ -2464,17 +2363,16 @@ static int process_ksi_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *e
 	KSI_Signature_free(sig);
 	KSI_PolicyVerificationResult_free(verificationResult);
 	KSI_TlvElement_free(tlvSig);
-	KSI_DataHasher_free(hasher);
 	return res;
 }
 
-static int process_hash_step(ERR_TRCKR *err, KSI_CTX *ksi, KSI_TlvElement *tlv, LOGKSI *logksi, KSI_DataHash *inputHash, KSI_DataHash **outputHash) {
+static int process_hash_step(ERR_TRCKR *err, KSI_CTX *ksi, KSI_TlvElement *tlv, LOGKSI *logksi, KSI_DataHash *inputHash, unsigned char *chainHeight, KSI_DataHash **outputHash) {
 	int res;
 	size_t correction = 0;
 	KSI_DataHash *siblingHash = NULL;
 	KSI_DataHash *tmp = NULL;
 
-	if (tlv == NULL || logksi == NULL || inputHash == NULL || outputHash == NULL) {
+	if (tlv == NULL || logksi == NULL || inputHash == NULL || chainHeight == NULL || outputHash == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
@@ -2488,11 +2386,12 @@ static int process_hash_step(ERR_TRCKR *err, KSI_CTX *ksi, KSI_TlvElement *tlv, 
 	res = tlv_element_get_hash(err, tlv, ksi, 0x02, &siblingHash);
 	if (res != KT_OK) goto cleanup;
 
-	logksi->treeHeight += correction + 1;
+	*chainHeight = *chainHeight + correction + 1;
+
 	if (tlv->ftlv.tag == 0x02) {
-		res = block_info_calculate_new_tree_hash(logksi, inputHash, siblingHash, logksi->treeHeight, &tmp);
+		res = MERKLE_TREE_calculate_new_tree_hash(logksi->tree, inputHash, siblingHash, *chainHeight, &tmp);
 	} else if (tlv->ftlv.tag == 0x03){
-		res = block_info_calculate_new_tree_hash(logksi, siblingHash, inputHash, logksi->treeHeight, &tmp);
+		res = MERKLE_TREE_calculate_new_tree_hash(logksi->tree, siblingHash, inputHash, *chainHeight, &tmp);
 	} else {
 		res = KT_INVALID_INPUT_FORMAT;
 	}
@@ -2580,8 +2479,8 @@ static int process_record_chain(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *er
 	if (tlv->subList) {
 		int i;
 		char description[1024];
+		unsigned char chainHeight = 0;
 
-		logksi->treeHeight = 0;
 		root = KSI_DataHash_ref(replacement);
 
 		for (i = 0; i < KSI_TlvElementList_length(tlv->subList); i++) {
@@ -2590,7 +2489,7 @@ static int process_record_chain(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *er
 			res = KSI_TlvElementList_elementAt(tlv->subList, i, &tmpTlv);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to get element %d from TLV.", logksi->blockNo, i);
 			if (tmpTlv && (tmpTlv->ftlv.tag == 0x02 || tmpTlv->ftlv.tag == 0x03)) {
-				res = process_hash_step(err, ksi, tmpTlv, logksi, root, &tmpHash);
+				res = process_hash_step(err, ksi, tmpTlv, logksi, root, &chainHeight, &tmpHash);
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to process hash step.", logksi->blockNo);
 
 				KSI_DataHash_free(root);
@@ -2674,7 +2573,7 @@ static int process_partial_block(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, L
 		char description[1024];
 		PST_snprintf(description, sizeof(description), "Root hash mismatch in block %zu", logksi->blockNo);
 
-		res = block_info_calculate_root_hash(logksi, ksi, &rootHash);
+		res = MERKLE_TREE_calculate_root_hash(logksi->tree, &rootHash);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate root hash.", logksi->blockNo);
 
 		res = logksi_datahash_compare(err, mp, logksi, 0, rootHash, hash, description, "Root hash computed from record hashes:", "Unsigned root hash stored in block data file:");
@@ -2743,11 +2642,6 @@ static int process_partial_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCK
 	res = is_block_signature_expected(err, logksi);
 	if (res != KT_OK) goto cleanup;
 
-	/* If no record hashes were computed or encountered, previous leaf hashes must not be compared. */
-	if (logksi->block.nofRecordHashes == 0) {
-		KSI_DataHash_free(logksi->prevLeaf);
-		logksi->prevLeaf = NULL;
-	}
 
 	if (logksi->block.nofRecordHashes && logksi->block.nofRecordHashes != logksi->block.recordCount) {
 		res = KT_INVALID_INPUT_FORMAT;
@@ -2759,8 +2653,10 @@ static int process_partial_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCK
 		if (logksi->block.keepRecordHashes || (!logksi->block.keepRecordHashes && logksi->block.finalTreeHashesSome)) {
 			do {
 				missing = NULL;
-				res = block_info_merge_one_level(logksi, ksi, &missing);
+
+				res = MERKLE_TREE_merge_one_level(logksi->tree, &missing);
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing tree hash could not be computed.", logksi->blockNo);
+
 				if (missing) {
 					res = tlv_element_write_hash(missing, 0x903, files->files.outSig);
 					ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing tree hash could not be written.", logksi->blockNo);
@@ -2805,7 +2701,7 @@ static int process_partial_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCK
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: root hashes not equal.", logksi->blockNo);
 		} else if (logksi->block.nofRecordHashes) {
 			/* Compute the root hash and compare with signed root hash. */
-			res = block_info_calculate_root_hash(logksi, ksi, &rootHash);
+			res = MERKLE_TREE_calculate_root_hash(logksi->tree, &rootHash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate root hash.", logksi->blockNo);
 
 			res = logksi_datahash_compare(err, mp, logksi, 0, rootHash, docHash, description, "Root hash computed from record hashes:", "Signed root hash stored in KSI signature:");
@@ -2824,7 +2720,7 @@ static int process_partial_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCK
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: root hashes not equal.", logksi->blockNo);
 		} else if (logksi->block.nofRecordHashes) {
 			/* Compute the root hash and compare with unsigned root hash. */
-			res = block_info_calculate_root_hash(logksi, ksi, &rootHash);
+			res = MERKLE_TREE_calculate_root_hash(logksi->tree, &rootHash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate root hash.", logksi->blockNo);
 
 			res = logksi_datahash_compare(err, mp, logksi, 0, rootHash, hash, description, "Root hash computed from record hashes:", "Unsigned root hash stored in block signature file:");
@@ -2960,6 +2856,7 @@ static int finalize_log_signature(PARAM_SET* set, MULTI_PRINTER* mp, ERR_TRCKR *
 	char outHash[256] = "<null>";
 	int shortIndentation = 13;
 	int longIndentation = 29;
+	KSI_DataHash *prevLeaf = NULL;
 
 
 
@@ -3006,9 +2903,9 @@ static int finalize_log_signature(PARAM_SET* set, MULTI_PRINTER* mp, ERR_TRCKR *
 		ERR_CATCH_MSG(err, res, "Error: %zu hash comparison failures found.", logksi->file.nofTotaHashFails);
 	}
 
-	if (logksi->task.extract.nofExtractPositionsFound < logksi->task.extract.nofExtractPositions) {
+	if (EXTRACT_INFO_isLastPosPending(logksi->task.extract.info)) {
 		res = KT_INVALID_CMD_PARAM;
-		ERR_CATCH_MSG(err, res, "Error: Extract position %zu out of range - not enough loglines.", logksi->task.extract.extractPositions[logksi->task.extract.nofExtractPositionsFound]);
+		ERR_CATCH_MSG(err, res, "Error: Extract position %zu out of range - not enough loglines.", EXTRACT_INFO_getNextPosition(logksi->task.extract.info));
 	}
 
 	/* Mark output signature file consistent. */
@@ -3042,7 +2939,7 @@ cleanup:
 
 	if (logksi->file.nofTotalMetarecords > 0) print_debug_mp(mp, MP_ID_LOGFILE_SUMMARY, DEBUG_SMALLER | DEBUG_LEVEL_3, " * %-*s%zu\n", longIndentation, "Count of meta-records:", logksi->file.nofTotalMetarecords); /* Meta records not included. */
 	if (logksi->file.nofTotaHashFails > 0) print_debug_mp(mp, MP_ID_LOGFILE_SUMMARY, DEBUG_SMALLER | DEBUG_LEVEL_3, " * %-*s%zu\n", longIndentation, "Count of hash failures:", logksi->file.nofTotaHashFails);
-	if (logksi->task.extract.nofExtractPositions > 0) print_debug_mp(mp, MP_ID_LOGFILE_SUMMARY, DEBUG_SMALLER | DEBUG_LEVEL_3, " * %-*s%zu\n", longIndentation, "Records extracted:", logksi->task.extract.nofExtractPositions);
+	if (EXTRACT_INFO_getPositionsExtracted(logksi->task.extract.info) > 0) print_debug_mp(mp, MP_ID_LOGFILE_SUMMARY, DEBUG_SMALLER | DEBUG_LEVEL_3, " * %-*s%zu\n", longIndentation, "Records extracted:", EXTRACT_INFO_getPositionsExtracted(logksi->task.extract.info));
 
 	if (logksi->file.rec_time_in_file_min > 0 && logksi->file.rec_time_in_file_max) {
 		char str_rec_time_min[1024] = "<null>";
@@ -3062,8 +2959,9 @@ cleanup:
 		print_debug_mp(mp, MP_ID_LOGFILE_SUMMARY, DEBUG_SMALLER | DEBUG_LEVEL_3, " * %-*s%s%s\n", longIndentation, "Log file duration:", sign, time_diff);
 	}
 
+	MERKLE_TREE_getPrevLeaf(logksi->tree, &prevLeaf);
 	LOGKSI_DataHash_toString(inputHash, inHash, sizeof(inHash));
-	LOGKSI_DataHash_toString(logksi->prevLeaf, outHash, sizeof(outHash));
+	LOGKSI_DataHash_toString(prevLeaf, outHash, sizeof(outHash));
 
 	if (logksi->file.version != RECSIG11 && logksi->file.version != RECSIG12 && (logksi->taskId == TASK_VERIFY || logksi->taskId == TASK_INTEGRATE)) {
 		print_debug_mp(mp, MP_ID_LOGFILE_SUMMARY, DEBUG_SMALLER | DEBUG_LEVEL_3, " * %-*s%s\n", shortIndentation, "Input hash:", inHash);
@@ -3087,6 +2985,7 @@ cleanup:
 
 	MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
 	MULTI_PRINTER_printByID(mp, MP_ID_LOGFILE_SUMMARY);
+	KSI_DataHash_free(prevLeaf);
 
 	return res;
 }
@@ -3261,11 +3160,15 @@ int logsignature_extend(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 		goto cleanup;
 	}
 
-	LOGKSI_clearAll(&logksi);
+	LOGKSI_initialize(&logksi);
 	logksi.ftlv_raw = ftlv_raw;
 	logksi.taskId = TASK_EXTEND;
+	logksi.err = err;
 	memset(&processors, 0, sizeof(processors));
 	processors.extend_signature = extend_signature;
+
+	res = MERKLE_TREE_new(&logksi.tree);
+	if (res != KT_OK) goto cleanup;
 
 	logksi.isContinuedOnFail = PARAM_SET_isSetByName(set, "continue-on-fail");
 
@@ -3404,6 +3307,9 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 	int skipCurrentBlock = 0;
 	int printHeader = 0;
 	REGEXP *tmp_regxp = NULL;
+	KSI_DataHash *prevLeaf = NULL;
+	static uint64_t lastSignatureTime = 0;
+
 
 	if (set == NULL || err == NULL || ksi == NULL || logksi == NULL || verify_signature == NULL || files == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -3412,10 +3318,15 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 
 	logksi->ftlv_raw = ftlv_raw;
 	logksi->taskId = TASK_VERIFY;
+	logksi->err = err;
 	memset(&processors, 0, sizeof(processors));
 	processors.verify_signature = verify_signature;
 
+	res = MERKLE_TREE_new(&logksi->tree);
+	if (res != KT_OK) goto cleanup;
+
 	logksi->isContinuedOnFail = PARAM_SET_isSetByName(set, "continue-on-fail");
+	logksi->sigTime_0 = lastSignatureTime;
 
 	res = process_magic_number(set, mp, err, logksi, files);
 	if (res != KT_OK) goto cleanup;
@@ -3483,9 +3394,13 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 					/* Addidional post processor for block header. */
 					if (logksi->ftlv.tag == 0x901) {
 						char buf[256];
-						LOGKSI_DataHash_toString(logksi->prevLeaf, buf, sizeof(buf));
+
+						res = MERKLE_TREE_getPrevLeaf(logksi->tree, &prevLeaf);
+						ERR_CATCH_MSG(err, res, "Error: Unable to get previous leaf.");
+
+						LOGKSI_DataHash_toString(prevLeaf, buf, sizeof(buf));
 						print_progressResult(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_2, res);
-						if (theFirstInputHashInFile == NULL) theFirstInputHashInFile = KSI_DataHash_ref(logksi->prevLeaf);
+						if (theFirstInputHashInFile == NULL) theFirstInputHashInFile = KSI_DataHash_ref(prevLeaf);
 
 						print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, "Block no. %3zu: input hash: %s.\n", logksi->blockNo, buf);
 
@@ -3496,7 +3411,7 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 						if (isFirst == 1 && firstLink != NULL) {
 							print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_LEVEL_3, "Block no. %3zu: verifying inter-linking input hash... ", logksi->blockNo);
 							isFirst = 0;
-							if (!KSI_DataHash_equals(firstLink, logksi->prevLeaf)) {
+							if (!KSI_DataHash_equals(firstLink, prevLeaf)) {
 								char buf_imp[1024];
 								char buf_exp_imp[1024];
 								char buf_fname[4096];
@@ -3515,7 +3430,7 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 									prevBlockSource = files->previousLogFile;
 								}
 
-								ERR_TRCKR_ADD(err, res, "Error: Block no. %zu: The last leaf from the previous block (%s) does not match with the current first block (%s). Expecting '%s', but got '%s'.", logksi->blockNo, prevBlockSource, firstBlockSource, LOGKSI_DataHash_toString(firstLink, buf_exp_imp, sizeof(buf_exp_imp)), LOGKSI_DataHash_toString(logksi->prevLeaf, buf_imp, sizeof(buf_imp)));
+								ERR_TRCKR_ADD(err, res, "Error: Block no. %zu: The last leaf from the previous block (%s) does not match with the current first block (%s). Expecting '%s', but got '%s'.", logksi->blockNo, prevBlockSource, firstBlockSource, LOGKSI_DataHash_toString(firstLink, buf_exp_imp, sizeof(buf_exp_imp)), LOGKSI_DataHash_toString(prevLeaf, buf_imp, sizeof(buf_imp)));
 
 								goto cleanup;
 							}
@@ -3643,7 +3558,13 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 
 	/* If requested, return last leaf of last block. */
 	if (lastLeaf != NULL) {
-		*lastLeaf = KSI_DataHash_ref(logksi->prevLeaf);
+		KSI_DataHash_free(prevLeaf);
+		prevLeaf = NULL;
+
+		res = MERKLE_TREE_getPrevLeaf(logksi->tree, &prevLeaf);
+		ERR_CATCH_MSG(err, res, "Error: Unable to get previous leaf.");
+
+		*lastLeaf = KSI_DataHash_ref(prevLeaf);
 	}
 
 	if (last_rec_time != NULL) {
@@ -3678,8 +3599,10 @@ cleanup:
 	MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
 	MULTI_PRINTER_printByID(mp, MP_ID_BLOCK_ERRORS);
 
+	KSI_DataHash_free(prevLeaf);
 	REGEXP_free(tmp_regxp);
 	KSI_DataHash_free(theFirstInputHashInFile);
+	lastSignatureTime = logksi->block.sigTime_1;
 	LOGKSI_freeAndClearInternals(logksi);
 
 	return res;
@@ -3691,29 +3614,37 @@ int logsignature_extract(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_
 	unsigned char ftlv_raw[SOF_FTLV_BUFFER];
 	SIGNATURE_PROCESSORS processors;
 	KSI_DataHash *theFirstInputHashInFile = NULL;
+	char *range = NULL;
 
 	if (set == NULL || err == NULL || ksi == NULL || files == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
 
-	LOGKSI_clearAll(&logksi);
+	LOGKSI_initialize(&logksi);
 	logksi.ftlv_raw = ftlv_raw;
 	logksi.taskId = TASK_EXTRACT;
+	logksi.err = err;
 	memset(&processors, 0, sizeof(processors));
 	processors.extract_signature = 1;
 
-	res = PARAM_SET_getStr(set, "r", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &logksi.task.extract.records);
+	res = MERKLE_TREE_new(&logksi.tree);
 	if (res != KT_OK) goto cleanup;
+
+	res = MERKLE_TREE_setCallbacks(logksi.tree, &logksi, logksi_extract_record_chain, logksi_new_record_chain);
+	if (res != KT_OK) goto cleanup;
+
 
 	logksi.isContinuedOnFail = PARAM_SET_isSetByName(set, "continue-on-fail");
 
-	res = block_info_extract_verify_positions(err, logksi.task.extract.records);
+	/* Initialize the first extract position. */
+	res = PARAM_SET_getStr(set, "r", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, (char**)&range);
 	if (res != KT_OK) goto cleanup;
 
-	/* Initialize the first extract position. */
-	res = block_info_extract_next_position(&logksi, err, logksi.task.extract.records);
-	if (res != KT_OK) goto cleanup;
+	if (range) {
+		res = EXTRACT_INFO_new(range, &logksi.task.extract.info);
+		if (res != KT_OK) goto cleanup;
+	}
 
 	res = process_magic_number(set, mp, err, &logksi, files);
 	if (res != KT_OK) goto cleanup;
@@ -3785,7 +3716,11 @@ int logsignature_integrate(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KS
 
 	logksi->ftlv_raw = ftlv_raw;
 	logksi->taskId = TASK_INTEGRATE;
+	logksi->err = err;
 	memset(&processors, 0, sizeof(processors));
+
+	res = MERKLE_TREE_new(&logksi->tree);
+	if (res != KT_OK) goto cleanup;
 
 	logksi->isContinuedOnFail = PARAM_SET_isSetByName(set, "continue-on-fail");
 
@@ -3902,11 +3837,15 @@ int logsignature_sign(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX
 		goto cleanup;
 	}
 
-	LOGKSI_clearAll(&logksi);
+	LOGKSI_initialize(&logksi);
 	logksi.ftlv_raw = ftlv_raw;
 	logksi.taskId = TASK_SIGN;
+	logksi.err = err;
 	memset(&processors, 0, sizeof(processors));
 	processors.create_signature = wrapper_LOGKSI_createSignature;
+
+	res = MERKLE_TREE_new(&logksi.tree);
+	if (res != KT_OK) goto cleanup;
 
 	logksi.isContinuedOnFail = PARAM_SET_isSetByName(set, "continue-on-fail");
 
@@ -4012,6 +3951,207 @@ cleanup:
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_2, res);
 	LOGKSI_freeAndClearInternals(&logksi);
 	KSI_DataHash_free(theFirstInputHashInFile);
+
+	return res;
+}
+
+/* MERKLE_TREE newRecordChain implementation. */
+static int logksi_new_record_chain(MERKLE_TREE *tree, void *ctx, int isMetaRecordHash, KSI_DataHash *hash) {
+	int res;
+	LOGKSI *logksi = ctx;
+	ERR_TRCKR *err = NULL;
+	KSI_DataHash *hshRef = NULL;
+	KSI_DataHash *prevMask = NULL;
+	char *logLineCopy = NULL;
+
+	if (tree == NULL || ctx == NULL || hash == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	err = logksi->err;
+
+	/*
+	 * Enter only if not all extract positions are found AND
+	 * current record hash is at desired position.
+	 */
+	if (EXTRACT_INFO_isLastPosPending(logksi->task.extract.info) &&
+		EXTRACT_INFO_getNextPosition(logksi->task.extract.info) - logksi->file.nofTotalRecordHashes == logksi->block.nofRecordHashes) {
+		RECORD_INFO *recordInfo = NULL;
+		size_t index = 0;
+
+		hshRef = KSI_DataHash_ref(hash);
+		if (hshRef == NULL) {
+			res = KT_OUT_OF_MEMORY;
+			ERR_CATCH_MSG(err, res, "Error: Unable to create hash reference.");
+		}
+
+		/* Get reference to record info. */
+		res = EXTRACT_INFO_getNewRecord(logksi->task.extract.info, &index, &recordInfo);
+		ERR_CATCH_MSG(err, res, "Error: Unable to create new extract info extractor.");
+
+		res = logksi_set_extract_record(logksi, recordInfo, isMetaRecordHash, hash);
+		if (isMetaRecordHash) {
+			ERR_CATCH_MSG(err, res, "Error: Unable to create new extract record for metadata.");
+		} else {
+			ERR_CATCH_MSG(err, res, "Error: Unable to create new extract record for record.");
+		}
+
+		/* Retreive and use mask. */
+		res = MERKLE_TREE_getPrevMask(tree, &prevMask);
+		if (res != KT_OK) goto cleanup;
+
+		if (isMetaRecordHash) {
+			res = RECORD_INFO_add_hash_to_record_chain(recordInfo, LEFT_LINK, prevMask, 0);
+		} else {
+			res = RECORD_INFO_add_hash_to_record_chain(recordInfo, RIGHT_LINK, prevMask, 0);
+		}
+		if (res != KT_OK) goto cleanup;
+
+		res = EXTRACT_INFO_moveToNext(logksi->task.extract.info);
+		ERR_CATCH_MSG(err, res, "Error: Unable to move to next extract position.");
+	}
+
+
+	res = KT_OK;
+
+cleanup:
+
+	KSI_DataHash_free(hshRef);
+	KSI_DataHash_free(prevMask);
+	free(logLineCopy);
+
+	return res;
+}
+
+/* MERKLE_TREE extractRecordChain implementation. */
+static int logksi_extract_record_chain(MERKLE_TREE *tree, void *ctx, unsigned char level, KSI_DataHash *leftLink) {
+	int res;
+	size_t j;
+	int condition;
+	LOGKSI *logksi = ctx;
+	ERR_TRCKR *err = NULL;
+	KSI_DataHash *hsh = NULL;
+	int finalize;
+
+	if (ctx == NULL || leftLink == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	err = logksi->err;
+	finalize = MERKLE_TREE_isClosing(tree);
+
+	/**
+	 * The input hash will represent the root value of the leftmost subtree that
+	 * has level. The root value is compared with extract info and its suitability
+	 * for extract hash chain node is examined. If value is suitable it is included
+	 * to the chain.
+	 */
+	for (j = 0; j < EXTRACT_INFO_getPositionsInBlock(logksi->task.extract.info); j++) {
+		RECORD_INFO *record = NULL;
+		size_t recordOffset = 0;
+		size_t recordLevel = 0;
+
+		res = EXTRACT_INFO_getRecord(logksi->task.extract.info, j, &record);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to get extract record.", logksi->blockNo);
+
+		res = RECORD_INFO_getPositionInTree(record, &recordOffset, &recordLevel);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable get extract record position in tree.", logksi->blockNo);
+
+		/**
+		 * Check that the (level + 1) matches with extractLevel (expected next level).
+		 * If the level is less it is not suitable for building extract chain.
+		 */
+		if (finalize) {
+			condition = (level + 1 >= recordLevel);
+		} else {
+			condition = (level + 1 == recordLevel);
+		}
+		if (condition) {
+			if (((recordOffset - 1) >> level) & 1L) {
+				res = MERKLE_TREE_get(logksi->tree, level, &hsh);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable get hash from merkle tree.", logksi->blockNo);
+
+				res = RECORD_INFO_add_hash_to_record_chain(record, RIGHT_LINK, hsh, level + 1 - recordLevel);
+			} else {
+				res = RECORD_INFO_add_hash_to_record_chain(record, LEFT_LINK, leftLink, level + 1 - recordLevel);
+			}
+			if (res != KT_OK) {
+				ERR_CATCH_MSG(err, res, "Error: Unable to add hash to record chain.");
+				goto cleanup;
+			}
+		}
+	}
+
+	res = KT_OK;
+
+cleanup:
+
+	KSI_DataHash_free(hsh);
+
+	return res;
+}
+
+static int logksi_add_record_hash_to_merkle_tree(LOGKSI *logksi, int isMetaRecordHash, KSI_DataHash *hash) {
+	if (logksi == NULL) {
+		return KT_INVALID_ARGUMENT;
+	}
+
+	if (isMetaRecordHash) {
+		logksi->file.nofTotalMetarecords++;
+		logksi->block.nofMetaRecords++;
+		logksi->file.nofTotalRecordHashes--;
+	}
+
+	return MERKLE_TREE_add_record_hash_to_merkle_tree(logksi->tree, isMetaRecordHash, hash);
+}
+
+static int logksi_set_extract_record(LOGKSI *logksi, RECORD_INFO *recordInfo, int isMetaRecordHash, KSI_DataHash *hash) {
+	int res = KT_UNKNOWN_ERROR;
+	KSI_DataHash *hashRef = NULL;
+	char *logLineCopy = NULL;
+
+
+	if (logksi == NULL || recordInfo == NULL || hash == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	hashRef = KSI_DataHash_ref(hash);
+	if (hashRef == NULL) {
+		res = KT_OUT_OF_MEMORY;
+		goto cleanup;
+	}
+
+	if (isMetaRecordHash) {
+		res = RECORD_INFO_setMetaRecordHash(recordInfo,
+			EXTRACT_INFO_getNextPosition(logksi->task.extract.info),
+			logksi->block.nofRecordHashes,
+			hashRef,
+			logksi->task.extract.metaRecord, logksi->task.extract.metaRecord_len);
+		if (res != KT_OK) goto cleanup;
+		hashRef = NULL;
+	} else {
+		res = KSI_strdup(logksi->logLine, &logLineCopy);
+		if (res != KT_OK) goto cleanup;
+
+		res = RECORD_INFO_setRecordHash(recordInfo,
+			EXTRACT_INFO_getNextPosition(logksi->task.extract.info),
+			logksi->block.nofRecordHashes,
+			hashRef, logLineCopy);
+		if (res != KT_OK) goto cleanup;
+
+		hashRef = NULL;
+		logLineCopy = NULL;
+	}
+
+	res = KT_OK;
+
+cleanup:
+
+	KSI_DataHash_free(hashRef);
+	free(logLineCopy);
 
 	return res;
 }
