@@ -37,7 +37,7 @@
 #include "debug_print.h"
 #include "tool.h"
 #include "rsyslog.h"
-#include "blocks_info.h"
+#include "logksi.h"
 #include "io_files.h"
 
 static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
@@ -519,7 +519,7 @@ static int recover_procedure(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, 
 			goto cleanup;
 		}
 
-		for (i = 0; i < logksi->block.firstLineInBlock - 1; i++) {
+		for (i = 0; i < logksi->block.firstLineNo - 1; i++) {
 			/* Maximum line size is 64K characters, without newline character. */
 			size_t count = 0;
 			char buf[0x10000 + 2];
@@ -540,7 +540,7 @@ static int recover_procedure(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, 
 		ERR_CATCH_MSG(err, res, "Error: Could not close output log file %s.", files->internal.outLog);
 
 		print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, 0);
-		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, "It was possible to recover %zu blocks (lines 1 - %zu).\n", logksi->blockNo - 1, logksi->block.firstLineInBlock - 1);
+		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, "It was possible to recover %zu blocks (lines 1 - %zu).\n", logksi->blockNo - 1, logksi->block.firstLineNo - 1);
 		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, "Recovered log signature saved to '%s'\n", files->internal.outSig);
 		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, "Recovered Log file saved to '%s'\n", files->internal.outLog);
 

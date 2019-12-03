@@ -36,7 +36,7 @@
 #include "tlv_object.h"
 #include "extract_info.h"
 #include "io_files.h"
-#include "blocks_info.h"
+#include "logksi.h"
 #include "rsyslog.h"
 #include "param_control.h"
 #include <time.h>
@@ -124,14 +124,14 @@ static int block_info_calculate_hash_of_logline_and_store_logline_check_log_time
 		t = KSI_CalendarTimeToUnixTime(&tmp_time);
 
 		/* Check the order of log lines. */
-		last_time = logksi->block.rec_time_max == 0 ? logksi->file.rec_time_in_file_max : logksi->block.rec_time_max;
+		last_time = logksi->block.recTimeMax == 0 ? logksi->file.recTimeMax : logksi->block.recTimeMax;
 
-		if (logksi->block.rec_time_min == 0 && logksi->file.rec_time_in_file_max == 0) {
-			logksi->block.rec_time_min = t;
-			logksi->block.rec_time_max = t;
+		if (logksi->block.recTimeMin == 0 && logksi->file.recTimeMax == 0) {
+			logksi->block.recTimeMin = t;
+			logksi->block.recTimeMax = t;
 		} else {
-			if (logksi->block.rec_time_min == 0 || logksi->block.rec_time_min > t) logksi->block.rec_time_min = t;
-			if (logksi->block.rec_time_max < t) logksi->block.rec_time_max = t;
+			if (logksi->block.recTimeMin == 0 || logksi->block.recTimeMin > t) logksi->block.recTimeMin = t;
+			if (logksi->block.recTimeMax < t) logksi->block.recTimeMax = t;
 
 			if (PARAM_SET_isSetByName(set, "time-diff")) {
 				size_t line_nr_0 = get_nof_lines(logksi) - 1;
@@ -492,7 +492,7 @@ static int check_log_record_embedded_time_against_ksi_signature_time(PARAM_SET *
 
 	checkLogRecordTime = PARAM_SET_isSetByName(set, "time-form,time-diff");
 
-	if (checkLogRecordTime && logksi->block.sigTime_1 != 0 && logksi->block.rec_time_min != 0 && logksi->block.rec_time_max != 0) {
+	if (checkLogRecordTime && logksi->block.sigTime_1 != 0 && logksi->block.recTimeMin != 0 && logksi->block.recTimeMax != 0) {
 		char str_sigTime1[1024] = "<null>";
 		char str_rec_time_min[1024] = "<null>";
 		char str_rec_time_max[1024] = "<null>";
@@ -530,22 +530,22 @@ static int check_log_record_embedded_time_against_ksi_signature_time(PARAM_SET *
 			neg_sign = -1;
 		}
 
-		diff_calc_most_recent = uint64_diff(logksi->block.sigTime_1, logksi->block.rec_time_max, &diff_calc_most_recent_sign);
-		diff_calc_less_recent = uint64_diff(logksi->block.sigTime_1, logksi->block.rec_time_min, &diff_calc_less_recent_sign);
+		diff_calc_most_recent = uint64_diff(logksi->block.sigTime_1, logksi->block.recTimeMax, &diff_calc_most_recent_sign);
+		diff_calc_less_recent = uint64_diff(logksi->block.sigTime_1, logksi->block.recTimeMin, &diff_calc_less_recent_sign);
 		isTimeDiffTooLarge_past = uint64_signcmp(diff_calc_less_recent_sign, diff_calc_less_recent, 1, allowed_deviation_pos) > 0;	/* Calculated deviation must be greater or equal to allowed deviation to fail. */
 		isTimeDiffTooLarge_future = uint64_signcmp(diff_calc_most_recent_sign, diff_calc_most_recent, neg_sign, neg_sign * allowed_deviation_neg) < 0;	/* Calculated deviation must be smaller or equal to allowed deviation to fail. */
 		isTimeDiffTooLarge = isTimeDiffTooLarge_past || isTimeDiffTooLarge_future;
 
 		if (allowed_deviation_pos > 0 && allowed_deviation_neg == 0) {
-			isSigTimeOlderThanRecTime = (logksi->block.sigTime_1 < logksi->block.rec_time_min) || (logksi->block.sigTime_1 < logksi->block.rec_time_max);
+			isSigTimeOlderThanRecTime = (logksi->block.sigTime_1 < logksi->block.recTimeMin) || (logksi->block.sigTime_1 < logksi->block.recTimeMax);
 		}
 
 
 		/* Format some strings for debugging output and error messages. */
 		time_diff_to_string(diff_calc_less_recent, str_diff_calc_past, sizeof(str_diff_calc_past));
 		time_diff_to_string(diff_calc_most_recent, str_diff_calc_future, sizeof(str_diff_calc_future));
-		LOGKSI_uint64_toDateString(logksi->block.rec_time_min, str_rec_time_min, sizeof(str_rec_time_min));
-		LOGKSI_uint64_toDateString(logksi->block.rec_time_max, str_rec_time_max, sizeof(str_rec_time_max));
+		LOGKSI_uint64_toDateString(logksi->block.recTimeMin, str_rec_time_min, sizeof(str_rec_time_min));
+		LOGKSI_uint64_toDateString(logksi->block.recTimeMax, str_rec_time_max, sizeof(str_rec_time_max));
 
 		if (uint64_signcmp(diff_calc_most_recent_sign, diff_calc_most_recent, 1, 0) >= 0 && uint64_signcmp(diff_calc_less_recent_sign, diff_calc_less_recent, 1, 0) >= 0) {
 			KSI_snprintf(str_diff_calc, sizeof(str_diff_calc), "%s%s", (diff_calc_less_recent_sign < 0 ? "-" : ""), str_diff_calc_past);
@@ -591,15 +591,15 @@ static int check_log_record_embedded_time_against_ksi_signature_time(PARAM_SET *
 
 		/* In case of failures format final error messages.*/
 		if (isSigTimeOlderThanRecTime) {
-				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: %s the log lines are more recent than KSI signature.\n", logksi->blockNo, (logksi->block.sigTime_1 < logksi->block.rec_time_min ? "All" : "Some of"));
+				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: %s the log lines are more recent than KSI signature.\n", logksi->blockNo, (logksi->block.sigTime_1 < logksi->block.recTimeMin ? "All" : "Some of"));
 				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: %s the log lines in block %zu are more recent than KSI signature:\n"
 																					  "   + Signing time:                              %s\n"
 																					  "   + Time extracted from least recent log line: %s\n"
 																					  "   + Time extracted from most recent log line:  %s\n"
-																					  ,  (logksi->block.sigTime_1 < logksi->block.rec_time_min ? "All" : "Some of"), logksi->blockNo, str_sigTime1, str_rec_time_min, str_rec_time_max);
+																					  ,  (logksi->block.sigTime_1 < logksi->block.recTimeMin ? "All" : "Some of"), logksi->blockNo, str_sigTime1, str_rec_time_min, str_rec_time_max);
 			logksi->quietError = res;
 			if (logksi->isContinuedOnFail) res = KT_OK;
-			else ERR_TRCKR_ADD(err, res, "Error: %s the log lines in block %zu are more recent than KSI signature!", (logksi->block.sigTime_1 < logksi->block.rec_time_min ? "All" : "Some of"), logksi->blockNo);
+			else ERR_TRCKR_ADD(err, res, "Error: %s the log lines in block %zu are more recent than KSI signature!", (logksi->block.sigTime_1 < logksi->block.recTimeMin ? "All" : "Some of"), logksi->blockNo);
 			goto cleanup;
 		} else if (isTimeDiffTooLarge) {
 			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Log lines do not fit into expected time window (%s).\n", logksi->blockNo, str_allowed_diff);
@@ -638,7 +638,7 @@ static int handle_record_time_check_between_files(PARAM_SET *set, MULTI_PRINTER*
 		goto cleanup;
 	}
 
-	if (logksi->blockNo == 1 && logksi->file.rec_time_in_file_max != 0 && logksi->block.rec_time_min != 0 && PARAM_SET_isSetByName(set, "time-diff")) {
+	if (logksi->blockNo == 1 && logksi->file.recTimeMax != 0 && logksi->block.recTimeMin != 0 && PARAM_SET_isSetByName(set, "time-diff")) {
 		int time_diff = 0;
 
 		if (PARAM_SET_isSetByName(set, "time-disordered")) {
@@ -646,15 +646,15 @@ static int handle_record_time_check_between_files(PARAM_SET *set, MULTI_PRINTER*
 			ERR_CATCH_MSG(err, res, "Error: Unable to extract time base as integer.");
 		}
 
-		if (logksi->file.rec_time_in_file_max > logksi->block.rec_time_min + time_diff) {
+		if (logksi->file.recTimeMax > logksi->block.recTimeMin + time_diff) {
 			char str_last_time[1024] = "<null>";
 			char str_current_time[1024] = "<null>";
 
 			/* Check if deviation in current range is accepted. */
 			res = KT_VERIFICATION_FAILURE;
 			print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
-			LOGKSI_uint64_toDateString(logksi->file.rec_time_in_file_max, str_last_time, sizeof(str_last_time));
-			LOGKSI_uint64_toDateString(logksi->block.rec_time_min, str_current_time, sizeof(str_current_time));
+			LOGKSI_uint64_toDateString(logksi->file.recTimeMax, str_last_time, sizeof(str_last_time));
+			LOGKSI_uint64_toDateString(logksi->block.recTimeMin, str_current_time, sizeof(str_current_time));
 
 			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Last log line (%s) from previous file is more recent than first log line (%s) from current file.\n", logksi->blockNo, str_last_time, str_current_time);
 
@@ -907,8 +907,8 @@ static int finalize_block(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI
 	res = handle_record_time_check_between_files(set, mp, err, logksi, files);
 	if (res != KT_OK) goto cleanup;
 
-	if ((logksi->file.rec_time_in_file_min == 0 || logksi->file.rec_time_in_file_min > logksi->block.rec_time_min) && logksi->block.rec_time_min > 0) logksi->file.rec_time_in_file_min = logksi->block.rec_time_min;
-	if (logksi->file.rec_time_in_file_max == 0 || logksi->file.rec_time_in_file_max < logksi->block.rec_time_max) logksi->file.rec_time_in_file_max = logksi->block.rec_time_max;
+	if ((logksi->file.recTimeMin == 0 || logksi->file.recTimeMin > logksi->block.recTimeMin) && logksi->block.recTimeMin > 0) logksi->file.recTimeMin = logksi->block.recTimeMin;
+	if (logksi->file.recTimeMax == 0 || logksi->file.recTimeMax < logksi->block.recTimeMax) logksi->file.recTimeMax = logksi->block.recTimeMax;
 
 	res = handle_block_signing_time_check(set, mp, err, logksi, files);
 	if (res != KT_OK) goto cleanup;
@@ -970,23 +970,23 @@ static int finalize_block(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI
 			}
 
 			/* Print line numbers. */
-			if (logksi->block.firstLineInBlock < logksi->file.nofTotalRecordHashes) {
-				print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%zu - %zu (%zu)\n", longIndentation, "Lines:", logksi->block.firstLineInBlock, logksi->file.nofTotalRecordHashes, logksi->block.recordCount - logksi->block.nofMetaRecords);
+			if (logksi->block.firstLineNo < logksi->file.nofTotalRecordHashes) {
+				print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%zu - %zu (%zu)\n", longIndentation, "Lines:", logksi->block.firstLineNo, logksi->file.nofTotalRecordHashes, logksi->block.recordCount - logksi->block.nofMetaRecords);
 			} else if (logksi->block.recordCount == 1 && logksi->block.nofMetaRecords == 1) {
 				print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*sn/a\n", longIndentation, "Line:");
-			} else if (logksi->block.firstLineInBlock == logksi->file.nofTotalRecordHashes) {
-				print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%zu\n", longIndentation, "Line:", logksi->block.firstLineInBlock);
+			} else if (logksi->block.firstLineNo == logksi->file.nofTotalRecordHashes) {
+				print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%zu\n", longIndentation, "Line:", logksi->block.firstLineNo);
 			} else {
 				print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s<unknown>\n", longIndentation, "Line:");
 			}
 
-			if (logksi->block.rec_time_min > 0) {
-				print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", longIndentation, "First record time:", LOGKSI_uint64_toDateString(logksi->block.rec_time_min, strT1, sizeof(strT1)));
+			if (logksi->block.recTimeMin > 0) {
+				print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", longIndentation, "First record time:", LOGKSI_uint64_toDateString(logksi->block.recTimeMin, strT1, sizeof(strT1)));
 			}
 
-			if (logksi->block.rec_time_max > 0) {
-				print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", longIndentation, "Last record time:", LOGKSI_uint64_toDateString(logksi->block.rec_time_max, strT1, sizeof(strT1)));
-				print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", longIndentation, "Block duration:", time_diff_to_string(logksi->block.rec_time_max - logksi->block.rec_time_min, strT1, sizeof(strT1)));
+			if (logksi->block.recTimeMax > 0) {
+				print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", longIndentation, "Last record time:", LOGKSI_uint64_toDateString(logksi->block.recTimeMax, strT1, sizeof(strT1)));
+				print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", longIndentation, "Block duration:", time_diff_to_string(logksi->block.recTimeMax - logksi->block.recTimeMin, strT1, sizeof(strT1)));
 
 			}
 
@@ -1042,7 +1042,7 @@ static int init_next_block(LOGKSI *logksi) {
 
 	LOGKSI_resetBlockInfo(logksi);
 
-	logksi->block.firstLineInBlock = logksi->file.nofTotalRecordHashes + 1;
+	logksi->block.firstLineNo = logksi->file.nofTotalRecordHashes + 1;
 
 	return KT_OK;
 }
@@ -2116,12 +2116,12 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 
 	logksi->file.nofTotalRecordHashes += logksi->block.nofRecordHashes;
 
-	if (logksi->block.firstLineInBlock < logksi->file.nofTotalRecordHashes) {
-		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: lines processed %zu - %zu (%zu)\n", logksi->blockNo, logksi->block.firstLineInBlock, logksi->file.nofTotalRecordHashes, logksi->block.recordCount - logksi->block.nofMetaRecords);
+	if (logksi->block.firstLineNo < logksi->file.nofTotalRecordHashes) {
+		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: lines processed %zu - %zu (%zu)\n", logksi->blockNo, logksi->block.firstLineNo, logksi->file.nofTotalRecordHashes, logksi->block.recordCount - logksi->block.nofMetaRecords);
 	} else if (logksi->block.recordCount == 1 && logksi->block.nofMetaRecords == 1) {
 		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: line processed n/a\n", logksi->blockNo);
-	} else if (logksi->block.firstLineInBlock == logksi->file.nofTotalRecordHashes) {
-		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: line processed %zu\n", logksi->blockNo,  logksi->block.firstLineInBlock);
+	} else if (logksi->block.firstLineNo == logksi->file.nofTotalRecordHashes) {
+		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: line processed %zu\n", logksi->blockNo,  logksi->block.firstLineNo);
 	} else {
 		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: line processed <unknown>\n", logksi->blockNo);
 	}
@@ -2811,12 +2811,12 @@ static int process_partial_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCK
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
 	logksi->file.nofTotalRecordHashes += logksi->block.nofRecordHashes;
 
-	if (logksi->block.firstLineInBlock < logksi->file.nofTotalRecordHashes) {
-		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: lines processed %zu - %zu (%zu)\n", logksi->blockNo, logksi->block.firstLineInBlock, logksi->file.nofTotalRecordHashes, logksi->block.recordCount - logksi->block.nofMetaRecords);
+	if (logksi->block.firstLineNo < logksi->file.nofTotalRecordHashes) {
+		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: lines processed %zu - %zu (%zu)\n", logksi->blockNo, logksi->block.firstLineNo, logksi->file.nofTotalRecordHashes, logksi->block.recordCount - logksi->block.nofMetaRecords);
 	} else if (logksi->block.recordCount == 1 && logksi->block.nofMetaRecords == 1) {
 		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: line processed n/a\n", logksi->blockNo);
-	} else if (logksi->block.firstLineInBlock == logksi->file.nofTotalRecordHashes) {
-		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: line processed %zu\n", logksi->blockNo,  logksi->block.firstLineInBlock);
+	} else if (logksi->block.firstLineNo == logksi->file.nofTotalRecordHashes) {
+		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: line processed %zu\n", logksi->blockNo,  logksi->block.firstLineNo);
 	} else {
 		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: line processed <unknown>\n", logksi->blockNo);
 	}
@@ -2941,18 +2941,18 @@ cleanup:
 	if (logksi->file.nofTotaHashFails > 0) print_debug_mp(mp, MP_ID_LOGFILE_SUMMARY, DEBUG_SMALLER | DEBUG_LEVEL_3, " * %-*s%zu\n", longIndentation, "Count of hash failures:", logksi->file.nofTotaHashFails);
 	if (EXTRACT_INFO_getPositionsExtracted(logksi->task.extract.info) > 0) print_debug_mp(mp, MP_ID_LOGFILE_SUMMARY, DEBUG_SMALLER | DEBUG_LEVEL_3, " * %-*s%zu\n", longIndentation, "Records extracted:", EXTRACT_INFO_getPositionsExtracted(logksi->task.extract.info));
 
-	if (logksi->file.rec_time_in_file_min > 0 && logksi->file.rec_time_in_file_max) {
+	if (logksi->file.recTimeMin > 0 && logksi->file.recTimeMax) {
 		char str_rec_time_min[1024] = "<null>";
 		char str_rec_time_max[1024] = "<null>";
 		char time_diff[1024] = "<null>";
 		const char *sign = "";
 		int calc_sign = 0;
 
-		time_diff_to_string(uint64_diff(logksi->file.rec_time_in_file_max, logksi->file.rec_time_in_file_min, &calc_sign), time_diff, sizeof(time_diff));
+		time_diff_to_string(uint64_diff(logksi->file.recTimeMax, logksi->file.recTimeMin, &calc_sign), time_diff, sizeof(time_diff));
 		if (calc_sign < 0) sign = "-";
 
-		LOGKSI_uint64_toDateString(logksi->file.rec_time_in_file_min, str_rec_time_min, sizeof(str_rec_time_min));
-		LOGKSI_uint64_toDateString(logksi->file.rec_time_in_file_max, str_rec_time_max, sizeof(str_rec_time_max));
+		LOGKSI_uint64_toDateString(logksi->file.recTimeMin, str_rec_time_min, sizeof(str_rec_time_min));
+		LOGKSI_uint64_toDateString(logksi->file.recTimeMax, str_rec_time_max, sizeof(str_rec_time_max));
 
 		print_debug_mp(mp, MP_ID_LOGFILE_SUMMARY, DEBUG_SMALLER | DEBUG_LEVEL_3, " * %-*s%s\n", longIndentation, "First record time:", str_rec_time_min);
 		print_debug_mp(mp, MP_ID_LOGFILE_SUMMARY, DEBUG_SMALLER | DEBUG_LEVEL_3, " * %-*s%s\n", longIndentation, "Last record time:", str_rec_time_max);
@@ -3262,7 +3262,7 @@ static int skip_current_block_as_it_does_not_verify(LOGKSI *logksi, MULTI_PRINTE
 
 			/* Normally this is incremented in process_block_signature or process_partial_signature.
 			   If this has not happened it must be incremented here. */
-			if (logksi->block.firstLineInBlock - 1 == logksi->file.nofTotalRecordHashes) {
+			if (logksi->block.firstLineNo - 1 == logksi->file.nofTotalRecordHashes) {
 				logksi->file.nofTotalRecordHashes += logksi->block.recordCount;
 			}
 
@@ -3454,19 +3454,19 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 								MULTI_PRINTER_printByID(mp, MP_ID_BLOCK_PARSING_TREE_NODES);
 							}
 
-							if ((logksi->file.rec_time_in_file_min == 0 || logksi->file.rec_time_in_file_min > logksi->block.rec_time_min) && logksi->block.rec_time_min > 0) logksi->file.rec_time_in_file_min = logksi->block.rec_time_min;
-							if (logksi->file.rec_time_in_file_max == 0 || logksi->file.rec_time_in_file_max < logksi->block.rec_time_max) logksi->file.rec_time_in_file_max = logksi->block.rec_time_max;
+							if ((logksi->file.recTimeMin == 0 || logksi->file.recTimeMin > logksi->block.recTimeMin) && logksi->block.recTimeMin > 0) logksi->file.recTimeMin = logksi->block.recTimeMin;
+							if (logksi->file.recTimeMax == 0 || logksi->file.recTimeMax < logksi->block.recTimeMax) logksi->file.recTimeMax = logksi->block.recTimeMax;
 
 							print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_2, res);
 							if (MULTI_PRINTER_hasDataByID(mp, MP_ID_BLOCK_SUMMARY)) {
 								print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%zu\n", SIZE_OF_LONG_INDENTATION, "Record count:", logksi->block.nofRecordHashes);
-								if (logksi->block.rec_time_min > 0) {
-									print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", SIZE_OF_LONG_INDENTATION, "First record time:", LOGKSI_uint64_toDateString(logksi->block.rec_time_min, strT1, sizeof(strT1)));
+								if (logksi->block.recTimeMin > 0) {
+									print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", SIZE_OF_LONG_INDENTATION, "First record time:", LOGKSI_uint64_toDateString(logksi->block.recTimeMin, strT1, sizeof(strT1)));
 								}
 
-								if (logksi->block.rec_time_max > 0) {
-									print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", SIZE_OF_LONG_INDENTATION, "Last record time:", LOGKSI_uint64_toDateString(logksi->block.rec_time_max, strT1, sizeof(strT1)));
-									print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", SIZE_OF_LONG_INDENTATION, "Block duration:", time_diff_to_string(logksi->block.rec_time_max - logksi->block.rec_time_min, strT1, sizeof(strT1)));
+								if (logksi->block.recTimeMax > 0) {
+									print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", SIZE_OF_LONG_INDENTATION, "Last record time:", LOGKSI_uint64_toDateString(logksi->block.recTimeMax, strT1, sizeof(strT1)));
+									print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", SIZE_OF_LONG_INDENTATION, "Block duration:", time_diff_to_string(logksi->block.recTimeMax - logksi->block.recTimeMin, strT1, sizeof(strT1)));
 								}
 
 								print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, "\n", SIZE_OF_LONG_INDENTATION, "Record count:", logksi->block.nofRecordHashes);
@@ -3481,7 +3481,7 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 							if (res != KT_OK) goto cleanup;
 
 							logksi->block.nofRecordHashes = 0;
-							logksi->block.rec_time_min = 0;
+							logksi->block.recTimeMin = 0;
 
 							LOGKSI_uint64_toDateString(logksi->block.sigTime_1, strT1, sizeof(strT1));
 
@@ -3538,13 +3538,13 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 
 		print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%zu\n", SIZE_OF_LONG_INDENTATION, "Record count:", logksi->block.nofRecordHashes);
 
-										if (logksi->block.rec_time_min > 0) {
-									print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", SIZE_OF_LONG_INDENTATION, "First record time:", LOGKSI_uint64_toDateString(logksi->block.rec_time_min, strT1, sizeof(strT1)));
+										if (logksi->block.recTimeMin > 0) {
+									print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", SIZE_OF_LONG_INDENTATION, "First record time:", LOGKSI_uint64_toDateString(logksi->block.recTimeMin, strT1, sizeof(strT1)));
 								}
 
-								if (logksi->block.rec_time_max > 0) {
-									print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", SIZE_OF_LONG_INDENTATION, "Last record time:", LOGKSI_uint64_toDateString(logksi->block.rec_time_max, strT1, sizeof(strT1)));
-									print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", SIZE_OF_LONG_INDENTATION, "Block duration:", time_diff_to_string(logksi->block.rec_time_max - logksi->block.rec_time_min, strT1, sizeof(strT1)));
+								if (logksi->block.recTimeMax > 0) {
+									print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", SIZE_OF_LONG_INDENTATION, "Last record time:", LOGKSI_uint64_toDateString(logksi->block.recTimeMax, strT1, sizeof(strT1)));
+									print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", SIZE_OF_LONG_INDENTATION, "Block duration:", time_diff_to_string(logksi->block.recTimeMax - logksi->block.recTimeMin, strT1, sizeof(strT1)));
 								}
 										print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, "\n", SIZE_OF_LONG_INDENTATION, "Record count:", logksi->block.nofRecordHashes);
 
@@ -3568,7 +3568,7 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 	}
 
 	if (last_rec_time != NULL) {
-		*last_rec_time = logksi->block.rec_time_max;
+		*last_rec_time = logksi->block.recTimeMax;
 	}
 
 	res = finalize_log_signature(set, mp, err, ksi, theFirstInputHashInFile, logksi, files);

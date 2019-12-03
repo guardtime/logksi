@@ -20,7 +20,7 @@
 #include <ksi/tlv_element.h>
 #include <ksi/publicationsfile.h>
 #include "smart_file.h"
-#include "blocks_info_impl.h"
+#include "logksi_impl.h"
 #include "param_set/param_set.h"
 #include "debug_print.h"
 #include "io_files.h"

@@ -41,7 +41,7 @@
 #include "conf_file.h"
 #include "tool.h"
 #include "rsyslog.h"
-#include "blocks_info.h"
+#include "logksi.h"
 #include "io_files.h"
 
 enum {
@@ -212,7 +212,7 @@ int verify_run(int argc, char **argv, char **envp) {
 			print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, "%sLog file '%s'.\n", (i == 0 ? "" : "\n"), files.internal.inLog);
 		}
 
-		logksi.file.rec_time_in_file_max = las_rec_time;
+		logksi.file.recTimeMax = las_rec_time;
 
 		print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_EQUAL | DEBUG_LEVEL_1, "Verifying... ");
 		res = logsignature_verify(set, mp, err, ksi, &logksi, inputHash, verify_signature, &files, &outputHash, &las_rec_time);

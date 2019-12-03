@@ -58,7 +58,7 @@ typedef enum {
 typedef struct SIGN_TASK_st {
 	size_t blockCount;				/* Count of blocks counted in the beginning of the sign task. */
 	size_t noSigCount;				/* Count of not signed blocks counted in the beginning of the sign task. */
-	size_t noSigNo;					/* Count of not signed blocks. */
+	size_t noSigNo;					/* Number of the last unsigned blocks. */
 	size_t noSigCreated;			/* Count of signatures created for unsigned blocks. */
 	char curBlockJustReSigned;
 	char outSigModified;			/* Indicates that output signature file is actually modified. */
@@ -84,7 +84,7 @@ typedef struct VERIFY_TASK_st {
 	char client_id_last[0xffff];	/* Last signer id. Used to detect change. */
 	REGEXP *client_id_match;		/* A regular expression value to be matched with KSI signatures. */
 	char lastBlockWasSkipped;		/* If block is skipped (--continue-on-failure) due to verification failure, this is set. It is cleared in process_ksi_signature or process_block_signature. */
-	char errSignTime;	/* TODO maybe rename -> derive name from checkDescSigkTime. */
+	char errSignTime;				/* Signing time check failed. */
 } VERIFY_TASK;
 
 typedef struct TASK_SPECIFIC_st {
@@ -101,21 +101,21 @@ typedef struct FILE_INFO_st {
 	size_t nofTotalMetarecords;		/* All meta-record over all blocks. */
 	size_t nofTotalFailedBlocks;
 	size_t nofTotaHashFails;		/* Overall count of hahs failures inside log signature. */
-	uint64_t rec_time_in_file_min;	/* The lowest record time value in the log file, extracted from the log line. */
-	uint64_t rec_time_in_file_max;	/* The highest record time value in the log file, extracted from the log line. */
+	uint64_t recTimeMin;			/* The lowest record time value in the log file, extracted from the log line. */
+	uint64_t recTimeMax;			/* The highest record time value in the log file, extracted from the log line. */
 	char warningLegacy;
 	char warningTreeHashes;
 } FILE_INFO;
 
 typedef struct BLOCK_INF_st {
-	size_t firstLineInBlock;		/* First line in current block. */
+	size_t firstLineNo;				/* First line in current block. */
 	size_t recordCount;				/* Record count read from block signature, partial block or partial block signature. It is just a number and may differ from the real count! */
 	size_t nofRecordHashes;			/* Number of all records and meta record hashes that are aggregated into a tree (no tree_hash included). */
 	size_t nofMetaRecords;			/* Number of meta-records inside a block. */
 	size_t nofTreeHashes;
 	size_t nofHashFails;			/* Count of hahs failures inside log block. */
-	uint64_t rec_time_min;			/* The lowest record time value in the block, extracted from the log line. */
-	uint64_t rec_time_max;			/* The highest record time value in the block, extracted from the log line. */
+	uint64_t recTimeMin;			/* The lowest record time value in the block, extracted from the log line. */
+	uint64_t recTimeMax;			/* The highest record time value in the block, extracted from the log line. */
 	uint64_t sigTime_1;
 	KSI_HashAlgorithm hashAlgo;		/* Hash algorithm used for aggregation. */
 	KSI_DataHash *inputHash;		/* Just a reference for the input hash of a block. */

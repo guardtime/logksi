@@ -21,7 +21,7 @@
 #define	BLOCKS_INFO_H
 
 #include <ksi/ksi.h>
-#include "blocks_info_impl.h"
+#include "logksi_impl.h"
 #include "err_trckr.h"
 #include "io_files.h"
 

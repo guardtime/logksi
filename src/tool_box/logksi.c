@@ -24,8 +24,8 @@
 #include "io_files.h"
 #include "logksi_err.h"
 #include "param_set/strn.h"
-#include "blocks_info.h"
-#include "blocks_info_impl.h"
+#include "logksi.h"
+#include "logksi_impl.h"
 #include "extract_info.h"
 #include "merkle_tree.h"
 
@@ -340,8 +340,8 @@ static void file_info_initialize(FILE_INFO *obj) {
 	obj->nofTotalFailedBlocks = 0;
 	obj->nofTotalMetarecords = 0;
 	obj->nofTotalRecordHashes = 0;
-	obj->rec_time_in_file_max = 0;
-	obj->rec_time_in_file_min = 0;
+	obj->recTimeMax = 0;
+	obj->recTimeMin = 0;
 	obj->version = UNKN_VER;
 	obj->warningLegacy = 0;
 	obj->warningTreeHashes = 0;
@@ -356,15 +356,15 @@ static void block_info_initialize(BLOCK_INFO *obj) {
 	obj->finalTreeHashesLeaf = 0;
 	obj->finalTreeHashesNone = 0;
 	obj->finalTreeHashesSome = 0;
-	obj->firstLineInBlock = 0;
+	obj->firstLineNo = 0;
 	obj->keepRecordHashes = 0;
 	obj->keepTreeHashes = 0;
 	obj->nofHashFails = 0;
 	obj->nofMetaRecords = 0;
 	obj->nofRecordHashes = 0;
 	obj->nofTreeHashes = 0;
-	obj->rec_time_max = 0;
-	obj->rec_time_min = 0;
+	obj->recTimeMax = 0;
+	obj->recTimeMin = 0;
 	obj->recordCount = 0;
 	obj->sigTime_1 = 0;
 	obj->signatureTLVReached = 0;
