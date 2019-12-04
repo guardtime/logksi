@@ -17,8 +17,8 @@
  * reserves and retains all trademark rights.
  */
 
-#ifndef BLOCKS_INFO_H
-#define	BLOCKS_INFO_H
+#ifndef LOGKSI_H
+#define	LOGKSI_H
 
 #include <ksi/ksi.h>
 #include "logksi_impl.h"
@@ -33,9 +33,9 @@ void LOGKSI_initialize(LOGKSI *block);
 void LOGKSI_freeAndClearInternals(LOGKSI *logksi);
 void LOGKSI_resetBlockInfo(LOGKSI *logksi);
 
-int block_info_get_aggregation_level(LOGKSI *logksi);
-int block_info_calculate_hash_of_logline_and_store_logline(LOGKSI *logksi, IO_FILES *files, KSI_DataHash **hash);
-int block_info_calculate_hash_of_metarecord_and_store_metarecord(LOGKSI *logksi, KSI_TlvElement *tlv, KSI_DataHash **hash);
+int LOGKSI_get_aggregation_level(LOGKSI *logksi);
+int LOGKSI_calculate_hash_of_logline_and_store_logline(LOGKSI *logksi, IO_FILES *files, KSI_DataHash **hash);
+int LOGKSI_calculate_hash_of_metarecord_and_store_metarecord(LOGKSI *logksi, KSI_TlvElement *tlv, KSI_DataHash **hash);
 
 
 
@@ -43,4 +43,4 @@ int block_info_calculate_hash_of_metarecord_and_store_metarecord(LOGKSI *logksi,
 }
 #endif
 
-#endif	/* BLOCKS_INFO_H */
+#endif	/* LOGKSI_H */

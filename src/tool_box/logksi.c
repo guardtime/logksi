@@ -110,7 +110,7 @@ void LOGKSI_resetBlockInfo(LOGKSI *logksi) {
 	extend_task_reset_block_info(&logksi->task.extend);
 }
 
-int block_info_get_aggregation_level(LOGKSI *logksi) {
+int LOGKSI_get_aggregation_level(LOGKSI *logksi) {
 	int level = 0;
 	if (logksi != NULL) {
 		if (logksi->file.version == LOGSIG11) {
@@ -166,7 +166,7 @@ cleanup:
 	return res;
 }
 
-int block_info_calculate_hash_of_logline_and_store_logline(LOGKSI *logksi, IO_FILES *files, KSI_DataHash **hash) {
+int LOGKSI_calculate_hash_of_logline_and_store_logline(LOGKSI *logksi, IO_FILES *files, KSI_DataHash **hash) {
 	int res;
 	KSI_DataHash *tmp = NULL;
 	KSI_DataHasher *pHasher = NULL;
@@ -244,7 +244,7 @@ cleanup:
 	return res;
 }
 
-int block_info_calculate_hash_of_metarecord_and_store_metarecord(LOGKSI *logksi, KSI_TlvElement *tlv, KSI_DataHash **hash) {
+int LOGKSI_calculate_hash_of_metarecord_and_store_metarecord(LOGKSI *logksi, KSI_TlvElement *tlv, KSI_DataHash **hash) {
 	int res;
 	KSI_DataHash *tmp = NULL;
 	KSI_DataHasher *pHasher = NULL;

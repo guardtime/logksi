@@ -87,7 +87,7 @@ static int block_info_calculate_hash_of_logline_and_store_logline_check_log_time
 		goto cleanup;
 	}
 
-	res = block_info_calculate_hash_of_logline_and_store_logline(logksi, files, hash);
+	res = LOGKSI_calculate_hash_of_logline_and_store_logline(logksi, files, hash);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate hash of logline no. %zu.", logksi->blockNo, get_nof_lines(logksi));
 
 
@@ -1588,7 +1588,7 @@ static int process_metarecord(PARAM_SET* set, MULTI_PRINTER *mp, ERR_TRCKR *err,
 
 	KSI_DataHash_free(logksi->block.metarecordHash);
 	logksi->block.metarecordHash = NULL;
-	res = block_info_calculate_hash_of_metarecord_and_store_metarecord(logksi, tlv, &logksi->block.metarecordHash);
+	res = LOGKSI_calculate_hash_of_metarecord_and_store_metarecord(logksi, tlv, &logksi->block.metarecordHash);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate metarecord hash with index %zu.", logksi->blockNo, metarecord_index);
 
 	if (files->files.outSig) {
@@ -2132,7 +2132,7 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 	res = MERKLE_TREE_calculate_root_hash(logksi->tree, (KSI_DataHash**)&context.documentHash);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to get root hash for verification.", logksi->blockNo);
 
-	context.docAggrLevel = block_info_get_aggregation_level(logksi);
+	context.docAggrLevel = LOGKSI_get_aggregation_level(logksi);
 
 	if (processors->verify_signature) {
 
@@ -2434,7 +2434,7 @@ static int process_record_chain(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *er
 	KSI_DataHash_free(logksi->block.metarecordHash);
 	logksi->block.metarecordHash = NULL;
 	if (tlvMetaRecord != NULL) {
-		res = block_info_calculate_hash_of_metarecord_and_store_metarecord(logksi, tlvMetaRecord, &hash);
+		res = LOGKSI_calculate_hash_of_metarecord_and_store_metarecord(logksi, tlvMetaRecord, &hash);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate metarecord hash.", logksi->blockNo);
 
 		logksi->block.metarecordHash = KSI_DataHash_ref(hash);
@@ -2739,7 +2739,7 @@ static int process_partial_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCK
 			}
 			print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_LEVEL_3, "Block no. %3zu: creating missing KSI signature... ", logksi->blockNo);
 
-			res = processors->create_signature(set, mp, err, ksi, logksi, files, hash, block_info_get_aggregation_level(logksi), &sig);
+			res = processors->create_signature(set, mp, err, ksi, logksi, files, hash, LOGKSI_get_aggregation_level(logksi), &sig);
 			if (res != KT_OK && logksi->isContinuedOnFail) {
 				sign_err = KT_SIGNING_FAILURE;
 				print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
