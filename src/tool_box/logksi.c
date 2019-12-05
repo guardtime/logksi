@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <ksi/ksi.h>
 #include <ksi/tlv_element.h>
+#include <ksi/compatibility.h>
 #include "io_files.h"
 #include "logksi_err.h"
 #include "param_set/strn.h"
@@ -28,6 +29,7 @@
 #include "logksi_impl.h"
 #include "extract_info.h"
 #include "merkle_tree.h"
+#include "api_wrapper.h"
 
 static void extract_task_free_and_clear_internals(EXTRACT_TASK *obj);
 static void sign_task_free_and_clear_internals(SIGN_TASK *obj);
@@ -281,16 +283,214 @@ cleanup:
 	return res;
 }
 
+/* MERKLE_TREE newRecordChain implementation. */
+int logksi_new_record_chain(MERKLE_TREE *tree, void *ctx, int isMetaRecordHash, KSI_DataHash *hash) {
+	int res;
+	LOGKSI *logksi = ctx;
+	ERR_TRCKR *err = NULL;
+	KSI_DataHash *hshRef = NULL;
+	KSI_DataHash *prevMask = NULL;
+	char *logLineCopy = NULL;
+
+	if (tree == NULL || ctx == NULL || hash == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	err = logksi->err;
+
+	/*
+	 * Enter only if not all extract positions are found AND
+	 * current record hash is at desired position.
+	 */
+	if (EXTRACT_INFO_isLastPosPending(logksi->task.extract.info) &&
+		EXTRACT_INFO_getNextPosition(logksi->task.extract.info) - logksi->file.nofTotalRecordHashes == logksi->block.nofRecordHashes) {
+		RECORD_INFO *recordInfo = NULL;
+		size_t index = 0;
+
+		hshRef = KSI_DataHash_ref(hash);
+		if (hshRef == NULL) {
+			res = KT_OUT_OF_MEMORY;
+			ERR_CATCH_MSG(err, res, "Error: Unable to create hash reference.");
+		}
+
+		/* Get reference to record info. */
+		res = EXTRACT_INFO_getNewRecord(logksi->task.extract.info, &index, &recordInfo);
+		ERR_CATCH_MSG(err, res, "Error: Unable to create new extract info extractor.");
+
+		res = logksi_set_extract_record(logksi, recordInfo, isMetaRecordHash, hash);
+		if (isMetaRecordHash) {
+			ERR_CATCH_MSG(err, res, "Error: Unable to create new extract record for metadata.");
+		} else {
+			ERR_CATCH_MSG(err, res, "Error: Unable to create new extract record for record.");
+		}
+
+		/* Retreive and use mask. */
+		res = MERKLE_TREE_getPrevMask(tree, &prevMask);
+		if (res != KT_OK) goto cleanup;
+
+		if (isMetaRecordHash) {
+			res = RECORD_INFO_add_hash_to_record_chain(recordInfo, LEFT_LINK, prevMask, 0);
+		} else {
+			res = RECORD_INFO_add_hash_to_record_chain(recordInfo, RIGHT_LINK, prevMask, 0);
+		}
+		if (res != KT_OK) goto cleanup;
+
+		res = EXTRACT_INFO_moveToNext(logksi->task.extract.info);
+		ERR_CATCH_MSG(err, res, "Error: Unable to move to next extract position.");
+	}
 
 
+	res = KT_OK;
+
+cleanup:
+
+	KSI_DataHash_free(hshRef);
+	KSI_DataHash_free(prevMask);
+	free(logLineCopy);
+
+	return res;
+}
+
+/* MERKLE_TREE extractRecordChain implementation. */
+int logksi_extract_record_chain(MERKLE_TREE *tree, void *ctx, unsigned char level, KSI_DataHash *leftLink) {
+	int res;
+	size_t j;
+	int condition;
+	LOGKSI *logksi = ctx;
+	ERR_TRCKR *err = NULL;
+	KSI_DataHash *hsh = NULL;
+	int finalize;
+
+	if (ctx == NULL || leftLink == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	err = logksi->err;
+	finalize = MERKLE_TREE_isClosing(tree);
+
+	/**
+	 * The input hash will represent the root value of the leftmost subtree that
+	 * has level. The root value is compared with extract info and its suitability
+	 * for extract hash chain node is examined. If value is suitable it is included
+	 * to the chain.
+	 */
+	for (j = 0; j < EXTRACT_INFO_getPositionsInBlock(logksi->task.extract.info); j++) {
+		RECORD_INFO *record = NULL;
+		size_t recordOffset = 0;
+		size_t recordLevel = 0;
+
+		res = EXTRACT_INFO_getRecord(logksi->task.extract.info, j, &record);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to get extract record.", logksi->blockNo);
+
+		res = RECORD_INFO_getPositionInTree(record, &recordOffset, &recordLevel);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable get extract record position in tree.", logksi->blockNo);
+
+		/**
+		 * Check that the (level + 1) matches with extractLevel (expected next level).
+		 * If the level is less it is not suitable for building extract chain.
+		 */
+		if (finalize) {
+			condition = (level + 1 >= recordLevel);
+		} else {
+			condition = (level + 1 == recordLevel);
+		}
+		if (condition) {
+			if (((recordOffset - 1) >> level) & 1L) {
+				res = MERKLE_TREE_get(logksi->tree, level, &hsh);
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable get hash from merkle tree.", logksi->blockNo);
+
+				res = RECORD_INFO_add_hash_to_record_chain(record, RIGHT_LINK, hsh, level + 1 - recordLevel);
+			} else {
+				res = RECORD_INFO_add_hash_to_record_chain(record, LEFT_LINK, leftLink, level + 1 - recordLevel);
+			}
+			if (res != KT_OK) {
+				ERR_CATCH_MSG(err, res, "Error: Unable to add hash to record chain.");
+				goto cleanup;
+			}
+		}
+	}
+
+	res = KT_OK;
+
+cleanup:
+
+	KSI_DataHash_free(hsh);
+
+	return res;
+}
+
+int logksi_add_record_hash_to_merkle_tree(LOGKSI *logksi, int isMetaRecordHash, KSI_DataHash *hash) {
+	if (logksi == NULL) {
+		return KT_INVALID_ARGUMENT;
+	}
+
+	if (isMetaRecordHash) {
+		logksi->file.nofTotalMetarecords++;
+		logksi->block.nofMetaRecords++;
+		logksi->file.nofTotalRecordHashes--;
+	}
+
+	return MERKLE_TREE_add_record_hash_to_merkle_tree(logksi->tree, isMetaRecordHash, hash);
+}
+
+int logksi_set_extract_record(LOGKSI *logksi, RECORD_INFO *recordInfo, int isMetaRecordHash, KSI_DataHash *hash) {
+	int res = KT_UNKNOWN_ERROR;
+	KSI_DataHash *hashRef = NULL;
+	char *logLineCopy = NULL;
 
 
+	if (logksi == NULL || recordInfo == NULL || hash == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
 
+	hashRef = KSI_DataHash_ref(hash);
+	if (hashRef == NULL) {
+		res = KT_OUT_OF_MEMORY;
+		goto cleanup;
+	}
 
+	if (isMetaRecordHash) {
+		res = RECORD_INFO_setMetaRecordHash(recordInfo,
+			EXTRACT_INFO_getNextPosition(logksi->task.extract.info),
+			logksi->block.nofRecordHashes,
+			hashRef,
+			logksi->task.extract.metaRecord, logksi->task.extract.metaRecord_len);
+		if (res != KT_OK) goto cleanup;
+		hashRef = NULL;
+	} else {
+		res = KSI_strdup(logksi->logLine, &logLineCopy);
+		if (res != KT_OK) goto cleanup;
 
+		res = RECORD_INFO_setRecordHash(recordInfo,
+			EXTRACT_INFO_getNextPosition(logksi->task.extract.info),
+			logksi->block.nofRecordHashes,
+			hashRef, logLineCopy);
+		if (res != KT_OK) goto cleanup;
 
+		hashRef = NULL;
+		logLineCopy = NULL;
+	}
 
+	res = KT_OK;
 
+cleanup:
+
+	KSI_DataHash_free(hashRef);
+	free(logLineCopy);
+
+	return res;
+}
+
+size_t logksi_get_nof_lines(LOGKSI *logksi) {
+	if (logksi) {
+		return logksi->block.nofRecordHashes + logksi->file.nofTotalRecordHashes;
+	} else {
+		return 0;
+	}
+}
 
 static void extract_task_initialize(EXTRACT_TASK *obj) {
 	if (obj == NULL) return;

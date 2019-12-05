@@ -17,34 +17,34 @@
  * reserves and retains all trademark rights.
  */
 
-#ifndef LOGKSI_H
-#define	LOGKSI_H
+#ifndef CHECK_H
+#define	CHECK_H
 
+#include <stddef.h>
+#include <ctype.h>
 #include <ksi/ksi.h>
 #include "logksi_impl.h"
-#include "err_trckr.h"
 #include "io_files.h"
+#include "debug_print.h"
+#include "smart_file.h"
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-void LOGKSI_initialize(LOGKSI *block);
-void LOGKSI_freeAndClearInternals(LOGKSI *logksi);
-void LOGKSI_resetBlockInfo(LOGKSI *logksi);
 
-int LOGKSI_get_aggregation_level(LOGKSI *logksi);
-int LOGKSI_calculate_hash_of_logline_and_store_logline(LOGKSI *logksi, IO_FILES *files, KSI_DataHash **hash);
-int LOGKSI_calculate_hash_of_metarecord_and_store_metarecord(LOGKSI *logksi, KSI_TlvElement *tlv, KSI_DataHash **hash);
+int check_log_line_embedded_time(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi);
+int check_log_record_embedded_time_against_ksi_signature_time(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi);
+int check_log_signature_client_id(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi, KSI_Signature *sig);
+int handle_block_signing_time_check(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi, IO_FILES *files);
+int handle_record_time_check_between_files(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi, IO_FILES *files);
 
-int logksi_new_record_chain(MERKLE_TREE *tree, void *ctx, int isMetaRecordHash, KSI_DataHash *hash);
-int logksi_extract_record_chain(MERKLE_TREE *tree, void *ctx, unsigned char level, KSI_DataHash *leftLink);
-int logksi_add_record_hash_to_merkle_tree(LOGKSI *logksi, int isMetaRecordHash, KSI_DataHash *hash);
-int logksi_set_extract_record(LOGKSI *logksi, RECORD_INFO *recordInfo, int isMetaRecordHash, KSI_DataHash *hash);
-size_t logksi_get_nof_lines(LOGKSI *logksi);
+int uint64_signcmp(int sa, uint64_t a, int sb, uint64_t b);
+uint64_t uint64_diff(uint64_t a, uint64_t b, int *sign);
+char* time_diff_to_string(uint64_t time_diff, char *buf, size_t buf_len);
 
 #ifdef	__cplusplus
 }
 #endif
 
-#endif	/* LOGKSI_H */
+#endif	/* CHECK_H */
