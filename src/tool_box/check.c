@@ -23,7 +23,6 @@
 #include <string.h>
 #include <stdlib.h>
 #include <ksi/ksi.h>
-#include <ksi/tlv_element.h>
 #include "io_files.h"
 #include "logksi_err.h"
 #include "param_set/param_set.h"
@@ -34,17 +33,7 @@
 #include <time.h>
 #include "param_control.h"
 
-
-/*
- * TODO:
- * TODO:
- * TODO:
- * TODO:
- * TODO:
- * TODO: Put me somewhere.
- */
-const char *io_files_getCurrentLogFilePrintRepresentation(IO_FILES *files);
-
+static int uint64_signcmp(int sa, uint64_t a, int sb, uint64_t b);
 
 int check_log_line_embedded_time(PARAM_SET* set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi) {
 	int res = KT_UNKNOWN_ERROR;
@@ -68,13 +57,13 @@ int check_log_line_embedded_time(PARAM_SET* set, MULTI_PRINTER *mp, ERR_TRCKR *e
 		ret = strptime(logksi->logLine, format, &tmp_time);
 		if (ret == NULL) {
 			res = KT_INVALID_INPUT_FORMAT;
-			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Unable to extract timestamp (%s) from log line %zu: %.*s.\n", logksi->blockNo, format, logksi_get_nof_lines(logksi), (strlen(logksi->logLine) - 1), logksi->logLine);
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Unable to extract timestamp (%s) from log line %zu: %.*s.\n", logksi->blockNo, format, LOGKSI_getNofLines(logksi), (strlen(logksi->logLine) - 1), logksi->logLine);
 			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Unable to extract time stamp from log line %zu in block %zu:\n"
 																						  "   + Log line:    '%.*s'\n"
 																						  "   + Time format: '%s'\n"
-																						  ,  logksi_get_nof_lines(logksi), logksi->blockNo, (strlen(logksi->logLine) - 1), logksi->logLine, format);
+																						  ,  LOGKSI_getNofLines(logksi), logksi->blockNo, (strlen(logksi->logLine) - 1), logksi->logLine, format);
 
-			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to extract time stamp from the logline no. %zu.", logksi->blockNo, logksi_get_nof_lines(logksi))
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to extract time stamp from the logline no. %zu.", logksi->blockNo, LOGKSI_getNofLines(logksi))
 		}
 
 
@@ -100,8 +89,8 @@ int check_log_line_embedded_time(PARAM_SET* set, MULTI_PRINTER *mp, ERR_TRCKR *e
 			if (logksi->block.recTimeMax < t) logksi->block.recTimeMax = t;
 
 			if (PARAM_SET_isSetByName(set, "time-diff")) {
-				size_t line_nr_0 = logksi_get_nof_lines(logksi) - 1;
-				size_t line_nr_1 = logksi_get_nof_lines(logksi);
+				size_t line_nr_0 = LOGKSI_getNofLines(logksi) - 1;
+				size_t line_nr_1 = LOGKSI_getNofLines(logksi);
 
 				if (last_time > t && line_nr_0 > 0) {
 					char str_last_time[1024] = "<null>";
@@ -505,7 +494,7 @@ int handle_block_signing_time_check(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR
 																								  "   + Time diff:              %s%s\n"
 																								  "   + Expected time diff:     %s\n",
 																								  files->previousLogFile, strT0,
-																								  io_files_getCurrentLogFilePrintRepresentation(files), strT1,
+																								  IO_FILES_getCurrentLogFilePrintRepresentation(files), strT1,
 																								  str_diff_sign, str_diff,
 																								  str_range);
 					} else {
@@ -611,7 +600,7 @@ int handle_record_time_check_between_files(PARAM_SET *set, MULTI_PRINTER* mp, ER
 																			  "   + Time for most recent log line:  %s\n"
 																			  "   + Current log file:               %s\n"
 																			  "   + Time for least recent log line: %s\n"
-																			  ,files->previousLogFile , str_last_time, io_files_getCurrentLogFilePrintRepresentation(files), str_current_time);
+																			  ,files->previousLogFile , str_last_time, IO_FILES_getCurrentLogFilePrintRepresentation(files), str_current_time);
 			logksi->quietError = res;
 			if (logksi->isContinuedOnFail) res = KT_OK;
 			else ERR_TRCKR_ADD(err, res, "Error: Most recent log line from previous file is more recent than least recent log line from current file!");
@@ -629,13 +618,12 @@ cleanup:
 
 
 
-
 /**
  * a > b ret 1
  * a == b ret 0
  * a < b ret -1
  */
-int uint64_signcmp(int sa, uint64_t a, int sb, uint64_t b) {
+static int uint64_signcmp(int sa, uint64_t a, int sb, uint64_t b) {
 	sa = sa >= 0 ? 1 : -1;
 	sb = sb >= 0 ? 1 : -1;
 
@@ -690,4 +678,311 @@ char* time_diff_to_string(uint64_t time_diff, char *buf, size_t buf_len) {
 	count += PST_snprintf(buf + count, buf_len - count, "%s%02i:%02i:%02i", (d > 0 ? " " : ""), H, M, S);
 
 	return buf;
+}
+
+int logksi_datahash_compare(ERR_TRCKR *err, MULTI_PRINTER *mp, LOGKSI* logksi, int isLogline, KSI_DataHash *left, KSI_DataHash *right, const char * reason, const char *helpLeft_raw, const char *helpRight_raw) {
+	int res;
+	KSI_HashAlgorithm leftId;
+	KSI_HashAlgorithm rightId;
+	char buf[1024];
+	const char *failureReason = NULL;
+	int differentHashAlg = 0;
+
+	if (mp == NULL || logksi == NULL || left == NULL || right == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	failureReason = (reason == NULL) ? "Hash values do not match" : reason;
+
+	if (!KSI_DataHash_equals(left, right)) {
+		const char *helpLeft = NULL;
+		const char *helpRight = NULL;
+		size_t minSize = 0;
+
+		res = KT_VERIFICATION_FAILURE;
+		print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
+		MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
+		differentHashAlg = KSI_DataHash_getHashAlg(left, &leftId) == KSI_OK && KSI_DataHash_getHashAlg(right, &rightId) == KSI_OK && leftId != rightId;
+
+		helpLeft = helpLeft_raw == NULL ? "Computed hash:" : helpLeft_raw;
+		helpRight = helpRight_raw == NULL ? "Stored hash:" : helpRight_raw;
+		minSize = strlen(helpLeft);
+		minSize = strlen(helpRight) > minSize ? strlen(helpRight) : minSize;
+
+		if (isLogline) {
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Failed to verify logline no. %zu:\n"
+																				  "   + Logline:\n"
+																				  "     '%.*s'\n", LOGKSI_getNofLines(logksi), (strlen(logksi->logLine) - 1), logksi->logLine);
+			if (differentHashAlg) print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "   + Hash algorithms differ!%s\n");
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "   + %s\n"
+																				  "     %s\n", helpLeft, LOGKSI_DataHash_toString(left, buf, sizeof(buf)));
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "   + %s\n"
+																				  "     %s\n", helpRight, LOGKSI_DataHash_toString(right, buf, sizeof(buf)));
+
+
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: failed to verify logline no. %zu: %s", logksi->blockNo, LOGKSI_getNofLines(logksi), logksi->logLine);
+		} else {
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: %s:\n", failureReason);
+			if (differentHashAlg) print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "   + Hash algorithms differ!%s\n");
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "   + %s\n"
+																				  "     %s\n", helpLeft, LOGKSI_DataHash_toString(left, buf, sizeof(buf)));
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "   + %s\n"
+																				  "     %s\n", helpRight, LOGKSI_DataHash_toString(right, buf, sizeof(buf)));
+		}
+
+		print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: %s\n", logksi->blockNo, failureReason);
+		print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Hash algorithms differ\n", logksi->blockNo);
+		print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: %-*s %s\n", logksi->blockNo, minSize, helpLeft, LOGKSI_DataHash_toString(left, buf, sizeof(buf)));
+		print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: %-*s %s\n", logksi->blockNo, minSize, helpRight, LOGKSI_DataHash_toString(right, buf, sizeof(buf)));
+
+		goto cleanup;
+	}
+
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
+
+int continue_on_hash_fail(int result, PARAM_SET *set, MULTI_PRINTER* mp, LOGKSI *logksi, KSI_DataHash *computed, KSI_DataHash *stored, KSI_DataHash **replacement) {
+	int res = result;
+
+	if (set == NULL || logksi == NULL || computed == NULL || stored == NULL || replacement == NULL) {
+		goto cleanup;
+	}
+
+	if (res == KT_OK) {
+		*replacement = KSI_DataHash_ref(computed);
+	} else {
+		logksi->file.nofTotaHashFails++;
+		logksi->block.nofHashFails++;
+		if (PARAM_SET_isSetByName(set, "use-computed-hash-on-fail")) {
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "   + Using computed hash to continue.\n");
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Using computed hash to continue.\n", logksi->blockNo);
+			*replacement = KSI_DataHash_ref(computed);
+			res = KT_OK;
+		} else if (PARAM_SET_isSetByName(set, "use-stored-hash-on-fail")) {
+			*replacement = KSI_DataHash_ref(stored);
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "   + Using stored hash to continue.\n");
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Using stored hash to continue.\n", logksi->blockNo);
+			res = KT_OK;
+		} else {
+			*replacement = KSI_DataHash_ref(computed);
+		}
+	}
+
+cleanup:
+
+	return res;
+}
+
+int is_block_signature_expected(LOGKSI *logksi, ERR_TRCKR *err) {
+	int res;
+	size_t maxTreeHashes;
+	size_t maxFinalHashes;
+
+	if (err == NULL || logksi == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	maxTreeHashes = MERKLE_TREE_calcMaxTreeHashes(logksi->block.recordCount);
+	maxFinalHashes = LOGKSI_getMaxFinalHashes(logksi);
+
+	if (logksi->block.keepRecordHashes) {
+		/* Check if record hash is present for the most recent metarecord (if any). */
+		if (logksi->block.metarecordHash) {
+			res = KT_VERIFICATION_FAILURE;
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing record hash for metarecord with index %zu.", logksi->blockNo, logksi->block.nofRecordHashes);
+		}
+
+		/* Check if all record hashes are present in the current block. */
+		if (logksi->block.nofRecordHashes < logksi->block.recordCount) {
+			res = KT_VERIFICATION_FAILURE;
+
+			ERR_TRCKR_ADD(err, res, "Error: Block no. %zu: expected %zu record hashes, but found %zu.", logksi->blockNo, logksi->block.recordCount, logksi->block.nofRecordHashes);
+			ERR_TRCKR_ADD(err, res, "Error: Block no. %zu: there are too few record hashes for this block.", logksi->blockNo);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing record hash for logline no. %zu.", logksi->blockNo, LOGKSI_getNofLines(logksi) + 1);
+		}
+
+		if (logksi->block.nofRecordHashes > logksi->block.recordCount) {
+			res = KT_VERIFICATION_FAILURE;
+
+			ERR_TRCKR_ADD(err, res, "Error: Block no. %zu: expected %zu record hashes, but found %zu.", logksi->blockNo, logksi->block.recordCount, logksi->block.nofRecordHashes);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: there are too many record hashes for this block.", logksi->blockNo);
+		}
+	}
+
+	if (logksi->block.keepTreeHashes) {
+		if (!logksi->block.keepRecordHashes && !MERKLE_TREE_isBalenced(logksi->tree) && !logksi->block.finalTreeHashesSome) {
+			/* If LOGSIG12 format is used, metarecords are mandatory for closing unbalanced blocks. */
+			if (logksi->file.version == LOGSIG12) {
+				res = KT_VERIFICATION_FAILURE;
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: incomplete block is closed without a metarecord.", logksi->blockNo);
+			}
+		}
+		/* Check if all mandatory tree hashes are present in the current block. */
+		if (logksi->block.nofTreeHashes < maxTreeHashes) {
+			res = KT_VERIFICATION_FAILURE;
+
+			if (logksi->block.nofMetaRecords > 0) {
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing tree hash(es) for metarecord with index %zu.", logksi->blockNo, logksi->block.nofRecordHashes - 1);
+			} else {
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing tree hash(es) for logline no. %zu.", logksi->blockNo, logksi->block.recordCount + logksi->file.nofTotalRecordHashes);
+			}
+		}
+		/* Check if the block contains too few final tree hashes. */
+		if (logksi->block.nofTreeHashes < maxTreeHashes + maxFinalHashes) {
+			/* Check if none of the final tree hashes have yet been received. (Final tree hashes must all be present or all missing.) */
+			if (logksi->block.nofTreeHashes == maxTreeHashes) {
+				/* Check if there is reason to expect final tree hashes. */
+				if (logksi->block.finalTreeHashesSome || logksi->block.keepRecordHashes) {
+					/* All final tree hashes are missing, but at least they are being expected -> this is OK and can be repaired. */
+					logksi->block.finalTreeHashesNone = 1;
+				} else {
+					/* If LOGSIG12 format is used, metarecords are mandatory for closing unbalanced blocks. */
+					if (logksi->file.version == LOGSIG12) {
+						/* All of the final tree hashes are missing, but they are not being expected either (e.g. missing metarecord). This should never happen. */
+						res = KT_VERIFICATION_FAILURE;
+						ERR_CATCH_MSG(err, res, "Error: Block no. %zu: all final tree hashes are missing and block is closed without a metarecord.", logksi->blockNo);
+					}
+				}
+			} else {
+				/* If some final tree hashes are present, they must all be present. */
+				res = KT_VERIFICATION_FAILURE;
+				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: found %zu final tree hashes instead of %zu.", logksi->blockNo, logksi->block.nofTreeHashes - maxTreeHashes, maxFinalHashes);
+			}
+		}
+		/* Check if the block contains too many optional tree hashes. */
+		if (logksi->block.nofTreeHashes > maxTreeHashes + maxFinalHashes) {
+			res = KT_VERIFICATION_FAILURE;
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: found %zu final tree hashes instead of %zu.", logksi->blockNo, logksi->block.nofTreeHashes - maxTreeHashes, maxFinalHashes);
+		}
+		if (logksi->block.nofTreeHashes == maxTreeHashes + maxFinalHashes) {
+			logksi->block.finalTreeHashesAll = 1;
+		}
+	}
+
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
+
+int is_record_hash_expected(LOGKSI *logksi, ERR_TRCKR *err) {
+	int res;
+
+	if (err == NULL || logksi == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	/* Check if record hash is received between block header and block signature. */
+	if (logksi->blockNo == logksi->sigNo) {
+		res = KT_VERIFICATION_FAILURE;
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: record hash without preceding block header found.", logksi->blockNo + 1);
+	}
+	/* Check if record hashes are present for previous records. */
+	if (logksi->block.keepRecordHashes == 0 && logksi->block.nofRecordHashes > 0) {
+		res = KT_VERIFICATION_FAILURE;
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing record hash for logline no. %zu.", logksi->blockNo, LOGKSI_getNofLines(logksi));
+	}
+	/* Check if all tree hashes are present for previous records. */
+	if (logksi->block.keepTreeHashes && logksi->block.nofTreeHashes != MERKLE_TREE_calcMaxTreeHashes(logksi->block.nofRecordHashes)) {
+		res = KT_VERIFICATION_FAILURE;
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing tree hash(es) for logline no. %zu.", logksi->blockNo, LOGKSI_getNofLines(logksi));
+	}
+
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
+
+int is_tree_hash_expected(LOGKSI *logksi, ERR_TRCKR *err) {
+	int res;
+
+	if (err == NULL || logksi == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+
+	/* Check if tree hash is received between block header and block signature. */
+	if (logksi->blockNo == logksi->sigNo) {
+		res = KT_VERIFICATION_FAILURE;
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: tree hash without preceding block header found.", logksi->blockNo + 1);
+	}
+	/* Check if tree hashes are present for previous records. */
+	if (logksi->block.keepTreeHashes == 0 && logksi->block.nofRecordHashes > 1) {
+		res = KT_VERIFICATION_FAILURE;
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing tree hash for logline no. %zu.", logksi->blockNo, LOGKSI_getNofLines(logksi) - 1);
+	}
+	/* Check if all record hashes are present for previous records. */
+	if (logksi->block.keepRecordHashes && logksi->block.nofTreeHashes == MERKLE_TREE_calcMaxTreeHashes(logksi->block.nofRecordHashes)) {
+		/* All the tree hashes that can be computed from the received record hashes have been received.
+		 * However, another tree hash was just received, so either the preceding record hash is missing or
+		 * the tree hash is used in finalizing the unbalanced tree. */
+		if (MERKLE_TREE_isBalenced(logksi->tree)) {
+			/* The tree is balanced, so no finalizing is needed. Thus the tree hash is unexpected, probably due to a missing record hash. */
+			res = KT_VERIFICATION_FAILURE;
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing record hash for logline no. %zu.", logksi->blockNo, LOGKSI_getNofLines(logksi) + 1);
+		} else if (logksi->block.metarecordHash) {
+			/* A metarecord hash is missing while the tree hash for the metarecord is present. */
+			res = KT_VERIFICATION_FAILURE;
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing record hash for metarecord with index %zu.", logksi->blockNo, logksi->block.nofRecordHashes);
+		} else {
+			/* Assuming that no record hashes are missing, let's start the finalizing process. */
+			logksi->block.finalTreeHashesSome = 1;
+			/* Prepare tree hashes for verification of finalizing. */
+
+			res = MERKLE_TREE_setFinalHashesForVerification(logksi->tree);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: Unable to get tree hash for verification.", logksi->blockNo);
+		}
+	}
+
+	/* Check if all final tree hashes are present. */
+	if (logksi->block.finalTreeHashesSome && logksi->block.nofTreeHashes == MERKLE_TREE_calcMaxTreeHashes(logksi->block.nofRecordHashes) + LOGKSI_getMaxFinalHashes(logksi)) {
+		res = KT_VERIFICATION_FAILURE;
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unexpected final tree hash no. %zu.", logksi->blockNo, logksi->block.nofTreeHashes + 1);
+	}
+
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
+
+int check_file_header(SMART_FILE *in, ERR_TRCKR *err, LOGSIG_VERSION *expected_ver, size_t expected_ver_count, const char *human_readable_file_name, LOGSIG_VERSION *ver_out) {
+	int res = KT_UNKNOWN_ERROR;
+	LOGSIG_VERSION ver = UNKN_VER;
+	char permitted_versions[1024] = "<unexpected>";
+	int i = 0;
+	size_t count = 0;
+
+	if (in == NULL || err == NULL) return KT_INVALID_ARGUMENT;
+
+	/* Get the actual version. */
+	ver = LOGSIG_VERSION_getFileVer(in);
+	if (ver_out != NULL) *ver_out = ver;
+
+	/* Check if any of the file types matches. In case of success return with OK */
+	for (i = 0; i < expected_ver_count; i++) {
+		if (expected_ver[i] == ver) return KT_OK;
+		count += PST_snprintf(permitted_versions + count, sizeof(permitted_versions) - count, "%s%s", (i > 0 ? ", " : ""), LOGSIG_VERSION_toString(expected_ver[i]));
+	}
+
+	/* Format error messages.*/
+	res = KT_INVALID_INPUT_FORMAT;
+	if (expected_ver_count > 1) ERR_TRCKR_ADD(err, res, "Error: Expected file types {%s} but got %s!", permitted_versions, LOGSIG_VERSION_toString(ver));
+	else ERR_TRCKR_ADD(err, res, "Error: Expected file type %s but got %s!", permitted_versions, LOGSIG_VERSION_toString(ver));
+	ERR_TRCKR_ADD(err, res, "Error: Log signature file identification magic number not found.");
+	ERR_TRCKR_ADD(err, res, "Error: Unable to parse %s file '%s'.", human_readable_file_name, SMART_FILE_getFname(in));
+
+	return res;
 }

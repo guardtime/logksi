@@ -28,12 +28,11 @@
 #include "merkle_tree.h"
 #include "err_trckr.h"
 #include "extract_info.h"
+#include "logsig_version.h"
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
-
-#define MAGIC_SIZE 8
 
 typedef enum {
 	TASK_NONE = 0x00,
@@ -44,16 +43,6 @@ typedef enum {
 	TASK_INTEGRATE,
 } LOGKSI_TASK_ID;
 
-typedef enum {
-	LOGSIG11 = 0,
-	LOGSIG12 = 1,
-	RECSIG11 = 2,
-	RECSIG12 = 3,
-	LOG12BLK = 4,
-	LOG12SIG = 5,
-	NOF_VERS,
-	UNKN_VER = 0xff
-} LOGSIG_VERSION;
 
 typedef struct SIGN_TASK_st {
 	size_t blockCount;				/* Count of blocks counted in the beginning of the sign task. */

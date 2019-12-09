@@ -32,6 +32,9 @@
 extern "C" {
 #endif
 
+int check_file_header(SMART_FILE *in, ERR_TRCKR *err, LOGSIG_VERSION *expected_ver, size_t expected_ver_count, const char *human_readable_file_name, LOGSIG_VERSION *ver_out);
+int logksi_datahash_compare(ERR_TRCKR *err, MULTI_PRINTER *mp, LOGKSI* logksi, int isLogline, KSI_DataHash *left, KSI_DataHash *right, const char * reason, const char *helpLeft_raw, const char *helpRight_raw);
+int continue_on_hash_fail(int result, PARAM_SET *set, MULTI_PRINTER* mp, LOGKSI *logksi, KSI_DataHash *computed, KSI_DataHash *stored, KSI_DataHash **replacement);
 
 int check_log_line_embedded_time(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi);
 int check_log_record_embedded_time_against_ksi_signature_time(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi);
@@ -39,7 +42,10 @@ int check_log_signature_client_id(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *
 int handle_block_signing_time_check(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi, IO_FILES *files);
 int handle_record_time_check_between_files(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi, IO_FILES *files);
 
-int uint64_signcmp(int sa, uint64_t a, int sb, uint64_t b);
+int is_block_signature_expected(LOGKSI *logksi, ERR_TRCKR *err);
+int is_record_hash_expected(LOGKSI *logksi, ERR_TRCKR *err);
+int is_tree_hash_expected(LOGKSI *logksi, ERR_TRCKR *err);
+
 uint64_t uint64_diff(uint64_t a, uint64_t b, int *sign);
 char* time_diff_to_string(uint64_t time_diff, char *buf, size_t buf_len);
 

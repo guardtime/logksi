@@ -615,3 +615,12 @@ cleanup:
 
 	return res;
 }
+
+size_t MERKLE_TREE_calcMaxTreeHashes(size_t nof_records) {
+	size_t max = 0;
+	while (nof_records) {
+		max = max + nof_records;
+		nof_records = nof_records / 2;
+	}
+	return max;
+}

@@ -39,6 +39,10 @@ logksi_SOURCES = \
 	tool_box/merkle_tree.c \
 	tool_box/merkle_tree.h \
 	tool_box/logksi.c \
+	tool_box/logsig_version.c \
+	tool_box/logsig_version.h \
+	tool_box/process.c \
+	tool_box/process.h \
 	tool_box/check.h \
 	tool_box/check.c \
 	tool_box/logksi.h \

@@ -17,7 +17,6 @@
  * reserves and retains all trademark rights.
  */
 
-#include <ksi/tlv_element.h>
 #include <ksi/publicationsfile.h>
 #include "smart_file.h"
 #include "logksi_impl.h"

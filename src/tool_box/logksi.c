@@ -19,17 +19,9 @@
 
 #include <string.h>
 #include <stdlib.h>
-#include <ksi/ksi.h>
-#include <ksi/tlv_element.h>
-#include <ksi/compatibility.h>
-#include "io_files.h"
 #include "logksi_err.h"
-#include "param_set/strn.h"
 #include "logksi.h"
 #include "logksi_impl.h"
-#include "extract_info.h"
-#include "merkle_tree.h"
-#include "api_wrapper.h"
 
 static void extract_task_free_and_clear_internals(EXTRACT_TASK *obj);
 static void sign_task_free_and_clear_internals(SIGN_TASK *obj);
@@ -52,6 +44,7 @@ static void extract_task_reset_block_info(EXTRACT_TASK *obj);
 static void integrate_task_reset_block_info(INTEGRATE_TASK *obj);
 static void sign_task_reset_block_info(SIGN_TASK *obj);
 static void extend_task_reset_block_info(EXTEND_TASK *obj);
+static void logksi_reset_block_info(LOGKSI *logksi);
 
 void LOGKSI_initialize(LOGKSI *obj) {
 	if (obj == NULL) return;
@@ -103,13 +96,25 @@ void LOGKSI_freeAndClearInternals(LOGKSI *logksi) {
 	return;
 }
 
-void LOGKSI_resetBlockInfo(LOGKSI *logksi) {
-	if (logksi == NULL) return;
-	block_info_reset_block_info(&logksi->block);
-	extract_task_reset_block_info(&logksi->task.extract);
-	integrate_task_reset_block_info(&logksi->task.integrate);
-	sign_task_reset_block_info(&logksi->task.sign);
-	extend_task_reset_block_info(&logksi->task.extend);
+
+
+/* Called right before process_block_header. */
+int LOGKSI_initNextBlock(LOGKSI *logksi) {
+	if (logksi == NULL) return KT_INVALID_ARGUMENT;
+
+	logksi->blockNo++;
+
+	/* Previous and current (next) signature time. Note that 0 indicates not set. */
+	if (logksi->block.sigTime_1 > 0 || logksi->block.curBlockNotSigned) {
+		logksi->sigTime_0 = logksi->block.sigTime_1;
+		logksi->block.sigTime_1 = 0;
+	}
+
+	logksi_reset_block_info(logksi);
+
+	logksi->block.firstLineNo = logksi->file.nofTotalRecordHashes + 1;
+
+	return KT_OK;
 }
 
 int LOGKSI_get_aggregation_level(LOGKSI *logksi) {
@@ -140,351 +145,39 @@ int LOGKSI_get_aggregation_level(LOGKSI *logksi) {
 	return level;
 }
 
-static int block_info_store_logline(LOGKSI *logksi, char *buf) {
-	int res;
-	char *tmp = NULL;
-
-	if (logksi == NULL || buf == NULL) {
-		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
-
-	tmp = (char*)malloc(strlen(buf) + 1);
-	if (tmp == NULL) {
-		res = KT_OUT_OF_MEMORY;
-		goto cleanup;
-	}
-
-	strncpy(tmp, buf, strlen(buf) + 1);
-	free(logksi->logLine);
-	logksi->logLine = tmp;
-	tmp = NULL;
-
-	res = KT_OK;
-
-cleanup:
-
-	free(tmp);
-	return res;
-}
-
-int LOGKSI_calculate_hash_of_logline_and_store_logline(LOGKSI *logksi, IO_FILES *files, KSI_DataHash **hash) {
-	int res;
-	KSI_DataHash *tmp = NULL;
-	KSI_DataHasher *pHasher = NULL;
-	/* Maximum line size is 64K characters, without newline character. */
-	char buf[0x10000 + 2];
-
-	if (files == NULL || hash == NULL) {
-		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
-
-	res = MERKLE_TREE_getHasher(logksi->tree, &pHasher);
-	if (res != KSI_OK) goto cleanup;
-
-	if (files->files.inLog) {
-		res = SMART_FILE_gets(files->files.inLog, buf, sizeof(buf), NULL);
-		if (res != SMART_FILE_OK) goto cleanup;
-
-		res = KSI_DataHasher_reset(pHasher);
-		if (res != KSI_OK) goto cleanup;
-
-		/* Last character (newline) is not used in hash calculation. */
-		res = KSI_DataHasher_add(pHasher, buf, strlen(buf) - 1);
-		if (res != KSI_OK) goto cleanup;
-
-		res = KSI_DataHasher_close(pHasher, &tmp);
-		if (res != KSI_OK) goto cleanup;
-
-		/* Store logline for extraction. */
-		res = block_info_store_logline(logksi, buf);
-		if (res != KT_OK) goto cleanup;
-	}
-	*hash = tmp;
-	tmp = NULL;
-	res = KT_OK;
-
-cleanup:
-
-	KSI_DataHash_free(tmp);
-	return res;
-}
-
-static int block_info_store_metarecord(LOGKSI *logksi, KSI_TlvElement *tlv) {
-	int res;
-	size_t len = 0;
-	unsigned char *buf = NULL;
-
-	if (logksi == NULL || tlv == NULL) {
-		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
-
-	res = KSI_TlvElement_serialize(tlv, NULL, 0, &len, 0);
-	if (res != KSI_OK) goto cleanup;
-
-	buf = (unsigned char*)malloc(len);
-	if (buf == NULL) {
-		res = KT_OUT_OF_MEMORY;
-		goto cleanup;
-	}
-
-	res = KSI_TlvElement_serialize(tlv, buf, len, &len, 0);
-	if (res != KSI_OK) goto cleanup;
-
-	free(logksi->task.extract.metaRecord);
-	logksi->task.extract.metaRecord = buf;
-	logksi->task.extract.metaRecord_len = len;
-	buf = NULL;
-
-	res = KT_OK;
-
-cleanup:
-
-	free(buf);
-	return res;
-}
-
-int LOGKSI_calculate_hash_of_metarecord_and_store_metarecord(LOGKSI *logksi, KSI_TlvElement *tlv, KSI_DataHash **hash) {
-	int res;
-	KSI_DataHash *tmp = NULL;
-	KSI_DataHasher *pHasher = NULL;
-
-	if (tlv == NULL || hash == NULL) {
-		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
-
-	res = MERKLE_TREE_getHasher(logksi->tree, &pHasher);
-	if (res != KSI_OK) goto cleanup;
-
-	res = KSI_DataHasher_reset(pHasher);
-	if (res != KSI_OK) goto cleanup;
-
-	/* The complete metarecord TLV us used in hash calculation. */
-	res = KSI_DataHasher_add(pHasher, tlv->ptr, tlv->ftlv.hdr_len + tlv->ftlv.dat_len);
-	if (res != KSI_OK) goto cleanup;
-
-	res = KSI_DataHasher_close(pHasher, &tmp);
-	if (res != KSI_OK) goto cleanup;
-
-	/* Store metarecord for extraction. */
-	res = block_info_store_metarecord(logksi, tlv);
-	if (res != KT_OK) goto cleanup;
-
-	*hash = tmp;
-	tmp = NULL;
-	res = KT_OK;
-
-cleanup:
-
-	KSI_DataHash_free(tmp);
-	return res;
-}
-
-/* MERKLE_TREE newRecordChain implementation. */
-int logksi_new_record_chain(MERKLE_TREE *tree, void *ctx, int isMetaRecordHash, KSI_DataHash *hash) {
-	int res;
-	LOGKSI *logksi = ctx;
-	ERR_TRCKR *err = NULL;
-	KSI_DataHash *hshRef = NULL;
-	KSI_DataHash *prevMask = NULL;
-	char *logLineCopy = NULL;
-
-	if (tree == NULL || ctx == NULL || hash == NULL) {
-		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
-
-	err = logksi->err;
-
-	/*
-	 * Enter only if not all extract positions are found AND
-	 * current record hash is at desired position.
-	 */
-	if (EXTRACT_INFO_isLastPosPending(logksi->task.extract.info) &&
-		EXTRACT_INFO_getNextPosition(logksi->task.extract.info) - logksi->file.nofTotalRecordHashes == logksi->block.nofRecordHashes) {
-		RECORD_INFO *recordInfo = NULL;
-		size_t index = 0;
-
-		hshRef = KSI_DataHash_ref(hash);
-		if (hshRef == NULL) {
-			res = KT_OUT_OF_MEMORY;
-			ERR_CATCH_MSG(err, res, "Error: Unable to create hash reference.");
+int LOGKSI_hasWarnings(LOGKSI *logksi) {
+	if (logksi) {
+		if (logksi->task.integrate.warningSignatures || logksi->file.warningTreeHashes || logksi->file.warningLegacy) {
+			return 1;
 		}
-
-		/* Get reference to record info. */
-		res = EXTRACT_INFO_getNewRecord(logksi->task.extract.info, &index, &recordInfo);
-		ERR_CATCH_MSG(err, res, "Error: Unable to create new extract info extractor.");
-
-		res = logksi_set_extract_record(logksi, recordInfo, isMetaRecordHash, hash);
-		if (isMetaRecordHash) {
-			ERR_CATCH_MSG(err, res, "Error: Unable to create new extract record for metadata.");
-		} else {
-			ERR_CATCH_MSG(err, res, "Error: Unable to create new extract record for record.");
-		}
-
-		/* Retreive and use mask. */
-		res = MERKLE_TREE_getPrevMask(tree, &prevMask);
-		if (res != KT_OK) goto cleanup;
-
-		if (isMetaRecordHash) {
-			res = RECORD_INFO_add_hash_to_record_chain(recordInfo, LEFT_LINK, prevMask, 0);
-		} else {
-			res = RECORD_INFO_add_hash_to_record_chain(recordInfo, RIGHT_LINK, prevMask, 0);
-		}
-		if (res != KT_OK) goto cleanup;
-
-		res = EXTRACT_INFO_moveToNext(logksi->task.extract.info);
-		ERR_CATCH_MSG(err, res, "Error: Unable to move to next extract position.");
 	}
-
-
-	res = KT_OK;
-
-cleanup:
-
-	KSI_DataHash_free(hshRef);
-	KSI_DataHash_free(prevMask);
-	free(logLineCopy);
-
-	return res;
+	return 0;
 }
 
-/* MERKLE_TREE extractRecordChain implementation. */
-int logksi_extract_record_chain(MERKLE_TREE *tree, void *ctx, unsigned char level, KSI_DataHash *leftLink) {
-	int res;
-	size_t j;
-	int condition;
-	LOGKSI *logksi = ctx;
-	ERR_TRCKR *err = NULL;
-	KSI_DataHash *hsh = NULL;
-	int finalize;
+int LOGKSI_getMaxFinalHashes(LOGKSI *logksi) {
+	int finalHashes = 0;
+	int i;
+	if (logksi) {
+		for (i = 0; i < MERKLE_TREE_getHeight(logksi->tree); i++) {
+			KSI_DataHash *hsh = NULL;
+			int res = KT_UNKNOWN_ERROR;
 
-	if (ctx == NULL || leftLink == NULL) {
-		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
+			res = MERKLE_TREE_get(logksi->tree, i, &hsh);
+			if (res != KT_OK) return finalHashes;
 
-	err = logksi->err;
-	finalize = MERKLE_TREE_isClosing(tree);
-
-	/**
-	 * The input hash will represent the root value of the leftmost subtree that
-	 * has level. The root value is compared with extract info and its suitability
-	 * for extract hash chain node is examined. If value is suitable it is included
-	 * to the chain.
-	 */
-	for (j = 0; j < EXTRACT_INFO_getPositionsInBlock(logksi->task.extract.info); j++) {
-		RECORD_INFO *record = NULL;
-		size_t recordOffset = 0;
-		size_t recordLevel = 0;
-
-		res = EXTRACT_INFO_getRecord(logksi->task.extract.info, j, &record);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to get extract record.", logksi->blockNo);
-
-		res = RECORD_INFO_getPositionInTree(record, &recordOffset, &recordLevel);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable get extract record position in tree.", logksi->blockNo);
-
-		/**
-		 * Check that the (level + 1) matches with extractLevel (expected next level).
-		 * If the level is less it is not suitable for building extract chain.
-		 */
-		if (finalize) {
-			condition = (level + 1 >= recordLevel);
-		} else {
-			condition = (level + 1 == recordLevel);
-		}
-		if (condition) {
-			if (((recordOffset - 1) >> level) & 1L) {
-				res = MERKLE_TREE_get(logksi->tree, level, &hsh);
-				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable get hash from merkle tree.", logksi->blockNo);
-
-				res = RECORD_INFO_add_hash_to_record_chain(record, RIGHT_LINK, hsh, level + 1 - recordLevel);
-			} else {
-				res = RECORD_INFO_add_hash_to_record_chain(record, LEFT_LINK, leftLink, level + 1 - recordLevel);
+			if (hsh != NULL) {
+				finalHashes++;
 			}
-			if (res != KT_OK) {
-				ERR_CATCH_MSG(err, res, "Error: Unable to add hash to record chain.");
-				goto cleanup;
-			}
+
+			KSI_DataHash_free(hsh);
 		}
+		finalHashes--;
 	}
-
-	res = KT_OK;
-
-cleanup:
-
-	KSI_DataHash_free(hsh);
-
-	return res;
+	return finalHashes;
 }
 
-int logksi_add_record_hash_to_merkle_tree(LOGKSI *logksi, int isMetaRecordHash, KSI_DataHash *hash) {
-	if (logksi == NULL) {
-		return KT_INVALID_ARGUMENT;
-	}
 
-	if (isMetaRecordHash) {
-		logksi->file.nofTotalMetarecords++;
-		logksi->block.nofMetaRecords++;
-		logksi->file.nofTotalRecordHashes--;
-	}
-
-	return MERKLE_TREE_add_record_hash_to_merkle_tree(logksi->tree, isMetaRecordHash, hash);
-}
-
-int logksi_set_extract_record(LOGKSI *logksi, RECORD_INFO *recordInfo, int isMetaRecordHash, KSI_DataHash *hash) {
-	int res = KT_UNKNOWN_ERROR;
-	KSI_DataHash *hashRef = NULL;
-	char *logLineCopy = NULL;
-
-
-	if (logksi == NULL || recordInfo == NULL || hash == NULL) {
-		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
-
-	hashRef = KSI_DataHash_ref(hash);
-	if (hashRef == NULL) {
-		res = KT_OUT_OF_MEMORY;
-		goto cleanup;
-	}
-
-	if (isMetaRecordHash) {
-		res = RECORD_INFO_setMetaRecordHash(recordInfo,
-			EXTRACT_INFO_getNextPosition(logksi->task.extract.info),
-			logksi->block.nofRecordHashes,
-			hashRef,
-			logksi->task.extract.metaRecord, logksi->task.extract.metaRecord_len);
-		if (res != KT_OK) goto cleanup;
-		hashRef = NULL;
-	} else {
-		res = KSI_strdup(logksi->logLine, &logLineCopy);
-		if (res != KT_OK) goto cleanup;
-
-		res = RECORD_INFO_setRecordHash(recordInfo,
-			EXTRACT_INFO_getNextPosition(logksi->task.extract.info),
-			logksi->block.nofRecordHashes,
-			hashRef, logLineCopy);
-		if (res != KT_OK) goto cleanup;
-
-		hashRef = NULL;
-		logLineCopy = NULL;
-	}
-
-	res = KT_OK;
-
-cleanup:
-
-	KSI_DataHash_free(hashRef);
-	free(logLineCopy);
-
-	return res;
-}
-
-size_t logksi_get_nof_lines(LOGKSI *logksi) {
+size_t LOGKSI_getNofLines(LOGKSI *logksi) {
 	if (logksi) {
 		return logksi->block.nofRecordHashes + logksi->file.nofTotalRecordHashes;
 	} else {
@@ -661,4 +354,13 @@ static void extend_task_reset_block_info(EXTEND_TASK *obj) {
 	if (obj == NULL) return;
 	obj->extendedToTime = 0;
 	return;
+}
+
+static void logksi_reset_block_info(LOGKSI *logksi) {
+	if (logksi == NULL) return;
+	block_info_reset_block_info(&logksi->block);
+	extract_task_reset_block_info(&logksi->task.extract);
+	integrate_task_reset_block_info(&logksi->task.integrate);
+	sign_task_reset_block_info(&logksi->task.sign);
+	extend_task_reset_block_info(&logksi->task.extend);
 }

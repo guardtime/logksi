@@ -17,27 +17,36 @@
  * reserves and retains all trademark rights.
  */
 
-#ifndef LOGKSI_H
-#define	LOGKSI_H
+#ifndef LOGSIG_VERSION_H
+#define LOGSIG_VERSION_H
 
-#include <ksi/ksi.h>
-#include "logksi_impl.h"
+#include <stddef.h>
+#include <ctype.h>
+#include "smart_file.h"
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-void LOGKSI_initialize(LOGKSI *block);
-void LOGKSI_freeAndClearInternals(LOGKSI *logksi);
-int LOGKSI_initNextBlock(LOGKSI *logksi);
-int LOGKSI_get_aggregation_level(LOGKSI *logksi);
-int LOGKSI_hasWarnings(LOGKSI *logksi);
-int LOGKSI_getMaxFinalHashes(LOGKSI *logksi);
-size_t LOGKSI_getNofLines(LOGKSI *logksi);
+#define MAGIC_SIZE 8
 
+typedef enum {
+	LOGSIG11 = 0,
+	LOGSIG12 = 1,
+	RECSIG11 = 2,
+	RECSIG12 = 3,
+	LOG12BLK = 4,
+	LOG12SIG = 5,
+	NOF_VERS,
+	UNKN_VER = 0xff
+} LOGSIG_VERSION;
+
+const char* LOGSIG_VERSION_toString(LOGSIG_VERSION ver);
+LOGSIG_VERSION LOGSIG_VERSION_getIntProofVer(LOGSIG_VERSION ver);
+LOGSIG_VERSION LOGSIG_VERSION_getFileVer(SMART_FILE *in);
 
 #ifdef	__cplusplus
 }
 #endif
 
-#endif	/* LOGKSI_H */
+#endif	/* LOGSIG_VERSION_H */

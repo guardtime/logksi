@@ -71,6 +71,8 @@ int MERKLE_TREE_setFinalHashesForVerification(MERKLE_TREE *tree);
 int MERKLE_TREE_popUnverifed(MERKLE_TREE *tree, unsigned char *pos, KSI_DataHash **hsh);
 int MERKLE_TREE_insertUnverified(MERKLE_TREE *tree, unsigned char pos, KSI_DataHash *hsh);
 
+size_t MERKLE_TREE_calcMaxTreeHashes(size_t nof_records);
+
 #ifdef	__cplusplus
 }
 #endif
