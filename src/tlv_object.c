@@ -330,7 +330,6 @@ static int foldl(void *acc, LINK_DIRECTION dir, KSI_DataHash *sibling, size_t co
 	res = KSI_TlvElement_appendElement(recChain, hashStep);
 	if (res != KT_OK) goto cleanup;
 
-	hashStep = NULL;
 
 	res = KT_OK;
 

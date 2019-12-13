@@ -267,6 +267,8 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 							print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
 						}
 
+						KSI_DataHash_free(prevLeaf);
+						prevLeaf = NULL;
 					}
 
 				break;
@@ -1090,6 +1092,9 @@ static int logksi_extract_record_chain(MERKLE_TREE *tree, void *ctx, unsigned ch
 				ERR_CATCH_MSG(err, res, "Error: Unable to add hash to record chain.");
 				goto cleanup;
 			}
+
+			KSI_DataHash_free(hsh);
+			hsh = NULL;
 		}
 	}
 

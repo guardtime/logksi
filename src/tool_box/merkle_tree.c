@@ -357,6 +357,7 @@ cleanup:
 
 		KSI_DataHash_free(right);
 		right = tmp;
+		tmp = NULL;
 		KSI_DataHash_free(tree->MerkleTree[i]);
 		tree->MerkleTree[i] = NULL;
 		i++;
@@ -375,7 +376,6 @@ cleanup:
 	KSI_DataHash_free(tree->prevLeaf);
 	tree->prevLeaf = KSI_DataHash_ref(hash);
 	right = NULL;
-	tmp = NULL;
 	res = KT_OK;
 
 cleanup:

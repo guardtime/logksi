@@ -953,6 +953,7 @@ static int process_block_header(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *er
 
 			if (logksi->task.verify.lastBlockWasSkipped) {
 				PST_snprintf(debugMessage, sizeof(debugMessage), " Failure may be caused by the error in the previous block %zu. Using input hash of the current block instead.", logksi->blockNo - 1);
+				KSI_DataHash_free(replacement);
 				replacement = KSI_DataHash_ref(hash);
 			}
 
@@ -1092,6 +1093,7 @@ static int process_tree_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, 
 	KSI_DataHash *tmpRoot = NULL;
 	KSI_DataHash *root = NULL;
 	KSI_DataHash *replacement = NULL;
+	KSI_DataHash *tmp = NULL;
 	unsigned char i;
 
 	if (err == NULL || files == NULL || logksi == NULL) {
@@ -1195,7 +1197,6 @@ static int process_tree_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, 
 		}
 	} else {
 		if (logksi->block.nofRecordHashes) {
-			KSI_DataHash *tmp = NULL;
 			char description[1024];
 			PST_snprintf(description, sizeof(description), "Tree hash mismatch in block %zu", logksi->blockNo);
 
@@ -1243,6 +1244,7 @@ cleanup:
 	KSI_DataHash_free(tmpRoot);
 	KSI_DataHash_free(root);
 	KSI_DataHash_free(replacement);
+	KSI_DataHash_free(tmp);
 	return res;
 }
 

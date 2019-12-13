@@ -40,6 +40,7 @@ cp test/resource/logfiles/signed test/out/signed4
 	run test -f test/out/signed3.logsig.bak
 	[ "$status" -ne 0 ]
 }
+
 @test "extend signed3.logsig to output signed4.logsig" {
 	run ./src/logksi extend test/out/signed3 -o test/out/signed4.logsig \
 	--pub-str AAAAAA-C2PMAF-IAISKD-4JLNKD-ZFCF5L-4OWMS5-DMJLTC-DCJ6SS-QDFBC4-ELLWTM-5BO7WF-I7W2JK \
