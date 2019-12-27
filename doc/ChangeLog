@@ -2,6 +2,7 @@
 (LOGKSI-133) * IMPROVEMENT: Wording for inconclusive verification result message improved.
 (LOGKSI-133) * IMPROVEMENT: Inconclusive verification result will return EXIT_FAILURE as exit code.
 (LOGKSI-132) * IMPROVEMENT: Detailed verification errors are displayed before error trace.
+(LOGKSI-127) * IMPROVEMENT: At least libksi 3.20 is needed to build logksi.
 (LOGKSI-132) * BUGFIX: When verifying and --continue-on-fail is set, error trace is not crowded with detailed error messages.
 (LOGKSI-132) * BUGFIX: When during verification resource is not available due to user error, verification is stopped.
 (LOGKSI-132) * BUGFIX: Duplicate suggestions messages are not displayed.
