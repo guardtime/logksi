@@ -41,6 +41,7 @@ int block_info_calculate_hash_of_metarecord_and_store_metarecord(BLOCK_INFO *blo
 
 void BLOCK_INFO_clearAll(BLOCK_INFO *block);
 void BLOCK_INFO_freeAndClearInternals(BLOCK_INFO *blocks);
+int BLOCK_INFO_setErrorLevel(BLOCK_INFO *blocks, int lvl);
 
 #ifdef	__cplusplus
 }
