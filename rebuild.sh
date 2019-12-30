@@ -54,7 +54,7 @@ help_txt() {
 	echo "         values. Note that full path is required!"
 	echo ""
 	echo "  --inc-dir | -i"
-	echo "       - Path to directory containing include directories. Can have."
+	echo "       - Path to directory containing include directories. Can have"
 	echo "         multiple values. Note that full path is required!"
 	echo ""
 	echo "  --lib | -b"
