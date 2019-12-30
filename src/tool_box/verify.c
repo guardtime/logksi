@@ -578,9 +578,19 @@ static int isUserInputError(KSI_PolicyVerificationResult *result) {
 	return 0;
 }
 
-static int handle_verification_result(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ctx, BLOCK_INFO *blocks, KSI_Signature *sig, KSI_PublicationData *pubData, int res, const char *task_desc, KSI_PolicyVerificationResult *result, int isPubBased) {
+static int mapToLogksiVerRes(KSI_RuleVerificationResult *verificationResult) {
+	if (verificationResult == NULL) return LOGKSI_VER_RES_INVALID;
+	switch (verificationResult->resultCode) {
+		case KSI_VER_RES_OK: return LOGKSI_VER_RES_OK;
+		case KSI_VER_RES_FAIL: return LOGKSI_VER_RES_FAIL;
+		case KSI_VER_RES_NA: return LOGKSI_VER_RES_NA;
+		default: return LOGKSI_VER_RES_INVALID;
+	}
+}
+
+static int handle_verification_result(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ctx, BLOCK_INFO *blocks, KSI_Signature *sig, KSI_PublicationData *pubData, int res_in, const char *task_desc, KSI_PolicyVerificationResult *result, int isPubBased) {
 	KSI_RuleVerificationResult *verificationResult = NULL;
-	int res_out = res;
+	int res_out = res_in;
 
 	if (isUserInputError(result)) {
 		res_out = KT_USER_INPUT_FAILURE;
@@ -589,7 +599,11 @@ static int handle_verification_result(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRC
 	if (KSI_RuleVerificationResultList_elementAt(
 			result->ruleResults, KSI_RuleVerificationResultList_length(result->ruleResults) - 1,
 			&verificationResult) == KSI_OK && verificationResult != NULL) {
-			if (isPubBased) signature_set_suggestions_for_publication_based_verification(set, err, res, ctx, sig, verificationResult, pubData);
+			int res = KT_UNKNOWN_ERROR;
+			if (isPubBased) signature_set_suggestions_for_publication_based_verification(set, err, res_in, ctx, sig, verificationResult, pubData);
+
+			res = BLOCK_INFO_setErrorLevel(blocks, mapToLogksiVerRes(verificationResult));
+			if (res != KT_OK) return res;
 
 			if (verificationResult->status != KSI_OK && verificationResult->statusMessage != NULL) {
 				size_t str_len = strlen(verificationResult->statusMessage);
@@ -604,7 +618,7 @@ static int handle_verification_result(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRC
 				print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: %s%s", blocks->blockNo, verificationResult->statusMessage, period);
 			}
 
-			print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
+			print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res_in);
 			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: %s: [%s] %s.",
 				task_desc,
 				OBJPRINT_getVerificationErrorCode(verificationResult->errorCode),
@@ -685,7 +699,10 @@ static int signature_verify_general(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR
 	print_progressDesc(mp, MP_ID_BLOCK, d, DEBUG_LEVEL_3, "%s... ", task);
 
 	res = check_resources_verify_general(set, err, sig, pub_data, x);
-	if (res != KT_OK) goto cleanup;
+	if (res != KT_OK) {
+		BLOCK_INFO_setErrorLevel(blocks, LOGKSI_VER_RES_NA);
+		goto cleanup;
+	}
 
 	res = LOGKSI_SignatureVerify_general(err, sig, ksi, hsh, rootLevel, pub_data, x, out);
 	if (res != KSI_OK && *out != NULL) {
