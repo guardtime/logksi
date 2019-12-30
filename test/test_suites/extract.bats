@@ -263,7 +263,7 @@ cp -r test/resource/logfiles/legacy_extract test/out
 }
 
 @test "extract records from non-extended legacy.gtsig" {
-	run ./src/logksi verify test/out/legacy_extract -ddd
+	run ./src/logksi verify --ver-int test/out/legacy_extract -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Warning: RFC3161 timestamp(s) found in log signature." ]]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
@@ -271,7 +271,7 @@ cp -r test/resource/logfiles/legacy_extract test/out
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Warning: RFC3161 timestamp(s) found in log signature." ]]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run ./src/logksi verify test/out/legacy_extract.excerpt -ddd
+	run ./src/logksi verify --ver-int test/out/legacy_extract.excerpt -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	run diff test/out/legacy_extract.excerpt test/resource/logfiles/legacy_extract.r1-20.excerpt

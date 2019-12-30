@@ -7,6 +7,8 @@
 (LOGKSI-132) * BUGFIX: When during verification resource is not available due to user error, verification is stopped.
 (LOGKSI-132) * BUGFIX: Duplicate suggestions messages are not displayed.
 (LOGKSI-136) * BUGFIX: rebuild.sh --get-dep-online fixed.
+(LOGKSI-140) * BUGFIX: Legacy signature tests fixed.
+(LOGKSI-141) * BUGFIX: When extending RFC3161 timestamps without --enable-rfc3161-conversion original file is restored from backup.
 
 Version 1.5
 
