@@ -3359,9 +3359,7 @@ cleanup:
 	 * + Inconsistent state discards temporary file created.
 	 */
 	if (files->files.outSig != NULL &&
-										(res != KT_OK ||
-										 (!blocks.outSigModified && !PARAM_SET_isSetByName(set, "o") && SMART_FILE_doFileExist(files->internal.outSig))
-										)) {
+		(res != KT_OK || (!blocks.outSigModified && !PARAM_SET_isSetByName(set, "o") && SMART_FILE_doFileExist(files->internal.outSig)))) {
 		int tmp_res;
 		tmp_res = SMART_FILE_markInconsistent(files->files.outSig);
 		ERR_CATCH_MSG(err, tmp_res, "Error: Unable to mark output signature file as inconsistent.");
@@ -4046,9 +4044,7 @@ cleanup:
 	 * + Inconsistent state discards temporary file created.
 	 */
 	if (files->files.outSig != NULL &&
-										(res != KT_OK ||
-										 (!blocks.outSigModified && !PARAM_SET_isSetByName(set, "o") && SMART_FILE_doFileExist(files->internal.outSig))
-										)) {
+		(res != KT_OK || (!blocks.outSigModified && !PARAM_SET_isSetByName(set, "o") && SMART_FILE_doFileExist(files->internal.outSig)))) {
 		int tmp_res;
 		tmp_res = SMART_FILE_markInconsistent(files->files.outSig);
 		ERR_CATCH_MSG(err, tmp_res, "Error: Unable to mark output signature file as inconsistent.");
