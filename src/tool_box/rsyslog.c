@@ -3352,6 +3352,18 @@ int logsignature_extend(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 	res = KT_OK;
 
 cleanup:
+	/**
+	 * + If there is error mark output file as inconsistent.
+	 * + If there is no changes and output is not explicitly specified
+	 *   and output file already exists, mark output file as inconsistent.
+	 * + Inconsistent state discards temporary file created.
+	 */
+	if (files->files.outSig != NULL &&
+		(res != KT_OK || (!blocks.outSigModified && !PARAM_SET_isSetByName(set, "o") && SMART_FILE_doFileExist(files->internal.outSig)))) {
+		int tmp_res;
+		tmp_res = SMART_FILE_markInconsistent(files->files.outSig);
+		ERR_CATCH_MSG(err, tmp_res, "Error: Unable to mark output signature file as inconsistent.");
+	}
 
 	BLOCK_INFO_freeAndClearInternals(&blocks);
 	KSI_DataHash_free(theFirstInputHashInFile);
@@ -4032,9 +4044,7 @@ cleanup:
 	 * + Inconsistent state discards temporary file created.
 	 */
 	if (files->files.outSig != NULL &&
-										(res != KT_OK ||
-										 (!blocks.outSigModified && !PARAM_SET_isSetByName(set, "o") && SMART_FILE_doFileExist(files->internal.outSig))
-										)) {
+		(res != KT_OK || (!blocks.outSigModified && !PARAM_SET_isSetByName(set, "o") && SMART_FILE_doFileExist(files->internal.outSig)))) {
 		int tmp_res;
 		tmp_res = SMART_FILE_markInconsistent(files->files.outSig);
 		ERR_CATCH_MSG(err, tmp_res, "Error: Unable to mark output signature file as inconsistent.");
