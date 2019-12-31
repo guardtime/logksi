@@ -26,9 +26,10 @@
 #include <ksi/ksi.h>
 #include <ksi/compatibility.h>
 #include <ksi/policy.h>
-#include "param_set/param_set.h"
-#include "param_set/task_def.h"
-#include "param_set/parameter.h"
+#include <param_set/param_set.h>
+#include <param_set/task_def.h>
+#include <param_set/parameter.h>
+#include <param_set/strn.h>
 #include "tool_box/ksi_init.h"
 #include "tool_box/param_control.h"
 #include "tool_box/task_initializer.h"
@@ -81,6 +82,7 @@ static void close_log_and_signature_files(IO_FILES *files);
 static int save_output_hash(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *ioFiles, KSI_DataHash *hash, char * logFileName, char * sigFileName);
 static int getLogFiles(PARAM_SET *set, ERR_TRCKR *err, int i, IO_FILES *files);
 
+#define PARAMS "{warn-same-block-time}{warn-client-id-change}{ignore-desc-block-time}{multiple_logs}{input}{input-hash}{client-id}{output-hash}{log-from-stdin}{x}{d}{pub-str}{ver-int}{ver-cal}{ver-key}{ver-pub}{use-computed-hash-on-fail}{use-stored-hash-on-fail}{continue-on-fail}{conf}{time-form}{time-base}{time-diff}{time-disordered}{block-time-diff}{log}{h|help}{hex-to-str}"
 
 int verify_run(int argc, char **argv, char **envp) {
 	int res;
@@ -112,7 +114,7 @@ int verify_run(int argc, char **argv, char **envp) {
 	 * Extract command line parameters and also add configuration specific parameters.
 	 */
 	res = PARAM_SET_new(
-			CONF_generate_param_set_desc("{warn-same-block-time}{warn-client-id-change}{ignore-desc-block-time}{multiple_logs}{input}{input-hash}{client-id}{output-hash}{log-from-stdin}{x}{d}{pub-str}{ver-int}{ver-cal}{ver-key}{ver-pub}{use-computed-hash-on-fail}{use-stored-hash-on-fail}{continue-on-fail}{conf}{time-form}{time-base}{time-diff}{time-disordered}{block-time-diff}{log}{h|help}{hex-to-str}", "XP", buf, sizeof(buf)),
+			CONF_generate_param_set_desc(PARAMS, "XP", buf, sizeof(buf)),
 			&set);
 	if (res != KT_OK) goto cleanup;
 
@@ -275,153 +277,86 @@ cleanup:
 }
 
 char *verify_help_toString(char *buf, size_t len) {
-	KSI_snprintf(buf, len,
-		"Usage:\n"
-		" %s verify <logfile> [<logfile.logsig>] [more_options]\n"
-		" %s verify --log-from-stdin <logfile.logsig> [more_options]\n"
-		" %s verify <logfile>.excerpt [<logfile.excerpt.logsig>] [more_options]\n"
-		" %s verify --log-from-stdin <logfile.excerpt.logsig> [more_options]\n"
-		" %s verify --ver-int <logfile> [<logfile.logsig>] [more_options]\n"
-		" %s verify --ver-cal <logfile> [<logfile.logsig>] -X <URL>\n"
-		"     [--ext-user <user> --ext-key <key>] [more_options]\n"
-		" %s verify --ver-key <logfile> [<logfile.logsig>] -P <URL>\n"
-		"     [--cnstr <oid=value>]... [more_options]\n"
-		" %s verify --ver-pub <logfile> [<logfile.logsig>] --pub-str <pubstr>\n"
-		"     [-x -X <URL>  [--ext-user <user> --ext-key <key>]] [more_options]\n"
-		" %s verify --ver-pub <logfile> [<logfile.logsig>] -P <URL> [--cnstr <oid=value>]...\n"
-		"        [-x -X <URL>  [--ext-user <user> --ext-key <key>]] [more_options]\n"
-		"\n"
-		" --ver-int\n"
-		"           - Perform internal verification.\n"
-		" --ver-cal\n"
-		"           - Perform calendar-based verification (use extending service).\n"
-		" --ver-key\n"
-		"           - Perform key-based verification.\n"
-		" --ver-pub\n"
-		"           - Perform publication-based verification (use with '-x' to permit extending).\n"
-		" <logfile>\n"
-		"           - Log file to be verified.\n"
-		" <logfile.logsig>\n"
-		"           - Log signature file to be verified. If omitted, the log signature file name is\n"
-		"             derived by adding either '.logsig' or '.gtsig' to '<logfile>'. The file is expected\n"
-		"             to be found in the same folder as the '<logfile>'.\n"
-		" <logfile.excerpt>\n"
-		"           - Excerpt file to be verified.\n"
-		" <logfile.excerpt.logsig>\n"
-		"           - Record integrity proof file to be verified. If omitted, the file name is\n"
-		"             derived by adding '.logsig' to '<logfile>.excerpt'. It is expected to be found in the\n"
-		"             same folder as the '<logfile>.excerpt'\n"
-		" --log-from-stdin\n"
-		"           - The log or excerpt file is read from stdin.\n"
-		"             If '--log-from-stdin' is used, the log signature or integrity proof file name must\n"
-		"             be specified explicitly.\n"
-		" --        - If used, everything specified after the token is interpreted as\n"
-		"             <logfile>. Note that log signature files can NOT be specified manually\n"
-		"             and must have matching file names to log files. If multiple log files\n"
-		"             are specified, both integrity and inter-linking between them is verified.\n"
-		" --input-hash <hash>\n"
-		"           - Specify hash imprint for inter-linking (the last leaf from the previous\n"
-		"             log signature) verification. Hash can be specified on command line or\n"
-		"             from a file containing its string representation. Hash format:\n"
-		"             <alg>:<hash in hex>. Use '-' as file name to read the imprint from\n"
-		"             stdin. Call logksi -h to get the list of supported hash algorithms.\n"
-		"             See --output-hash to see how to extract the hash imprint from the previous\n"
-		"             log signature. When used together with --, only the first log file is\n"
-		"             verified against specified value.\n"
-		" --output-hash <file>\n"
-		"           - Output the last leaf from the log signature into file. Use '-' as\n"
-		"             file name to redirect hash imprint to stdout. See --input-hash to\n"
-		"             see how to verify that log signature is bound with this log signature\n"
-		"             (where from the output hash was extracted). When used together with\n"
-		"             '--', only the output hash of the last log file is returned.\n"
-		" --ignore-desc-block-time\n"
-		"           - Skip signing time verification where more recent log blocks must have\n"
-		"             more recent (or equal) signing time than previous blocks.\n"
-		" --client-id <regexp>\n"
-		"           - Verifies if KSI signatures client ID is matching regular expression\n"
-		"             specified.\n"
-		" --time-form <fmt>\n"
-		"           - Format string fmt is used to extract time stamp from the beginning\n"
-		"             of the log line to be matched with KSI signature signing time. Fmt\n"
-		"             is specified by function strptime and its documentation can be read\n"
-		"             for more details.\n"
-		" --time-base <year>\n"
-		"           - Specify the year (e.g. 2019) when it can not be extracted with\n"
-		"             --time-form.\n"
-		" --time-diff <time>\n"
-		"           - A specified time difference that with the signing time of the KSI\n"
-		"             signature forms a valid time window where all the log records must\n"
-		"             fit. Also the chronological order of the log records is checked.\n"
-		"             The difference can be specified as seconds (e.g 86400) or using\n"
-		"             integers followed by markers (e.g. 10d2H3M1S), where d, H, M and S\n"
-		"             stand for day, hour, minute and second accordingly.\n"
-		" --time-disordered <time>\n"
-		"          -  Will permit log records to be disordered within specified range\n"
-		"             (e.g. with value 1 following sequence of time values is correct:\n"
-		"             1, 3, 2, 4).\n"
-		" --warn-client-id-change\n"
-		"           - Will warn the user if KSI signatures client ID is not constant over\n"
-		"             all the blocks.\n"
-		" --warn-same-block-time\n"
-		"           - Prints a warning when two consecutive blocks have same signing time.\n"
-		"             When multiple log files are verified the last block from the previous\n"
-		"             file is compared with the first block from the current file.\n"
-		" --continue-on-fail\n"
-		"           - Can be used to continue verification to improve\n"
-		"             debugging of verification errors. Other errors (e.g. IO error) will\n"
-		"             terminated verification.\n"
-		" --use-stored-hash-on-fail\n"
-		"           - Can be used to debug hash comparison failures, by\n"
-		"             using stored hash values to continue verification process.\n"
-		" --use-computed-hash-on-fail\n"
-		"           - Can be used to debug hash comparison failures, by\n"
-		"             using computed hash values to continue verification process.\n"
-		" -x\n"
-		"           - Permit to use extender for publication-based verification.\n"
-		" -X <URL>\n"
-		"           - Extending service (KSI Extender) URL.\n"
-		" --ext-user <user>\n"
-		"           - Username for extending service.\n"
-		" --ext-key <key>\n"
-		"           - HMAC key for extending service.\n"
-		" --ext-hmac-alg <alg>\n"
-		"           - Hash algorithm to be used for computing HMAC on outgoing messages\n"
-		"             towards KSI extender. If not set, default algorithm is used.\n"
-		" -P <URL>\n"
-		"           - Publications file URL (or file with URI scheme 'file://').\n"
-		" --cnstr <oid=value>\n"
-		"           - OID of the PKI certificate field (e.g. e-mail address) and the expected\n"
-		"             value to qualify the certificate for verification of publications file\n"
-		"             PKI signature. At least one constraint must be defined.\n"
-		" --pub-str <str>\n"
-		"           - Publication string to verify with.\n"
-		" -V\n"
-		"           - Certificate file in PEM format for publications file verification.\n"
-		"             All values from lower priority sources are ignored.\n"
-		" -d\n"
-		"           - Print detailed information about processes and errors to stderr.\n"
-		"             To make output more verbose use -dd or -ddd.\n"
-		" --hex-to-str\n"
-		"           - Will encode applicable hex encoded data fields to ASCII string\n"
-		"             (e.g. meta-record value). Non-printable characters are displayed in\n"
-		"             hex with leading backslash (e.g. 'Text\\00').\n"
-		" --conf <file>\n"
-		"             Read configuration options from the given file.\n"
-		"             Configuration options given explicitly on command line will\n"
-		"             override the ones in the configuration file.\n"
-		" --log <file>\n"
-		"           - Write libksi log to the given file. Use '-' as file name to redirect the log to stdout.\n",
-		TOOL_getName(),
-		TOOL_getName(),
-		TOOL_getName(),
-		TOOL_getName(),
-		TOOL_getName(),
-		TOOL_getName(),
-		TOOL_getName(),
-		TOOL_getName(),
-		TOOL_getName()
-	);
+	int res;
+	char *ret = NULL;
+	PARAM_SET *set;
+	size_t count = 0;
+	char tmp[1024];
 
+	if (buf == NULL || len == 0) return NULL;
+
+
+	/* Create set with documented parameters. */
+	res = PARAM_SET_new(CONF_generate_param_set_desc(PARAMS "{logsig}{exerpt-log}{exerpt-proof}", "XP", tmp, sizeof(tmp)), &set);
+	if (res != PST_OK) goto cleanup;
+
+	res = CONF_initialize_set_functions(set, "XP");
+	if (res != PST_OK) goto cleanup;
+
+	/* Temporary name change for formatting help text. */
+	PARAM_SET_setPrintName(set, "multiple_logs", "--", NULL);
+	PARAM_SET_setPrintName(set, "input", "<logfile>", NULL);
+	PARAM_SET_setHelpText(set, "input", NULL, "Log file from where to extract log records.");
+
+	/* Note that logsig, exerpt-log and exerpt-proof are not a real parameter, that are used to format help! */
+	PARAM_SET_setPrintName(set, "logsig", "<logfile.logsig>", NULL);
+	PARAM_SET_setPrintName(set, "exerpt-log", "<logfile.excerpt>", NULL);
+	PARAM_SET_setPrintName(set, "exerpt-proof", "<logfile.excerpt.logsig>", NULL);
+
+	PARAM_SET_setHelpText(set, "ver-int", NULL, "Perform internal verification.");
+	PARAM_SET_setHelpText(set, "ver-cal", NULL, "Perform calendar-based verification (use extending service).");
+	PARAM_SET_setHelpText(set, "ver-key", NULL, "Perform key-based verification.");
+	PARAM_SET_setHelpText(set, "ver-pub", NULL, "Perform publication-based verification (use with '-x' to permit extending).");
+	PARAM_SET_setHelpText(set, "input", NULL, "Log file to be verified.");
+	PARAM_SET_setHelpText(set, "logsig", NULL, "Log signature file to be verified. If omitted, the log signature file name is derived by adding either '.logsig' or '.gtsig' to '<logfile>'. The file is expected to be found in the same folder as the '<logfile>'.");
+	PARAM_SET_setHelpText(set, "exerpt-log", NULL, "Excerpt file to be verified.");
+	PARAM_SET_setHelpText(set, "exerpt-proof", NULL, "Record integrity proof file to be verified. If omitted, the file name is derived by adding '.logsig' to '<logfile>.excerpt'. It is expected to be found in the same folder as the '<logfile>.excerpt'");
+	PARAM_SET_setHelpText(set, "log-from-stdin", NULL, "The log or excerpt file is read from stdin. If '--log-from-stdin' is used, the log signature or integrity proof file name must be specified explicitly.");
+	PARAM_SET_setHelpText(set, "multiple_logs", NULL, "If used, everything specified after the token is interpreted as <logfile>. Note that log signature files can NOT be specified manually and must have matching file names to log files. If multiple log files are specified, both integrity and inter-linking between them is verified.");
+	PARAM_SET_setHelpText(set, "input-hash", "<hash>", "Specify hash imprint for inter-linking (the last leaf from the previous log signature) verification. Hash can be specified on command line or a file containing its string representation. Hash format: <alg>:<hash in hex>. Use '-' as file name to read the imprint from stdin. Call logksi -h to get the list of supported hash algorithms. See --output-hash to see how to extract the hash imprint from the previous log signature. When used together with --, only the first log file is verified against specified value.");
+	PARAM_SET_setHelpText(set, "output-hash", "<file>", "Output the last leaf from the log signature into file. Use '-' as file name to redirect hash imprint to stdout. See --input-hash to see how to verify that log signature is bound with this log signature (where from the output hash was extracted). When used together with '--', only the output hash of the last log file is returned.");
+	PARAM_SET_setHelpText(set, "ignore-desc-block-time", NULL, "Skip signing time verification where more recent log blocks must have more recent (or equal) signing time than previous blocks.");
+	PARAM_SET_setHelpText(set, "client-id", "<regexp>", "Verifies if KSI signatures client ID is matching regular expression specified.");
+	PARAM_SET_setHelpText(set, "time-form", "<fmt>", "Format string fmt is used to extract time stamp from the beginning of the log line to be matched with KSI signature signing time. Fmt is specified by function strptime and its documentation can be read for more details.");
+	PARAM_SET_setHelpText(set, "time-base", "<year>", "Specify the year (e.g. 2019) when it can not be extracted with --time-form.");
+	PARAM_SET_setHelpText(set, "time-diff", "<time>", "A specified time difference that with the signing time of the KSI signature forms a valid time window where all the log records must fit. Also the chronological order of the log records is checked. The difference can be specified as seconds (e.g 86400) or using integers followed by markers (e.g. 10d2H3M1S), where d, H, M and S stand for day, hour, minute and second accordingly.");
+	PARAM_SET_setHelpText(set, "time-disordered", "<time>", "Will permit log records to be disordered within specified range (e.g. with value 1 following sequence of time values is correct: 1, 3, 2, 4).");
+	PARAM_SET_setHelpText(set, "warn-client-id-change", NULL, "Will warn the user if KSI signatures client ID is not constant over all the blocks.");
+	PARAM_SET_setHelpText(set, "warn-same-block-time", NULL, "Prints a warning when two consecutive blocks have same signing time. When multiple log files are verified the last block from the previous file is compared with the first block from the current file.");
+	PARAM_SET_setHelpText(set, "continue-on-fail", NULL, "Can be used to continue verification to improve debugging of verification errors. Other errors (e.g. IO error) will terminated verification.");
+	PARAM_SET_setHelpText(set, "use-stored-hash-on-fail", NULL, "Can be used to debug hash comparison failures, by using stored hash values to continue verification process.");
+	PARAM_SET_setHelpText(set, "use-computed-hash-on-fail", NULL, "Can be used to debug hash comparison failures, by using computed hash values to continue verification process.");
+	PARAM_SET_setHelpText(set, "x", NULL, "Permit to use extender for publication-based verification.");
+	PARAM_SET_setHelpText(set, "pub-str", "<str>", "Publication string to verify with.");
+	PARAM_SET_setHelpText(set, "d", NULL, "Print detailed information about processes and errors to stderr. To make output more verbose use -dd or -ddd.");
+	PARAM_SET_setHelpText(set, "hex-to-str", NULL, "Will encode applicable hex encoded data fields to ASCII string (e.g. meta-record value). Non-printable characters are displayed in hex with leading backslash (e.g. 'Text\\00').");
+	PARAM_SET_setHelpText(set, "conf", NULL, "Read configuration options from the given file. Configuration options given explicitly on command line will override the ones in the configuration file.");
+	PARAM_SET_setHelpText(set, "log", NULL, "Write libksi log to the given file. Use '-' as file name to redirect the log to stdout.");
+
+
+	/* Format synopsis and parameters. */
+	count += PST_snhiprintf(buf + count, len - count, 80, 0, 0, NULL, ' ', "Usage:\\>1\n\\>8"
+	"logksi verify <logfile> [<logfile.logsig>] [more_options]\\>1\n\\>8"
+	"logksi verify --log-from-stdin <logfile.logsig> [more_options]\\>1\n\\>8"
+	"logksi verify <logfile>.excerpt [<logfile.excerpt.logsig>] [more_options]\\>1\n\\>8"
+	"logksi verify --log-from-stdin <logfile.excerpt.logsig> [more_options]\\>1\n\\>8"
+	"logksi verify --ver-int <logfile> [<logfile.logsig>] [more_options]\\>1\n\\>8"
+	"logksi verify --ver-cal <logfile> [<logfile.logsig>] -X <URL>\n"
+	"[--ext-user <user> --ext-key <key>] [more_options]\\>1\n\\>8"
+	"logksi verify --ver-key <logfile> [<logfile.logsig>] -P <URL>\n"
+	"[--cnstr <oid=value>]... [more_options]\\>1\n\\>8"
+	"logksi verify --ver-pub <logfile> [<logfile.logsig>] --pub-str <pubstr>\n"
+	"[-x -X <URL>  [--ext-user <user> --ext-key <key>]] [more_options]\\>1\n\\>8"
+	"logksi verify --ver-pub <logfile> [<logfile.logsig>] -P <URL> [--cnstr <oid=value>]... [-x -X <URL>  [--ext-user <user> --ext-key <key>]] [more_options]"
+	"\\>\n\n\n");
+
+	ret = PARAM_SET_helpToString(set, "ver-int,ver-cal,ver-key,ver-pub,input,logsig,exerpt-log,exerpt-proof,log-from-stdin,multiple_logs,input-hash,output-hash,ignore-desc-block-time,client-id,time-form,time-base,time-diff,time-disordered,warn-client-id-change,warn-same-block-time,continue-on-fail,use-stored-hash-on-fail,use-computed-hash-on-fail,x,X,ext-user,ext-key,ext-hmac-alg,P,cnstr,pub-str,V,d,hex-to-str,conf,log", 1, 13, 80, buf + count, len - count);
+
+cleanup:
+	if (res != PST_OK || ret == NULL) {
+		PST_snprintf(buf + count, len - count, "\nError: There were failures while generating help by PARAM_SET.\n");
+	}
+	PARAM_SET_free(set);
 	return buf;
 }
 
@@ -455,7 +390,6 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	PARAM_SET_addControl(set, "block-time-diff", isFormatOk_timeDiffInfinity, NULL, NULL, extract_timeDiff);
 	PARAM_SET_addControl(set, "time-disordered", isFormatOk_timeValue, NULL, NULL, extract_timeValue);
 
-	PARAM_SET_setParseOptions(set, "m", PST_PRSCMD_HAS_MULTIPLE_INSTANCES | PST_PRSCMD_BREAK_VALUE_WITH_EXISTING_PARAMETER_MATCH);
 	PARAM_SET_setParseOptions(set, "time-form,time-base,time-diff,time-disordered,block-time-diff", PST_PRSCMD_HAS_VALUE);
 
 	/* Make input also collect same values as multiple_logs. It simplifies task handling. */
