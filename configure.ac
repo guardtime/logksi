@@ -60,7 +60,7 @@ LIBGTRFC3161_VER="1.0"
 LIBPST_VER="1.1"
 
 AC_ARG_ENABLE(static-build,
-AS_HELP_STRING([--enable-static-build], [Enable static linking of libksi and libgtrfc3161. Note that on some platforms this option may not work and user has to provide the static libksi and libgtrfc3161 library file explicitly. See options --without-libksi, --without-libgtrfc3161 and --without-libparamset instead. Default is no static.]),:,:)
+AS_HELP_STRING([--enable-static-build], [Enable static linking of libksi, libgtrfc3161 and libparamset. Note that on some platforms this option may not work and user has to provide the static libksi and libgtrfc3161 library file explicitly. See options --without-libksi, --without-libgtrfc3161 and --without-libparamset instead. Default is no static.]),:,:)
 
 AC_ARG_WITH(libksi,
 AS_HELP_STRING([--without-libksi], [Do not check or add libksi automatically for linking (no -lksi is added). Libksi library file must be provided by user (via LIBS variable) explicitly. Usable when default automatic linking does not work as expected (e.g. unable to link libksi statically). Default is with libksi.]),:,:)
