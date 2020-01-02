@@ -147,7 +147,7 @@ int CONF_initialize_set_functions(PARAM_SET *conf, const char *flags) {
 		res = PARAM_SET_addControl(conf, "{aggr-user}{aggr-key}", isFormatOk_userPass, NULL, NULL, NULL);
 		if (res != PST_OK) goto cleanup;
 
-		PARAM_SET_setHelpText(conf, "S", "<URL>", "Signing service (KSI Aggregator) URL.");
+		PARAM_SET_setHelpText(conf, "S", "<URL>", "Signing service (KSI Aggregator) URL. Supported URL schemes are: http, https, ksi+http, ksi+https and ksi+tcp.");
 		PARAM_SET_setHelpText(conf, "aggr-user", "<user>", "Username for signing service.");
 		PARAM_SET_setHelpText(conf, "aggr-key", "<key>", "HMAC key for signing service.");
 		PARAM_SET_setHelpText(conf, "aggr-hmac-alg", "<alg>", "Hash algorithm to be used for computing HMAC on outgoing messages towards KSI aggregator. If not set, default algorithm is used.");
@@ -163,7 +163,7 @@ int CONF_initialize_set_functions(PARAM_SET *conf, const char *flags) {
 		res = PARAM_SET_addControl(conf, "{ext-key}{ext-user}", isFormatOk_userPass, NULL, NULL, NULL);
 		if (res != PST_OK) goto cleanup;
 
-		PARAM_SET_setHelpText(conf, "X", "<URL>", "Extending service (KSI Extender) URL.");
+		PARAM_SET_setHelpText(conf, "X", "<URL>", "Extending service (KSI Extender) URL. Supported URL schemes are: http, https, ksi+http, ksi+https and ksi+tcp.");
 		PARAM_SET_setHelpText(conf, "ext-user", "<user>", "Username for extending service.");
 		PARAM_SET_setHelpText(conf, "ext-key", "<key>", "HMAC key for extending service.");
 		PARAM_SET_setHelpText(conf, "ext-hmac-alg", "<alg>", "Hash algorithm to be used for computing HMAC on outgoing messages towards KSI extender. If not set, default algorithm is used.");
