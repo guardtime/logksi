@@ -10,7 +10,7 @@
  else
  	echo "Usage $0 <conf in> <aggr-user> <aggr-key> <ext-user> <ext-key> <new_scheme>"
 	echo ""
-	echo "  This script is used to generate KSI tool configuration file that has embedded"
+	echo "  This script is used to generate logksi configuration file that has embedded"
 	echo "  user info inside aggregator (-S) and extender (-X) URL. Requirements for"
 	echo "  original configuration file are:"
 	echo "    o URLs have scheme http or https."
@@ -18,7 +18,7 @@
 	echo "    o User info is specified explicitly."
 	echo ""
 	echo " Inputs:"
-	echo " <conf in>    - KSI tool configuration file."
+	echo " <conf in>    - logksi configuration file."
 	echo " <aggr-user>  - Value of --aggr-user, if is empty string value is extracted from"
 	echo "                configuration file."
 	echo " <aggr-key>   - Value of --aggr-key, if is empty string value is extracted from"
@@ -51,7 +51,7 @@ function extract_scheme() {
 # url (e.g. http://plahh)
 # scheme (e.g. http://)
 # return URL part after scheme
-function extract_host_and_stuff() {
+function extract_host_and_parameters() {
 	echo $1 | grep -Po "($2)\K.*"
 }
 
@@ -62,9 +62,9 @@ old_conf_usable_part=$(cat $1 | grep -Ev "(\-X)|(\-S)|(#)|(--aggr-user)|(--aggr-
 
 # Extract scheme and another part of URL.
 S_scheme=$(extract_scheme $S_URL)
-S_host_and_stuff=$(extract_host_and_stuff $S_URL $S_scheme)
+S_host_and_parameters=$(extract_host_and_parameters $S_URL $S_scheme)
 X_scheme=$(extract_scheme  $X_URL)
-X_host_and_stuff=$(extract_host_and_stuff $X_URL $X_scheme)
+X_host_and_parameters=$(extract_host_and_parameters $X_URL $X_scheme)
 
 S_key=$(extract_option $input_conf "--aggr-key")
 S_user=$(extract_option $input_conf "--aggr-user")
@@ -91,8 +91,8 @@ if [ "$X_embed_key" == "" ]; then
 fi
 
 # Create new URLs.
-S_NEW_URL=$(printf '%s%s:%s@%s' $new_scheme $S_embed_user $S_embed_key $S_host_and_stuff)
-X_NEW_URL=$(printf '%s%s:%s@%s' $new_scheme $X_embed_user $X_embed_key $X_host_and_stuff)
+S_NEW_URL=$(printf '%s%s:%s@%s' $new_scheme $S_embed_user $S_embed_key $S_host_and_parameters)
+X_NEW_URL=$(printf '%s%s:%s@%s' $new_scheme $X_embed_user $X_embed_key $X_host_and_parameters)
 
 
 printf "%s\n -S %s\n -X %s\n" "$old_conf_usable_part" $S_NEW_URL $X_NEW_URL
