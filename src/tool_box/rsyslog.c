@@ -119,6 +119,18 @@ int logsignature_extend(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 	res = KT_OK;
 
 cleanup:
+	/**
+	 * + If there is error mark output file as inconsistent.
+	 * + If there is no changes and output is not explicitly specified
+	 *   and output file already exists, mark output file as inconsistent.
+	 * + Inconsistent state discards temporary file created.
+	 */
+	if (files->files.outSig != NULL &&
+		(res != KT_OK || (!logksi.task.sign.outSigModified && !PARAM_SET_isSetByName(set, "o") && SMART_FILE_doFileExist(files->internal.outSig)))) {
+		int tmp_res;
+		tmp_res = SMART_FILE_markInconsistent(files->files.outSig);
+		ERR_CATCH_MSG(err, tmp_res, "Error: Unable to mark output signature file as inconsistent.");
+	}
 
 	LOGKSI_freeAndClearInternals(&logksi);
 	KSI_DataHash_free(theFirstInputHashInFile);
@@ -192,12 +204,14 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 							res = process_log_signature_with_block_signature(set, mp, err, logksi, files, ksi, &processors, NULL);
 							if (res != KT_OK) {
 								/* In case of verification failure and --continue-on-fail option, verification is continued. */
-								if ((res == KT_VERIFICATION_FAILURE || res == KSI_VERIFICATION_FAILURE) && logksi->isContinuedOnFail) {
+								if ((res == KT_VERIFICATION_FAILURE || res == KSI_VERIFICATION_FAILURE || res == KT_VERIFICATION_NA) && logksi->isContinuedOnFail) {
 									print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 									print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_2, res);
 									print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
 
-									logksi->quietError = KT_VERIFICATION_FAILURE;
+									/* Set quietError as failure if there has been at least clear failure. */
+									if (LOGKSI_getErrorLevel(logksi) == LOGKSI_VER_RES_NA) logksi->quietError = KT_VERIFICATION_NA;
+									else logksi->quietError = KT_VERIFICATION_FAILURE;
 
 									skipCurrentBlock = 1;
 									logksi->task.verify.lastBlockWasSkipped = 1;
@@ -418,7 +432,10 @@ cleanup:
 	if (logksi->quietError != KT_OK) {
 		int isContinued = logksi->isContinuedOnFail && (res != KT_INVALID_CMD_PARAM) && (res != KT_USER_INPUT_FAILURE);
 		res = logksi->quietError;
-		ERR_TRCKR_ADD(err, res, isContinued ? "Error: Verification FAILED but was continued for further analysis." : "Error: Verification FAILED and was stopped.");
+		if (isContinued && LOGKSI_getErrorLevel(logksi) == LOGKSI_VER_RES_NA) ERR_TRCKR_ADD(err, res, "Error: Verification inconclusive but was continued for further analysis.");
+		else if (LOGKSI_getErrorLevel(logksi) == LOGKSI_VER_RES_NA) ERR_TRCKR_ADD(err, res, "Error: Verification inconclusive and was stopped.");
+		else if (isContinued && LOGKSI_getErrorLevel(logksi) == LOGKSI_VER_RES_FAIL) ERR_TRCKR_ADD(err, res, "Error: Verification FAILED but was continued for further analysis.");
+		else ERR_TRCKR_ADD(err, res, "Error: Verification FAILED and was stopped.");
 	}
 
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_2, res);
@@ -747,9 +764,8 @@ cleanup:
 	 * + Inconsistent state discards temporary file created.
 	 */
 	if (files->files.outSig != NULL &&
-										(res != KT_OK ||
-										 (!logksi.task.sign.outSigModified && !PARAM_SET_isSetByName(set, "o") && SMART_FILE_doFileExist(files->internal.outSig))
-										)) {
+		(res != KT_OK ||
+		 (!logksi.task.sign.outSigModified && !PARAM_SET_isSetByName(set, "o") && SMART_FILE_doFileExist(files->internal.outSig)))) {
 		int tmp_res;
 		tmp_res = SMART_FILE_markInconsistent(files->files.outSig);
 		ERR_CATCH_MSG(err, tmp_res, "Error: Unable to mark output signature file as inconsistent.");

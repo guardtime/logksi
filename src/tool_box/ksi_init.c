@@ -89,7 +89,7 @@ static int tool_init_ksi_network_provider(KSI_CTX *ksi, ERR_TRCKR *err, PARAM_SE
 
 	/**
 	 * Extract values from the set.
-     */
+	 */
 	PARAM_SET_getStr(set, "S", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &aggr_url);
 	PARAM_SET_getStr(set, "X", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &ext_url);
 	PARAM_SET_getStr(set, "P", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &pub_url);
@@ -102,21 +102,27 @@ static int tool_init_ksi_network_provider(KSI_CTX *ksi, ERR_TRCKR *err, PARAM_SE
 	PARAM_SET_getObj(set, "C", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, (void**)&networkConnectionTimeout);
 	PARAM_SET_getObj(set, "c", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, (void**)&networkTransferTimeout);
 
-	aggr_user = aggr_user == NULL ? "anon" : aggr_user;
-	aggr_pass = aggr_pass == NULL ? "anon" : aggr_pass;
-	ext_user = ext_user == NULL ? "anon" : ext_user;
-	ext_pass = ext_pass == NULL ? "anon" : ext_pass;
-
-
 	/**
 	 * Set service urls.
-     */
+	 */
 	if (ext_url != NULL) {
+		res = KT_OK;
+		if (ext_user == NULL || ext_pass == NULL) res = KT_INVALID_CMD_PARAM;
+		if (ext_user == NULL) ERR_TRCKR_ADD(err, res, "Error: Extender user (null) not set!");
+		if (ext_pass == NULL) ERR_TRCKR_ADD(err, res, "Error: Extender key (null) not set!");
+		ERR_CATCH_MSG(err, res, "Error: Unable set extender.");
+
 		res = KSI_CTX_setExtender(ksi, ext_url, ext_user, ext_pass);
 		ERR_CATCH_MSG(err, res, "Error: Unable set extender.");
 	}
 
 	if (aggr_url != NULL) {
+		res = KT_OK;
+		if (aggr_user == NULL || aggr_pass == NULL) res = KT_INVALID_CMD_PARAM;
+		if (aggr_user == NULL) ERR_TRCKR_ADD(err, res, "Error: Aggregator user (null) not set!");
+		if (aggr_pass == NULL) ERR_TRCKR_ADD(err, res, "Error: Aggregator key (null) not set!");
+		ERR_CATCH_MSG(err, res, "Error: Unable set aggregator.");
+
 		res = KSI_CTX_setAggregator(ksi, aggr_url, aggr_user, aggr_pass);
 		ERR_CATCH_MSG(err, res, "Error: Unable set aggregator.");
 	}
@@ -128,7 +134,7 @@ static int tool_init_ksi_network_provider(KSI_CTX *ksi, ERR_TRCKR *err, PARAM_SE
 
 	/**
 	 * Set service timeouts.
-     */
+	 */
 	if (networkTransferTimeout > 0) {
 		res = KSI_CTX_setConnectionTimeoutSeconds(ksi, networkConnectionTimeout);
 		ERR_CATCH_MSG(err, res, "Error: Unable set connection timeout.");
@@ -222,7 +228,7 @@ static int tool_init_ksi_pub_cert_constraints(KSI_CTX *ksi, ERR_TRCKR *err, PARA
 	/**
 	 * Generate array of publications file signatures certificate constraints and
 	 * load it with values.
-     */
+	 */
 	constraintArray = KSI_malloc(sizeof(KSI_CertConstraint) * (1 + constraint_count));
 	if (constraintArray == NULL) {
 		ERR_TRCKR_ADD(err, res = KT_OUT_OF_MEMORY, NULL);
@@ -261,7 +267,7 @@ static int tool_init_ksi_pub_cert_constraints(KSI_CTX *ksi, ERR_TRCKR *err, PARA
 
 	/**
 	 * Configure KSI publications file constraints.
-     */
+	 */
 	res = KSI_CTX_setDefaultPubFileCertConstraints(ksi, constraintArray);
 	ERR_CATCH_MSG(err, res, "Error: Unable to add cert constraints.");
 
@@ -297,13 +303,13 @@ static int tool_init_ksi_trust_store(KSI_CTX *ksi, ERR_TRCKR *err, PARAM_SET *se
 
 	/**
 	 * Check if there are trust store related files or directories.
-     */
+	 */
 	V = PARAM_SET_isSetByName(set,"V");
 	W = PARAM_SET_isSetByName(set,"W");
 
 	/**
 	 * Configure KSI trust store.
-     */
+	 */
 	if (V || W) {
 		res = KSI_PKITruststore_new(ksi, 0, &tmp);
 		ERR_CATCH_MSG(err, res, "Error: Unable create new PKI trust store.");
@@ -349,7 +355,7 @@ static int tool_init_ksi_publications_file(KSI_CTX *ksi, ERR_TRCKR *err, PARAM_S
 	 * If there is a direct need to not verify publications file do the publications
 	 * file request manually so KSI API do not verify the file extracted by the API
 	 * user.
-     */
+	 */
 	if (PARAM_SET_isSetByName(set, "publications-file-no-verify")) {
 		KSI_receivePublicationsFile(ksi, &tmp);
 	}
@@ -408,7 +414,7 @@ int TOOL_init_ksi(PARAM_SET *set, KSI_CTX **ksi, ERR_TRCKR **error, SMART_FILE *
 	/**
 	 * Initialize error tracker and configure output parameter immediately to be
 	 * able to track errors if this function fails.
-     */
+	 */
 	err = ERR_TRCKR_new(print_errors, LOGKSI_errToString);
 	if (err == NULL) {
 		res = KT_OUT_OF_MEMORY;
@@ -425,7 +431,7 @@ int TOOL_init_ksi(PARAM_SET *set, KSI_CTX **ksi, ERR_TRCKR **error, SMART_FILE *
 	 * 3) TODO:pubfile.
 	 * 4) Publications file constraints.
 	 * 5) Trust store.
-     */
+	 */
 	res = KSI_CTX_new(&tmp);
 	if (res != KSI_OK) {
 		ERR_TRCKR_ADD(err, res, "Error: Unable to initialize KSI context.");

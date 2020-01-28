@@ -22,8 +22,8 @@
 #include <string.h>
 #include <ksi/ksi.h>
 #include <ksi/compatibility.h>
-#include "param_set/param_set.h"
-#include "param_set/task_def.h"
+#include <param_set/param_set.h>
+#include <param_set/task_def.h>
 #include "tool_box/default_tasks.h"
 #include "tool_box.h"
 #include "component.h"
@@ -36,6 +36,15 @@
 #  include "config.h"
 #include "param_set/parameter.h"
 #endif
+
+typedef enum {
+       TASK_ID_SIGN = 0,
+       TASK_ID_VERIFY = 1,
+       TASK_ID_EXTEND = 2,
+       TASK_ID_INTEGRATE = 3,
+       TASK_ID_EXTRACT = 4,
+       TASK_ID_CONF = 5
+} TASK_ID;
 
 const char *TOOL_getVersion(void) {
 	static const char versionString[] = VERSION;
@@ -245,7 +254,7 @@ int main(int argc, char** argv, char **envp) {
 	if (task == NULL) {
 		print_errors("Error: Invalid task. Read help (-h) or man page.\n");
 		if (PARAM_SET_isTypoFailure(set_task_name)) {
-			print_errors("%s\n", PARAM_SET_typosToString(set_task_name, PST_TOSTR_NONE, NULL, buf, sizeof(buf)));
+			print_errors("%s\n", PARAM_SET_typosToString(set_task_name, NULL, buf, sizeof(buf)));
 		} else if (PARAM_SET_isUnknown(set_task_name)){
 			print_errors("%s\n", PARAM_SET_unknownsToString(set_task_name, NULL, buf, sizeof(buf)));
 		}

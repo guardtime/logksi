@@ -23,9 +23,10 @@
 #include <ksi/ksi.h>
 #include <ksi/compatibility.h>
 #include <unistd.h>
-#include "param_set/param_set.h"
-#include "param_set/task_def.h"
-#include "param_set/parameter.h"
+#include <param_set/param_set.h>
+#include <param_set/task_def.h>
+#include <param_set/parameter.h>
+#include <param_set/strn.h>
 #include "tool_box/ksi_init.h"
 #include "tool_box/param_control.h"
 #include "tool_box/task_initializer.h"
@@ -48,6 +49,8 @@ static int recover_procedure(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, 
 static int rename_temporary_and_backup_files(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files);
 static void close_input_and_output_files(ERR_TRCKR *err, int res, IO_FILES *files);
 static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err);
+
+#define PARAMS "{input}{o}{out-log}{insert-missing-hashes}{force-overwrite}{use-computed-hash-on-fail}{use-stored-hash-on-fail}{recover}{d}{log}{h|help}{hex-to-str}"
 
 int integrate_run(int argc, char **argv, char **envp) {
 	int res;
@@ -73,7 +76,7 @@ int integrate_run(int argc, char **argv, char **envp) {
 	 * Extract command line parameters.
 	 */
 	res = PARAM_SET_new(
-			CONF_generate_param_set_desc("{input}{o}{out-log}{insert-missing-hashes}{force-overwrite}{use-computed-hash-on-fail}{use-stored-hash-on-fail}{recover}{d}{log}{h|help}{hex-to-str}", "", buf, sizeof(buf)),
+			CONF_generate_param_set_desc(PARAMS, "", buf, sizeof(buf)),
 			&set);
 	if (res != KT_OK) goto cleanup;
 
@@ -157,45 +160,50 @@ cleanup:
 }
 
 char *integrate_help_toString(char *buf, size_t len) {
-	KSI_snprintf(buf, len,
-		"Usage:\n"
-		" %s integrate <logfile> [-o <out.logsig>]\n"
-		" %s integrate <logfile> --recover [-o <out.logsig>] [--out-log <out.recovered.logsig>]\n"
-		"\n"
-		" <logfile>\n"
-		"           - Name of the log file whose temporary files are to be integrated.\n"
-		"             The two temporary files created while asynchronously signing are:\n"
-		"               * the log signature blocks file: '<logfile>.logsig.parts/blocks.dat'; and\n"
-		"               * the log signature file containing the respective KSI signatures: \n"
-		"                 '<logfile>.logsig.parts/block-signatures.dat'.\n"
-		" -o <out.logsig>\n"
-		"           - Name of the integrated output log signature file. If not specified,\n"
-		"             the log signature file is saved as '<logfile>.logsig' in the same folder where\n"
-		"             the '<logfile>' is located. An attempt to overwrite an existing log signature file will\n"
-		" --out-log <out.logsig>\n"
-		"           - Specify the name of recovered log file (only valid with --recover). If not specified,\n"
-		"             the log signature file is saved as <logfile>.recovered in the same folder where the\n"
-		"             <logfile> is located. An attempt to overwrite an existing log file will result in an\n"
-		"             error. Use '-' as file name to redirect the output as a binary stream to stdout\n"
-		"             result in an error. Use '-' to redirect the integrated log signature binary stream to\n"
-		"             stdout.\n"
-		" --recover - Tries to recover as many blocks as possible from corrupted log and log signature\n"
-		"             temporary files. For example if block no. 6 is corrupted it is possible to recover log\n"
-		"             records and log signatures until the end of the block no. 5. By default output\n"
-		"             file names are derived from the log file name: <logfile>.recovered and\n"
-		"             <logfile>.recovered.logsig for log and log signature file accordingly. If the files\n"
-		"             already exist, error is returned (see --force-overwrite).\n"
-		" --force-overwrite\n"
-		"           - Force overwriting of existing log signature file.\n"
-		" -d\n"
-		"           - Print detailed information about processes and errors to stderr.\n"
-		"             To make output more verbose use -dd or -ddd.\n"
-		" --log <file>\n"
-		"           - Write libksi log to the given file. Use '-' as file name to redirect the log to stdout.\n",
-		TOOL_getName(),
-		TOOL_getName()
-	);
+	int res;
+	char *ret = NULL;
+	PARAM_SET *set;
+	size_t count = 0;
+	char tmp[1024];
 
+	if (buf == NULL || len == 0) return NULL;
+
+
+	/* Create set with documented parameters. */
+	res = PARAM_SET_new(CONF_generate_param_set_desc(PARAMS, "", tmp, sizeof(tmp)), &set);
+	if (res != PST_OK) goto cleanup;
+
+	res = CONF_initialize_set_functions(set, "");
+	if (res != PST_OK) goto cleanup;
+
+	/* Temporary name change for formatting help text. */
+	PARAM_SET_setPrintName(set, "input", "<logfile>", NULL);
+	PARAM_SET_setHelpText(set, "input", NULL, "Name of the log file whose temporary files are to be integrated. The two temporary files created while asynchronously signing are:\\>2\n\\>4"
+		"* the log signature blocks file: '<logfile>.logsig.parts/blocks.dat'; and\\>2\n\\>4"
+		"* the log signature file containing the respective KSI signatures: '<logfile>.logsig.parts/block-signatures.dat'.");
+
+	PARAM_SET_setHelpText(set, "o", "<out.logsig>", "Name of the integrated output log signature file. If not specified, the log signature file is saved as '<logfile>.logsig' in the same folder where the '<logfile>' is located. An attempt to overwrite an existing log signature file will result in an error. Use '-' as file name to redirect the output as a binary stream to stdout.");
+	PARAM_SET_setHelpText(set, "out-log", "<out.logsig>", "Specify the name of recovered log file (only valid with --recover). If not specified, the log signature file is saved as <logfile>.recovered in the same folder where the <logfile> is located. An attempt to overwrite an existing log file will result in an error. Use '-' as file name to redirect the output as a binary stream to stdout result in an error. Use '-' to redirect the integrated log signature binary stream to stdout.");
+	PARAM_SET_setHelpText(set, "recover", NULL, "Tries to recover as many blocks as possible from corrupted log and log signature temporary files. For example if block no. 6 is corrupted it is possible to recover log records and log signatures until the end of the block no. 5. By default output file names are derived from the log file name: <logfile>.recovered and <logfile>.recovered.logsig for log and log signature file accordingly. If the files already exist, error is returned (see --force-overwrite).");
+	PARAM_SET_setHelpText(set, "force-overwrite", NULL, "Force overwriting of existing log signature file.");
+	PARAM_SET_setHelpText(set, "d", NULL, "Print detailed information about processes and errors to stderr. To make output more verbose use -dd or -ddd.");
+	PARAM_SET_setHelpText(set, "log", "<file>", "Write libksi log to the given file. Use '-' as file name to redirect the log to stdout.");
+
+
+	/* Format synopsis and parameters. */
+	count += PST_snhiprintf(buf + count, len - count, 80, 0, 0, NULL, ' ', "Usage:\\>1\n\\>8"
+	"logksi integrate <logfile> [-o <out.logsig>]\\>1\n\\>8"
+	"logksi integrate <logfile> --recover [-o <out.logsig>]\n"
+	"[--out-log <out.recovered.logsig>]"
+	"\\>\n\n\n");
+
+	ret = PARAM_SET_helpToString(set, "input,o,out-log,recover,force-overwrite,d,log", 1, 13, 80, buf + count, len - count);
+
+cleanup:
+	if (res != PST_OK || ret == NULL) {
+		PST_snprintf(buf + count, len - count, "\nError: There were failures while generating help by PARAM_SET.\n");
+	}
+	PARAM_SET_free(set);
 	return buf;
 }
 

@@ -145,7 +145,7 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ "Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
 }
 
-@test "extract CMD: attempt to extract a list that contains whitepace" {
+@test "extract CMD: attempt to extract a list that contains whitespace" {
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r "5 6"
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "List of positions must not contain whitespace. Use ',' and '-' as separators." ]]

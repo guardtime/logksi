@@ -64,6 +64,8 @@ void LOGKSI_initialize(LOGKSI *obj) {
 	obj->tree = NULL;
 	obj->logLine = NULL;
 
+	obj->logksiVerRes = LOGKSI_VER_RES_INVALID;
+
 	extract_task_initialize(&obj->task.extract);
 	sign_task_initialize(&obj->task.sign);
 	verify_task_initialize(&obj->task.verify);
@@ -183,6 +185,17 @@ size_t LOGKSI_getNofLines(LOGKSI *logksi) {
 	} else {
 		return 0;
 	}
+}
+
+int LOGKSI_setErrorLevel(LOGKSI *logksi, int lvl) {
+	if (logksi == NULL || lvl == LOGKSI_VER_RES_INVALID || lvl >= LOGKSI_VER_RES_COUNT) return KT_INVALID_ARGUMENT;
+	if (logksi->logksiVerRes < lvl) logksi->logksiVerRes = lvl;
+	return KT_OK;
+}
+
+int LOGKSI_getErrorLevel(LOGKSI *logksi) {
+	if (logksi == NULL) return LOGKSI_VER_RES_INVALID;
+	return logksi->logksiVerRes;
 }
 
 static void extract_task_initialize(EXTRACT_TASK *obj) {

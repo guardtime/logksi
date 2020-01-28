@@ -71,13 +71,13 @@ export KSI_CONF=test/test.cfg
 
 @test "Verify log signatures that contains unsigned blocks with continuation." {
 	run ./src/logksi verify test/resource/logs_and_signatures/unsigned -d --continue-on-fail
-	[ "$status" -eq 6 ]
+	[ "$status" -eq 1 ]
 	[[ "$output" =~ (Verifying... failed.)..( x Error: Block 5 is unsigned!)..( x Error: Skipping block 5!)..( x Error: Block 6 is unsigned!)..( x Error: Skipping block 6!).*( x Error: Block 25 is unsigned!)..( x Error: Skipping block 25!) ]]
 	[[ ! "$output" =~ (Error: Skipping block 4)  ]]	
 	[[ ! "$output" =~ (Error: Skipping block 7)  ]]	
 	[[ ! "$output" =~ (Error: Skipping block 24)  ]]	
 	[[ ! "$output" =~ (Error: Skipping block 26)  ]]	
-	[[ "$output" =~ (2[\)]).*(Error: Verification FAILED but was continued for further analysis)  ]]
+	[[ "$output" =~ (2[\)]).*(Error: Verification inconclusive but was continued for further analysis)  ]]
 }
 
 @test "Verify log signature that has unexpected client ID." {
@@ -156,6 +156,6 @@ export KSI_CONF=test/test.cfg
 
 @test "verify with --block-time-diff and continue on fail and check that time check for unsigned block is skipped." {
 	run src/logksi verify test/resource/logs_and_signatures/unsigned  -d --block-time-diff 1 --ignore-desc-block-time --continue-on-fail
-	[ "$status" -eq 6 ]
+	[ "$status" -eq 1 ]
 	[[ "$output" =~ (Verifying... failed.)..( x Error: Block 5 is unsigned!)..( x Error: Skipping block 5!)..( x Error: Block 6 is unsigned!)..( x Error: Skipping block 6!)..( x Error: Block 25 is unsigned!)..( x Error: Skipping block 25!)..(Summary of logfile) ]]
 }

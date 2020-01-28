@@ -830,6 +830,7 @@ int finalize_log_signature(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LO
 
 cleanup:
 
+	if (res == KT_VERIFICATION_FAILURE) LOGKSI_setErrorLevel(logksi, LOGKSI_VER_RES_FAIL);
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 
 	print_debug_mp(mp, MP_ID_LOGFILE_SUMMARY, DEBUG_SMALLER | DEBUG_LEVEL_3, "\nSummary of logfile:\n");
@@ -1236,6 +1237,7 @@ static int process_tree_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, 
 	res = KT_OK;
 
 cleanup:
+	if (res == KT_VERIFICATION_FAILURE) LOGKSI_setErrorLevel(logksi, LOGKSI_VER_RES_FAIL);
 
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
 	KSI_DataHash_free(unverified);
@@ -1577,6 +1579,15 @@ cleanup:
 	return res;
 }
 
+static const char *error_level_to_string(LOGKSI *logksi) {
+	switch (logksi->logksiVerRes) {
+		case LOGKSI_VER_RES_OK: return "ok";
+		case LOGKSI_VER_RES_NA: return "inconclusive";
+		case LOGKSI_VER_RES_FAIL: return "failed";
+		default: return "<unexpected verification result>";
+	}
+}
+
 static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, KSI_PublicationsFile *pubFile, SIGNATURE_PROCESSORS *processors, LOGKSI *logksi, IO_FILES *files) {
 	int res;
 	KSI_Signature *sig = NULL;
@@ -1605,6 +1616,7 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 	logksi->sigNo++;
 	if (logksi->sigNo > logksi->blockNo) {
 		res = KT_VERIFICATION_FAILURE;
+		LOGKSI_setErrorLevel(logksi, LOGKSI_VER_RES_FAIL);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: block signature data without preceding block header found.", logksi->sigNo);
 	}
 
@@ -1645,7 +1657,8 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 
 	/* If block is unsigned, return verification error. If signature data is missing, return format error. */
 	if (tlvUnsig != NULL) {
-		res = KT_VERIFICATION_FAILURE;
+		res = KT_VERIFICATION_NA;
+		LOGKSI_setErrorLevel(logksi, LOGKSI_VER_RES_NA);
 		logksi->block.curBlockNotSigned = 1;
 		logksi->quietError = res;
 		print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
@@ -1707,6 +1720,7 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 	 * their count must match the record count in block signature. */
 	if (logksi->block.nofRecordHashes && logksi->block.nofRecordHashes != logksi->block.recordCount) {
 		res = KT_VERIFICATION_FAILURE;
+		LOGKSI_setErrorLevel(logksi, LOGKSI_VER_RES_FAIL);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: expected %zu record hashes, but found %zu.", logksi->blockNo, logksi->block.recordCount, logksi->block.nofRecordHashes);
 	}
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
@@ -1744,8 +1758,9 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 			logksi->quietError = res;
 
 			print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
-			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Verification of block %zu KSI signature failed!\n", logksi->blockNo);
-			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Verification of KSI signature failed!\n", logksi->blockNo);
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Verification of block %zu KSI signature %s!\n", logksi->blockNo, error_level_to_string(logksi));
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Verification of KSI signature %s!\n", logksi->blockNo), error_level_to_string(logksi);
+
 
 			if (!logksi->isContinuedOnFail || logksi->taskId != TASK_VERIFY) {
 				ERR_TRCKR_ADD(err, res, "Error: Block no. %zu: KSI signature verification failed.", logksi->blockNo);

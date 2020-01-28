@@ -18,7 +18,7 @@ export KSI_CONF=""
 	run src/logksi verify test/resource/logs_and_signatures/signed -d
 	[ "$status" -eq 3 ]
 	[[ "$output" =~ "Verifying... failed." ]]
-	[[ "$output" =~ "Error: Verification FAILED and was stopped." ]]
+	[[ "$output" =~ "Error: Verification inconclusive and was stopped." ]]
 	[[ "$output" =~ "Error: Publications file (-P) needed for verifying Calendar Authentication Record is not configured!" ]]
 }
 
@@ -26,7 +26,7 @@ export KSI_CONF=""
 	run src/logksi verify test/resource/logs_and_signatures/signed -d --continue-on-fail
 	[ "$status" -eq 3 ]
 	[[ "$output" =~ "Verifying... failed." ]]
-	[[ "$output" =~ "Error: Verification FAILED and was stopped." ]]
+	[[ "$output" =~ "Error: Verification inconclusive and was stopped." ]]
 	[[ "$output" =~ "Error: Publications file (-P) needed for verifying Calendar Authentication Record is not configured!" ]]
 }
 
@@ -34,7 +34,7 @@ export KSI_CONF=""
 	run src/logksi verify test/resource/logs_and_signatures/extended -d
 	[ "$status" -eq 3 ]
 	[[ "$output" =~ "Verifying... failed." ]]
-	[[ "$output" =~ "Error: Verification FAILED and was stopped." ]]
+	[[ "$output" =~ "Error: Verification inconclusive and was stopped." ]]
 	[[ "$output" =~ "Error: Publications file (-P) needed for verifying signature's Publication Record is not configured!" ]]
 }
 
@@ -42,7 +42,7 @@ export KSI_CONF=""
 	run src/logksi verify test/resource/logs_and_signatures/extended -d --continue-on-fail
 	[ "$status" -eq 3 ]
 	[[ "$output" =~ "Verifying... failed." ]]
-	[[ "$output" =~ "Error: Verification FAILED and was stopped." ]]
+	[[ "$output" =~ "Error: Verification inconclusive and was stopped." ]]
 	[[ "$output" =~ "Error: Publications file (-P) needed for verifying signature's Publication Record is not configured!" ]]
 }
 
@@ -50,7 +50,7 @@ export KSI_CONF=""
 	run src/logksi verify test/resource/logs_and_signatures/signed -d -x
 	[ "$status" -eq 3 ]
 	[[ "$output" =~ "Verifying... failed." ]]
-	[[ "$output" =~ "Error: Verification FAILED and was stopped." ]]
+	[[ "$output" =~ "Error: Verification inconclusive and was stopped." ]]
 	[[ "$output" =~ "Error: Extending is permitted (-x) but extender is not configured (-X)." ]]
 }
 
@@ -58,7 +58,7 @@ export KSI_CONF=""
 	run src/logksi verify test/resource/logs_and_signatures/signed -d -x --continue-on-fail
 	[ "$status" -eq 3 ]
 	[[ "$output" =~ "Verifying... failed." ]]
-	[[ "$output" =~ "Error: Verification FAILED and was stopped." ]]
+	[[ "$output" =~ "Error: Verification inconclusive and was stopped." ]]
 	[[ "$output" =~ "Error: Extending is permitted (-x) but extender is not configured (-X)." ]]
 }
 
@@ -86,7 +86,7 @@ export KSI_CONF=""
 	run src/logksi verify test/resource/logs_and_signatures/signed -d --ver-cal -X file://test/resource/server/ok_extender_error_response_102.tlv --ext-key Xanon --ext-user anon --continue-on-fail
 	[ "$status" -eq 1 ]
 	[[ "$output" =~ "Verifying... failed." ]]
-	[[ "$output" =~ "Error: Verification FAILED and was stopped" ]]
+	[[ "$output" =~ "Error: Verification inconclusive and was stopped" ]]
 	[[ "$output" =~ "Error: HMAC mismatch" ]]
 }
 
@@ -94,7 +94,7 @@ export KSI_CONF=""
 	run src/logksi verify test/resource/logs_and_signatures/signed -d --ver-cal -X file://test/resource/thisfiledoesnotexist --ext-key plah --ext-user plah --continue-on-fail
 	[ "$status" -eq 1 ]
 	[[ "$output" =~ "Verifying... failed." ]]
-	[[ "$output" =~ "Error: Verification FAILED and was stopped." ]]
+	[[ "$output" =~ "Error: Verification inconclusive and was stopped." ]]
 	[[ "$output" =~ "Error: Unable to open file." ]]
 }
 
@@ -102,7 +102,7 @@ export KSI_CONF=""
 	run src/logksi verify test/resource/logs_and_signatures/signed -d --ver-cal -X http://this-extender-url-must-not-exist --ext-key plah --ext-user plah --continue-on-fail
 	[ "$status" -eq 1 ]
 	[[ "$output" =~ "Verifying... failed." ]]
-	[[ "$output" =~ "Error: Verification FAILED and was stopped." ]]
+	[[ "$output" =~ "Error: Verification inconclusive and was stopped." ]]
 	[[ "$output" =~ "Error: Could not resolve host: this-extender-url-must-not-exist"|"Error: Couldn't resolve host 'this-extender-url-must-not-exist'" ]]
 }
 
@@ -110,18 +110,18 @@ export KSI_CONF=""
 	run src/logksi verify test/resource/logs_and_signatures/signed -d --ver-key  --continue-on-fail -P http://this-pubfile-url-must-not-exist --cnstr "E=dummy.email@email.com"
 	[ "$status" -eq 1 ]
 	[[ "$output" =~ "Verifying... failed." ]]
-	[[ "$output" =~ "Error: Verification FAILED and was stopped." ]]
+	[[ "$output" =~ "Error: Verification inconclusive and was stopped." ]]
 	[[ "$output" =~ "Error: Could not resolve host: this-pubfile-url-must-not-exist"|"Error: Couldn't resolve host 'this-pubfile-url-must-not-exist'" ]]
 }
 
 # err_message
 f_error_response_message () {
-	echo "(Verifying... failed.)..( x Error: $1).( x Error: Signature calendar-based verification: .GEN-02. Verification inconclusive.).( x Error: Verification of block 1 KSI signature failed.).*(Error: Verification FAILED but was continued for further analysis.)"
+	echo "(Verifying... failed.)..( x Error: $1).( x Error: Signature calendar-based verification: .GEN-02. Verification inconclusive.).( x Error: Verification of block 1 KSI signature inconclusive.).*(Error: Verification inconclusive but was continued for further analysis.)"
 }
 
 @test "calendar-based verification: --continue-on-fail extender error 101" {
 	run src/logksi verify test/resource/logs_and_signatures/signed -d --ver-cal -X file://test/resource/server/ok_extender_error_response_101.tlv --ext-key anon --ext-user anon --continue-on-fail
-	[ "$status" -eq 6 ]
+	[ "$status" -eq 1 ]
 	[[ "$output" =~ (`f_error_response_message "The request had invalid format."`) ]]
 }
 
@@ -129,66 +129,66 @@ f_error_response_message () {
 	run src/logksi verify test/resource/logs_and_signatures/signed -d --ver-cal -X file://test/resource/server/ok_extender_error_response_102.tlv --ext-key anon --ext-user anon --continue-on-fail
 	[ "$status" -eq 1 ]
 	[[ "$output" =~ "Verifying... failed." ]]
-	[[ "$output" =~ "Error: Verification FAILED and was stopped." ]]
+	[[ "$output" =~ "Error: Verification inconclusive and was stopped." ]]
 	[[ "$output" =~ "Error: The request could not be authenticated" ]]
 }
 
 @test "calendar-based verification: --continue-on-fail extender error 103" {
 	run src/logksi verify test/resource/logs_and_signatures/signed -d --ver-cal -X file://test/resource/server/ok_extender_error_response_103.tlv --ext-key anon --ext-user anon --continue-on-fail
-	[ "$status" -eq 6 ]
+	[ "$status" -eq 1 ]
 	[[ "$output" =~ (`f_error_response_message "The request contained invalid payload."`) ]]
 }
 
 @test "calendar-based verification: --continue-on-fail extender error 104" {
 	run src/logksi verify test/resource/logs_and_signatures/signed -d --ver-cal -X file://test/resource/server/ok_extender_error_response_104.tlv --ext-key anon --ext-user anon --continue-on-fail
-	[ "$status" -eq 6 ]
+	[ "$status" -eq 1 ]
 	[[ "$output" =~ (`f_error_response_message "The request asked for a hash chain going backwards in time."`) ]]
 }
 
 @test "calendar-based verification: --continue-on-fail extender error 105" {
 	run src/logksi verify test/resource/logs_and_signatures/signed -d --ver-cal -X file://test/resource/server/ok_extender_error_response_105.tlv --ext-key anon --ext-user anon --continue-on-fail
-	[ "$status" -eq 6 ]
+	[ "$status" -eq 1 ]
 	[[ "$output" =~ (`f_error_response_message "The request asked for hash values older than the oldest round in the server's database."`) ]]
 }
 
 @test "calendar-based verification: --continue-on-fail extender error 106" {
 	run src/logksi verify test/resource/logs_and_signatures/signed -d --ver-cal -X file://test/resource/server/ok_extender_error_response_106.tlv --ext-key anon --ext-user anon --continue-on-fail
-	[ "$status" -eq 6 ]
+	[ "$status" -eq 1 ]
 	[[ "$output" =~ (`f_error_response_message "The request asked for hash values newer than the newest round in the server's database."`) ]]
 }
 
 @test "calendar-based verification: --continue-on-fail extender error 107" {
 	run src/logksi verify test/resource/logs_and_signatures/signed -d --ver-cal -X file://test/resource/server/ok_extender_error_response_107.tlv --ext-key anon --ext-user anon --continue-on-fail
-	[ "$status" -eq 6 ]
+	[ "$status" -eq 1 ]
 	[[ "$output" =~ (`f_error_response_message "The request asked for hash values newer than the current real time."`) ]]
 }
 
 @test "calendar-based verification: --continue-on-fail extender error 200" {
 	run src/logksi verify test/resource/logs_and_signatures/signed -d --ver-cal -X file://test/resource/server/ok_extender_error_response_200.tlv --ext-key anon --ext-user anon --continue-on-fail
-	[ "$status" -eq 6 ]
+	[ "$status" -eq 1 ]
 	[[ "$output" =~ (`f_error_response_message "The server encountered an unspecified internal error."`) ]]
 }
 
 @test "calendar-based verification: --continue-on-fail extender error 201" {
 	run src/logksi verify test/resource/logs_and_signatures/signed -d --ver-cal -X file://test/resource/server/ok_extender_error_response_201.tlv --ext-key anon --ext-user anon --continue-on-fail
-	[ "$status" -eq 6 ]
+	[ "$status" -eq 1 ]
 	[[ "$output" =~ (`f_error_response_message "The server misses the internal database needed to service the request."`) ]]
 }
 
 @test "calendar-based verification: --continue-on-fail extender error 202" {
 	run src/logksi verify test/resource/logs_and_signatures/signed -d --ver-cal -X file://test/resource/server/ok_extender_error_response_202.tlv --ext-key anon --ext-user anon --continue-on-fail
-	[ "$status" -eq 6 ]
+	[ "$status" -eq 1 ]
 	[[ "$output" =~ (`f_error_response_message "The server's internal database is in an inconsistent state."`) ]]
 }
 
 @test "calendar-based verification: --continue-on-fail extender error 300" {
 	run src/logksi verify test/resource/logs_and_signatures/signed -d --ver-cal -X file://test/resource/server/ok_extender_error_response_300.tlv --ext-key anon --ext-user anon --continue-on-fail
-	[ "$status" -eq 6 ]
+	[ "$status" -eq 1 ]
 	[[ "$output" =~ (`f_error_response_message "The server encountered unspecified critical errors connecting to upstream servers."`) ]]
 }
 
 @test "calendar-based verification: --continue-on-fail extender error 301" {
 	run src/logksi verify test/resource/logs_and_signatures/signed -d --ver-cal -X file://test/resource/server/ok_extender_error_response_301.tlv --ext-key anon --ext-user anon --continue-on-fail
-	[ "$status" -eq 6 ]
+	[ "$status" -eq 1 ]
 	[[ "$output" =~ (`f_error_response_message "No response from upstream servers."`) ]]
 }

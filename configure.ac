@@ -55,11 +55,12 @@ AC_PROG_LN_S
 AC_CHECK_LIB([crypto], [SHA256_Init], [], [AC_MSG_FAILURE([Could not find OpenSSL 0.9.8+ libraries.])])
 AC_CHECK_LIB([curl], [curl_easy_init], [], [AC_MSG_FAILURE([Could not find Curl libraries.])])
 
-LIBKSI_VER="3.18"
+LIBKSI_VER="3.20"
 LIBGTRFC3161_VER="1.0"
+LIBPST_VER="1.1"
 
 AC_ARG_ENABLE(static-build,
-AS_HELP_STRING([--enable-static-build], [Enable static linking of libksi and libgtrfc3161. Note that on some platforms this option may not work and user has to provide the static libksi and libgtrfc3161 library file explicitly. See options --without-libksi and --without-libgtrfc3161 instead. Default is no static.]),:,:)
+AS_HELP_STRING([--enable-static-build], [Enable static linking of libksi, libgtrfc3161 and libparamset. Note that on some platforms this option may not work and user has to provide the static libksi and libgtrfc3161 library file explicitly. See options --without-libksi, --without-libgtrfc3161 and --without-libparamset instead. Default is no static.]),:,:)
 
 AC_ARG_WITH(libksi,
 AS_HELP_STRING([--without-libksi], [Do not check or add libksi automatically for linking (no -lksi is added). Libksi library file must be provided by user (via LIBS variable) explicitly. Usable when default automatic linking does not work as expected (e.g. unable to link libksi statically). Default is with libksi.]),:,:)
@@ -67,6 +68,8 @@ AS_HELP_STRING([--without-libksi], [Do not check or add libksi automatically for
 AC_ARG_WITH(libgtrfc3161,
 AS_HELP_STRING([--without-libgtrfc3161], [Do not check or add libgtrfc3161 automatically for linking (no -lgtrfc3161 is added). Libgtrfc3161 library file must be provided by user (via LIBS variable) explicitly. Usable when default automatic linking does not work as expected (e.g. unable to link libgtrfc3161 statically). Default is with libgtrfc3161.]),:,:)
 
+AC_ARG_WITH(libparamset,
+AS_HELP_STRING([--without-libparamset], [Do not check or add libparamset automatically for linking (no -lparamset is added). Libparamset library file must be provided by user (via LIBS variable) explicitly. Usable when default automatic linking does not work as expected (e.g. unable to link libparamset statically). Default is with libparamset.]),:,:)
 
 # Specify all possible dependencies for RPM and DEB packaging.
 KSI_RPM_BUILD_DEPENDENCY="BuildRequires: libksi-devel >= $LIBKSI_VER"
@@ -78,6 +81,11 @@ GTRFC3161_RPM_BUILD_DEPENDENCY="BuildRequires: libgtrfc3161-devel >= $LIBGTRFC31
 GTRFC3161_DEB_BUILD_DEPENDENCY="libgtrfc3161-dev(>=$LIBGTRFC3161_VER)"
 GTRFC3161_RPM_RUN_DEPENDENCY="Requires: libgtrfc3161 >= $LIBGTRFC3161_VER"
 GTRFC3161_DEB_RUN_DEPENDENCY="libgtrfc3161(>=$LIBGTRFC3161_VER)"
+
+PST_RPM_BUILD_DEPENDENCY="BuildRequires: libparamset-devel >= $LIBPST_VER"
+PST_DEB_BUILD_DEPENDENCY="libparamset-dev(>=$LIBPST_VER)"
+PST_RPM_RUN_DEPENDENCY="Requires: libparamset >= $LIBPST_VER"
+PST_DEB_RUN_DEPENDENCY="libparamset(>=$LIBPST_VER)"
 
 # If libksi is excluded from linking, remove packaging run dependency, as libksi must be provided as static library via LIBS environment variable. See ./configure -h.
 if (test "$with_libksi" = "no") ; then
@@ -95,6 +103,14 @@ if (test "$with_libgtrfc3161" = "no") ; then
 	GTRFC3161_DEB_RUN_DEPENDENCY=""
 fi
 
+# If libparamset is excluded from linking, remove packaging run dependency, as libparamset must be provided as static library via LIBS environment variable.  See ./configure -h.
+if (test "$with_libparamset" = "no") ; then
+	AC_MSG_NOTICE([Note that user must specify libparamset explicitly! See configure option (configure -h) --without-libparamset and environment variable LIBS.])
+	KSI_PACKAGING_BUILD_FLAGS="$KSI_PACKAGING_BUILD_FLAGS --without-libparamset"
+	PST_RPM_RUN_DEPENDENCY=""
+	PST_DEB_RUN_DEPENDENCY=""
+fi
+
 if test "$enable_static_build" = "yes" ; then
 	AC_CANONICAL_HOST
 	KSI_RPM_RUN_DEPENDENCY=""
@@ -108,8 +124,8 @@ if test "$enable_static_build" = "yes" ; then
 		dy_link_flag="-dynamic"
 	fi
 
-	if (test "$with_libksi" = "no") && (test "$with_libgtrfc3161" = "no") ; then
-		AC_MSG_ERROR(["Error: Both flags --without-libksi and --without-libgtrfc3161 set, can not be used with --enable-static-build!"])
+	if (test "$with_libksi" = "no") && (test "$with_libgtrfc3161" = "no") && (test "$with_libparamse" = "no") ; then
+		AC_MSG_ERROR(["Error: All flags --without-libksi and --without-libgtrfc3161 and --without-libparamset set, can not be used with --enable-static-build!"])
 	fi
 
 	if test "$with_libksi" != "no" ; then
@@ -120,6 +136,11 @@ if test "$enable_static_build" = "yes" ; then
 	if test "$with_libgtrfc3161" != "no" ; then
 		AC_MSG_NOTICE([libgtrfc3161 will be linked statically.])
 		AC_CHECK_LIB([gtrfc3161], [convert_signature], [LIBS="-Wl,-static -lgtrfc3161 -Wl,$dy_link_flag $LIBS"], [AC_MSG_FAILURE([Could not find libgtrfc3161. Install libgtrfc3161 or specify the library path manually.])])
+	fi
+
+	if test "$with_libparamset" != "no" ; then
+		AC_MSG_NOTICE([libparamset will be linked statically.])
+		AC_CHECK_LIB([paramset], [PARAM_SET_new], [LIBS="-Wl,-static -lparamset -Wl,$dy_link_flag $LIBS"], [AC_MSG_FAILURE([Could not find libparamset. Install libparamset or specify the library path manually.])])
 	fi
 
 	KSI_PACKAGING_BUILD_FLAGS="$KSI_PACKAGING_BUILD_FLAGS --enable-static-build"
@@ -133,6 +154,11 @@ else
 		AC_MSG_NOTICE([libgtrfc3161 will be linked dynamically.])
 		AC_CHECK_LIB([gtrfc3161], [convert_signature], [], [AC_MSG_FAILURE([Could not find libgtrfc3161. Install libgtrfc3161 or specify the library path manually.])])
 	fi
+
+	if test "$with_libparamset" != "no" ; then
+		AC_MSG_NOTICE([libparamset will be linked dynamically.])
+		AC_CHECK_LIB([paramset], [PARAM_SET_new], [], [AC_MSG_FAILURE([Could not find libparamset. Install libparamset or specify the library path manually.])])
+	fi
 fi
 
 AC_SUBST(KSI_RPM_RUN_DEPENDENCY)
@@ -143,11 +169,16 @@ AC_SUBST(GTRFC3161_RPM_RUN_DEPENDENCY)
 AC_SUBST(GTRFC3161_DEB_RUN_DEPENDENCY)
 AC_SUBST(GTRFC3161_DEB_BUILD_DEPENDENCY)
 AC_SUBST(GTRFC3161_RPM_BUILD_DEPENDENCY)
+AC_SUBST(PST_RPM_RUN_DEPENDENCY)
+AC_SUBST(PST_DEB_RUN_DEPENDENCY)
+AC_SUBST(PST_DEB_BUILD_DEPENDENCY)
+AC_SUBST(PST_RPM_BUILD_DEPENDENCY)
 AC_SUBST(KSI_PACKAGING_BUILD_FLAGS)
 
 
 AC_CHECK_HEADER([ksi/ksi.h], [], [AC_MSG_FAILURE([Could not find include files (libksi-devel) of libksi (KSI C SDK). Install libksi-devel or specify the headers manually.])])
 AC_CHECK_HEADER([gtrfc3161/tsconvert.h], [], [AC_MSG_FAILURE([Could not find include files (libgtrfc3161-devel) of libgtrfc3161. Install libgtrfc3161-devel or specify the headers manually.])])
+AC_CHECK_HEADER([param_set/param_set.h], [], [AC_MSG_FAILURE([Could not find include files (libparamset-devel) of libparamset. Install libparamset-devel or specify the headers manually.])])
 
 # Checks for header files.
 AC_CHECK_HEADERS([stdlib.h string.h])

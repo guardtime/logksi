@@ -41,7 +41,7 @@
 #include "tool.h"
 #include "param_set/parameter.h"
 #include "../tool_box.h"
-#include "param_set/param_set_obj_impl.h"
+//#include "param_set/param_set_obj_impl.h"
 #include "param_set/strn.h"
 #include "rsyslog.h"
 #include "logksi.h"
@@ -53,6 +53,8 @@ static int generate_filenames(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files);
 static int open_input_and_output_files(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files);
 static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files);
 static void close_input_and_output_files(ERR_TRCKR *err, int res, IO_FILES *files);
+
+#define PARAMS "{input}{o}{sig-from-stdin}{insert-missing-hashes}{d}{show-progress}{log}{conf}{h|help}{continue-on-fail}{hex-to-str}"
 
 int sign_run(int argc, char** argv, char **envp) {
 	int res;
@@ -73,7 +75,7 @@ int sign_run(int argc, char** argv, char **envp) {
 	 * Extract command line parameters.
 	 */
 	res = PARAM_SET_new(
-			CONF_generate_param_set_desc("{input}{o}{sig-from-stdin}{insert-missing-hashes}{d}{show-progress}{log}{conf}{h|help}{continue-on-fail}{hex-to-str}", "S", buf, sizeof(buf)),
+			CONF_generate_param_set_desc(PARAMS, "S", buf, sizeof(buf)),
 			&set);
 	if (res != KT_OK) goto cleanup;
 
@@ -151,53 +153,47 @@ cleanup:
 }
 
 char *sign_help_toString(char*buf, size_t len) {
-	KSI_snprintf(buf, len,
-		"Usage:\n"
-		" %s sign <logfile> [-o <out.logsig>] -S <URL> [--aggr-user <user> --aggr-key <key>]\n"
-		"          [more_options]\n"
-		" %s sign --sig-from-stdin [-o <out.logsig>] -S <URL> [--aggr-user <user> --aggr-key <key>]\n"
-		"          [more_options]\n"
-		"\n"
-		" <logfile>\n"
-		"           - Name of the log file whose log signature file's unsigned blocks are to be signed.\n"
-		"             Name of the log signature file is derived by adding either '.logsig' or '.gtsig' to '<logfile>'.\n"
-		"             If specified, the '--sig-from-stdin' switch cannot be used.\n"
-		" --sig-from-stdin\n"
-		"             The log signature file is read from stdin.\n"
-		" -o <out.logsig>\n"
-		"           - Name of the signed output log signature file. An existing log signature file is overwritten.\n"
-		"             If not specified, the log signature is saved to '<logfile>.logsig' while a backup of '<logfile>.logsig'\n"
-		"             is saved in '<logfile>.logsig.bak'.\n"
-		"             Use '-' to redirect the signed log signature binary stream to stdout.\n"
-		"             If input is read from stdin and output is not specified, stdout is used for output.\n"
-		" -S <URL>\n"
-		"           - Signing service (KSI Aggregator) URL.\n"
-		" --aggr-user <user>\n"
-		"           - Username for signing service.\n"
-		" --aggr-key <key>\n"
-		"           - HMAC key for signing service.\n"
-		" --aggr-hmac-alg <alg>\n"
-		"           - Hash algorithm to be used for computing HMAC on outgoing messages\n"
-		"             towards KSI aggregator. If not set, default algorithm is used.\n"
-		"--continue-on-fail\n"
-		"           - This option can be used to continue signing in case of signing\n"
-		"             error. Other errors (e.g. verification error) will terminated the\n"
-		"             process.\n"
-		" -d\n"
-		"           - Print detailed information about processes and errors to stderr.\n"
-		"             To make output more verbose use -dd or -ddd.\n"
-		" --show-progress\n"
-		"           - Print signing progress. Only valid with '-d' and debug level 1.\n"
-		" --conf <file>\n"
-		"           - Read configuration options from the given file. It must be noted\n"
-		"             that configuration options given explicitly on command line will\n"
-		"             override the ones in the configuration file.\n"
-		" --log <file>\n"
-		"           - Write libksi log to the given file. Use '-' as file name to redirect the log to stdout.\n",
-		TOOL_getName(),
-		TOOL_getName()
-	);
+	int res;
+	char *ret = NULL;
+	PARAM_SET *set;
+	size_t count = 0;
+	char tmp[1024];
 
+
+	if (buf == NULL || len == 0) return NULL;
+
+	/* Create set with documented parameters. */
+	res = PARAM_SET_new(CONF_generate_param_set_desc(PARAMS, "S", tmp, sizeof(tmp)), &set);
+	if (res != PST_OK) goto cleanup;
+
+	res = CONF_initialize_set_functions(set, "S");
+	if (res != PST_OK) goto cleanup;
+
+	PARAM_SET_setPrintName(set, "input", "<logfile>", NULL); /* Temporary name change for formatting help text. */
+	PARAM_SET_setHelpText(set, "input", NULL, "Name of the log file whose log signature file's unsigned blocks are to be signed. Name of the log signature file is derived by adding either '.logsig' or '.gtsig' to '<logfile>'. If specified, the '--sig-from-stdin' switch cannot be used.");
+	PARAM_SET_setHelpText(set, "sig-from-stdin", NULL, "The log signature file is read from stdin.");
+	PARAM_SET_setHelpText(set, "o", "<out.logsig>", "Name of the signed output log signature file. An existing log signature file is overwritten. If not specified, the log signature is saved to '<logfile>.logsig' while a backup of '<logfile>.logsig' is saved in '<logfile>.logsig.bak'. Use '-' to redirect the signed log signature binary stream to stdout. If input is read from stdin and output is not specified, stdout is used for output.");
+	PARAM_SET_setHelpText(set, "continue-on-fail", NULL, "This option can be used to continue signing in case of signing error. Other errors (e.g. verification error) will terminated the process.");
+	PARAM_SET_setHelpText(set, "d", NULL, "Print detailed information about processes and errors to stderr. To make output more verbose use -dd or -ddd.");
+	PARAM_SET_setHelpText(set, "show-progress", NULL, "Print signing progress. Only valid with '-d' and debug level 1.");
+	PARAM_SET_setHelpText(set, "conf", "<file>", "Read configuration options from the given file. It must be noted that configuration options given explicitly on command line will override the ones in the configuration file.");
+	PARAM_SET_setHelpText(set, "log", "<file>", "Write libksi log to the given file. Use '-' as file name to redirect the log to stdout.");
+
+
+	/* Format synopsis and parameters. */
+	count += PST_snhiprintf(buf + count, len - count, 80, 0, 0, NULL, ' ', "Usage:\\>1\n\\>8"
+		"logksi sign <logfile> [-o <out.logsig>] -S <URL> [--aggr-user <user>\n"
+		"--aggr-key <key>] [more_options]\\>1\n\\>8"
+		"logksi sign --sig-from-stdin [-o <out.logsig>] -S <URL> [--aggr-user <user> --aggr-key <key>] [more_options]"
+		"\\>\n\n\n");
+
+	ret = PARAM_SET_helpToString(set, "input,sig-from-stdin,o,S,aggr-user,aggr-key,aggr-hmac-alg,continue-on-fail,d,show-progress,conf,log", 1, 13, 80, buf + count, len - count);
+
+cleanup:
+	if (res != PST_OK || ret == NULL) {
+		PST_snprintf(buf + count, len - count, "\nError: There were failures while generating help by PARAM_SET.\n");
+	}
+	PARAM_SET_free(set);
 	return buf;
 }
 

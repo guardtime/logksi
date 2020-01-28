@@ -185,11 +185,11 @@ err_failed_b2_b3_too_apart=`f_failed_sig_time_diff_check 2 3 "apart" 1554200225 
 
 @test "Debug output for continuated verification: Verify signatures that contains unsigned blocks." {
 	run ./src/logksi verify test/resource/logs_and_signatures/unsigned -d --continue-on-fail
-	[ "$status" -eq 6 ]
+	[ "$status" -eq 1 ]
 	[[ "$output" =~ (Verifying... failed.)..( x Error: Block 5 is unsigned!)..( x Error: Skipping block 5!)..( x Error: Block 6 is unsigned!)..( x Error: Skipping block 6!).*( x Error: Block 25 is unsigned!)..( x Error: Skipping block 25!) ]]
 
 	[[ "$output" =~ (Summary of logfile:).( . Count of blocks:             30).( . Count of failures:           1).( . Count of record hashes:      88).( . Count of meta-records:       1).( . Input hash:  SHA-512:dd4e87.*e2b137).( . Output hash: SHA-512:7f5a17.*cd7827) ]]
-	[[ "$output" =~ (2[\)]).*(Error: Verification FAILED but was continued for further analysis)  ]]
+	[[ "$output" =~ (2[\)]).*(Error: Verification inconclusive but was continued for further analysis)  ]]
 }
 
 @test "Debug output for continuated verification: Client ID mismatch. Debug level 1." {

@@ -140,6 +140,7 @@ typedef struct {
 	char isContinuedOnFail;			/* Option --continue-on-failure is set. */
 	int quietError;					/* In case of failure and --continue-on-fail, this option will keep the error code and block is not skipped. */
 	uint64_t sigTime_0;
+	int logksiVerRes;
 
 	MERKLE_TREE *tree;
 } LOGKSI;

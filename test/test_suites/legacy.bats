@@ -2,15 +2,23 @@
 
 export KSI_CONF=test/test.cfg
 
-cp -r test/resource/logfiles/legacy test/out
-cp -r test/resource/logsignatures/legacy.gtsig test/out
-cp -r test/resource/logfiles/legacy_with_missing_tree_hashes test/out/legacy_with_missing_tree_hashes_1
-cp -r test/resource/logsignatures/legacy_with_missing_tree_hashes.gtsig test/out/legacy_with_missing_tree_hashes_1.gtsig
-cp -r test/resource/logfiles/legacy_with_missing_tree_hashes test/out/legacy_with_missing_tree_hashes_2
-cp -r test/resource/logsignatures/legacy_with_missing_tree_hashes.gtsig test/out/legacy_with_missing_tree_hashes_2.gtsig
+@test "copy resource files" {
+	run cp -r test/resource/logfiles/legacy test/out
+	[ "$status" -eq 0 ]
+	run cp -r test/resource/logsignatures/legacy.gtsig test/out
+	[ "$status" -eq 0 ]
+	run cp -r test/resource/logfiles/legacy_with_missing_tree_hashes test/out/legacy_with_missing_tree_hashes_1
+	[ "$status" -eq 0 ]
+	run cp -r test/resource/logsignatures/legacy_with_missing_tree_hashes.gtsig test/out/legacy_with_missing_tree_hashes_1.gtsig
+	[ "$status" -eq 0 ]
+	run cp -r test/resource/logfiles/legacy_with_missing_tree_hashes test/out/legacy_with_missing_tree_hashes_2
+	[ "$status" -eq 0 ]
+	run cp -r test/resource/logsignatures/legacy_with_missing_tree_hashes.gtsig test/out/legacy_with_missing_tree_hashes_2.gtsig
+	[ "$status" -eq 0 ]
+}
 
 @test "verify legacy.gtsig explicitly" {
-	run ./src/logksi verify test/out/legacy test/out/legacy.gtsig -ddd
+	run ./src/logksi verify --ver-int test/out/legacy test/out/legacy.gtsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Warning: RFC3161 timestamp(s) found in log signature." ]]
 	[[ "$output" =~ "Run 'logksi extend' with '--enable-rfc3161-conversion' to convert RFC3161 timestamps to KSI signatures." ]]
@@ -18,7 +26,7 @@ cp -r test/resource/logsignatures/legacy_with_missing_tree_hashes.gtsig test/out
 }
 
 @test "verify legacy.gtsig implicitly" {
-	run ./src/logksi verify test/out/legacy -ddd
+	run ./src/logksi verify --ver-int test/out/legacy -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Warning: RFC3161 timestamp(s) found in log signature." ]]
 	[[ "$output" =~ "Run 'logksi extend' with '--enable-rfc3161-conversion' to convert RFC3161 timestamps to KSI signatures." ]]
@@ -39,13 +47,14 @@ cp -r test/resource/logsignatures/legacy_with_missing_tree_hashes.gtsig test/out
 }
 
 @test "verify extended_legacy.gtsig" {
-	run ./src/logksi verify test/out/legacy -ddd
+	run ./src/logksi verify --ver-int test/out/legacy -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Warning: RFC3161 timestamp(s) found in log signature." ]]
 	[[ "$output" =~ "Run 'logksi extend' with '--enable-rfc3161-conversion' to convert RFC3161 timestamps to KSI signatures." ]]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	run ./src/logksi verify test/out/legacy test/out/extended_legacy.gtsig -ddd
 	[ "$status" -eq 0 ]
+	[[ ! "$output" =~ "Warning: RFC3161" ]]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 }
 
@@ -59,6 +68,7 @@ cp -r test/resource/logsignatures/legacy_with_missing_tree_hashes.gtsig test/out
 	run ./src/logksi verify test/out/legacy -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
+	[[ ! "$output" =~ "Warning: RFC3161" ]]
 }
 
 @test "insert missing tree hashes into extended legacy.gtsig" {
@@ -74,10 +84,11 @@ cp -r test/resource/logsignatures/legacy_with_missing_tree_hashes.gtsig test/out
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
+	[[ ! "$output" =~ "Warning: RFC3161" ]]
 }
 
 @test "insert missing tree hashes into non-extended legacy.gtsig" {
-	run ./src/logksi verify test/out/legacy_with_missing_tree_hashes_2 -ddd
+	run ./src/logksi verify --ver-int test/out/legacy_with_missing_tree_hashes_2 -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Warning: RFC3161 timestamp(s) found in log signature." ]]
 	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
@@ -87,7 +98,7 @@ cp -r test/resource/logsignatures/legacy_with_missing_tree_hashes.gtsig test/out
 	[[ "$output" =~ "Warning: RFC3161 timestamp(s) found in log signature." ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run ./src/logksi verify test/out/legacy_with_missing_tree_hashes_2 -ddd
+	run ./src/logksi verify --ver-int test/out/legacy_with_missing_tree_hashes_2 -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Warning: RFC3161 timestamp(s) found in log signature." ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]

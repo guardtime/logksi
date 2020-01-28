@@ -109,6 +109,7 @@ int check_log_line_embedded_time(PARAM_SET* set, MULTI_PRINTER *mp, ERR_TRCKR *e
 					}
 
 					res = KT_VERIFICATION_FAILURE;
+					LOGKSI_setErrorLevel(logksi, LOGKSI_VER_RES_FAIL);
 					print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 					LOGKSI_uint64_toDateString(last_time, str_last_time, sizeof(str_last_time));
 					LOGKSI_uint64_toDateString(t, str_current_time, sizeof(str_current_time));
@@ -221,6 +222,7 @@ int check_log_record_embedded_time_against_ksi_signature_time(PARAM_SET *set, MU
 		/* In case of failure leave a mark and format some more strings. */
 		if (isSigTimeOlderThanRecTime || isTimeDiffTooLarge) {
 			res = KT_VERIFICATION_FAILURE;
+			LOGKSI_setErrorLevel(logksi, LOGKSI_VER_RES_FAIL);
 			logksi->file.nofTotalFailedBlocks++;
 			print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 
@@ -320,6 +322,7 @@ int check_log_signature_client_id(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *
 		if (res != REGEXP_OK) {
 			logksi->file.nofTotalFailedBlocks++;
 			res = KT_VERIFICATION_FAILURE;
+			LOGKSI_setErrorLevel(logksi, LOGKSI_VER_RES_FAIL);
 			logksi->quietError = res;
 			print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 
@@ -474,6 +477,7 @@ int handle_block_signing_time_check(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR
 
 					if (!hasFailed) logksi->file.nofTotalFailedBlocks++;
 					res = KT_VERIFICATION_FAILURE;
+					LOGKSI_setErrorLevel(logksi, LOGKSI_VER_RES_FAIL);
 					hasFailed = 1;
 
 					print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
@@ -589,6 +593,7 @@ int handle_record_time_check_between_files(PARAM_SET *set, MULTI_PRINTER* mp, ER
 
 			/* Check if deviation in current range is accepted. */
 			res = KT_VERIFICATION_FAILURE;
+			LOGKSI_setErrorLevel(logksi, LOGKSI_VER_RES_FAIL);
 			print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 			LOGKSI_uint64_toDateString(logksi->file.recTimeMax, str_last_time, sizeof(str_last_time));
 			LOGKSI_uint64_toDateString(logksi->block.recTimeMin, str_current_time, sizeof(str_current_time));
@@ -701,6 +706,7 @@ int logksi_datahash_compare(ERR_TRCKR *err, MULTI_PRINTER *mp, LOGKSI* logksi, i
 		size_t minSize = 0;
 
 		res = KT_VERIFICATION_FAILURE;
+		LOGKSI_setErrorLevel(logksi, LOGKSI_VER_RES_FAIL);
 		print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 		MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
 		differentHashAlg = KSI_DataHash_getHashAlg(left, &leftId) == KSI_OK && KSI_DataHash_getHashAlg(right, &rightId) == KSI_OK && leftId != rightId;
@@ -869,6 +875,8 @@ int is_block_signature_expected(LOGKSI *logksi, ERR_TRCKR *err) {
 
 cleanup:
 
+	if (res == KT_VERIFICATION_FAILURE) LOGKSI_setErrorLevel(logksi, LOGKSI_VER_RES_FAIL);
+
 	return res;
 }
 
@@ -899,6 +907,8 @@ int is_record_hash_expected(LOGKSI *logksi, ERR_TRCKR *err) {
 	res = KT_OK;
 
 cleanup:
+
+	if (res == KT_VERIFICATION_FAILURE) LOGKSI_setErrorLevel(logksi, LOGKSI_VER_RES_FAIL);
 
 	return res;
 }
@@ -954,6 +964,8 @@ int is_tree_hash_expected(LOGKSI *logksi, ERR_TRCKR *err) {
 	res = KT_OK;
 
 cleanup:
+
+	if (res == KT_VERIFICATION_FAILURE) LOGKSI_setErrorLevel(logksi, LOGKSI_VER_RES_FAIL);
 
 	return res;
 }

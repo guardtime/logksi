@@ -27,6 +27,28 @@
 extern "C" {
 #endif
 
+enum LOGSIG_VER_enum {
+	/* Invalid value. */
+	LOGKSI_VER_RES_INVALID = 0,
+
+	/* Verification succeeded, which means there's a way to prove the correctness of the log signature. */
+	LOGKSI_VER_RES_OK,
+
+	/* Verification not possible, which means there is not enough data to prove or disprove the correctness of the log signature. */
+	LOGKSI_VER_RES_NA,
+
+	 /**
+	  * Verification failed, which means the log signature is definitely invalid or the log lines does not match with the log signature.
+	  * This result is also returned when some additional checks do fails (e.g. client id or signing time difference do not match with the
+	  * configured values)
+	  */
+	LOGKSI_VER_RES_FAIL,
+
+	/* Count of possible values. */
+	LOGKSI_VER_RES_COUNT,
+};
+
+
 void LOGKSI_initialize(LOGKSI *block);
 void LOGKSI_freeAndClearInternals(LOGKSI *logksi);
 int LOGKSI_initNextBlock(LOGKSI *logksi);
@@ -35,6 +57,8 @@ int LOGKSI_hasWarnings(LOGKSI *logksi);
 int LOGKSI_getMaxFinalHashes(LOGKSI *logksi);
 size_t LOGKSI_getNofLines(LOGKSI *logksi);
 
+int LOGKSI_setErrorLevel(LOGKSI *logksi, int lvl);
+int LOGKSI_getErrorLevel(LOGKSI *logksi);
 
 #ifdef	__cplusplus
 }

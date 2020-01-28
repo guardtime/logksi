@@ -24,9 +24,10 @@
 #include <ksi/ksi.h>
 #include <ksi/compatibility.h>
 #include <ksi/policy.h>
-#include "param_set/param_set.h"
-#include "param_set/task_def.h"
-#include "param_set/parameter.h"
+#include <param_set/param_set.h>
+#include <param_set/task_def.h>
+#include <param_set/parameter.h>
+#include <param_set/strn.h>
 #include "tool_box/ksi_init.h"
 #include "tool_box/param_control.h"
 #include "tool_box/task_initializer.h"
@@ -49,6 +50,8 @@ static int open_log_and_signature_files(PARAM_SET *set, ERR_TRCKR *err, IO_FILES
 static int rename_temporary_and_backup_files(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files);
 static void close_log_and_signature_files(ERR_TRCKR *err, int res, IO_FILES *files);
 
+#define PARAMS "{input}{log-from-stdin}{sig-from-stdin}{o}{out-log}{out-proof}{r}{d}{log}{h|help}{hex-to-str}{ksig}"
+
 int extract_run(int argc, char **argv, char **envp) {
 	int res;
 	char buf[2048];
@@ -70,7 +73,7 @@ int extract_run(int argc, char **argv, char **envp) {
 	 * Extract command line parameters and also add configuration specific parameters.
 	 */
 	res = PARAM_SET_new(
-			CONF_generate_param_set_desc("{input}{log-from-stdin}{sig-from-stdin}{o}{out-log}{out-proof}{r}{d}{log}{h|help}{hex-to-str}{ksig}", "", buf, sizeof(buf)),
+			CONF_generate_param_set_desc(PARAMS, "", buf, sizeof(buf)),
 			&set);
 	if (res != KT_OK) goto cleanup;
 
@@ -146,53 +149,55 @@ cleanup:
 }
 
 char *extract_help_toString(char *buf, size_t len) {
-	KSI_snprintf(buf, len,
-		"Usage:\n"
-		" %s extract <logfile> [<logfile.logsig>] [-o <outfile>] -r <records> [more_options]\n"
-		" %s extract --log-from-stdin <logfile.logsig> -o <outfile> -r <records> [more_options]\n"
-		" %s extract --sig-from-stdin <logfile> [-o <outfile>] -r <records> [more_options]\n"
-		"\n"
-		" <logfile>\n"
-		"           - Log file from where to extract log records.\n"
-		" <logfile.logsig>\n"
-		"             Log signature file from where to extract the KSI signature for integrity proof.\n"
-		"             If omitted, the log signature file name is derived by adding either '.logsig' or '.gtsig' to '<logfile>'.\n"
-		"             It is expected to be found in the same folder as the '<logfile>'.\n"
-		" --log-from-stdin\n"
-		"             The log file is read from stdin. Cannot be used with '--sig-from-stdin'.\n"
-		"             If '--log-from-stdin' is used, the log signature file name must be specified explicitly.\n"
-		" --sig-from-stdin\n"
-		"             The log signature file is read from stdin. Cannot be used with '--log-from-stdin'.\n"
-		"             If '--sig-from-stdin' is used, the log file name must be specified explicitly.\n"
-		" -o <outfile>\n"
-		"             Names of the output files will be derived from '<outfile>' by adding the appropriate suffixes.\n"
-		"             Name of the excerpt file will be '<outfile>.excerpt'.\n"
-		"             Name of the integrity proof file will be '<outfile>.excerpt.logsig'.\n"
-		"             If '<outfile>' is not specified, names of the output files will be derived from '<logfile>'.\n"
-		"             '<outfile>' must be specified if the log file is read from stdin.\n"
-		" --out-log <log.records>\n"
-		"             Name of the output log records file. '-' can be used to redirect the file to stdout.\n"
-		"             If '<log.records>' is not specified, the name is derived from either '<outfile>' or '<logfile>'.\n"
-		" --out-proof <integrity.proof>\n"
-		"             Name of the output integrity proof file. '-' can be used to redirect the file to stdout.\n"
-		"             If '<integrity.proof>' is not specified, the name is derived from either '<outfile>' or '<logfile>'.\n"
-		" -r <records>\n"
-		"             Positions of log records to be extraced, given as a list of ranges.\n"
-		"             Example: -r 12-18,21,88-192\n"
-		"             List of positions must be given in a strictly ascending order using positive decimal numbers.\n"
-		" --ksig      Extracts pure KSI signatures and corresponding log lines into\n"
-		"             separate files instead of single integrity proof file and single\n"
-		"             log records file.\n"
-		" -d\n"
-		"           - Print detailed information about processes and errors to stderr.\n"
-		"             To make output more verbose use -dd or -ddd.\n"
-		" --log <file>\n"
-		"           - Write libksi log to the given file. Use '-' as file name to redirect the log to stdout.\n",
-		TOOL_getName(),
-		TOOL_getName(),
-		TOOL_getName()
-	);
+	int res;
+	char *ret = NULL;
+	PARAM_SET *set;
+	size_t count = 0;
+	char tmp[1024];
 
+	if (buf == NULL || len == 0) return NULL;
+
+
+	/* Create set with documented parameters. */
+	res = PARAM_SET_new(CONF_generate_param_set_desc(PARAMS "{logsig}", "", tmp, sizeof(tmp)), &set);
+	if (res != PST_OK) goto cleanup;
+
+	res = CONF_initialize_set_functions(set, "");
+	if (res != PST_OK) goto cleanup;
+
+	/* Temporary name change for formatting help text. */
+	PARAM_SET_setPrintName(set, "input", "<logfile>", NULL);
+	PARAM_SET_setHelpText(set, "input", NULL, "Log file from where to extract log records.");
+
+	/* Note that logsig is not a real parameter, but a dummy parameter to be used to format help! */
+	PARAM_SET_setPrintName(set, "logsig", "<logfile.logsig>", NULL);
+	PARAM_SET_setHelpText(set, "logsig", NULL, "Log signature file from where to extract the KSI signature for integrity proof. If omitted, the log signature file name is derived by adding either '.logsig' or '.gtsig' to '<logfile>'. It is expected to be found in the same folder as the '<logfile>'.");
+
+	PARAM_SET_setHelpText(set, "log-from-stdin", NULL, "The log file is read from stdin. Cannot be used with '--sig-from-stdin'. If '--log-from-stdin' is used, the log signature file name must be specified explicitly.");
+	PARAM_SET_setHelpText(set, "sig-from-stdin", NULL, "The log signature file is read from stdin. Cannot be used with '--log-from-stdin'. If '--sig-from-stdin' is used, the log file name must be specified explicitly.");
+	PARAM_SET_setHelpText(set, "o", "<outfile>", "Names of the output files will be derived from '<outfile>' by adding the appropriate suffixes. Name of the excerpt file will be '<outfile>.excerpt'. Name of the integrity proof file will be '<outfile>.excerpt.logsig'. If '<outfile>' is not specified, names of the output files will be derived from '<logfile>'. '<outfile>' must be specified if the log file is read from stdin.");
+	PARAM_SET_setHelpText(set, "out-log", "<log.records>", "Name of the output log records file. '-' can be used to redirect the file to stdout. If '<log.records>' is not specified, the name is derived from either '<outfile>' or '<logfile>'.");
+	PARAM_SET_setHelpText(set, "out-proof", "<integrity.proof>", "Name of the output integrity proof file. '-' can be used to redirect the file to stdout. If '<integrity.proof>' is not specified, the name is derived from either '<outfile>' or '<logfile>'.");
+	PARAM_SET_setHelpText(set, "r", "<records>", "Positions of log records to be extraced, given as a list of ranges. Example: -r 12-18,21,88-192");
+	PARAM_SET_setHelpText(set, "ksig", NULL, "Extracts pure KSI signatures and corresponding log lines into separate files instead of single integrity proof file and single log records file.");
+	PARAM_SET_setHelpText(set, "d", NULL, "Print detailed information about processes and errors to stderr. To make output more verbose use -dd or -ddd.");
+	PARAM_SET_setHelpText(set, "log", "<file>", "Write libksi log to the given file. Use '-' as file name to redirect the log to stdout.");
+
+
+	/* Format synopsis and parameters. */
+	count += PST_snhiprintf(buf + count, len - count, 80, 0, 0, NULL, ' ', "Usage:\\>1\n\\>8"
+	"logksi extract <logfile> [<logfile.logsig>] [-o <outfile>] -r <records> [more_options]\\>1\n\\>8"
+	"logksi extract --log-from-stdin <logfile.logsig> -o <outfile> -r <records> [more_options]\\>1\n\\>8"
+	"logksi extract --sig-from-stdin <logfile> [-o <outfile>] -r <records> [more_options]"
+	"\\>\n\n\n");
+
+	ret = PARAM_SET_helpToString(set, "input,logsig,log-from-stdin,sig-from-stdin,o,out-log,out-proof,r,ksig,d,log", 1, 13, 80, buf + count, len - count);
+
+cleanup:
+	if (res != PST_OK || ret == NULL) {
+		PST_snprintf(buf + count, len - count, "\nError: There were failures while generating help by PARAM_SET.\n");
+	}
+	PARAM_SET_free(set);
 	return buf;
 }
 
