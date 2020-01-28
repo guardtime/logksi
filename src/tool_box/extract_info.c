@@ -71,7 +71,7 @@ struct NEXT_REC_st {
 	const char *records;
 };
 
-typedef struct EXTRACT_INFO_st {
+struct EXTRACT_INFO_st {
 	const char *pRange;					/* (old name records) Reference to PARAM_SET value. Maybe rename or make as const. */
 	size_t *extractPositions;			/* Array containing list of extract positions (log line numbers). */
 	size_t nofExtractPositions;			/* Count of all extract positions (in extractPositions). */
@@ -82,7 +82,7 @@ typedef struct EXTRACT_INFO_st {
 	RECORD_INFO *records;				/* Actual data structures containing extracted hash value and matching record chain. */
 	size_t records_capacity;			/* The size of extractPositions array. */
 	size_t nofExtractPositionsInBlock;	/* Count of \c records elements in array. Incremented by EXTRACT_INFO_getNew. */
-} EXTRACT_INFO;
+};
 
 struct aggr_chain_fold_st {
 	KSI_HashChainLinkList *chainList;
