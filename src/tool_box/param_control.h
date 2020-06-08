@@ -162,7 +162,7 @@ int isFormatOk_flag(const char *flag);
 int isFormatOk_constraint(const char *constraint);
 int isFormatOk_userPass(const char *uss_pass);
 
-int isFormatOk_RecordExtract(const char *rec);
+int isFormatOk_recordExtract(const char *rec);
 
 int convertRepair_constraint(const char* arg, char* buf, unsigned len);
 

@@ -49,7 +49,7 @@ size_t EXTRACT_INFO_getPositionsExtracted(EXTRACT_INFO *info);
 
 int RECORD_INFO_setRecordHash(RECORD_INFO *extractInfo, size_t pos, size_t offs, KSI_DataHash *hsh, const char *logLine);
 int RECORD_INFO_setMetaRecordHash(RECORD_INFO *extractInfo, size_t pos, size_t offs, KSI_DataHash *hsh, unsigned char *raw, size_t raw_len);
-int RECORD_INFO_add_hash_to_record_chain(RECORD_INFO *extracts, LINK_DIRECTION dir, KSI_DataHash *hash, int corr);
+int RECORD_INFO_addHash(RECORD_INFO *extracts, LINK_DIRECTION dir, KSI_DataHash *hash, int corr);
 int RECORD_INFO_getLine(RECORD_INFO *record, size_t *lineNr, char **logLine);
 int RECORD_INFO_getPositionInTree(RECORD_INFO *record, size_t *recordOffset, size_t *recordRootLvl);
 int RECORD_INFO_getRecordHash(RECORD_INFO *record, KSI_DataHash **extractRecord);

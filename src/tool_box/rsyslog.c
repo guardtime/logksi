@@ -1024,15 +1024,13 @@ static int logksi_new_record_chain(MERKLE_TREE *tree, void *ctx, int isMetaRecor
 			ERR_CATCH_MSG(err, res, "Error: Unable to create new extract record for record.");
 		}
 
-		/* Retreive and use mask. */
+		/* Retrieve and use mask. */
 		res = MERKLE_TREE_getPrevMask(tree, &prevMask);
 		if (res != KT_OK) goto cleanup;
 
-		if (isMetaRecordHash) {
-			res = RECORD_INFO_add_hash_to_record_chain(recordInfo, LEFT_LINK, prevMask, 0);
-		} else {
-			res = RECORD_INFO_add_hash_to_record_chain(recordInfo, RIGHT_LINK, prevMask, 0);
-		}
+		res = isMetaRecordHash ?
+			RECORD_INFO_addHash(recordInfo, LEFT_LINK, prevMask, 0) :
+			RECORD_INFO_addHash(recordInfo, RIGHT_LINK, prevMask, 0);
 		if (res != KT_OK) goto cleanup;
 
 		res = EXTRACT_INFO_moveToNext(logksi->task.extract.info);
@@ -1097,12 +1095,12 @@ static int logksi_extract_record_chain(MERKLE_TREE *tree, void *ctx, unsigned ch
 		}
 		if (condition) {
 			if (((recordOffset - 1) >> level) & 1L) {
-				res = MERKLE_TREE_get(logksi->tree, level, &hsh);
+				res = MERKLE_TREE_getSubTreeRoot(logksi->tree, level, &hsh);
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable get hash from merkle tree.", logksi->blockNo);
 
-				res = RECORD_INFO_add_hash_to_record_chain(record, RIGHT_LINK, hsh, level + 1 - recordLevel);
+				res = RECORD_INFO_addHash(record, RIGHT_LINK, hsh, level + 1 - recordLevel);
 			} else {
-				res = RECORD_INFO_add_hash_to_record_chain(record, LEFT_LINK, leftLink, level + 1 - recordLevel);
+				res = RECORD_INFO_addHash(record, LEFT_LINK, leftLink, level + 1 - recordLevel);
 			}
 			if (res != KT_OK) {
 				ERR_CATCH_MSG(err, res, "Error: Unable to add hash to record chain.");

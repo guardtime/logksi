@@ -178,7 +178,7 @@ cleanup:
 	return res;
 }
 
-int isFormatOk_RecordExtract(const char *rec) {
+int isFormatOk_recordExtract(const char *rec) {
 	long last = -1;
 	int expectingInteger = 1;
 	int expectingSeparator = 0;

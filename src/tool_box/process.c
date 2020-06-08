@@ -57,7 +57,7 @@ int process_magic_number(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGK
 	int res;
 	SMART_FILE *in = NULL;
 
-	if (err == NULL || files == NULL) {
+	if (err == NULL || logksi == NULL || files == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
@@ -174,7 +174,7 @@ int process_record_chain(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGK
 	}
 
 	if (tlv->subList) {
-		int i;
+		size_t i = 0;
 		char description[1024];
 		unsigned char chainHeight = 0;
 
@@ -184,7 +184,7 @@ int process_record_chain(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGK
 			KSI_TlvElement *tmpTlv = NULL;
 
 			res = KSI_TlvElementList_elementAt(tlv->subList, i, &tmpTlv);
-			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to get element %d from TLV.", logksi->blockNo, i);
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to get element %lu from TLV.", logksi->blockNo, i);
 			if (tmpTlv && (tmpTlv->ftlv.tag == 0x02 || tmpTlv->ftlv.tag == 0x03)) {
 				res = process_hash_step(err, ksi, tmpTlv, logksi, root, &chainHeight, &tmpHash);
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to process hash step.", logksi->blockNo);
@@ -281,7 +281,7 @@ int process_partial_signature(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err,
 			do {
 				missing = NULL;
 
-				res = MERKLE_TREE_merge_one_level(logksi->tree, &missing);
+				res = MERKLE_TREE_mergeLowestSubTrees(logksi->tree, &missing);
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing tree hash could not be computed.", logksi->blockNo);
 
 				if (missing) {
@@ -328,7 +328,7 @@ int process_partial_signature(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err,
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: root hashes not equal.", logksi->blockNo);
 		} else if (logksi->block.nofRecordHashes) {
 			/* Compute the root hash and compare with signed root hash. */
-			res = MERKLE_TREE_calculate_root_hash(logksi->tree, &rootHash);
+			res = MERKLE_TREE_calculateRootHash(logksi->tree, &rootHash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate root hash.", logksi->blockNo);
 
 			res = logksi_datahash_compare(err, mp, logksi, 0, rootHash, docHash, description, "Root hash computed from record hashes:", "Signed root hash stored in KSI signature:");
@@ -347,7 +347,7 @@ int process_partial_signature(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err,
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: root hashes not equal.", logksi->blockNo);
 		} else if (logksi->block.nofRecordHashes) {
 			/* Compute the root hash and compare with unsigned root hash. */
-			res = MERKLE_TREE_calculate_root_hash(logksi->tree, &rootHash);
+			res = MERKLE_TREE_calculateRootHash(logksi->tree, &rootHash);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate root hash.", logksi->blockNo);
 
 			res = logksi_datahash_compare(err, mp, logksi, 0, rootHash, hash, description, "Root hash computed from record hashes:", "Unsigned root hash stored in block signature file:");
@@ -513,7 +513,7 @@ int process_partial_block(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOG
 		char description[1024];
 		PST_snprintf(description, sizeof(description), "Root hash mismatch in block %zu", logksi->blockNo);
 
-		res = MERKLE_TREE_calculate_root_hash(logksi->tree, &rootHash);
+		res = MERKLE_TREE_calculateRootHash(logksi->tree, &rootHash);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate root hash.", logksi->blockNo);
 
 		res = logksi_datahash_compare(err, mp, logksi, 0, rootHash, hash, description, "Root hash computed from record hashes:", "Unsigned root hash stored in block data file:");
@@ -639,13 +639,13 @@ int finalize_block(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *lo
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: block signature data missing.", logksi->blockNo);
 	}
 
-	res = handle_record_time_check_between_files(set, mp, err, logksi, files);
+	res = check_record_time_check_between_files(set, mp, err, logksi, files);
 	if (res != KT_OK) goto cleanup;
 
 	if ((logksi->file.recTimeMin == 0 || logksi->file.recTimeMin > logksi->block.recTimeMin) && logksi->block.recTimeMin > 0) logksi->file.recTimeMin = logksi->block.recTimeMin;
 	if (logksi->file.recTimeMax == 0 || logksi->file.recTimeMax < logksi->block.recTimeMax) logksi->file.recTimeMax = logksi->block.recTimeMax;
 
-	res = handle_block_signing_time_check(set, mp, err, logksi, files);
+	res = check_block_signing_time_check(set, mp, err, logksi, files);
 	if (res != KT_OK) goto cleanup;
 
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_2, 0);
@@ -1038,15 +1038,6 @@ static int process_record_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err
 		res = logksi_add_record_hash_to_merkle_tree(logksi, 1, replacement);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add metarecord hash to Merkle tree.", logksi->blockNo);
 
-/*
- TODO:
- TODO:
- TODO:
- TODO:
- TODO:
- TODO:
- TODO: Kas see siin on vajalik või clean tehakse kuskil mujal?
- */
 		KSI_DataHash_free(logksi->block.metarecordHash);
 		logksi->block.metarecordHash = NULL;
 	} else {
@@ -1156,7 +1147,7 @@ static int process_tree_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, 
 				}
 			} else {
 				/* No log file available so build the Merkle tree from tree hashes alone. */
-				res = MERKLE_TREE_add_leaf_hash_to_merkle_tree(logksi->tree, treeHash, 0);
+				res = MERKLE_TREE_addLeafHash(logksi->tree, treeHash, 0);
 				ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to add leaf hash to Merkle tree.", logksi->blockNo);
 			}
 		}
@@ -1189,7 +1180,7 @@ static int process_tree_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, 
 			KSI_DataHash_free(unverified);
 			unverified = NULL;
 		}
-		if (logksi->block.finalTreeHashesLeaf && !MERKLE_TREE_nof_unverified_hashes(logksi->tree)) {
+		if (logksi->block.finalTreeHashesLeaf && !MERKLE_TREE_nofUnverifiedHashes(logksi->tree)) {
 			/* This was the last mandatory tree hash. From this point forward all tree hashes must be interpreted as optional final tree hashes. */
 			logksi->block.finalTreeHashesSome = 1;
 
@@ -1213,7 +1204,7 @@ static int process_tree_hash(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, 
 			res = MERKLE_TREE_popUnverifed(logksi->tree, &i, &tmp);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: Unable to pop unverified root tree node.", logksi->blockNo);
 
-			res = MERKLE_TREE_calculate_new_tree_hash(logksi->tree, tmp, root, i + 2, &tmpRoot);
+			res = MERKLE_TREE_calculateTreeHash(logksi->tree, tmp, root, i + 2, &tmpRoot);
 			ERR_CATCH_MSG(err, res, "Error: Block no. %zu: Unable pop unverified root tree node.", logksi->blockNo);
 
 			res = MERKLE_TREE_insertUnverified(logksi->tree, i, tmpRoot);
@@ -1435,7 +1426,7 @@ static int store_integrity_proof_and_log_records(PARAM_SET *set, ERR_TRCKR *err,
 	res = RECORD_INFO_getMetadata(record, &metadata);
 	ERR_CATCH_MSG(err, res, "Error: Unable to get metadata TLV.");
 
-	/* Construct hash chain for one log record	. */
+	/* Construct hash chain for one log record. */
 	res = KSI_TlvElement_new(&recChain);
 	ERR_CATCH_MSG(err, res, "Error: Record no. %zu: unable to create record chain.", lineNumber);
 	recChain->ftlv.tag = 0x0907;
@@ -1741,7 +1732,7 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 
 	print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_LEVEL_3, "Block no. %3zu: verifying KSI signature... ", logksi->blockNo);
 
-	res = MERKLE_TREE_calculate_root_hash(logksi->tree, (KSI_DataHash**)&context.documentHash);
+	res = MERKLE_TREE_calculateRootHash(logksi->tree, (KSI_DataHash**)&context.documentHash);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to get root hash for verification.", logksi->blockNo);
 
 	context.docAggrLevel = LOGKSI_get_aggregation_level(logksi);
@@ -1923,9 +1914,9 @@ static int process_hash_step(ERR_TRCKR *err, KSI_CTX *ksi, KSI_TlvElement *tlv, 
 	*chainHeight = *chainHeight + correction + 1;
 
 	if (tlv->ftlv.tag == 0x02) {
-		res = MERKLE_TREE_calculate_new_tree_hash(logksi->tree, inputHash, siblingHash, *chainHeight, &tmp);
+		res = MERKLE_TREE_calculateTreeHash(logksi->tree, inputHash, siblingHash, *chainHeight, &tmp);
 	} else if (tlv->ftlv.tag == 0x03){
-		res = MERKLE_TREE_calculate_new_tree_hash(logksi->tree, siblingHash, inputHash, *chainHeight, &tmp);
+		res = MERKLE_TREE_calculateTreeHash(logksi->tree, siblingHash, inputHash, *chainHeight, &tmp);
 	} else {
 		res = KT_INVALID_INPUT_FORMAT;
 	}
@@ -2200,5 +2191,5 @@ static int logksi_add_record_hash_to_merkle_tree(LOGKSI *logksi, int isMetaRecor
 		logksi->file.nofTotalRecordHashes--;
 	}
 
-	return MERKLE_TREE_add_record_hash_to_merkle_tree(logksi->tree, isMetaRecordHash, hash);
+	return MERKLE_TREE_addRecordHash(logksi->tree, isMetaRecordHash, hash);
 }

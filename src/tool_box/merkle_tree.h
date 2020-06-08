@@ -35,19 +35,20 @@ void MERKLE_TREE_free(MERKLE_TREE *tree);
 void MERKLE_TREE_clean(MERKLE_TREE *tree);
 int MERKLE_TREE_reset(MERKLE_TREE *tree, KSI_HashAlgorithm algo, KSI_DataHash *prevLeaf, KSI_OctetString *randomSeed);
 
-int MERKLE_TREE_merge_one_level(MERKLE_TREE *tree, KSI_DataHash **hash);
-int MERKLE_TREE_calculate_root_hash(MERKLE_TREE *tree, KSI_DataHash **hash);
-int MERKLE_TREE_calculate_new_tree_hash(MERKLE_TREE *tree, KSI_DataHash *leftHash, KSI_DataHash *rightHash, unsigned char level, KSI_DataHash **nodeHash);
+int MERKLE_TREE_mergeLowestSubTrees(MERKLE_TREE *tree, KSI_DataHash **hash);
+int MERKLE_TREE_calculateRootHash(MERKLE_TREE *tree, KSI_DataHash **hash);
+int MERKLE_TREE_calculateTreeHash(MERKLE_TREE *tree, KSI_DataHash *leftHash, KSI_DataHash *rightHash, unsigned char level, KSI_DataHash **nodeHash);
+int MERKLE_TREE_calculateLeafHash(MERKLE_TREE *tree, KSI_DataHash *recordHash, int isMetaRecordHash, KSI_DataHash **leafHash);
 
-int MERKLE_TREE_add_leaf_hash_to_merkle_tree(MERKLE_TREE *tree, KSI_DataHash *hash, int isMetaRecordHash);
-int MERKLE_TREE_calculate_new_leaf_hash(MERKLE_TREE *tree, KSI_DataHash *recordHash, int isMetaRecordHash, KSI_DataHash **leafHash);
+int MERKLE_TREE_addLeafHash(MERKLE_TREE *tree, KSI_DataHash *hash, int isMetaRecordHash);
+int MERKLE_TREE_addRecordHash(MERKLE_TREE *tree, int isMetaRecordHash, KSI_DataHash *hash);
 
 int MERKLE_TREE_setHasher(MERKLE_TREE *tree, KSI_DataHasher *hsr);
 int MERKLE_TREE_setCallbacks(MERKLE_TREE *tree,
 							void *ctx,
 							int (*extractRecordChain)(MERKLE_TREE*, void*, unsigned char, KSI_DataHash*),
 							int (*newRecordChain)(MERKLE_TREE*, void*, int, KSI_DataHash*));
-int MERKLE_TREE_get(MERKLE_TREE *tree, unsigned char level, KSI_DataHash **hsh);
+int MERKLE_TREE_getSubTreeRoot(MERKLE_TREE *tree, unsigned char level, KSI_DataHash **hsh);
 int MERKLE_TREE_getPrevLeaf(MERKLE_TREE *tree, KSI_DataHash **hsh);
 int MERKLE_TREE_getPrevMask(MERKLE_TREE *tree, KSI_DataHash **hsh);
 int MERKLE_TREE_getHasher(MERKLE_TREE *tree, KSI_DataHasher **hsr);
@@ -55,9 +56,8 @@ int MERKLE_TREE_isClosing(MERKLE_TREE *tree);
 unsigned char MERKLE_TREE_getHeight(MERKLE_TREE *tree);
 int MERKLE_TREE_isBalenced(MERKLE_TREE *tree);
 
-int MERKLE_TREE_add_record_hash_to_merkle_tree(MERKLE_TREE *tree, int isMetaRecordHash, KSI_DataHash *hash);
 
-size_t MERKLE_TREE_nof_unverified_hashes(MERKLE_TREE *tree);
+size_t MERKLE_TREE_nofUnverifiedHashes(MERKLE_TREE *tree);
 int MERKLE_TREE_setFinalHashesForVerification(MERKLE_TREE *tree);
 
 /**

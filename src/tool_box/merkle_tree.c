@@ -30,7 +30,7 @@ struct MERKLE_TREE_st {
 	KSI_OctetString *randomSeed;
 	KSI_DataHash *prevLeaf;
 	KSI_DataHash *prevMask;
-	KSI_DataHash *MerkleTree[MAX_TREE_HEIGHT];
+	KSI_DataHash *merkleTree[MAX_TREE_HEIGHT];
 	KSI_DataHash *notVerified[MAX_TREE_HEIGHT];
 	unsigned char treeHeight;
 	unsigned char balanced;
@@ -39,15 +39,36 @@ struct MERKLE_TREE_st {
 
 	int isClosing;
 
-	/* Abstract functionality for extracting hash chains from the tree while the tree
-	   is being built. */
+	/**
+	 * Abstract functionality for extracting hash chains from the tree while the tree
+	 * is being built. This object is feed to abstract functions newRecordChain and
+	 * extractRecordChain.
+	 */
 	void *ctx;
 
-	/* Is called within #MERKLE_TREE_calculate_root_hash and #MERKLE_TREE_add_leaf_hash_to_merkle_tree.*/
-	int (*extractRecordChain)(MERKLE_TREE *tree, void *ctx, unsigned char lvl, KSI_DataHash *hash);
-
-	/* Is called within #MERKLE_TREE_add_record_hash_to_merkle_tree. */
+	/**
+	 * Is called within #MERKLE_TREE_addRecordHash. This callback is always executed
+	 * when a new record is added to a tree and the hash value is always the first hash
+	 * in some record chain.
+	 *
+	 * tree              - current Merkle Tree.
+	 * ctx               - custom data structure to hold state of record chain(s) being built.
+	 * isMetaRecordHash  - is > 0, then input hash is meta record hash.
+	 * hash              - input hash.
+	 */
 	int (*newRecordChain)(MERKLE_TREE *tree, void *ctx, int isMetaRecordHash, KSI_DataHash *hash);
+
+	/**
+	 * Is called within #MERKLE_TREE_addLeafHash and #MERKLE_TREE_calculateRootHash to
+	 * extract hash chain components. This function is called for higher level hash chain
+	 * components.
+	 *
+	 * tree - current Merkle Tree.
+	 * ctx  - custom data structure to hold state of record chain(s) being built.
+	 * lvl  - level of the subtree root hash.
+	 * hash - subtree root hash.
+	 */
+	int (*extractRecordChain)(MERKLE_TREE *tree, void *ctx, unsigned char lvl, KSI_DataHash *hash);
 };
 
 
@@ -78,12 +99,12 @@ int MERKLE_TREE_new(MERKLE_TREE **tree) {
 	tmp->newRecordChain = NULL;
 	tmp->prevLeaf = NULL;
 	tmp->prevMask = NULL;
-	tmp->randomSeed= NULL;
+	tmp->randomSeed = NULL;
 
 
 	for (i = 0; i < MAX_TREE_HEIGHT; i++) {
 		tmp->notVerified[i] = NULL;
-		tmp->MerkleTree[i] = NULL;
+		tmp->merkleTree[i] = NULL;
 	}
 
 	*tree = tmp;
@@ -132,7 +153,7 @@ void MERKLE_TREE_free(MERKLE_TREE *tree) {
 	KSI_DataHash_free(tree->prevMask);
 
 	while (i < tree->treeHeight) {
-		KSI_DataHash_free(tree->MerkleTree[i]);
+		KSI_DataHash_free(tree->merkleTree[i]);
 		KSI_DataHash_free(tree->notVerified[i]);
 		i++;
 	}
@@ -154,9 +175,9 @@ void MERKLE_TREE_clean(MERKLE_TREE *tree) {
 	tree->randomSeed = NULL;
 
 	while (i < tree->treeHeight) {
-		KSI_DataHash_free(tree->MerkleTree[i]);
+		KSI_DataHash_free(tree->merkleTree[i]);
 		KSI_DataHash_free(tree->notVerified[i]);
-		tree->MerkleTree[i] = NULL;
+		tree->merkleTree[i] = NULL;
 		tree->notVerified[i] = NULL;
 		i++;
 	}
@@ -200,7 +221,7 @@ cleanup:
 	return res;
 }
 
-int MERKLE_TREE_merge_one_level(MERKLE_TREE *tree, KSI_DataHash **hash) {
+int MERKLE_TREE_mergeLowestSubTrees(MERKLE_TREE *tree, KSI_DataHash **hash) {
 	int res;
 	unsigned char i = 0;
 	KSI_DataHash *root = NULL;
@@ -212,23 +233,22 @@ int MERKLE_TREE_merge_one_level(MERKLE_TREE *tree, KSI_DataHash **hash) {
 	}
 
 	while (i < tree->treeHeight) {
-		if (tree->MerkleTree[i]) {
+		if (tree->merkleTree[i]) {
 			if (root == NULL) {
 				/* Initialize root hash only if there is at least one more hash afterwards. */
 				if (i < tree->treeHeight - 1) {
-					root = KSI_DataHash_ref(tree->MerkleTree[i]);
-					KSI_DataHash_free(tree->MerkleTree[i]);
-					tree->MerkleTree[i] = NULL;
+					root = tree->merkleTree[i];
+					tree->merkleTree[i] = NULL;
 				}
 			} else {
-				res = MERKLE_TREE_calculate_new_tree_hash(tree, tree->MerkleTree[i], root, i + 2, &tmp);
+				res = MERKLE_TREE_calculateTreeHash(tree, tree->merkleTree[i], root, i + 2, &tmp);
 				if (res != KT_OK) goto cleanup;
 
 				KSI_DataHash_free(root);
 				root = tmp;
 
-				KSI_DataHash_free(tree->MerkleTree[i]);
-				tree->MerkleTree[i] = KSI_DataHash_ref(root);
+				KSI_DataHash_free(tree->merkleTree[i]);
+				tree->merkleTree[i] = KSI_DataHash_ref(root);
 				break;
 			}
 		}
@@ -247,7 +267,7 @@ cleanup:
 	return res;
 }
 
-int MERKLE_TREE_calculate_root_hash(MERKLE_TREE *tree, KSI_DataHash **hash) {
+int MERKLE_TREE_calculateRootHash(MERKLE_TREE *tree, KSI_DataHash **hash) {
 	int res;
 	unsigned char i = 0;
 	KSI_DataHash *root = NULL;
@@ -261,16 +281,16 @@ int MERKLE_TREE_calculate_root_hash(MERKLE_TREE *tree, KSI_DataHash **hash) {
 	tree->isClosing = 1;
 
 	if (tree->balanced) {
-		root = KSI_DataHash_ref(tree->MerkleTree[tree->treeHeight - 1]);
+		root = KSI_DataHash_ref(tree->merkleTree[tree->treeHeight - 1]);
 	} else {
 		while (i < tree->treeHeight) {
 			if (root == NULL) {
-				root = KSI_DataHash_ref(tree->MerkleTree[i]);
+				root = KSI_DataHash_ref(tree->merkleTree[i]);
 				i++;
 				continue;
 			}
-			if (tree->MerkleTree[i]) {
-				res = MERKLE_TREE_calculate_new_tree_hash(tree, tree->MerkleTree[i], root, i + 2, &tmp);
+			if (tree->merkleTree[i]) {
+				res = MERKLE_TREE_calculateTreeHash(tree, tree->merkleTree[i], root, i + 2, &tmp);
 				if (res != KT_OK) goto cleanup;
 
 				if (tree->extractRecordChain != NULL) {
@@ -298,12 +318,17 @@ cleanup:
 	return res;
 }
 
-int MERKLE_TREE_calculate_new_tree_hash(MERKLE_TREE *tree, KSI_DataHash *leftHash, KSI_DataHash *rightHash, unsigned char level, KSI_DataHash **nodeHash) {
+int MERKLE_TREE_calculateTreeHash(MERKLE_TREE *tree, KSI_DataHash *leftHash, KSI_DataHash *rightHash, unsigned char level, KSI_DataHash **nodeHash) {
 	int res;
 	KSI_DataHash *tmp = NULL;
 
 	if (tree == NULL || leftHash == NULL || rightHash == NULL || nodeHash == NULL) {
 		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	if (level > MAX_TREE_HEIGHT) {
+		res = KT_TREE_LEVEL_OVF;
 		goto cleanup;
 	}
 
@@ -328,7 +353,7 @@ cleanup:
 	return res;
 }
 
- int MERKLE_TREE_add_leaf_hash_to_merkle_tree(MERKLE_TREE *tree, KSI_DataHash *hash, int isMetaRecordHash) {
+ int MERKLE_TREE_addLeafHash(MERKLE_TREE *tree, KSI_DataHash *hash, int isMetaRecordHash) {
 	int res;
 	unsigned char i = 0;
 	KSI_DataHash *right = NULL;
@@ -343,8 +368,8 @@ cleanup:
 
 	tree->balanced = 0;
 
-	while (tree->MerkleTree[i] != NULL) {
-		res = MERKLE_TREE_calculate_new_tree_hash (tree, tree->MerkleTree[i], right, i + 2, &tmp);
+	while (tree->merkleTree[i] != NULL) {
+		res = MERKLE_TREE_calculateTreeHash(tree, tree->merkleTree[i], right, i + 2, &tmp);
 		if (res != KT_OK) goto cleanup;
 
 		if (tree->extractRecordChain != NULL) {
@@ -358,12 +383,12 @@ cleanup:
 		KSI_DataHash_free(right);
 		right = tmp;
 		tmp = NULL;
-		KSI_DataHash_free(tree->MerkleTree[i]);
-		tree->MerkleTree[i] = NULL;
+		KSI_DataHash_free(tree->merkleTree[i]);
+		tree->merkleTree[i] = NULL;
 		i++;
 	}
 
-	tree->MerkleTree[i] = right;
+	tree->merkleTree[i] = right;
 
 	res = MERKLE_TREE_insertUnverified(tree, i, right);
 	if (res != KT_OK) goto cleanup;
@@ -385,7 +410,7 @@ cleanup:
 	return res;
 }
 
-int MERKLE_TREE_calculate_new_leaf_hash(MERKLE_TREE *tree, KSI_DataHash *recordHash, int isMetaRecordHash, KSI_DataHash **leafHash) {
+int MERKLE_TREE_calculateLeafHash(MERKLE_TREE *tree, KSI_DataHash *recordHash, int isMetaRecordHash, KSI_DataHash **leafHash) {
 	int res;
 	KSI_DataHash *mask = NULL;
 	KSI_DataHash *tmp = NULL;
@@ -404,19 +429,13 @@ int MERKLE_TREE_calculate_new_leaf_hash(MERKLE_TREE *tree, KSI_DataHash *recordH
 	res = KSI_DataHasher_close(tree->hasher, &mask);
 	if (res != KSI_OK) goto cleanup;
 
-
 	KSI_DataHash_free(tree->prevMask);
 	tree->prevMask = KSI_DataHash_ref(mask);
 
-
-
-	if (isMetaRecordHash) {
-		res = MERKLE_TREE_calculate_new_tree_hash(tree, recordHash, mask, 1, &tmp);
-		if (res != KT_OK) goto cleanup;
-	} else {
-		res = MERKLE_TREE_calculate_new_tree_hash(tree, mask, recordHash, 1, &tmp);
-		if (res != KT_OK) goto cleanup;
-	}
+	res = isMetaRecordHash ?
+		MERKLE_TREE_calculateTreeHash(tree, recordHash, mask, 1, &tmp) :
+		MERKLE_TREE_calculateTreeHash(tree, mask, recordHash, 1, &tmp);
+	if (res != KT_OK) goto cleanup;
 
 	*leafHash = tmp;
 	tmp = NULL;
@@ -429,7 +448,7 @@ cleanup:
 	return res;
 }
 
-int MERKLE_TREE_add_record_hash_to_merkle_tree(MERKLE_TREE *tree, int isMetaRecordHash, KSI_DataHash *hash) {
+int MERKLE_TREE_addRecordHash(MERKLE_TREE *tree, int isMetaRecordHash, KSI_DataHash *hash) {
 	int res;
 	KSI_DataHash *lastHash = NULL;
 
@@ -438,7 +457,7 @@ int MERKLE_TREE_add_record_hash_to_merkle_tree(MERKLE_TREE *tree, int isMetaReco
 		goto cleanup;
 	}
 
-	res = MERKLE_TREE_calculate_new_leaf_hash(tree, hash, isMetaRecordHash, &lastHash);
+	res = MERKLE_TREE_calculateLeafHash(tree, hash, isMetaRecordHash, &lastHash);
 	if (res != KT_OK) goto cleanup;
 
 
@@ -447,7 +466,7 @@ int MERKLE_TREE_add_record_hash_to_merkle_tree(MERKLE_TREE *tree, int isMetaReco
 		if (res != KT_OK) goto cleanup;
 	}
 
-	res = MERKLE_TREE_add_leaf_hash_to_merkle_tree(tree, lastHash, isMetaRecordHash);
+	res = MERKLE_TREE_addLeafHash(tree, lastHash, isMetaRecordHash);
 	if (res != KT_OK) goto cleanup;
 
 cleanup:
@@ -456,39 +475,15 @@ cleanup:
 	return res;
 }
 
-int LOGKSI_add_record_hash_to_merkle_tree(LOGKSI *logksi, int isMetaRecordHash, KSI_DataHash *hash) {
-	int res = KT_UNKNOWN_ERROR;
-
-	if (logksi == NULL || hash == NULL) {
-		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
-
-	/* Do not allow meta records to be extracted. */
-	if (isMetaRecordHash) {
-		logksi->file.nofTotalMetarecords++;
-		logksi->block.nofMetaRecords++;
-		logksi->file.nofTotalRecordHashes--;
-	}
-
-	res = MERKLE_TREE_add_record_hash_to_merkle_tree(logksi->tree, isMetaRecordHash, hash);
-	if (res != KT_OK) goto cleanup;
-
-	res = KT_OK;
-
-cleanup:
-
-	return res;
-}
-
 unsigned char MERKLE_TREE_getHeight(MERKLE_TREE *tree) {
 	if (tree == NULL) return 0;
 	return tree->treeHeight;
 }
 
-int MERKLE_TREE_get(MERKLE_TREE *tree, unsigned char level, KSI_DataHash **hsh) {
-	if (tree == NULL || level > MAX_TREE_HEIGHT || hsh == NULL) return KT_INVALID_ARGUMENT;
-	*hsh = KSI_DataHash_ref(tree->MerkleTree[level]);
+int MERKLE_TREE_getSubTreeRoot(MERKLE_TREE *tree, unsigned char level, KSI_DataHash **hsh) {
+	if (tree == NULL || hsh == NULL) return KT_INVALID_ARGUMENT;
+	if (level > MAX_TREE_HEIGHT) return KT_TREE_LEVEL_OVF;
+	*hsh = KSI_DataHash_ref(tree->merkleTree[level]);
 	return KT_OK;
 }
 
@@ -520,7 +515,7 @@ int MERKLE_TREE_isBalenced(MERKLE_TREE *tree) {
 	return tree->balanced;
 }
 
-size_t MERKLE_TREE_nof_unverified_hashes(MERKLE_TREE *tree) {
+size_t MERKLE_TREE_nofUnverifiedHashes(MERKLE_TREE *tree) {
 	size_t count = 0;
 	size_t i;
 
@@ -547,11 +542,13 @@ int MERKLE_TREE_setFinalHashesForVerification(MERKLE_TREE *tree) {
 
 	for (i = 0; i < MERKLE_TREE_getHeight(tree); i++) {
 
-		res = MERKLE_TREE_get(tree, i, &tmp);
+		res = MERKLE_TREE_getSubTreeRoot(tree, i, &tmp);
 		if (res != KT_OK) goto cleanup;
 
+		/* Sanity check for unexpected case. */
 		if (tree->notVerified[i] != NULL) {
-			//Rise error ?????????
+			res = KT_UNKNOWN_ERROR;
+			goto cleanup;
 		}
 
 		tree->notVerified[i] = tmp;

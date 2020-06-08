@@ -77,6 +77,10 @@ int check_log_line_embedded_time(PARAM_SET* set, MULTI_PRINTER *mp, ERR_TRCKR *e
 		}
 
 		t = KSI_CalendarTimeToUnixTime(&tmp_time);
+		if (t == (time_t)-1) {
+			res = KT_INVALID_INPUT_FORMAT;
+			ERR_CATCH_MSG(err, res, "Error: Unable convert timestamp from logline to unix time.");
+		}
 
 		/* Check the order of log lines. */
 		last_time = logksi->block.recTimeMax == 0 ? logksi->file.recTimeMax : logksi->block.recTimeMax;
@@ -359,7 +363,7 @@ cleanup:
 	return res;
 }
 
-int handle_block_signing_time_check(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, LOGKSI *logksi, IO_FILES *files) {
+int check_block_signing_time_check(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, LOGKSI *logksi, IO_FILES *files) {
 	int res = KT_UNKNOWN_ERROR;
 	char *dummy = NULL;
 	int checkDescSigkTime = 0;
@@ -571,7 +575,7 @@ cleanup:
 	return res;
 }
 
-int handle_record_time_check_between_files(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, LOGKSI *logksi, IO_FILES *files) {
+int check_record_time_check_between_files(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, LOGKSI *logksi, IO_FILES *files) {
 	int res = KT_UNKNOWN_ERROR;
 
 	if (set == NULL || mp == NULL || err == NULL || logksi == NULL || files == NULL) {

@@ -164,7 +164,7 @@ int LOGKSI_getMaxFinalHashes(LOGKSI *logksi) {
 			KSI_DataHash *hsh = NULL;
 			int res = KT_UNKNOWN_ERROR;
 
-			res = MERKLE_TREE_get(logksi->tree, i, &hsh);
+			res = MERKLE_TREE_getSubTreeRoot(logksi->tree, i, &hsh);
 			if (res != KT_OK) return finalHashes;
 
 			if (hsh != NULL) {

@@ -39,8 +39,8 @@ int continue_on_hash_fail(int result, PARAM_SET *set, MULTI_PRINTER* mp, LOGKSI 
 int check_log_line_embedded_time(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi);
 int check_log_record_embedded_time_against_ksi_signature_time(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi);
 int check_log_signature_client_id(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi, KSI_Signature *sig);
-int handle_block_signing_time_check(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi, IO_FILES *files);
-int handle_record_time_check_between_files(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi, IO_FILES *files);
+int check_block_signing_time_check(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi, IO_FILES *files);
+int check_record_time_check_between_files(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi, IO_FILES *files);
 
 int is_block_signature_expected(LOGKSI *logksi, ERR_TRCKR *err);
 int is_record_hash_expected(LOGKSI *logksi, ERR_TRCKR *err);

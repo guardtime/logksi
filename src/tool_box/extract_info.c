@@ -143,7 +143,7 @@ int RECORD_INFO_setMetaRecordHash(RECORD_INFO *extractInfo, size_t pos, size_t o
 	return record_info_set_value(extractInfo, pos, offs, hsh, 1, raw, raw_len);
 }
 
-int RECORD_INFO_add_hash_to_record_chain(RECORD_INFO *extracts, LINK_DIRECTION dir, KSI_DataHash *hash, int corr) {
+int RECORD_INFO_addHash(RECORD_INFO *extracts, LINK_DIRECTION dir, KSI_DataHash *hash, int corr) {
 	int res;
 
 	if (extracts == NULL || hash == NULL) {

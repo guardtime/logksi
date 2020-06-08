@@ -36,6 +36,7 @@ static int logksi_ErrToExitcode(int error_code) {
 		case KT_INVALID_ARGUMENT:
 		case KT_VERIFICATION_NA:
 		case KT_INDEX_OVF:
+		case KT_TREE_LEVEL_OVF:
 		case KT_UNKNOWN_ERROR:
 		case KT_SIGNING_FAILURE:
 		case KT_USER_INPUT_FAILURE:
@@ -158,6 +159,8 @@ static const char* logksiErrToString(int error_code) {
 			return "Multi printer channel does not exist.";
 		case KT_INTEGRATION_PURPOSELY_STOPPED:
 			return "Integration purposely stopped.";
+		case KT_TREE_LEVEL_OVF:
+			return "Tree too large.";
 		case KT_UNKNOWN_ERROR:
 			return "Unknown error.";
 		default:
