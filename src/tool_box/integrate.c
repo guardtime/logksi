@@ -38,14 +38,14 @@
 #include "debug_print.h"
 #include "tool.h"
 #include "rsyslog.h"
-#include "blocks_info.h"
+#include "logksi.h"
 #include "io_files.h"
 
 static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
 static int generate_filenames(PARAM_SET* set, ERR_TRCKR *err, IO_FILES *files);
 static int open_input_and_output_files(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files, int forceOverwrite);
 static int acquire_file_locks(ERR_TRCKR *err, MULTI_PRINTER *mp, IO_FILES *files);
-static int recover_procedure(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, BLOCK_INFO* blocks, IO_FILES *files, int resIn);
+static int recover_procedure(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI* blocks, IO_FILES *files, int resIn);
 static int rename_temporary_and_backup_files(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files);
 static void close_input_and_output_files(ERR_TRCKR *err, int res, IO_FILES *files);
 static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err);
@@ -65,11 +65,11 @@ int integrate_run(int argc, char **argv, char **envp) {
 	int d = 0;
 	int forceOverwrite = 0;
 	IO_FILES files;
-	BLOCK_INFO blocks;
+	LOGKSI logksi;
 	MULTI_PRINTER *mp = NULL;
 
 
-	BLOCK_INFO_clearAll(&blocks);
+	LOGKSI_initialize(&logksi);
 	IO_FILES_init(&files);
 
 	/**
@@ -119,9 +119,9 @@ int integrate_run(int argc, char **argv, char **envp) {
 
 
 	print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_EQUAL | DEBUG_LEVEL_1, "Integrating... ");
-	integrate_res = logsignature_integrate(set, mp, err, ksi, &blocks, &files);
+	integrate_res = logsignature_integrate(set, mp, err, ksi, &logksi, &files);
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, integrate_res);
-	res = recover_procedure(set, mp, err, &blocks, &files, integrate_res);
+	res = recover_procedure(set, mp, err, &logksi, &files, integrate_res);
 	if (res != KT_OK) goto cleanup;
 
 	res = rename_temporary_and_backup_files(set, err, &files);
@@ -148,7 +148,7 @@ cleanup:
 	}
 	ERR_TRCKR_print(err, d);
 
-	BLOCK_INFO_freeAndClearInternals(&blocks);
+	LOGKSI_freeAndClearInternals(&logksi);
 	SMART_FILE_close(logfile);
 	PARAM_SET_free(set);
 	TASK_SET_free(task_set);
@@ -478,14 +478,14 @@ cleanup:
 
 
 }
-static int recover_procedure(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, BLOCK_INFO* blocks, IO_FILES *files, int resIn) {
+static int recover_procedure(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI* logksi, IO_FILES *files, int resIn) {
 	int res = KT_UNKNOWN_ERROR;
 	int returnCode = resIn;
 	SMART_FILE *originalLogFile = NULL;
 	size_t i = 0;
 
 
-	if (set == NULL || mp == NULL || err == NULL || blocks == NULL || files == NULL) {
+	if (set == NULL || mp == NULL || err == NULL || logksi == NULL || files == NULL) {
 		goto cleanup;
 	}
 
@@ -499,10 +499,10 @@ static int recover_procedure(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, 
 		/* Check if there is a need and possibility to do something. */
 		if (resIn == KT_OK) {
 			print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, 0);
-			print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, "All blocks (%zu) have successfully integrated - no recovery process needed.\n", blocks->partNo);
+			print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, "All blocks (%zu) have successfully integrated - no recovery process needed.\n", logksi->task.integrate.partNo);
 			returnCode = KT_OK;
 			goto cleanup;
-		} else if (blocks->blockNo < 2) {
+		} else if (logksi->blockNo < 2) {
 			print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, 1);
 			ERR_TRCKR_ADD(err, resIn, "Error: Unable to recover any blocks as the first block is already corrupted!");
 			goto cleanup;
@@ -527,7 +527,7 @@ static int recover_procedure(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, 
 			goto cleanup;
 		}
 
-		for (i = 0; i < blocks->firstLineInBlock - 1; i++) {
+		for (i = 0; i < logksi->block.firstLineNo - 1; i++) {
 			/* Maximum line size is 64K characters, without newline character. */
 			size_t count = 0;
 			char buf[0x10000 + 2];
@@ -548,7 +548,7 @@ static int recover_procedure(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, 
 		ERR_CATCH_MSG(err, res, "Error: Could not close output log file %s.", files->internal.outLog);
 
 		print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, 0);
-		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, "It was possible to recover %zu blocks (lines 1 - %zu).\n", blocks->blockNo - 1, blocks->firstLineInBlock - 1);
+		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, "It was possible to recover %zu blocks (lines 1 - %zu).\n", logksi->blockNo - 1, logksi->block.firstLineNo - 1);
 		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, "Recovered log signature saved to '%s'\n", files->internal.outSig);
 		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, "Recovered Log file saved to '%s'\n", files->internal.outLog);
 

@@ -1,3 +1,4 @@
+(LOGKSI-142) * IMPROVEMENT: Code refactored into decoupled modules to improve maintainability.
 (LOGKSI-131) * FEATURE: New option --ksi to extract pure KSI signature for log line.
 (LOGKSI-133) * IMPROVEMENT: Wording for inconclusive verification result message improved.
 (LOGKSI-133) * IMPROVEMENT: Inconclusive verification result will return EXIT_FAILURE as exit code.

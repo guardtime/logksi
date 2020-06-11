@@ -27,300 +27,132 @@
 #include "tlv_object.h"
 #include "smart_file.h"
 #include "api_wrapper.h"
-#include"rsyslog.h"
+#include "merkle_tree.h"
+#include "extract_info.h"
 
-static int add_hash_to_record_chain(EXTRACT_INFO *extracts, LINK_DIRECTION dir, KSI_DataHash *hash, int corr);
-static int expand_extract_info(BLOCK_INFO *blocks);
-static int add_position(ERR_TRCKR *err, long int n, BLOCK_INFO *blocks);
+typedef struct NEXT_REC_st NEXT_REC;
 
-int block_info_extract_update_record_chain(BLOCK_INFO *blocks, unsigned char level, int finalize, KSI_DataHash *leftLink) {
-	int res;
-	size_t j;
-	int condition;
+static int next_rec_reset(NEXT_REC *recextract, const char *range);
+static int next_rec_extract_next_position(NEXT_REC *recextract, long *position);
+static int foldl_aggr_chain(void *acc, LINK_DIRECTION dir, KSI_DataHash *sibling, size_t corr);
+static int record_info_set_value(RECORD_INFO *extractInfo, size_t pos, size_t offs, KSI_DataHash *hsh, int isMetaRecordHash, void *raw, size_t len);
+static void record_info_clean(RECORD_INFO *obj);
 
-	if (blocks == NULL || leftLink == NULL) {
-		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
+static int extract_info_add_position(EXTRACT_INFO *extract, long int n);
+static int extract_info_register_next_extract_position(EXTRACT_INFO *info);
+static int extract_info_add_position(EXTRACT_INFO *extract, long int n);
 
-	for (j = 0; j < blocks->nofExtractPositionsInBlock; j++) {
-		if (blocks->extractInfo[j].extractOffset <= blocks->nofRecordHashes) {
-			if (finalize) {
-				condition = (level + 1 >= blocks->extractInfo[j].extractLevel);
-			} else {
-				condition = (level + 1 == blocks->extractInfo[j].extractLevel);
-			}
-			if (condition) {
-				if (((blocks->extractInfo[j].extractOffset - 1) >> level) & 1L) {
-					res = add_hash_to_record_chain(blocks->extractInfo + j, RIGHT_LINK, blocks->MerkleTree[level], level + 1 - blocks->extractInfo[j].extractLevel);
-				} else {
-					res = add_hash_to_record_chain(blocks->extractInfo + j, LEFT_LINK, leftLink, level + 1 - blocks->extractInfo[j].extractLevel);
-				}
-				if (res != KT_OK) goto cleanup;
-			}
-		}
-	}
-
-	res = KT_OK;
-
-cleanup:
-
-	return res;
-}
-
-int block_info_extract_next_position(BLOCK_INFO *blocks, ERR_TRCKR *err, char *range) {
-	int res;
-	static long int n = 0;
-	static long int from = 0;
-	static char *endp = NULL;
-	static char digit_expected = 1;
-	static char dash_allowed = 1;
-	static char get_next_n = 1;
-	static char *records = NULL;
-
-	if (range == NULL || blocks == NULL) {
-		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
-
-	if (records == NULL) {
-		records = range;
-	}
-	while (*records) {
-		if (isspace(*records)) {
-			res = KT_INVALID_CMD_PARAM;
-			ERR_CATCH_MSG(err, res, "Error: List of positions must not contain whitespace. Use ',' and '-' as separators.");
-		}
-		if(!digit_expected) {
-			/* Process either ',' or '-' as a separator. */
-			digit_expected = 1;
-			if (*records == ',') {
-				dash_allowed = 1;
-				records++;
-				from = 0;
-				get_next_n = 1;
-				continue;
-			} else if (*records == '-') {
-				if (dash_allowed) {
-					dash_allowed = 0;
-					records++;
-					from = n;
-					get_next_n = 1;
-					continue;
-				} else {
-					res = KT_INVALID_CMD_PARAM;
-					ERR_CATCH_MSG(err, res, "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges.");
-				}
-			} else {
-				res = KT_INVALID_CMD_PARAM;
-				ERR_CATCH_MSG(err, res, "Error: List of positions must be separated with ',' or '-'.");
-			}
-		} else {
-			/* Get the next integer and interpret it as a single position or range of positions. */
-			if (get_next_n) {
-				n = strtol(records, &endp, 10);
-				get_next_n = 0;
-				if (endp == records) {
-					res = KT_INVALID_CMD_PARAM;
-					ERR_CATCH_MSG(err, res, "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges.");
-				}
-			}
-			if (n <= 0) {
-				res = KT_INVALID_CMD_PARAM;
-				ERR_CATCH_MSG(err, res, "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges.");
-			} else if (from == 0) {
-				/* Add a single position. */
-				res = add_position(err, n, blocks);
-				if (res != KT_OK) goto cleanup;
-				records = endp;
-				digit_expected = 0;
-				goto cleanup;
-			} else if (from < n) {
-				/* Add the next position in the range. */
-				from++;
-				res = add_position(err, from, blocks);
-				if (res != KT_OK) goto cleanup;
-				if (from < n) {
-					goto cleanup;
-				} else {
-					records = endp;
-					digit_expected = 0;
-				}
-			} else {
-				res = KT_INVALID_CMD_PARAM;
-				ERR_CATCH_MSG(err, res, "Error: List of positions must be given in strictly ascending order.");
-			}
-		}
-	}
-
-	/* Make sure the last processed character was a digit. */
-	if(digit_expected) {
-		res = KT_INVALID_CMD_PARAM;
-		ERR_CATCH_MSG(err, res, "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges.");
-	}
-	res = KT_OK;
-
-cleanup:
-
-	return res;
-}
-
-int block_info_extract_update(BLOCK_INFO *blocks, ERR_TRCKR *err, int isMetaRecordHash, KSI_DataHash *hash) {
-	int res;
-	EXTRACT_INFO *extractInfo = NULL;
-
-	if (blocks == NULL || hash == NULL) {
-		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
-
-	if (blocks->nofExtractPositionsFound < blocks->nofExtractPositions && blocks->extractPositions[blocks->nofExtractPositionsFound] - blocks->nofTotalRecordHashes == blocks->nofRecordHashes) {
-		/* make room in extractInfo */
-		res = expand_extract_info(blocks);
-		if (res != KT_OK) goto cleanup;
-
-		extractInfo = &blocks->extractInfo[blocks->nofExtractPositionsInBlock - 1];
-
-		extractInfo->extractPos = blocks->extractPositions[blocks->nofExtractPositionsFound];
-		extractInfo->extractOffset = blocks->extractPositions[blocks->nofExtractPositionsFound] - blocks->nofTotalRecordHashes;
-		extractInfo->extractRecord = KSI_DataHash_ref(hash);
-		if (!isMetaRecordHash) {
-			extractInfo->metaRecord = NULL;
-			extractInfo->logLine = strdup(blocks->logLine);
-			if (extractInfo->logLine == NULL) {
-				res = KT_OUT_OF_MEMORY;
-				goto cleanup;
-			}
-		} else {
-			extractInfo->logLine = NULL;
-			res = KSI_TlvElement_parse(blocks->metaRecord, 0xffff, &extractInfo->metaRecord);
-			if (res != KT_OK) goto cleanup;
-		}
-		blocks->nofExtractPositionsFound++;
-
-		if (isMetaRecordHash) {
-			res = add_hash_to_record_chain(extractInfo, LEFT_LINK, blocks->extractMask, 0);
-		} else {
-			res = add_hash_to_record_chain(extractInfo, RIGHT_LINK, blocks->extractMask, 0);
-		}
-		if (res != KT_OK) goto cleanup;
-
-	}
-
-	if (blocks->records && blocks->nofExtractPositionsFound == blocks->nofExtractPositions) {
-		res = block_info_extract_next_position(blocks, err, blocks->records);
-		if (res != KT_OK) goto cleanup;
-	}
-
-	res = KT_OK;
-
-cleanup:
-
-	return res;
-}
-
-int block_info_extract_verify_positions(ERR_TRCKR *err, char *records) {
-	int res;
-
-	if (records == NULL || *records == 0) {
-		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
-
-	while (*records) {
-		char c = *records;
-		if (isspace(c)) {
-			res = KT_INVALID_CMD_PARAM;
-			ERR_CATCH_MSG(err, res, "Error: List of positions must not contain whitespace. Use ',' and '-' as separators.");
-		}
-		if (!isdigit(c) && c != ',' && c != '-') {
-			res = KT_INVALID_CMD_PARAM;
-			ERR_CATCH_MSG(err, res, "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges.");
-		}
-		records++;
-	}
-	res = KT_OK;
-
-cleanup:
-
-	return res;
-}
-
-static int add_position(ERR_TRCKR *err, long int n, BLOCK_INFO *blocks) {
-	int res;
-	size_t *tmp = NULL;
-
-	if (n <= 0 || blocks == NULL) {
-		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
-
-	if (blocks->nofExtractPositions) {
-		if (n <= blocks->extractPositions[blocks->nofExtractPositions - 1]) {
-			res = KT_INVALID_CMD_PARAM;
-			ERR_CATCH_MSG(err, res, "Error: List of positions must be given in strictly ascending order.");
-		}
-	}
-
-	if (blocks->extractPositions == NULL) {
-		tmp = (size_t*)malloc(sizeof(size_t));
-	} else {
-		tmp = (size_t*)realloc(blocks->extractPositions, sizeof(size_t) * (blocks->nofExtractPositions + 1));
-	}
-
-	if (tmp == NULL) {
-		res = KT_OUT_OF_MEMORY;
-		goto cleanup;
-	}
-
-	blocks->extractPositions = tmp;
-	tmp = NULL;
-	blocks->extractPositions[blocks->nofExtractPositions] = n;
-	blocks->nofExtractPositions++;
-	res = KT_OK;
+#define REC_SIZE_INCR 32
 
 
-cleanup:
+typedef struct REC_CHAIN_st {
+	LINK_DIRECTION dir;
+	KSI_DataHash *sibling;
+	size_t corr;
+} REC_CHAIN;
 
-	return res;
-}
+struct RECORD_INFO_st {
+	size_t extractLine;							/* Position of the current record (log line number). */
+	size_t extractOffset;						/* Record position in tree (count of record hashes and meta record hashes). */
+	size_t extractLevel;						/* Level of the record chain root. */
+	char *logLine;								/* Log line thats record chain is extracted. */
+	KSI_TlvElement *metaRecord;
+	KSI_DataHash *extractRecord;				/* Hash value thats record chain is extracted. */
+	REC_CHAIN extractChain[MAX_TREE_HEIGHT];	/* Record chain. */
+};
 
-static int expand_extract_info(BLOCK_INFO *blocks) {
-	int res;
+struct NEXT_REC_st {
+	long int n;
+	long int from;
+	char *endp;
+	char digit_expected;
+	char dash_allowed;
+	char get_next_n;
+	const char *records;
+};
+
+struct EXTRACT_INFO_st {
+	const char *pRange;					/* (old name records) Reference to PARAM_SET value. Maybe rename or make as const. */
+	size_t *extractPositions;			/* Array containing list of extract positions (log line numbers). */
+	size_t nofExtractPositions;			/* Count of all extract positions (in extractPositions). */
+	size_t nofExtractPositionsFound;	/* Count of all extract positions found. */
+
+	NEXT_REC recExtract;				/* Helper data struct to extract record values from range string. */
+
+	RECORD_INFO *records;				/* Actual data structures containing extracted hash value and matching record chain. */
+	size_t records_capacity;			/* The size of extractPositions array. */
+	size_t nofExtractPositionsInBlock;	/* Count of \c records elements in array. Incremented by EXTRACT_INFO_getNew. */
+};
+
+struct aggr_chain_fold_st {
+	KSI_HashChainLinkList *chainList;
+	KSI_HashAlgorithm hashAlgo;
+	KSI_CTX *ksi;
+};
+
+int EXTRACT_INFO_new(const char *range, EXTRACT_INFO **info) {
+	int res = KT_UNKNOWN_ERROR;
 	EXTRACT_INFO *tmp = NULL;
 
-	if (blocks == NULL) {
+	if (info == NULL || range == NULL) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
-	if (blocks->extractInfo == NULL) {
-		tmp = (EXTRACT_INFO*)malloc(sizeof(EXTRACT_INFO));
-	} else {
-		tmp = (EXTRACT_INFO*)realloc(blocks->extractInfo, sizeof(EXTRACT_INFO) * (blocks->nofExtractPositionsInBlock + 1));
-	}
 
+	tmp = (EXTRACT_INFO*)malloc(sizeof(EXTRACT_INFO));
 	if (tmp == NULL) {
 		res = KT_OUT_OF_MEMORY;
 		goto cleanup;
 	}
 
-	blocks->extractInfo = tmp;
+	tmp->records_capacity = 0;
+	tmp->nofExtractPositions = 0;
+	tmp->nofExtractPositionsFound = 0;
+	tmp->nofExtractPositionsInBlock = 0;
+	tmp->pRange = range;
+
+	tmp->extractPositions = NULL;
+	tmp->records = NULL;
+
+	res = next_rec_reset(&tmp->recExtract, tmp->pRange);
+	if (res != KT_OK) goto cleanup;
+
+	res = extract_info_register_next_extract_position(tmp);
+	if (res != KT_OK) goto cleanup;
+
+	*info = tmp;
 	tmp = NULL;
-	memset(blocks->extractInfo + blocks->nofExtractPositionsInBlock, 0, sizeof(EXTRACT_INFO));
-	blocks->nofExtractPositionsInBlock++;
+
 	res = KT_OK;
 
 cleanup:
 
 	free(tmp);
+
 	return res;
 }
 
-static int add_hash_to_record_chain(EXTRACT_INFO *extracts, LINK_DIRECTION dir, KSI_DataHash *hash, int corr) {
+
+
+
+int RECORD_INFO_setRecordHash(RECORD_INFO *extractInfo, size_t pos, size_t offs, KSI_DataHash *hsh, const char *logLine) {
+	return record_info_set_value(extractInfo, pos, offs, hsh, 0, (void*)logLine, 0);
+}
+
+int RECORD_INFO_setMetaRecordHash(RECORD_INFO *extractInfo, size_t pos, size_t offs, KSI_DataHash *hsh, unsigned char *raw, size_t raw_len) {
+	return record_info_set_value(extractInfo, pos, offs, hsh, 1, raw, raw_len);
+}
+
+int RECORD_INFO_addHash(RECORD_INFO *extracts, LINK_DIRECTION dir, KSI_DataHash *hash, int corr) {
 	int res;
 
 	if (extracts == NULL || hash == NULL) {
 		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	if (extracts->extractLevel >= MAX_TREE_HEIGHT) {
+		res = KT_INDEX_OVF;
 		goto cleanup;
 	}
 
@@ -330,6 +162,531 @@ static int add_hash_to_record_chain(EXTRACT_INFO *extracts, LINK_DIRECTION dir, 
 	extracts->extractLevel = extracts->extractLevel + corr + 1;
 
 	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
+
+int RECORD_INFO_getLine(RECORD_INFO *record, size_t *lineNr, char **logLine) {
+	if (record == NULL || (lineNr == NULL && logLine == NULL)) return KT_INVALID_ARGUMENT;
+	if (lineNr) *lineNr = record->extractLine;
+	if (logLine) *logLine = record->logLine;
+	return KT_OK;
+}
+
+int RECORD_INFO_getPositionInTree(RECORD_INFO *record, size_t *recordOffset, size_t *recordRootLvl) {
+	if (record == NULL || (recordOffset == NULL && recordRootLvl != NULL)) return KT_INVALID_ARGUMENT;
+	if (recordOffset) *recordOffset = record->extractOffset;
+	if (recordRootLvl) *recordRootLvl = record->extractLevel;
+	return KT_OK;
+}
+
+int RECORD_INFO_getRecordHash(RECORD_INFO *record, KSI_DataHash **extractRecord) {
+	if (record == NULL || extractRecord == NULL) return KT_INVALID_ARGUMENT;
+	*extractRecord = KSI_DataHash_ref(record->extractRecord);
+	return KT_OK;
+}
+
+int RECORD_INFO_getMetadata(RECORD_INFO *record, KSI_TlvElement **metaRecord) {
+	if (record == NULL || metaRecord == NULL) return KT_INVALID_ARGUMENT;
+	*metaRecord = KSI_TlvElement_ref(record->metaRecord);
+	return KT_OK;
+}
+
+int RECORD_INFO_foldl(RECORD_INFO *record,
+					void *acc,
+					int (*f)(void *, LINK_DIRECTION, KSI_DataHash*, size_t)) {
+	int res = KT_UNKNOWN_ERROR;
+	size_t i = 0;
+
+	if (record == NULL || acc == NULL || f == NULL) return KT_INVALID_ARGUMENT;
+
+	for (i = 0; i < record->extractLevel; i++) {
+		res = f(acc, record->extractChain[i].dir, record->extractChain[i].sibling, record->extractChain[i].corr);
+		if (res != KT_OK) return res;
+	}
+
+	return KT_OK;
+}
+
+int RECORD_INFO_getAggregationHashChain(RECORD_INFO *record, KSI_CTX *ksi, KSI_AggregationHashChain **aggrChain) {
+	KSI_HashChainLinkList *chainList;
+	KSI_AggregationHashChain *tmp = NULL;
+	KSI_DataHash *hashRef = NULL;
+	KSI_Integer *hashId = NULL;
+
+	int res = KT_INVALID_ARGUMENT;
+	struct aggr_chain_fold_st acc;
+
+	if (ksi == NULL || record == NULL || aggrChain == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+
+	}
+
+	/* Create a list for aggregation hash chain links, fold over
+	 * extract records and fill the list. */
+	res = KSI_HashChainLinkList_new(&chainList);
+	if (res != KSI_OK) goto cleanup;
+
+	acc.chainList = chainList;
+	acc.ksi = ksi;
+	acc.hashAlgo = KSI_HASHALG_INVALID_VALUE;
+
+	res = RECORD_INFO_foldl(record, &acc, foldl_aggr_chain);
+	if (res != KT_OK) return res;
+
+	/* Create aggregation hash chain and fill its fields. */
+	res = KSI_AggregationHashChain_new(acc.ksi, &tmp);
+	if (res != KSI_OK) goto cleanup;
+
+	res = KSI_AggregationHashChain_setChain(tmp, chainList);
+	if (res != KSI_OK) goto cleanup;
+	chainList = NULL;
+
+	hashRef = KSI_DataHash_ref(record->extractRecord);
+	res = KSI_AggregationHashChain_setInputHash(tmp, hashRef);
+	if (res != KSI_OK) goto cleanup;
+	hashRef = NULL;
+
+	res = KSI_Integer_new(acc.ksi, acc.hashAlgo, &hashId);
+	if (res != KSI_OK) goto cleanup;
+
+	res = KSI_AggregationHashChain_setAggrHashId(tmp, hashId);
+	if (res != KSI_OK) goto cleanup;
+	hashId = NULL;
+
+	*aggrChain = tmp;
+	tmp = NULL;
+
+
+cleanup:
+
+	KSI_AggregationHashChain_free(tmp);
+	KSI_DataHash_free(hashRef);
+	KSI_Integer_free(hashId);
+	KSI_HashChainLinkList_free(chainList);
+	return KT_OK;
+}
+
+
+void EXTRACT_INFO_resetBlockInfo(EXTRACT_INFO *extract) {
+	size_t i = 0;
+	size_t j = 0;
+
+	if (extract == NULL) return;
+
+	for (j = 0; j < extract->nofExtractPositionsInBlock; j++) {
+		for (i = 0; i < extract->records[j].extractLevel; i++) {
+			KSI_DataHash_free(extract->records[j].extractChain[i].sibling);
+			extract->records[j].extractChain[i].sibling = NULL;
+		}
+		extract->records[j].extractLevel = 0;
+		KSI_DataHash_free(extract->records[j].extractRecord);
+		extract->records[j].extractRecord = NULL;
+		free(extract->records[j].logLine);
+		extract->records[j].logLine = NULL;
+		KSI_TlvElement_free(extract->records[j].metaRecord);
+		extract->records[j].metaRecord = NULL;
+	}
+
+	extract->nofExtractPositionsInBlock = 0;
+
+	return;
+}
+
+void EXTRACT_INFO_free(EXTRACT_INFO *extract) {
+	if (extract == NULL) return;
+
+	if (extract->extractPositions) free(extract->extractPositions);
+
+	/* Free data allocated during last block. */
+	EXTRACT_INFO_resetBlockInfo(extract);
+	if (extract->records) free(extract->records);
+	free(extract);
+}
+
+int EXTRACT_INFO_getNewRecord(EXTRACT_INFO *extract, size_t *index, RECORD_INFO **info) {
+	int res;
+	RECORD_INFO *tmp = NULL;
+
+	if (extract == NULL || info == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	if (extract->records_capacity < extract->nofExtractPositionsInBlock + 1) {
+		size_t new_size = 0;
+
+		if (extract->records_capacity == 0) {
+			new_size = REC_SIZE_INCR;
+			tmp = (RECORD_INFO*)malloc(sizeof(RECORD_INFO) * new_size);
+		} else {
+			new_size = extract->records_capacity + REC_SIZE_INCR;
+			tmp = (RECORD_INFO*)realloc(extract->records, sizeof(RECORD_INFO) * new_size);
+		}
+
+		if (tmp == NULL) {
+			res = KT_OUT_OF_MEMORY;
+			goto cleanup;
+		}
+
+		extract->records_capacity = new_size;
+
+		extract->records = tmp;
+		tmp = NULL;
+	}
+
+	/* Clean next extract position. */
+	record_info_clean(&extract->records[extract->nofExtractPositionsInBlock]);
+	*info = &extract->records[extract->nofExtractPositionsInBlock];
+
+	if (index != NULL) {
+		*index = extract->nofExtractPositionsInBlock;
+	}
+
+	extract->nofExtractPositionsInBlock++;
+
+	res = KT_OK;
+
+cleanup:
+
+	free(tmp);
+
+	return res;
+}
+
+int EXTRACT_INFO_isLastPosPending(EXTRACT_INFO *info) {
+	if (info == NULL) return 0;
+	return info->nofExtractPositionsFound < info->nofExtractPositions;
+}
+
+int EXTRACT_INFO_moveToNext(EXTRACT_INFO *info) {
+	if (info == NULL) return KT_INVALID_ARGUMENT;
+	if (info->nofExtractPositionsFound + 1 > info->nofExtractPositions) return KT_INDEX_OVF;
+	info->nofExtractPositionsFound++;
+	return extract_info_register_next_extract_position(info);
+}
+
+size_t EXTRACT_INFO_getNextPosition(EXTRACT_INFO *info) {
+	if (info == NULL) return 0;
+	if (info->nofExtractPositionsFound == info->nofExtractPositions) return 0;
+	return info->extractPositions[info->nofExtractPositionsFound];
+}
+
+size_t EXTRACT_INFO_getPositionsInBlock(EXTRACT_INFO *info) {
+	if (info == NULL) return 0;
+	return info->nofExtractPositionsInBlock;
+}
+
+size_t EXTRACT_INFO_getPositionsExtracted(EXTRACT_INFO *info) {
+	if (info == NULL) return 0;
+	return info->nofExtractPositionsFound;
+}
+
+int EXTRACT_INFO_getRecord(EXTRACT_INFO *extract, size_t index, RECORD_INFO **pRec) {
+	int res;
+
+	if (extract == NULL || index >= extract->nofExtractPositionsInBlock || pRec == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	if (index >= extract->nofExtractPositionsInBlock || index >= extract->records_capacity) {
+		res = KT_INDEX_OVF;
+		goto cleanup;
+	}
+
+	*pRec = &extract->records[index];
+
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+}
+
+
+
+
+static int next_rec_reset(NEXT_REC *recextract, const char *range) {
+	if (recextract == NULL || range == NULL) return KT_INVALID_ARGUMENT;
+
+	recextract->n = 0;
+	recextract->from = 0;
+	recextract->endp = NULL;
+	recextract->digit_expected = 1;
+	recextract->dash_allowed = 1;
+	recextract->get_next_n = 1;
+	recextract->records = range;
+
+	return KT_OK;
+}
+
+static int next_rec_extract_next_position(NEXT_REC *recextract, long *position) {
+	int res = KT_UNKNOWN_ERROR;
+	long tmp = -1;
+
+	if (recextract == NULL || position == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	while (*recextract->records) {
+		if (isspace(*recextract->records)) {
+			res = KT_INVALID_INPUT_FORMAT;
+			goto cleanup;
+		}
+		if(!recextract->digit_expected) {
+			/* Process either ',' or '-' as a separator. */
+			recextract->digit_expected = 1;
+			if (*recextract->records == ',') {
+				recextract->dash_allowed = 1;
+				recextract->records++;
+				recextract->from = 0;
+				recextract->get_next_n = 1;
+				continue;
+			} else if (*recextract->records == '-') {
+				if (recextract->dash_allowed) {
+					recextract->dash_allowed = 0;
+					recextract->records++;
+					recextract->from = recextract->n;
+					recextract->get_next_n = 1;
+					continue;
+				} else {
+					res = KT_INVALID_INPUT_FORMAT;
+					goto cleanup;
+				}
+			} else {
+				res = KT_INVALID_INPUT_FORMAT;
+				goto cleanup;
+			}
+		} else {
+			/* Get the next integer and interpret it as a single position or range of positions. */
+			if (recextract->get_next_n) {
+				recextract->n = strtol(recextract->records, &recextract->endp, 10);
+				recextract->get_next_n = 0;
+				if (recextract->endp == recextract->records) {
+					res = KT_INVALID_INPUT_FORMAT;
+					goto cleanup;
+				}
+			}
+			if (recextract->n <= 0) {
+				res = KT_INVALID_INPUT_FORMAT;
+				goto cleanup;
+			} else if (recextract->from == 0) {
+				tmp = recextract->n;
+
+				recextract->records = recextract->endp;
+				recextract->digit_expected = 0;
+				res = KT_OK;
+				goto cleanup;
+			} else if (recextract->from < recextract->n) {
+				/* Add the next position in the range. */
+				recextract->from++;
+				tmp = recextract->from;
+				res = KT_OK;
+				if (recextract->from < recextract->n) {
+					goto cleanup;
+				} else {
+					recextract->records = recextract->endp;
+					recextract->digit_expected = 0;
+					goto cleanup;
+				}
+			} else {
+				res = KT_INVALID_INPUT_FORMAT;
+				goto cleanup;
+			}
+		}
+	}
+
+	/* Make sure the last processed character was a digit. */
+	if(recextract->digit_expected) {
+		res = KT_INVALID_INPUT_FORMAT;
+		goto cleanup;
+	}
+
+	res = KT_OK;
+
+cleanup:
+
+	if (res == KT_OK) {
+		*position = tmp;
+	}
+
+	return res;
+}
+
+static int foldl_aggr_chain(void *acc, LINK_DIRECTION dir, KSI_DataHash *sibling, size_t corr) {
+	int res = KT_UNKNOWN_ERROR;
+	KSI_HashChainLinkList *chainList = NULL;
+	KSI_DataHash *hashRef = NULL;
+	KSI_HashChainLink *link = NULL;
+	KSI_Integer *lvlcrct = NULL;
+
+	struct aggr_chain_fold_st *wrap = NULL;
+
+	if (acc == NULL || sibling == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	wrap = acc;
+	chainList = wrap->chainList;
+
+
+	/* Extract hash algorithm. */
+	if (wrap->hashAlgo == KSI_HASHALG_INVALID_VALUE) {
+		res = KSI_DataHash_getHashAlg(sibling, &wrap->hashAlgo);
+		if (res != KSI_OK) goto cleanup;
+	}
+
+
+	res = KSI_HashChainLink_new(wrap->ksi, &link);
+	if (res != KSI_OK) goto cleanup;
+
+	hashRef = KSI_DataHash_ref(sibling);
+	res = KSI_HashChainLink_setImprint(link, hashRef);
+	if (res != KSI_OK) goto cleanup;
+	hashRef = NULL;
+
+	res = KSI_HashChainLink_setIsLeft(link, (dir == LEFT_LINK));
+	if (res != KSI_OK) goto cleanup;
+
+	res = KSI_Integer_new(wrap->ksi, corr, &lvlcrct);
+	if (res != KSI_OK) goto cleanup;
+
+	res = KSI_HashChainLink_setLevelCorrection(link, lvlcrct);
+	if (res != KSI_OK) goto cleanup;
+	lvlcrct = NULL;
+
+	res = KSI_HashChainLinkList_append(chainList, link);
+	if (res != KSI_OK) goto cleanup;
+	link = NULL;
+
+
+	res = KT_OK;
+
+cleanup:
+
+	KSI_HashChainLink_free(link);
+	KSI_DataHash_free(hashRef);
+	KSI_Integer_free(lvlcrct);
+
+	return KT_OK;
+}
+
+static int record_info_set_value(RECORD_INFO *extractInfo, size_t pos, size_t offs, KSI_DataHash *hsh, int isMetaRecordHash, void *raw, size_t len) {
+	int res = KT_UNKNOWN_ERROR;
+
+	if (extractInfo == NULL || hsh == NULL || raw == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	extractInfo->extractLine = pos;
+	extractInfo->extractOffset = offs;
+	extractInfo->extractRecord = hsh;
+
+	if (isMetaRecordHash) {
+		unsigned char *meta = raw;
+		extractInfo->logLine = NULL;
+
+		res = KSI_TlvElement_parse(meta, len, &extractInfo->metaRecord);
+		if (res != KT_OK) goto cleanup;
+	} else {
+		char *logLine = raw;
+		extractInfo->metaRecord = NULL;
+
+		extractInfo->logLine = logLine;
+		if (extractInfo->logLine == NULL) {
+			res = KT_OUT_OF_MEMORY;
+			goto cleanup;
+		}
+	}
+
+	res = KT_OK;
+
+cleanup:
+	return res;
+}
+
+static void record_info_clean(RECORD_INFO *obj) {
+	int i = 0;
+	if (obj == NULL) return;
+	memset(obj, 0, sizeof(RECORD_INFO));
+
+	obj->extractRecord = NULL;
+	obj->metaRecord = NULL;
+	obj->logLine = NULL;
+
+	for (i = 0; i < MAX_TREE_HEIGHT; i++) {
+		obj->extractChain[i].sibling = NULL;
+		obj->extractChain[i].dir = LEFT_LINK;
+	}
+
+	return;
+}
+
+static int extract_info_register_next_extract_position(EXTRACT_INFO *info) {
+	int res;
+	long position = 0;
+
+
+	if (info == NULL){
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	res = next_rec_extract_next_position(&info->recExtract, &position);
+	if (res != KT_OK) goto cleanup;
+
+	if (position > 0) {
+		res = extract_info_add_position(info, position);
+		if (res != KT_OK) goto cleanup;
+	}
+
+	res = KT_OK;
+
+	cleanup:
+	return res;
+}
+
+static int extract_info_add_position(EXTRACT_INFO *extract, long int n) {
+	int res;
+	size_t *tmp = NULL;
+
+	if (extract == NULL || n <= 0) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+
+	if (extract->nofExtractPositions) {
+		if (n <= extract->extractPositions[extract->nofExtractPositions - 1]) {
+			res = KT_INVALID_INPUT_FORMAT;
+			goto cleanup;
+		}
+	}
+
+	if (extract->extractPositions == NULL) {
+		tmp = (size_t*)malloc(sizeof(size_t));
+	} else {
+		tmp = (size_t*)realloc(extract->extractPositions, sizeof(size_t) * (extract->nofExtractPositions + 1));
+	}
+
+	if (tmp == NULL) {
+		res = KT_OUT_OF_MEMORY;
+		goto cleanup;
+	}
+
+	extract->extractPositions = tmp;
+	tmp = NULL;
+	extract->extractPositions[extract->nofExtractPositions] = n;
+	extract->nofExtractPositions++;
+	res = KT_OK;
+
 
 cleanup:
 
