@@ -43,6 +43,7 @@ int conf_run(int argc, char** argv, char **envp) {
 	res = PARAM_SET_new(PARAMS, &set);
 	if (res != PST_OK) goto cleanup;
 
+	PARAM_SET_setParseOptions(set, "h,dump,d", PST_PRSCMD_HAS_NO_VALUE);
 
 	res = PARAM_SET_parseCMD(set, argc, argv, "CMD", 3);
 	if (res != PST_OK) {
