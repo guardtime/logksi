@@ -197,3 +197,10 @@ export KSI_CONF=test/test.cfg
 	[[ ! "$output" =~ (are too apart) ]]
 	[[ ! "$output" =~ (are too close) ]]
 }
+
+# Test checking for a fixed bug. It must not be possible to remove log lines from the log file containing identical records.
+@test "try to verify log file containing identical records where the last one is removed" {
+	run ./src/logksi verify --ver-int test/resource/logs_and_signatures/equal-log-lines-one-missing -d
+	[ "$status" -ge 1 ]
+	[[ "$output" =~ (Error: Block no. 1: unable to calculate hash of logline no. 4. .Unexpected end of file.) ]]
+}

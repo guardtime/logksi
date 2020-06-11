@@ -742,7 +742,6 @@ int logksi_datahash_compare(ERR_TRCKR *err, MULTI_PRINTER *mp, LOGKSI* logksi, i
 		}
 
 		print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: %s\n", logksi->blockNo, failureReason);
-		print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Hash algorithms differ\n", logksi->blockNo);
 		print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: %-*s %s\n", logksi->blockNo, minSize, helpLeft, LOGKSI_DataHash_toString(left, buf, sizeof(buf)));
 		print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: %-*s %s\n", logksi->blockNo, minSize, helpRight, LOGKSI_DataHash_toString(right, buf, sizeof(buf)));
 

@@ -161,6 +161,8 @@ static const char* logksiErrToString(int error_code) {
 			return "Integration purposely stopped.";
 		case KT_TREE_LEVEL_OVF:
 			return "Tree too large.";
+		case KT_UNEXPECTED_EOF:
+			return "Unexpected end of file.";
 		case KT_UNKNOWN_ERROR:
 			return "Unknown error.";
 		default:
