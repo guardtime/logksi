@@ -2048,7 +2048,7 @@ static int logksi_calculate_hash_of_logline_and_store_logline(LOGKSI *logksi, IO
 	KSI_DataHash *tmp = NULL;
 	KSI_DataHasher *pHasher = NULL;
 	/* Maximum line size is 64K characters, without newline character. */
-	char buf[0x10000 + 2];
+	char buf[0x10000 + 2] = "";
 
 	if (files == NULL || hash == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -2061,6 +2061,11 @@ static int logksi_calculate_hash_of_logline_and_store_logline(LOGKSI *logksi, IO
 	if (files->files.inLog) {
 		res = SMART_FILE_gets(files->files.inLog, buf, sizeof(buf), NULL);
 		if (res != SMART_FILE_OK) goto cleanup;
+
+		if (SMART_FILE_isEof(files->files.inLog)) {
+			res = KT_UNEXPECTED_EOF;
+			goto cleanup;
+		}
 
 		res = KSI_DataHasher_reset(pHasher);
 		if (res != KSI_OK) goto cleanup;
@@ -2076,6 +2081,7 @@ static int logksi_calculate_hash_of_logline_and_store_logline(LOGKSI *logksi, IO
 		res = block_info_store_logline(logksi, buf);
 		if (res != KT_OK) goto cleanup;
 	}
+
 	*hash = tmp;
 	tmp = NULL;
 	res = KT_OK;
