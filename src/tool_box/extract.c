@@ -222,9 +222,9 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	PARAM_SET_addControl(set, "{r}", isFormatOk_recordExtract, NULL, NULL, NULL);
 
 	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
-	PARAM_SET_setParseOptions(set, "d", PST_PRSCMD_HAS_NO_VALUE | PST_PRSCMD_NO_TYPOS);
+	PARAM_SET_setParseOptions(set, "d,h", PST_PRSCMD_HAS_NO_VALUE | PST_PRSCMD_NO_TYPOS);
 	PARAM_SET_setParseOptions(set, "r", PST_PRSCMD_HAS_VALUE | PST_PRSCMD_NO_TYPOS);
-	PARAM_SET_setParseOptions(set, "log-from-stdin,sig-from-stdin,d,ksig", PST_PRSCMD_HAS_NO_VALUE);
+	PARAM_SET_setParseOptions(set, "log-from-stdin,sig-from-stdin,hex-to-str,ksig", PST_PRSCMD_HAS_NO_VALUE);
 
 
 	/*						ID		DESC									MAN							ATL		FORBIDDEN							IGN	*/

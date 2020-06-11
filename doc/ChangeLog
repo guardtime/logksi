@@ -13,6 +13,7 @@
 (LOGKSI-136) * BUGFIX: rebuild.sh --get-dep-online fixed.
 (LOGKSI-137) * BUGFIX: There is no default user and key as anon anymore.
 (LOGKSI-140) * BUGFIX: Legacy signature tests fixed.
+(LOGKSI-145) * BUGFIX: Options -h, --hex-to-str and --continue-on-fail can be followed by input file.
 (LOGKSI-141) * BUGFIX: When extending RFC3161 timestamps without --enable-rfc3161-conversion original file is restored from backup.
 
 Version 1.5
