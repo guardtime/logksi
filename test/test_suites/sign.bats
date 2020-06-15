@@ -28,6 +28,7 @@ export KSI_CONF=test/test.cfg
 	[ "$status" -ne 0 ]
 }
 
+# @SKIP_MEMORY_TEST
 @test "sign from standard input" {
 	run bash -c "cat test/out/unsigned.logsig | ./src/logksi sign --sig-from-stdin -o test/out/signed_from_stdin.logsig -ddd"
 	[ "$status" -eq 0 ]
@@ -37,6 +38,7 @@ export KSI_CONF=test/test.cfg
 	[ "$status" -eq 0 ]
 }
 
+# @SKIP_MEMORY_TEST
 @test "sign already signed signed2.logsig to stdout" {
 	run bash -c "./src/logksi sign test/out/signed2 -ddd -o - > test/out/signed_stdout.logsig"
 	[ "$status" -eq 0 ]

@@ -181,6 +181,7 @@ cp -r test/resource/logfiles/extract.base test/out/ksig-not-const-size-aggr-chai
 	[ "$status" -eq 0 ]
 }
 
+# @SKIP_MEMORY_TEST
 @test "extract pure KSI signatures - --out-log to stdout" {
 	run bash -c "src/logksi extract -r 1 test/out/ksig/extract.base -d --out-log - --out-proof test/out/ksig-to-stdout/mysig --ksig > test/out/ksig-to-stdout/log_from_stdout"
 	[ "$status" -eq 0 ]
@@ -194,6 +195,7 @@ cp -r test/resource/logfiles/extract.base test/out/ksig-not-const-size-aggr-chai
 	[ "$status" -eq 0 ]
 }
 
+# @SKIP_MEMORY_TEST
 @test "extract pure KSI signatures - --out-proof to stdout" {
 	run bash -c "src/logksi extract -r 1 test/out/ksig/extract.base -d --out-log test/out/ksig-to-stdout/mylog --out-proof - --ksig > test/out/ksig-to-stdout/sig_from_stdout"
 	[ "$status" -eq 0 ]
@@ -207,6 +209,7 @@ cp -r test/resource/logfiles/extract.base test/out/ksig-not-const-size-aggr-chai
 	[ "$status" -eq 0 ]
 }
 
+# @SKIP_MEMORY_TEST
 @test "extract pure KSI signatures - -o to stdout with --out-proof" {
 	run bash -c "src/logksi extract -r 1 test/out/ksig/extract.base -d -o - --out-proof test/out/ksig-to-stdout-with-base-name/mysig --ksig > test/out/ksig-to-stdout-with-base-name/log_from_stdout"
 	[ "$status" -eq 0 ]
@@ -220,6 +223,7 @@ cp -r test/resource/logfiles/extract.base test/out/ksig-not-const-size-aggr-chai
 	[ "$status" -eq 0 ]
 }
 
+# @SKIP_MEMORY_TEST
 @test "extract pure KSI signatures - -o to stdout with --out-log" {
 	run bash -c "src/logksi extract -r 1 test/out/ksig/extract.base -d --out-log test/out/ksig-to-stdout-with-base-name/mylog -o - --ksig > test/out/ksig-to-stdout-with-base-name/sig_from_stdout"
 	[ "$status" -eq 0 ]

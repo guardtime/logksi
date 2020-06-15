@@ -104,6 +104,7 @@ cp -r test/resource/logfiles/legacy_extract test/out
 	[ "$status" -eq 0 ]
 }
 
+# @SKIP_MEMORY_TEST
 @test "extract record 1, redirect log records to stdout" {
 	run bash -c "./src/logksi extract test/out/extract.base.7 --out-log - -r 1 -ddd > test/out/extract.user.7.stdout"
 	[ "$status" -eq 0 ]
@@ -115,6 +116,7 @@ cp -r test/resource/logfiles/legacy_extract test/out
 	[ "$status" -eq 0 ]
 }
 
+# @SKIP_MEMORY_TEST
 @test "extract record 1, redirect integrity proof to stdout" {
 	run bash -c "./src/logksi extract test/out/extract.base.8 --out-proof - -r 1 -ddd > test/out/extract.user.8.stdout"
 	[ "$status" -eq 0 ]
@@ -126,6 +128,7 @@ cp -r test/resource/logfiles/legacy_extract test/out
 	[ "$status" -eq 0 ]
 }
 
+# @SKIP_MEMORY_TEST
 @test "extract record 1, read log file from stdin" {
 	run bash -c "cat test/out/extract.base.9 | ./src/logksi extract --log-from-stdin test/out/extract.base.9.logsig -o test/out/extract.user.9 -r 1 -ddd"
 	[ "$status" -eq 0 ]
@@ -137,6 +140,7 @@ cp -r test/resource/logfiles/legacy_extract test/out
 	[ "$status" -eq 0 ]
 }
 
+# @SKIP_MEMORY_TEST
 @test "extract record 1, read signature file from stdin" {
 	run bash -c "cat test/out/extract.base.10.logsig | ./src/logksi extract test/out/extract.base.10 --sig-from-stdin -r 1 -ddd"
 	[ "$status" -eq 0 ]

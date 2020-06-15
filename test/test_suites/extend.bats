@@ -28,6 +28,7 @@ cp test/resource/logfiles/signed test/out/signed4
 	[ "$status" -eq 0 ]
 }
 
+# @SKIP_MEMORY_TEST
 @test "extend from standard input" {
 	run bash -c "cat test/out/signed3.logsig | ./src/logksi extend --sig-from-stdin -o test/out/extended_from_stdin.logsig \
 	--pub-str AAAAAA-C2PMAF-IAISKD-4JLNKD-ZFCF5L-4OWMS5-DMJLTC-DCJ6SS-QDFBC4-ELLWTM-5BO7WF-I7W2JK \
@@ -54,6 +55,7 @@ cp test/resource/logfiles/signed test/out/signed4
 	[ "$status" -ne 0 ]
 }
 
+# @SKIP_MEMORY_TEST
 @test "extend signed3.logsig to stdout" {
 	run bash -c "./src/logksi extend test/out/signed3 -o - > test/out/extended_stdout.logsig \
 	--pub-str AAAAAA-C2PMAF-IAISKD-4JLNKD-ZFCF5L-4OWMS5-DMJLTC-DCJ6SS-QDFBC4-ELLWTM-5BO7WF-I7W2JK \
