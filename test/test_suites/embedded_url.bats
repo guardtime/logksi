@@ -14,7 +14,7 @@ export KSI_CONF=""
 	[[ "$output" =~ (Publications file.*Not defined) ]]
 }
 
-
+# @NOT_MODIFIED_BY_MEMORY_TEST
 @test "embedded URL test: generate configuration files" {
 	run bash -c "test/construct_conf_file.sh test/test.cfg '' '' '' '' 'ksi+http://' > test/out/ok-embed-ksi-usrinf.cnf"
 	[ "$status" -eq 0 ]
