@@ -1750,7 +1750,7 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 
 			print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Verification of block %zu KSI signature %s!\n", logksi->blockNo, error_level_to_string(logksi));
-			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Verification of KSI signature %s!\n", logksi->blockNo), error_level_to_string(logksi);
+			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Verification of KSI signature %s!\n", logksi->blockNo, error_level_to_string(logksi));
 
 
 			if (!logksi->isContinuedOnFail || logksi->taskId != TASK_VERIFY) {

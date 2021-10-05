@@ -28,6 +28,7 @@
 #include "tool_box.h"
 #include "logksi_err.h"
 #include "printer.h"
+#include "smart_file.h"
 
 char* CONF_generate_param_set_desc(char *description, const char *flags, char *buf, size_t buf_len) {
 	char *extra_desc = NULL;
@@ -187,6 +188,16 @@ static int conf_fromFile(PARAM_SET *set, const char *fname, const char *source, 
 
 	if (fname == NULL || set == NULL) {
 		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	if (!SMART_FILE_doFileExist(fname)) {
+		res = KT_IO_ERROR;
+		goto cleanup;
+	}
+
+	if (!SMART_FILE_isReadAccess(fname)) {
+		res = KT_NO_PRIVILEGES;
 		goto cleanup;
 	}
 
