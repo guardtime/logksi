@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2019 Guardtime, Inc.
+ * Copyright 2013-2021 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -1646,34 +1646,8 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 	res = KSI_TlvElement_getElement(tlv, 0x02, &tlvUnsig);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to extract unsigned block marker.", logksi->blockNo);
 
-	/* If block is unsigned, return verification error. If signature data is missing, return format error. */
-	if (tlvUnsig != NULL) {
-		res = KT_VERIFICATION_NA;
-		LOGKSI_setErrorLevel(logksi, LOGKSI_VER_RES_NA);
-		logksi->block.curBlockNotSigned = 1;
-		logksi->quietError = res;
-		print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
-		print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Block %zu is unsigned!\n", logksi->blockNo);
-		print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Block is unsigned!\n", logksi->blockNo);
-		/* Don't use ERR_CATCH_MSG when --continue-on-fail is set, as the amount of errors
-		   produced will easily exceed the limits of ERR_TRCKR. */
-		if (!logksi->isContinuedOnFail || logksi->taskId != TASK_VERIFY) {
-			ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion: Make sure that block signature is actually the original output\n"
-											 "                and KSI signature is not replaced with unsigned marker!\n"
-											 "                If that's correct, use logksi sign to sign unsigned blocks.\n");
-			ERR_CATCH_MSG(err, res, "Error: Block no. %zu is unsigned and missing KSI signature in block signature.", logksi->blockNo);
-		}
-
-		goto cleanup;
-	} else if (tlvSig == NULL) {
-		res = KT_INVALID_INPUT_FORMAT;
-		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing KSI signature (and unsigned block marker) in block signature.", logksi->blockNo);
-	}
-
-
-	res = is_block_signature_expected(logksi, err);
-	if (res != KT_OK) goto cleanup;
-
+	/* Calculate missing record hashes before doing other checks.
+	 * Doing this will generate correct messages. */
 	if (files->files.inLog) {
 		/* If the block contains metarecords but not the corresponding record hashes:
 		 * Calculate missing metarecord hash from the last metarecord and
@@ -1707,6 +1681,35 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 	}
 
 
+	res = is_block_signature_expected(logksi, err);
+	if (res != KT_OK) goto cleanup;
+
+	logksi->file.nofTotalRecordHashes += logksi->block.nofRecordHashes;
+
+	/* If block is unsigned, return verification error. If signature data is missing, return format error. */
+	if (tlvUnsig != NULL) {
+		res = KT_VERIFICATION_NA;
+		LOGKSI_setErrorLevel(logksi, LOGKSI_VER_RES_NA);
+		logksi->block.curBlockNotSigned = 1;
+		logksi->quietError = res;
+		print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
+		print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Block %zu is unsigned!\n", logksi->blockNo);
+		print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: Block is unsigned!\n", logksi->blockNo);
+		/* Don't use ERR_CATCH_MSG when --continue-on-fail is set, as the amount of errors
+		   produced will easily exceed the limits of ERR_TRCKR. */
+		if (!logksi->isContinuedOnFail || logksi->taskId != TASK_VERIFY) {
+			ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion: Make sure that block signature is actually the original output\n"
+											 "                and KSI signature is not replaced with unsigned marker!\n"
+											 "                If that's correct, use logksi sign to sign unsigned blocks.\n");
+			ERR_CATCH_MSG(err, res, "Error: Block no. %zu is unsigned and missing KSI signature in block signature.", logksi->blockNo);
+		}
+
+		goto cleanup;
+	} else if (tlvSig == NULL) {
+		res = KT_INVALID_INPUT_FORMAT;
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: missing KSI signature (and unsigned block marker) in block signature.", logksi->blockNo);
+	}
+
 	/* If we have any record hashes directly from log signature file or indirectly from log file,
 	 * their count must match the record count in block signature. */
 	if (logksi->block.nofRecordHashes && logksi->block.nofRecordHashes != logksi->block.recordCount) {
@@ -1716,8 +1719,6 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 	}
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
 
-
-	logksi->file.nofTotalRecordHashes += logksi->block.nofRecordHashes;
 
 	if (logksi->block.firstLineNo < logksi->file.nofTotalRecordHashes) {
 		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: lines processed %zu - %zu (%zu)\n", logksi->blockNo, logksi->block.firstLineNo, logksi->file.nofTotalRecordHashes, logksi->block.recordCount - logksi->block.nofMetaRecords);

@@ -7,6 +7,7 @@
 (LOGKSI-124) * IMPROVEMENT: Usage of ksi+ (e.g. ksi+http) URL schemes documented.
 (LOGKSI-135) * IMPROVEMENT: libparamset 1.1 is used to parse command-line parameters and to generate help.
 (LOGKSI-127) * IMPROVEMENT: At least libksi 3.20 is needed to build logksi.
+(LOGKSI-144,LOGKSI-146) * BUGFIX: When unsigned block interrupts verification with flag --continue-on-fail, correct summary of block and file is displayed.
 (LOGKSI-147) * BUGFIX: It is not possible to remove lines from log file containing only identical log lines.
 (LOGKSI-132) * BUGFIX: When verifying and --continue-on-fail is set, error trace is not crowded with detailed error messages.
 (LOGKSI-132) * BUGFIX: When during verification resource is not available due to user error, verification is stopped.
