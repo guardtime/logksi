@@ -24,6 +24,7 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <ksi/ksi.h>
+#include <ksi/err.h>
 #include <ksi/compatibility.h>
 #include <ksi/policy.h>
 #include <param_set/param_set.h>
@@ -681,6 +682,7 @@ static int signature_verify_general(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR
 	int d = PARAM_SET_isSetByName(set, "d");
 	int x = PARAM_SET_isSetByName(set, "x");
 	KSI_PublicationData *pub_data = NULL;
+	KSI_PublicationsFile *pubFile = NULL;
 	static const char *task = "Signature verification according to trust anchor";
 	COMPOSITE extra;
 
@@ -696,6 +698,16 @@ static int signature_verify_general(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR
 		ERR_CATCH_MSG(err, res, "Error: Failed to get publication data.");
 	}
 
+	/* If user insists to ignore the publications file and publications file URI is set, try to retrieve it.
+	   If it fails ignore the incident and let the general verification handle the case. */
+	if (PARAM_SET_isSetByName(set, "publications-file-no-verify,P")) {
+		res = LOGKSI_receivePublicationsFile(err, ksi, &pubFile);
+		if (res != KSI_OK) {
+			KSI_ERR_clearErrors(ksi);
+			res = KSI_OK;
+		}
+	}
+
 	/**
 	 * Verify signature.
 	 */
@@ -707,7 +719,7 @@ static int signature_verify_general(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR
 		goto cleanup;
 	}
 
-	res = LOGKSI_SignatureVerify_general(err, sig, ksi, hsh, rootLevel, pub_data, x, out);
+	res = LOGKSI_SignatureVerify_general(err, sig, ksi, hsh, rootLevel, pubFile, pub_data, x, out);
 	if (res != KSI_OK && *out != NULL) {
 		int is_pub_based = pub_data != NULL || LOGKSI_Signature_isPublicationRecordPresent(sig);
 

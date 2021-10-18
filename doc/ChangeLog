@@ -1,6 +1,7 @@
 (LOGKSI-142) * IMPROVEMENT: Code refactored into decoupled modules to improve maintainability.
 (LOGKSI-131) * FEATURE: New option --ksi to extract pure KSI signature for log line.
 (LOGKSI-138) * FEATURE: Memory tests can be run with test/memory-test.sh.
+(LOGKSI-134) * IMPROVEMENT: General verification is based on libksi verification policy.
 (LOGKSI-133) * IMPROVEMENT: Wording for inconclusive verification result message improved.
 (LOGKSI-133) * IMPROVEMENT: Inconclusive verification result will return EXIT_FAILURE as exit code.
 (LOGKSI-132) * IMPROVEMENT: Detailed verification errors are displayed before error trace.
