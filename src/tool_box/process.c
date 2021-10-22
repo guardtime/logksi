@@ -125,6 +125,11 @@ int process_record_chain(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGK
 	res = tlv_element_parse_and_check_sub_elements(err, ksi, logksi->ftlv_raw, logksi->ftlv_len, logksi->ftlv.hdr_len, &tlv);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse record chain as TLV element.", logksi->blockNo);
 
+	if (files->files.outSig) {
+		res = SMART_FILE_write(files->files.outSig, logksi->ftlv_raw, logksi->ftlv_len, NULL);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to copy tree hash.", logksi->blockNo);
+	}
+
 	res = KSI_TlvElement_getElement(tlv, 0x911, &tlvMetaRecord);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to extract metarecord in record chain.", logksi->blockNo);
 
@@ -537,7 +542,75 @@ cleanup:
 	return res;
 }
 
-int process_ksi_signature(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi, IO_FILES *files, KSI_CTX *ksi, SIGNATURE_PROCESSORS *processors) {
+static int extend_and_store(KSI_Signature *sig, KSI_VerificationContext *context, KSI_TlvElement *tlv, PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, KSI_PublicationsFile *pubFile, SIGNATURE_PROCESSORS *processors, LOGKSI *logksi, IO_FILES *files) {
+	int isBlocksig = 0;
+	int res = 0;
+	KSI_Signature *tmp = NULL;
+	time_t t = 0;
+	unsigned char *sigTlv = NULL;
+	size_t sigTlv_len = 0;
+	KSI_TlvElement *tmpTlv = NULL;
+
+	if (sig == NULL || context == NULL || tlv == NULL || set == NULL ||
+		mp == NULL || err == NULL || ksi == NULL || processors == NULL ||
+		logksi == NULL || files == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	isBlocksig = logksi->file.version == LOGSIG11 || logksi->file.version == LOGSIG12;
+
+	res = processors->extend_signature(set, mp, err, ksi, logksi, files, sig, pubFile, context, &tmp);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to extend KSI signature.", logksi->blockNo);
+
+	res = KSI_Signature_getPublicationInfo(tmp, NULL, NULL, &t, NULL, NULL);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to get publication time from KSI signature.", logksi->blockNo);
+
+	logksi->task.extend.extendedToTime = t;
+
+
+	if (logksi->file.warningLegacy) {
+		int convertLegacy = PARAM_SET_isSetByName(set, "enable-rfc3161-conversion");
+
+		if (files->internal.bOverwrite && !convertLegacy) {
+			res = KT_RFC3161_EXT_IMPOSSIBLE;
+			ERR_CATCH_MSG(err, res, "Error: Overwriting of legacy log signature file not enabled. Run 'logksi extend' with '--enable-rfc3161-conversion' to convert RFC3161 timestamps to KSI signatures.");
+		}
+		logksi->file.warningLegacy = 0;
+	}
+
+	if (isBlocksig) {
+		res = tlv_element_set_signature(tlv, ksi, 0x905, tmp);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to serialize extended KSI signature.", logksi->blockNo);
+	} else {
+		res = KSI_Signature_serialize(tmp, &sigTlv, &sigTlv_len);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to serialize extended KSI signature.", logksi->blockNo);
+		res = KSI_TlvElement_parse(sigTlv, sigTlv_len, &tmpTlv);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to create TLV object from serialized KSI signature.", logksi->blockNo);
+		res = KSI_TlvElement_setElement(tlv, tmpTlv);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to create TLV object from serialized KSI signature.", logksi->blockNo);
+	}
+
+	res = KSI_TlvElement_serialize(tlv, logksi->ftlv_raw, SOF_FTLV_BUFFER, &logksi->ftlv_len, 0);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to serialize extended block signature.", logksi->blockNo);
+
+	res = SMART_FILE_write(files->files.outSig, logksi->ftlv_raw, logksi->ftlv_len, NULL);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to write extended signature to extended %s file.",
+							logksi->blockNo,
+							isBlocksig ? "log signature" : "excerpt");
+
+	res = KT_OK;
+
+cleanup:
+
+	KSI_free(sigTlv);
+	KSI_TlvElement_free(tmpTlv);
+	KSI_Signature_free(tmp);
+
+	return res;
+}
+
+int process_ksi_signature(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi, IO_FILES *files, KSI_CTX *ksi, KSI_PublicationsFile* pubFile, SIGNATURE_PROCESSORS *processors) {
 	int res;
 	KSI_Signature *sig = NULL;
 	KSI_PolicyVerificationResult *verificationResult = NULL;
@@ -559,35 +632,44 @@ int process_ksi_signature(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOG
 	res = tlv_element_parse_and_check_sub_elements(err, ksi, logksi->ftlv_raw, logksi->ftlv_len, logksi->ftlv.hdr_len, &tlvSig);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse KSI signature as TLV element.", logksi->blockNo);
 
+	res = LOGKSI_Signature_parseWithPolicy(err, ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_EMPTY, NULL, &sig);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse KSI signature.", logksi->blockNo);
+
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
-	print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_LEVEL_3, "Block no. %3zu: verifying KSI signature... ", logksi->blockNo);
 
 	if (processors->verify_signature) {
-		res = LOGKSI_Signature_parseWithPolicy(err, ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_EMPTY, NULL, &sig);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse KSI signature.", logksi->blockNo);
-
+		print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_LEVEL_3, "Block no. %3zu: verifying KSI signature... ", logksi->blockNo);
 		res = processors->verify_signature(set, mp, err, ksi, logksi, files, sig, NULL, 0, &verificationResult);
+		print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: KSI signature verification failed.", logksi->blockNo);
 		/* TODO: add dumping of verification results. */
 		KSI_PolicyVerificationResult_free(verificationResult);
 		verificationResult = NULL;
-
-		res = KSI_Signature_getDocumentHash(sig, &hash);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to get root hash from KSI signature.", logksi->blockNo);
-
-		res = KSI_DataHash_getHashAlg(hash, &algo);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to get algorithm ID from root hash.", logksi->blockNo);
-
-		/* Configure merkle tree internal hash algorithm, that is used
-		   to hash the record chain.  */
-		res = MERKLE_TREE_reset(logksi->tree, algo,
-								NULL,
-								NULL);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to reset MERKLE_TREE.", logksi->blockNo);
-
-		KSI_DataHash_free(logksi->block.rootHash);
-		logksi->block.rootHash = KSI_DataHash_ref(hash);
+	} else if (processors->extend_signature) {
+		KSI_VerificationContext context;
+		/* As we don't know the root hash of record chain yet, just feed in
+		 * verification context and clean it up. */
+		KSI_VerificationContext_init(&context, ksi);
+		res = extend_and_store(sig, &context, tlvSig, set, mp, err, ksi, pubFile, processors, logksi, files);
+		KSI_VerificationContext_clean(&context);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: KSI signature extending failed.", logksi->blockNo);
 	}
+
+	res = KSI_Signature_getDocumentHash(sig, &hash);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to get root hash from KSI signature.", logksi->blockNo);
+
+	res = KSI_DataHash_getHashAlg(hash, &algo);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to get algorithm ID from root hash.", logksi->blockNo);
+
+	/* Configure merkle tree internal hash algorithm, that is used
+	   to hash the record chain.  */
+	res = MERKLE_TREE_reset(logksi->tree, algo,
+							NULL,
+							NULL);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to reset MERKLE_TREE.", logksi->blockNo);
+
+	KSI_DataHash_free(logksi->block.rootHash);
+	logksi->block.rootHash = KSI_DataHash_ref(hash);
 
 	logksi->task.verify.lastBlockWasSkipped = 0;
 	res = KT_OK;
@@ -600,7 +682,6 @@ int process_ksi_signature(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOG
 
 		logksi->block.sigTime_1 = KSI_Integer_getUInt64(t1);
 
-		print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
 		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, "Block no. %3zu: signing time: (%llu) %s\n", logksi->blockNo, logksi->block.sigTime_1, LOGKSI_signature_sigTimeToString(sig, sigTimeStr, sizeof(sigTimeStr)));
 	}
 
@@ -608,7 +689,7 @@ int process_ksi_signature(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOG
 	res = check_log_signature_client_id(set, mp, err, logksi, sig);
 	if (res != KT_OK) goto cleanup;
 
-	cleanup:
+cleanup:
 
 	KSI_Signature_free(sig);
 	KSI_PolicyVerificationResult_free(verificationResult);
@@ -624,6 +705,47 @@ int process_log_signature_with_block_signature(PARAM_SET *set, MULTI_PRINTER *mp
 	return process_log_signature_general_components_(set, mp, err, ksi, pubFile, 1, logksi, files, processors);
 }
 
+void print_block_duration_summary(MULTI_PRINTER *mp, int indent, LOGKSI *logksi) {
+	char strT1[256];
+
+	if (logksi->block.recTimeMin > 0) {
+		print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2,
+			" * %-*s%s\n", indent,
+							"First record time:",
+							LOGKSI_uint64_toDateString(logksi->block.recTimeMin, strT1, sizeof(strT1)));
+	}
+
+	if (logksi->block.recTimeMax > 0) {
+		print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2,
+			" * %-*s%s\n", indent,
+							"Last record time:",
+							LOGKSI_uint64_toDateString(logksi->block.recTimeMax, strT1, sizeof(strT1)));
+
+		print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2,
+			" * %-*s%s\n", indent,
+							"Block duration:",
+							time_diff_to_string(logksi->block.recTimeMax - logksi->block.recTimeMin, strT1, sizeof(strT1)));
+	}
+}
+
+void print_block_sign_times(MULTI_PRINTER *mp, int indent, LOGKSI *logksi) {
+	char strT1[256] = "<no signature data available>";
+
+	if (logksi->block.sigTime_1 > 0) {
+		LOGKSI_uint64_toDateString(logksi->block.sigTime_1, strT1, sizeof(strT1));
+	}
+
+	if (!logksi->block.curBlockNotSigned) {
+		print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", indent, "Sig time:", strT1);
+		if (logksi->task.extend.extendedToTime > 0) {
+			char strExtTo[256] = "<null>";
+			LOGKSI_uint64_toDateString(logksi->task.extend.extendedToTime, strExtTo, sizeof(strExtTo));
+			print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", indent, "Extended to:", strExtTo);
+		}
+	} else {
+		print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", indent, "Sig time:", "<unsigned>");
+	}
+}
 
 int finalize_block(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi, IO_FILES *files, KSI_CTX *ksi) {
 	int res;
@@ -655,8 +777,6 @@ int finalize_block(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *lo
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to get previous leaf.", logksi->blockNo);
 
 	if (logksi->blockNo > 0) {
-		char strT1[256] = "<no signature data available>";
-		char strExtTo[256] = "<null>";
 		char inHash[256] = "<null>";
 		char outHash[256] = "<null>";
 		int isSignTask = 0;
@@ -664,14 +784,6 @@ int finalize_block(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *lo
 		int isExtendTask = 0;
 		int shortIndentation = SIZE_OF_SHORT_INDENTENTION;
 		int longIndentation = SIZE_OF_LONG_INDENTATION;
-
-		if (logksi->block.sigTime_1 > 0) {
-			LOGKSI_uint64_toDateString(logksi->block.sigTime_1, strT1, sizeof(strT1));
-		}
-
-		if (logksi->task.extend.extendedToTime > 0) {
-			LOGKSI_uint64_toDateString(logksi->task.extend.extendedToTime, strExtTo, sizeof(strExtTo));
-		}
 
 		LOGKSI_DataHash_toString(logksi->block.inputHash, inHash, sizeof(inHash));
 		LOGKSI_DataHash_toString(prevLeaf, outHash, sizeof(outHash));
@@ -687,13 +799,7 @@ int finalize_block(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *lo
 			if (isSignTask || isExtractTask || isExtendTask) {
 				shortIndentation = longIndentation;
 			}
-
-			if (!logksi->block.curBlockNotSigned) {
-				print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", shortIndentation, "Sig time:", strT1);
-				if (logksi->task.extend.extendedToTime > 0) print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", shortIndentation, "Extended to:", strExtTo);
-			} else {
-				print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", shortIndentation, "Sig time:", "<unsigned>");
-			}
+			print_block_sign_times(mp, shortIndentation, logksi);
 
 			if (!isSignTask && !isExtractTask && !isExtendTask) {
 				print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", shortIndentation, "Input hash:", inHash);
@@ -715,15 +821,7 @@ int finalize_block(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *lo
 				print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s<unknown>\n", longIndentation, "Line:");
 			}
 
-			if (logksi->block.recTimeMin > 0) {
-				print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", longIndentation, "First record time:", LOGKSI_uint64_toDateString(logksi->block.recTimeMin, strT1, sizeof(strT1)));
-			}
-
-			if (logksi->block.recTimeMax > 0) {
-				print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", longIndentation, "Last record time:", LOGKSI_uint64_toDateString(logksi->block.recTimeMax, strT1, sizeof(strT1)));
-				print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", longIndentation, "Block duration:", time_diff_to_string(logksi->block.recTimeMax - logksi->block.recTimeMin, strT1, sizeof(strT1)));
-
-			}
+			print_block_duration_summary(mp, longIndentation, logksi);
 
 			if (logksi->block.nofMetaRecords > 0) print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%zu\n", longIndentation, "Count of meta-records:", logksi->block.nofMetaRecords);
 			if (logksi->block.nofHashFails > 0) print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%zu\n", longIndentation, "Count of hash failures:", logksi->block.nofHashFails);
@@ -1582,7 +1680,6 @@ static const char *error_level_to_string(LOGKSI *logksi) {
 static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, KSI_PublicationsFile *pubFile, SIGNATURE_PROCESSORS *processors, LOGKSI *logksi, IO_FILES *files) {
 	int res;
 	KSI_Signature *sig = NULL;
-	KSI_Signature *ext = NULL;
 	KSI_VerificationContext context;
 	KSI_PolicyVerificationResult *verificationResult = NULL;
 	KSI_DataHash *hash = NULL;
@@ -1766,39 +1863,13 @@ static int process_block_signature(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR 
 		verificationResult = NULL;
 
 	} else if (processors->extend_signature) {
-		time_t t = 0;
-
 		res = LOGKSI_Signature_parseWithPolicy(err, ksi, tlvSig->ptr + tlvSig->ftlv.hdr_len, tlvSig->ftlv.dat_len, KSI_VERIFICATION_POLICY_INTERNAL, &context, &sig);
 		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to parse KSI signature.", logksi->blockNo);
 
 		print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
 
-		res = processors->extend_signature(set, mp, err, ksi, logksi, files, sig, pubFile, &context, &ext);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to extend KSI signature.", logksi->blockNo);
-
-		res = KSI_Signature_getPublicationInfo(ext, NULL, NULL, &t, NULL, NULL);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to get publication time from KSI signature.", logksi->blockNo);
-
-		logksi->task.extend.extendedToTime = t;
-
-		res = tlv_element_set_signature(tlv, ksi, 0x905, ext);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to serialize extended KSI signature.", logksi->blockNo);
-
-		res = KSI_TlvElement_serialize(tlv, logksi->ftlv_raw, SOF_FTLV_BUFFER, &logksi->ftlv_len, 0);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to serialize extended block signature.", logksi->blockNo);
-
-		if (logksi->file.warningLegacy) {
-			int convertLegacy = PARAM_SET_isSetByName(set, "enable-rfc3161-conversion");
-
-			if (files->internal.bOverwrite && !convertLegacy) {
-				res = KT_RFC3161_EXT_IMPOSSIBLE;
-				ERR_CATCH_MSG(err, res, "Error: Overwriting of legacy log signature file not enabled. Run 'logksi extend' with '--enable-rfc3161-conversion' to convert RFC3161 timestamps to KSI signatures.");
-			}
-			logksi->file.warningLegacy = 0;
-		}
-
-		res = SMART_FILE_write(files->files.outSig, logksi->ftlv_raw, logksi->ftlv_len, NULL);
-		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to write extended signature to extended log signature file.", logksi->blockNo);
+		res = extend_and_store(sig, &context, tlv, set, mp, err, ksi, pubFile, processors, logksi, files);
+		ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to extend.", logksi->blockNo);
 
 		KSI_DataHash_free((KSI_DataHash*)context.documentHash);
 		context.documentHash = NULL;
@@ -1879,7 +1950,6 @@ cleanup:
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
 
 	KSI_Signature_free(sig);
-	KSI_Signature_free(ext);
 	KSI_DataHash_free((KSI_DataHash*)context.documentHash);
 	KSI_DataHash_free(hash);
 	KSI_VerificationContext_clean(&context);

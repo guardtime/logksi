@@ -44,7 +44,14 @@ static int logksi_new_record_chain(MERKLE_TREE *tree, void *ctx, int isMetaRecor
 static int logksi_extract_record_chain(MERKLE_TREE *tree, void *ctx, unsigned char level, KSI_DataHash *leftLink);;
 
 
-
+static void print_excerpt_file_block_summary(MULTI_PRINTER *mp, LOGKSI *logksi) {
+	print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2,
+			" * %-*s%zu\n", SIZE_OF_LONG_INDENTATION,
+							"Record count:",
+							logksi->block.nofRecordHashes);
+	print_block_duration_summary(mp, SIZE_OF_LONG_INDENTATION, logksi);
+	print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, "\n");
+}
 
 int logsignature_extend(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, KSI_PublicationsFile* pubFile, EXTENDING_FUNCTION extend_signature, IO_FILES *files) {
 	int res;
@@ -73,34 +80,72 @@ int logsignature_extend(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 	res = process_magic_number(set, mp, err, &logksi, files);
 	if (res != KT_OK) goto cleanup;
 
-	if (logksi.file.version == RECSIG11 || logksi.file.version == RECSIG12) {
-		res = KT_VERIFICATION_SKIPPED;
-		ERR_TRCKR_ADD(err, res, "Extending of excerpt file not yet implemented!");
-		goto cleanup;
-	}
-
 	while (!SMART_FILE_isEof(files->files.inSig)) {
 		MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
 
 		res = LOGKSI_FTLV_smartFileRead(files->files.inSig, logksi.ftlv_raw, SOF_FTLV_BUFFER, &logksi.ftlv_len, &logksi.ftlv);
 		if (res == KSI_OK) {
-			switch (logksi.ftlv.tag) {
-				case 0x901:
-					if (theFirstInputHashInFile == NULL) theFirstInputHashInFile = KSI_DataHash_ref(logksi.block.inputHash);
-				case 0x902:
-				case 0x903:
-				case 0x911:
-				case 0x904:
-					res = process_log_signature_with_block_signature(set, mp, err, &logksi, files, ksi, &processors, pubFile);
-					if (res != KT_OK) goto cleanup;
-				break;
+			switch(logksi.file.version) {
+				case LOGSIG11:
+				case LOGSIG12:
+					switch (logksi.ftlv.tag) {
+						case 0x901:
+							if (theFirstInputHashInFile == NULL) theFirstInputHashInFile = KSI_DataHash_ref(logksi.block.inputHash);
+						case 0x902:
+						case 0x903:
+						case 0x911:
+						case 0x904:
+							res = process_log_signature_with_block_signature(set, mp, err, &logksi, files, ksi, &processors, pubFile);
+							if (res != KT_OK) goto cleanup;
+						break;
 
+						default:
+							/* TODO: unknown TLV found. Either
+							 * 1) Warn user and skip TLV
+							 * 2) Copy TLV (maybe warn user)
+							 * 3) Abort extending with an error
+							 */
+						break;
+					}
+					break;
+				case RECSIG11:
+				case RECSIG12:
+					switch (logksi.ftlv.tag) {
+						case 0x905:
+							logksi.file.nofTotalRecordHashes += logksi.block.nofRecordHashes;
+
+							res = process_ksi_signature(set, mp, err, &logksi, files, ksi, pubFile, &processors);
+							if (res != KT_OK) goto cleanup;
+
+							if (MULTI_PRINTER_hasDataByID(mp, MP_ID_BLOCK_SUMMARY)) {
+								print_excerpt_file_block_summary(mp, &logksi);
+								MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
+								MULTI_PRINTER_printByID(mp, MP_ID_BLOCK_ERRORS);
+								MULTI_PRINTER_printByID(mp, MP_ID_BLOCK_SUMMARY);
+							}
+
+							print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, "\nSummary of block %zu:\n", logksi.blockNo);
+							print_block_sign_times(mp, SIZE_OF_SHORT_INDENTENTION, &logksi);
+						break;
+
+						case 0x907:
+							res = process_record_chain(set, mp, err, &logksi, files, ksi);
+							if (res != KT_OK) goto cleanup;
+
+							res = check_log_record_embedded_time_against_ksi_signature_time(set, mp, err, &logksi);
+							if (res != KT_OK) goto cleanup;
+						break;
+
+						default:
+							/* TODO: unknown TLV found. Either
+							 * 1) Warn user and skip TLV
+							 * 2) Copy TLV (maybe warn user)
+							 * 3) Abort extending with an error
+							 */
+						break;
+					}
 				default:
-					/* TODO: unknown TLV found. Either
-					 * 1) Warn user and skip TLV
-					 * 2) Copy TLV (maybe warn user)
-					 * 3) Abort extending with an error
-					 */
+					/* TODO: unknown file header found. */
 				break;
 			}
 		} else {
@@ -111,6 +156,11 @@ int logsignature_extend(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 				break;
 			}
 		}
+	}
+
+	if (logksi.file.version == RECSIG11 || logksi.file.version == RECSIG12) {
+		logksi.file.nofTotalRecordHashes += logksi.block.nofRecordHashes;
+		print_excerpt_file_block_summary(mp, &logksi);
 	}
 
 	res = finalize_log_signature(set, mp, err, &logksi, files, ksi, theFirstInputHashInFile);
@@ -138,7 +188,7 @@ cleanup:
 	return res;
 }
 
-int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, LOGKSI *logksi, KSI_DataHash *firstLink, VERIFYING_FUNCTION verify_signature, IO_FILES *files, KSI_DataHash **lastLeaf, uint64_t* last_rec_time) {
+int logsignature_verify(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, LOGKSI *logksi, KSI_DataHash *firstLink, VERIFYING_FUNCTION verify_signature, IO_FILES *files, KSI_DataHash **lastLeaf, uint64_t* last_rec_time) {
 	int res;
 
 	KSI_DataHash *theFirstInputHashInFile = NULL;
@@ -292,7 +342,6 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 					switch (logksi->ftlv.tag) {
 						case 0x905:
 						{
-							char strT1[256];
 							logksi->file.nofTotalRecordHashes += logksi->block.nofRecordHashes;
 							if (MULTI_PRINTER_hasDataByID(mp, MP_ID_BLOCK_PARSING_TREE_NODES)) {
 								print_debug_mp(mp, MP_ID_BLOCK_PARSING_TREE_NODES, DEBUG_LEVEL_3, "}\n");
@@ -304,34 +353,20 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 
 							print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_2, res);
 							if (MULTI_PRINTER_hasDataByID(mp, MP_ID_BLOCK_SUMMARY)) {
-								print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%zu\n", SIZE_OF_LONG_INDENTATION, "Record count:", logksi->block.nofRecordHashes);
-								if (logksi->block.recTimeMin > 0) {
-									print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", SIZE_OF_LONG_INDENTATION, "First record time:", LOGKSI_uint64_toDateString(logksi->block.recTimeMin, strT1, sizeof(strT1)));
-								}
-
-								if (logksi->block.recTimeMax > 0) {
-									print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", SIZE_OF_LONG_INDENTATION, "Last record time:", LOGKSI_uint64_toDateString(logksi->block.recTimeMax, strT1, sizeof(strT1)));
-									print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", SIZE_OF_LONG_INDENTATION, "Block duration:", time_diff_to_string(logksi->block.recTimeMax - logksi->block.recTimeMin, strT1, sizeof(strT1)));
-								}
-
-								print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, "\n", SIZE_OF_LONG_INDENTATION, "Record count:", logksi->block.nofRecordHashes);
-
-
+								print_excerpt_file_block_summary(mp, logksi);
 								MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
 								MULTI_PRINTER_printByID(mp, MP_ID_BLOCK_ERRORS);
 								MULTI_PRINTER_printByID(mp, MP_ID_BLOCK_SUMMARY);
 							}
 							print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_EQUAL | DEBUG_LEVEL_2 , "Verifying block no. %3zu... ", logksi->blockNo + 1);
-							res = process_ksi_signature(set, mp, err, logksi, files, ksi, &processors);
+							res = process_ksi_signature(set, mp, err, logksi, files, ksi, NULL, &processors);
 							if (res != KT_OK) goto cleanup;
 
 							logksi->block.nofRecordHashes = 0;
 							logksi->block.recTimeMin = 0;
 
-							LOGKSI_uint64_toDateString(logksi->block.sigTime_1, strT1, sizeof(strT1));
-
 							print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, "\nSummary of block %zu:\n", logksi->blockNo);
-							print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", SIZE_OF_SHORT_INDENTENTION, "Sig time:", strT1);
+							print_block_sign_times(mp, SIZE_OF_SHORT_INDENTENTION, logksi);
 
 							printHeader = 1;
 						}
@@ -377,22 +412,8 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 	}
 
 	if (logksi->file.version == RECSIG11 || logksi->file.version == RECSIG12) {
-		char strT1[256];
-
 		logksi->file.nofTotalRecordHashes += logksi->block.nofRecordHashes;
-
-		print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%zu\n", SIZE_OF_LONG_INDENTATION, "Record count:", logksi->block.nofRecordHashes);
-
-										if (logksi->block.recTimeMin > 0) {
-									print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", SIZE_OF_LONG_INDENTATION, "First record time:", LOGKSI_uint64_toDateString(logksi->block.recTimeMin, strT1, sizeof(strT1)));
-								}
-
-								if (logksi->block.recTimeMax > 0) {
-									print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", SIZE_OF_LONG_INDENTATION, "Last record time:", LOGKSI_uint64_toDateString(logksi->block.recTimeMax, strT1, sizeof(strT1)));
-									print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", SIZE_OF_LONG_INDENTATION, "Block duration:", time_diff_to_string(logksi->block.recTimeMax - logksi->block.recTimeMin, strT1, sizeof(strT1)));
-								}
-										print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, "\n", SIZE_OF_LONG_INDENTATION, "Record count:", logksi->block.nofRecordHashes);
-
+		print_excerpt_file_block_summary(mp, logksi);
 	}
 
 	if (MULTI_PRINTER_hasDataByID(mp, MP_ID_BLOCK_PARSING_TREE_NODES)) {
