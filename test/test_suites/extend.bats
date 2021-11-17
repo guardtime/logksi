@@ -57,10 +57,10 @@ cp test/resource/logfiles/signed test/out/signed4
 
 # @SKIP_MEMORY_TEST
 @test "extend signed3.logsig to stdout" {
-	run bash -c "./src/logksi extend test/out/signed3 -o - > test/out/extended_stdout.logsig \
+	run bash -c "./src/logksi extend test/out/signed3 -o - \
 	--pub-str AAAAAA-C2PMAF-IAISKD-4JLNKD-ZFCF5L-4OWMS5-DMJLTC-DCJ6SS-QDFBC4-ELLWTM-5BO7WF-I7W2JK \
 	-P file://test/resource/publication/dummy-publications.bin \
-	-V test/resource/certificates/dummy-cert.pem -ddd"
+	-V test/resource/certificates/dummy-cert.pem -ddd > test/out/extended_stdout.logsig"
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	run test -f test/out/extended_stdout.logsig
@@ -105,9 +105,64 @@ cp test/resource/logfiles/signed test/out/signed4
 	[ "$status" -ne 0 ]
 }
 
-@test "Try to extend excerpt file - not implemented." {
-	run src/logksi extend test/resource/excerpt/log-ok.excerpt  -o test/out/dummy.ksig -d
-	[ "$status" -eq 1 ]
-	[[ "$output" =~ "Extending... failed." ]]
-	[[ "$output" =~ "Extending of excerpt file not yet implemented!" ]]
+@test "Extend excerpt file to earliest publication" {
+	run src/logksi extend test/resource/excerpt/log-ok.excerpt -o test/out/log-ok.excerpt.extended.logsig -ddd
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ (Block no.   [1-2]: extending KSI signature to the earliest available publication: 2018.02.15 00:00:00 UTC.*){2} ]]
+}
+
+@test "Extend excerpt file to publication string" {
+	run src/logksi extend test/resource/excerpt/log-ok.excerpt --pub-str AAAAAA-C2VG3Y-AANAMA-FULJ3X-CMWLPB-F5O2BA-7Y6UE5-VOJKPQ-OV2VFQ-W3SXJM-JIDMWY-4PDBN2 -o test/out/log-ok.excerpt.extended-to-pub.logsig -ddd
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ (Block no.   [1-2]: extending KSI signature to the specified publication: 2018.03.15 00:00:00 UTC.*){2} ]]
+}
+
+@test "extend excerpt file and check if backup is really backup" {
+	run cp test/resource/excerpt/log-ok.excerpt test/out/backup-test.excerpt
+	run cp test/resource/excerpt/log-ok.excerpt.logsig test/out/backup-test.excerpt.logsig
+	run ./src/logksi extend test/out/backup-test.excerpt -dd
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ (Summary of block 1).*(Extended to).*(1518652800).*(Summary of block 2).*(Extended to).*(1518652800) ]]
+	run test -f test/out/backup-test.excerpt.logsig
+	[ "$status" -eq 0 ]
+	run test -f test/out/backup-test.excerpt.logsig.bak
+	[ "$status" -eq 0 ]
+	run diff test/resource/excerpt/log-ok.excerpt.logsig test/out/backup-test.excerpt.logsig.bak
+	[ "$status" -eq 0 ]
+	run diff test/resource/excerpt/log-ok.excerpt.logsig test/out/backup-test.excerpt.logsig
+	[ "$status" -ne 0 ]
+	run diff test/out/log-ok.excerpt.extended.logsig test/out/backup-test.excerpt.logsig
+	[ "$status" -eq 0 ]
+}
+
+# @SKIP_MEMORY_TEST
+@test "extend excerpt file from standard input" {
+	run bash -c "cat test/resource/excerpt/log-ok.excerpt.logsig | ./src/logksi extend --sig-from-stdin -o test/out/extended_excerpt_from_stdin.logsig \
+	--pub-str AAAAAA-C2VG3Y-AANAMA-FULJ3X-CMWLPB-F5O2BA-7Y6UE5-VOJKPQ-OV2VFQ-W3SXJM-JIDMWY-4PDBN2 \
+	-ddd"
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
+	run test -f test/out/extended_excerpt_from_stdin.logsig
+	[ "$status" -eq 0 ]
+	run diff test/out/log-ok.excerpt.extended-to-pub.logsig test/out/extended_excerpt_from_stdin.logsig
+	[ "$status" -eq 0 ]
+}
+
+# @SKIP_MEMORY_TEST
+@test "extend excerpt file to stdout, check that backup is not created" {
+	run cp test/resource/excerpt/log-ok.excerpt.logsig test/out/backup-test2.excerpt.logsig
+	run cp test/resource/excerpt/log-ok.excerpt test/out/backup-test2.excerpt
+	run bash -c "./src/logksi extend test/out/backup-test2.excerpt -o - \
+	--pub-str AAAAAA-C2VG3Y-AANAMA-FULJ3X-CMWLPB-F5O2BA-7Y6UE5-VOJKPQ-OV2VFQ-W3SXJM-JIDMWY-4PDBN2 \
+	-ddd > test/out/extended_excerpt_stdout.logsig"
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
+	run test -f test/out/extended_excerpt_stdout.logsig
+	[ "$status" -eq 0 ]
+	run test -f test/out/extended_excerpt_stdout.logsig.bak
+	[ "$status" -ne 0 ]
+	run diff test/out/log-ok.excerpt.extended-to-pub.logsig test/out/extended_excerpt_stdout.logsig
+	[ "$status" -eq 0 ]
+	run diff test/resource/excerpt/log-ok.excerpt.logsig test/out/backup-test2.excerpt.logsig
+	[ "$status" -eq 0 ]
 }

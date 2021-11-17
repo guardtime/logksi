@@ -42,17 +42,19 @@ typedef struct {
 #define SIZE_OF_SHORT_INDENTENTION 13
 #define SIZE_OF_LONG_INDENTATION 29
 
+void print_block_duration_summary(MULTI_PRINTER *mp, int indent, LOGKSI *logksi);
+void print_block_sign_times(MULTI_PRINTER *mp, int indent, LOGKSI *logksi);
+
 int process_magic_number(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi, IO_FILES *files);
 int process_record_chain(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi, IO_FILES *files, KSI_CTX *ksi);
 int process_partial_signature(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi, IO_FILES *files, KSI_CTX *ksi, SIGNATURE_PROCESSORS *processors, int progress);
 int process_partial_block(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi, IO_FILES *files, KSI_CTX *ksi);
-int process_ksi_signature(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi, IO_FILES *files, KSI_CTX *ksi, SIGNATURE_PROCESSORS *processors);
+int process_ksi_signature(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi, IO_FILES *files, KSI_CTX *ksi, KSI_PublicationsFile* pubFile, SIGNATURE_PROCESSORS *processors);
 int process_log_signature(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi, IO_FILES *files, KSI_CTX *ksi);
 int process_log_signature_with_block_signature(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi, IO_FILES *files, KSI_CTX *ksi, SIGNATURE_PROCESSORS *processors, KSI_PublicationsFile *pubFile);
 
 int finalize_block(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi, IO_FILES *files, KSI_CTX *ksi);
 int finalize_log_signature(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi, IO_FILES *files, KSI_CTX *ksi, KSI_DataHash *inputHash);
-
 
 #ifdef	__cplusplus
 }

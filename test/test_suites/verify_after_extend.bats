@@ -46,3 +46,15 @@ export KSI_CONF=test/test.cfg
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 }
+
+@test "Verify extended (to earliest) excerpt file" {
+	run src/logksi verify --ver-pub --pub-str AAAAAA-C2QTGY-AAPWM5-CPIYU5-HN7JBO-CIDA2R-P2MCVN-ZSGTU3-CTENZU-JZBC2A-A3Q7ZO-6WT5V2 test/resource/excerpt/log-ok.excerpt test/out/log-ok.excerpt.extended.logsig -d
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ (Verifying... ok.) ]]
+}
+
+@test "Verify extended (to specific) excerpt file" {
+	run src/logksi verify --ver-pub --pub-str AAAAAA-C2VG3Y-AANAMA-FULJ3X-CMWLPB-F5O2BA-7Y6UE5-VOJKPQ-OV2VFQ-W3SXJM-JIDMWY-4PDBN2 test/resource/excerpt/log-ok.excerpt test/out/log-ok.excerpt.extended-to-pub.logsig -d
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ (Verifying... ok.) ]]
+}
