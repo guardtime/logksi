@@ -52,7 +52,7 @@ export KSI_CONF=test/test.cfg
 }
 
 @test "verify output with debug level 3. tree hash out of block" {
-	run ./src/logksi verify test/resource/logfiles/all_hashes test/resource/logsignatures/tree_hash_out_of_block.logsig -ddd
+	run ./src/logksi verify --ver-int test/resource/logfiles/all_hashes test/resource/logsignatures/tree_hash_out_of_block.logsig -ddd
 	[ "$status" -eq 6 ]
 	[[ "$output" =~ (Block no.   1: processing block header... ok.).(Block no.   1: input hash: SHA-512:7f5a17.*cd7827.).(Block no.   1: [{]r.r..r.[}]).*(Block no.   1: [{]. X) ]]
 	[[ "$output" =~ "Error: Block no. 2: tree hash without preceding block header found." ]]

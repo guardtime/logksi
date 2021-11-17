@@ -174,22 +174,22 @@ err_failed_b2_b3_too_apart=`f_failed_sig_time_diff_check 2 3 "apart" 1554200225 
 #}
 
 @test "Debug output for continuated verification: Wrong KSI signature for block 2. Debug lvl 1." {
-	run src/logksi verify test/resource/continue-verification/log test/resource/continue-verification/log-sig-no2-wrong.logsig -d --continue-on-fail
+	run src/logksi verify --ver-int test/resource/continue-verification/log test/resource/continue-verification/log-sig-no2-wrong.logsig -d --continue-on-fail
 	[ "$status" -eq 6 ]
-	[[ "$output" =~ (Verifying... failed.)..( x Error: Signature verification according to trust anchor: .GEN-01. Wrong document.).( x Error: Verification of block 2 KSI signature failed!)..( x Error: Skipping block 2!)..$summary_of_logfile_1_sig_fail ]]
+	[[ "$output" =~ (Verifying... failed.)..( x Error: Signature internal verification: .GEN-01. Wrong document.).( x Error: Verification of block 2 KSI signature failed!)..( x Error: Skipping block 2!)..$summary_of_logfile_1_sig_fail ]]
 }
 
 @test "Debug output for continuated verification: Wrong KSI signature for block 2. Debug lvl 2." {
-	run src/logksi verify test/resource/continue-verification/log test/resource/continue-verification/log-sig-no2-wrong.logsig -dd --continue-on-fail
+	run src/logksi verify --ver-int test/resource/continue-verification/log test/resource/continue-verification/log-sig-no2-wrong.logsig -dd --continue-on-fail
 	[ "$status" -eq 6 ]
 	[[ "$output" =~ (Verifying block no.   1... ok.)..$summary_of_block_1_ok..(Verifying block no.   2... failed.) ]]
-	[[ "$output" =~ (Verifying block no.   2... failed.)..( x Error: Signature verification according to trust anchor: .GEN-01. Wrong document.).( x Error: Verification of block 2 KSI signature failed!) ]]
+	[[ "$output" =~ (Verifying block no.   2... failed.)..( x Error: Signature internal verification: .GEN-01. Wrong document.).( x Error: Verification of block 2 KSI signature failed!) ]]
 	[[ "$output" =~ ( x Error: Skipping block 2!)..`f_summary_of_block 2 ".no signature data available." "SHA-512:20cfea.*88944a" "SHA-512:9c1ea0.*42e444" "(4 - 6 .3.)"` ]]
 	[[ "$output" =~ (Verifying block no.   3... ok.)..$summary_of_block_3_ok..(Verifying block no.   4... ok.)..$summary_of_block_4_ok...$summary_of_logfile_1_sig_fail ]]
 }
 
 @test "Debug output for continuated verification: Verify signatures that contains unsigned blocks." {
-	run ./src/logksi verify test/resource/logs_and_signatures/unsigned -d --continue-on-fail
+	run ./src/logksi verify --ver-int test/resource/logs_and_signatures/unsigned -d --continue-on-fail
 	[ "$status" -eq 1 ]
 	[[ "$output" =~ (Verifying... failed.)..( x Error: Block 5 is unsigned!)..( x Error: Skipping block 5!)..( x Error: Block 6 is unsigned!)..( x Error: Skipping block 6!).*( x Error: Block 25 is unsigned!)..( x Error: Skipping block 25!) ]]
 

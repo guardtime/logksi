@@ -170,42 +170,42 @@ cp -r test/resource/logfiles/legacy_extract test/out
 }
 
 @test "verify proof wrong record hash" {
-	run ./src/logksi verify test/out/extract.base.excerpt test/resource/logsignatures/proof_wrong_record_hash.excerpt.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/extract.base.excerpt test/resource/logsignatures/proof_wrong_record_hash.excerpt.logsig -ddd
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: Block no. 1: record hashes not equal." ]]
 	[[ "$output" =~ "Log signature verification failed." ]]
 }
 
 @test "verify proof wrong sibling hash 1" {
-	run ./src/logksi verify test/out/extract.base.excerpt test/resource/logsignatures/proof_wrong_sibling_hash_1.excerpt.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/extract.base.excerpt test/resource/logsignatures/proof_wrong_sibling_hash_1.excerpt.logsig -ddd
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: Block no. 1: root hashes not equal." ]]
 	[[ "$output" =~ "Log signature verification failed." ]]
 }
 
 @test "verify proof wrong sibling hash 3" {
-	run ./src/logksi verify test/out/extract.base.excerpt test/resource/logsignatures/proof_wrong_sibling_hash_3.excerpt.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/extract.base.excerpt test/resource/logsignatures/proof_wrong_sibling_hash_3.excerpt.logsig -ddd
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: Block no. 1: root hashes not equal." ]]
 	[[ "$output" =~ "Log signature verification failed." ]]
 }
 
 @test "verify proof wrong level correction 1" {
-	run ./src/logksi verify test/out/extract.base.excerpt test/resource/logsignatures/proof_wrong_level_correction_1.excerpt.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/extract.base.excerpt test/resource/logsignatures/proof_wrong_level_correction_1.excerpt.logsig -ddd
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: Block no. 1: root hashes not equal." ]]
 	[[ "$output" =~ "Log signature verification failed." ]]
 }
 
 @test "verify proof wrong level correction 2" {
-	run ./src/logksi verify test/out/extract.base.excerpt test/resource/logsignatures/proof_wrong_level_correction_2.excerpt.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/extract.base.excerpt test/resource/logsignatures/proof_wrong_level_correction_2.excerpt.logsig -ddd
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: Block no. 1: root hashes not equal." ]]
 	[[ "$output" =~ "Log signature verification failed." ]]
 }
 
 @test "verify proof wrong link direction" {
-	run ./src/logksi verify test/out/extract.base.excerpt test/resource/logsignatures/proof_wrong_link_direction.excerpt.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/extract.base.excerpt test/resource/logsignatures/proof_wrong_link_direction.excerpt.logsig -ddd
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: Block no. 1: root hashes not equal." ]]
 	[[ "$output" =~ "Log signature verification failed." ]]

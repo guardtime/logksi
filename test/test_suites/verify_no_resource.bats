@@ -15,7 +15,7 @@ export KSI_CONF=""
 }
 
 @test "trust anchor-based verification: no -P for Calendar Authentication Record" {
-	run src/logksi verify test/resource/logs_and_signatures/signed -d
+	run src/logksi verify test/out/signed -d
 	[ "$status" -eq 3 ]
 	[[ "$output" =~ "Verifying... failed." ]]
 	[[ "$output" =~ "Error: Verification inconclusive and was stopped." ]]
@@ -23,7 +23,7 @@ export KSI_CONF=""
 }
 
 @test "trust anchor-based verification: no -P for Calendar Authentication Record and --continue-on-fail" {
-	run src/logksi verify test/resource/logs_and_signatures/signed -d --continue-on-fail
+	run src/logksi verify test/out/signed -d --continue-on-fail
 	[ "$status" -eq 3 ]
 	[[ "$output" =~ "Verifying... failed." ]]
 	[[ "$output" =~ "Error: Verification inconclusive and was stopped." ]]
