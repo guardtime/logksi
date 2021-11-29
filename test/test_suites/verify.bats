@@ -41,7 +41,7 @@ export KSI_CONF=test/test.cfg
 }
 
 @test "verify log_repaired.logsig against key" {
-	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/log_repaired -ddd --ignore-desc-block-time
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/totally-resigned -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 }

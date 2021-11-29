@@ -92,9 +92,9 @@ cp test/resource/logfiles/signed test/out/signed4
 @test "extend and check if backup is really backup" {
 	run cp  test/resource/logs_and_signatures/signed test/out/ext-backup-test
 	run cp  test/resource/logs_and_signatures/signed.logsig test/out/ext-backup-test.logsig
-	run ./src/logksi extend test/out/ext-backup-test -dd
+	run ./src/logksi extend test/out/ext-backup-test -dd --pub-str AAAAAA-DBNDCI-AAKOZB-4EAVXI-OMCRJJ-ZPHEEM-Y7XQZM-YVTHYH-7IJAXF-FYELFS-C77R5H-DMWXJP
 	[ "$status" -eq 0 ]
-	[[ "$output" =~ (Summary of block 1).*(Extended to).*(1518652800).*(Summary of block 4).*(Extended to).*(1518652800) ]]
+	[[ "$output" =~ (Summary of block 1).*(Extended to).*(1634256000).*(Summary of block 4).*(Extended to).*(1634256000) ]]
 	run test -f test/out/ext-backup-test.logsig
 	[ "$status" -eq 0 ]
 	run test -f test/out/ext-backup-test.logsig.bak

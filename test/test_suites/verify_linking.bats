@@ -37,7 +37,7 @@ echo SHA-512:dd4e870e7e0c998f160688b97c7bdeef3d6d01b1c5f02db117018058ad51996777a
 }
 
 @test "try to write excerpt signature output hash to stdout. It must fail" {
-	run ./src/logksi verify test/out/extract.base.10.excerpt --output-hash -
+	run ./src/logksi verify --ver-int test/out/extract.base.10.excerpt --output-hash -
 	[ "$status" -eq 3 ]
 	[[ "$output" =~ "Error: --output-hash does not work with excerpt signature file" ]]
 }
@@ -151,7 +151,7 @@ echo SHA-512:dd4e870e7e0c998f160688b97c7bdeef3d6d01b1c5f02db117018058ad51996777a
 }
 
 @test "verify inter-linking with --block-time-diff where last block of previous file are more recent than expected" {
-	run ./src/logksi verify  --block-time-diff -6d,oo -- test/resource/interlink/ok-testlog-interlink-resigned-1 test/resource/interlink/ok-testlog-interlink-2
+	run ./src/logksi verify --block-time-diff -6d,oo -- test/resource/interlink/ok-testlog-interlink-resigned-1 test/resource/interlink/ok-testlog-interlink-2
 	[ "$status" -eq 6 ]
 		[[ "$output" =~ (Error: Signing times from last block of previous file is more recent than expected relative to first block of current file).*(Previous file).*(ok-testlog-interlink-resigned-1).*(Sig time).*(1540301997).*(Current file).*(ok-testlog-interlink-2).*(Sig time).*(1539771503).*(Time diff).*(-6d 03:21:34).*(Expected time diff).*(-6d 00:00:00 - oo) ]]
 }

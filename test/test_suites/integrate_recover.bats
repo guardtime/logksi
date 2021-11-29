@@ -12,7 +12,7 @@ mkdir -p test/out/integrate-recover
 }
 
 @test "recover-1: verify" {
-	run src/logksi verify test/out/integrate-recover/recovered-1 -d
+	run src/logksi verify --ver-int test/out/integrate-recover/recovered-1 -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ (Count of blocks).*(2).*(Count of record hashes).*(6).*(Input hash).*(SHA-512:7f3dea.*ee3141).*(Output hash).*(SHA-512:9c1ea0.*42e444) ]]
 }
@@ -25,7 +25,7 @@ mkdir -p test/out/integrate-recover
 }
 
 @test "recover-2: verify" {
-	run src/logksi verify test/out/integrate-recover/recovered-2 -d
+	run src/logksi verify --ver-int test/out/integrate-recover/recovered-2 -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ (Count of blocks).*(1).*(Count of record hashes).*(3).*(Input hash).*(SHA-512:7f3dea.*ee3141).*(Output hash).*(SHA-512:20cfea.*88944a) ]]
 }
@@ -58,7 +58,7 @@ mkdir -p test/out/integrate-recover
 }
 
 @test "recover-5: verify" {
-	run src/logksi verify test/out/integrate-recover/recovered-5 -d
+	run src/logksi verify --ver-int test/out/integrate-recover/recovered-5 -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ (Count of blocks).*(1).*(Count of record hashes).*(3).*(Input hash).*(SHA-512:7f3dea.*ee3141).*(Output hash).*(SHA-512:20cfea.*88944a) ]]
 }
@@ -71,7 +71,7 @@ mkdir -p test/out/integrate-recover
 }
 
 @test "recover-6: verify" {
-	run src/logksi verify test/out/integrate-recover/recovered-6 -d
+	run src/logksi verify --ver-int test/out/integrate-recover/recovered-6 -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ (Count of blocks).*(3).*(Count of record hashes).*(9).*(Input hash).*(SHA-512:7f3dea.*ee3141).*(Output hash).*(SHA-512:1dfeae.*43e987) ]]
 }
@@ -117,7 +117,7 @@ mkdir -p test/out/integrate-recover
 }
 
 @test "recover-10: verify" {
-	run src/logksi verify test/out/integrate-recover/recover-file-name-gen-1.recovered -d
+	run src/logksi verify --ver-int test/out/integrate-recover/recover-file-name-gen-1.recovered -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ (Count of blocks).*(2).*(Count of record hashes).*(6).*(Input hash).*(SHA-512:7f3dea.*ee3141).*(Output hash).*(SHA-512:9c1ea0.*42e444) ]]
 }
@@ -144,7 +144,7 @@ mkdir -p test/out/integrate-recover
 }
 
 @test "recover-12: verify" {
-	run src/logksi verify test/out/integrate-recover/explicitly-specified-recovered-logfile test/out/integrate-recover/recover-file-name-gen-2.recovered.logsig -d
+	run src/logksi verify --ver-int test/out/integrate-recover/explicitly-specified-recovered-logfile test/out/integrate-recover/recover-file-name-gen-2.recovered.logsig -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ (Count of blocks).*(2).*(Count of record hashes).*(6).*(Input hash).*(SHA-512:7f3dea.*ee3141).*(Output hash).*(SHA-512:9c1ea0.*42e444) ]]
 }
@@ -159,7 +159,7 @@ mkdir -p test/out/integrate-recover
 }
 
 @test "recover-13: verify" {
-	run src/logksi verify test/out/integrate-recover/recover-file-name-gen-3.recovered test/out/integrate-recover/explicitly-specified-recovered-log-signature-file -d
+	run src/logksi verify --ver-int test/out/integrate-recover/recover-file-name-gen-3.recovered test/out/integrate-recover/explicitly-specified-recovered-log-signature-file -d
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ (Count of blocks).*(2).*(Count of record hashes).*(6).*(Input hash).*(SHA-512:7f3dea.*ee3141).*(Output hash).*(SHA-512:9c1ea0.*42e444) ]]
 }
