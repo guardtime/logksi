@@ -25,6 +25,7 @@
 #include "param_set/task_def.h"
 #include "logksi_err.h"
 #include "debug_print.h"
+#include "err_trckr.h"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -67,6 +68,8 @@ int TASK_INITIALIZER_check_analyze_report(PARAM_SET *set, TASK_SET *task_set, do
 int TASK_INITIALIZER_getServiceInfo(PARAM_SET *set, int argc, char **argv, char **envp);
 
 int TASK_INITIALIZER_getPrinter(PARAM_SET *set, MULTI_PRINTER **mp);
+
+int extract_input_files_from_file(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err);
 
 #ifdef	__cplusplus
 }

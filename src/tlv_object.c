@@ -27,6 +27,133 @@
 #include "smart_file.h"
 #include "api_wrapper.h"
 
+
+typedef struct MetaRecordPair_st {
+	KSI_Utf8String *key;
+	KSI_Utf8String *value;
+} MetaRecordPair;
+
+struct MetaDataRecord_st {
+	KSI_Integer *rec_index;
+	MetaRecordPair *pair;
+};
+
+static void MetaRecordPair_free(MetaRecordPair *obj) {
+	if (obj == NULL) return;
+	KSI_Utf8String_free(obj->key);
+	KSI_Utf8String_free(obj->value);
+	free(obj);
+	return;
+}
+
+int MetaDataRecord_new(KSI_CTX *ksi, uint64_t recIndex, const char *key, const char *value, MetaDataRecord **obj) {
+	int res = KT_UNKNOWN_ERROR;
+	MetaDataRecord *tmp = NULL;
+	MetaRecordPair *tmpPair = NULL;
+	KSI_Integer *tmpIndex = NULL;
+	KSI_Utf8String *tmpKey = NULL;
+	KSI_Utf8String *tmpValue = NULL;
+
+	if (key == NULL || value == NULL || obj == NULL) return KT_INVALID_ARGUMENT;
+
+	tmp = malloc(sizeof(MetaDataRecord));
+	if (tmp == NULL) {
+		res = KT_OUT_OF_MEMORY;
+		goto cleanup;
+	}
+
+	tmpPair = malloc(sizeof(MetaRecordPair));
+	if (tmpPair == NULL) {
+		res = KT_OUT_OF_MEMORY;
+		goto cleanup;
+	}
+
+	res = KSI_Integer_new(ksi, recIndex, &tmpIndex);
+	if (res != KT_OK) goto cleanup;
+	res = KSI_Utf8String_new(ksi, key, strlen(key) + 1, &tmpKey);
+	if (res != KT_OK) goto cleanup;
+	res = KSI_Utf8String_new(ksi, value, strlen(value) + 1, &tmpValue);
+	if (res != KT_OK) goto cleanup;
+
+	tmp->rec_index = tmpIndex;
+	tmpPair->key = tmpKey;
+	tmpPair->value = tmpValue;
+	tmp->pair = tmpPair;
+
+	*obj = tmp;
+
+	tmpIndex = NULL;
+	tmpKey = NULL;
+	tmpValue = NULL;
+	tmpPair = NULL;
+	tmp = NULL;
+	res = KT_OK;
+
+cleanup:
+
+	KSI_Integer_free(tmpIndex);
+	KSI_Utf8String_free(tmpKey);
+	KSI_Utf8String_free(tmpValue);
+	free(tmpPair);
+	free(tmp);
+
+	return res;
+}
+
+void MetaDataRecord_free(MetaDataRecord *obj) {
+	if (obj == NULL) return;
+	KSI_Integer_free(obj->rec_index);
+	MetaRecordPair_free(obj->pair);
+	free(obj);
+	return;
+}
+
+int MetaDataRecord_serialize(KSI_CTX *ksi, MetaDataRecord *rec, unsigned char **raw, size_t *raw_len) {
+	int res = KT_UNKNOWN_ERROR;
+	KSI_TlvElement *metadata = NULL;
+	KSI_TlvElement *attrib_tlv = NULL;
+	unsigned char buf[1024];
+	size_t len = 0;
+
+	if (ksi == NULL || rec == NULL || raw == NULL || raw_len == 0) return KT_INVALID_ARGUMENT;
+
+	res = KSI_TlvElement_new(&metadata);
+	if (res != KSI_OK) goto cleanup;
+	metadata->ftlv.tag = 0x0911;
+
+	res = KSI_TlvElement_setInteger(metadata, 0x01, rec->rec_index);
+	if (res != KSI_OK) goto cleanup;
+
+	res = KSI_TlvElement_new(&attrib_tlv);
+	if (res != KSI_OK) goto cleanup;
+	attrib_tlv->ftlv.tag = 0x02;
+
+	res = KSI_TlvElement_setUtf8String(attrib_tlv, 0x01, rec->pair->key);
+	if (res != KSI_OK) goto cleanup;
+	res = KSI_TlvElement_setUtf8String(attrib_tlv, 0x02, rec->pair->value);
+	if (res != KSI_OK) goto cleanup;
+	res = KSI_TlvElement_setElement(metadata, attrib_tlv);
+	if (res != KSI_OK) goto cleanup;
+	res = KSI_TlvElement_serialize(metadata, buf, sizeof(buf), &len, 0);
+	if (res != KSI_OK) goto cleanup;
+
+	*raw = malloc(len);
+	if (*raw == NULL) {
+		res = KT_OUT_OF_MEMORY;
+		goto cleanup;
+	}
+	memcpy(*raw, buf, len);
+	*raw_len = len;
+
+	res = KT_OK;
+
+cleanup:
+	KSI_TlvElement_free(metadata);
+	KSI_TlvElement_free(attrib_tlv);
+
+	return res;
+}
+
 int LOGKSI_FTLV_smartFileRead(SMART_FILE *sf, unsigned char *buf, size_t len, size_t *consumed, struct fast_tlv_s *t) {
 	typedef int (*reader_t)(void *, unsigned char *, size_t, size_t *);
 	int readData(void *fd, unsigned char *buf, size_t len, size_t *consumed, struct fast_tlv_s *t, reader_t read_fn);
@@ -353,4 +480,70 @@ int tlv_element_set_record_hash_chain(KSI_TlvElement *parentTlv, KSI_CTX *ksi, R
 	if (res != KT_OK) return res;
 
 	return KT_OK;
+}
+
+int tlv_element_write_header(KSI_CTX *ksi, KSI_HashAlgorithm algo, KSI_OctetString *octet, KSI_DataHash *prevLeaf, SMART_FILE *out) {
+	int res = KSI_UNKNOWN_ERROR;
+	KSI_TlvElement *header = NULL;
+	unsigned char buf[0xffff + 4];
+	size_t len = 0;
+	unsigned char *ptr = NULL;
+
+	if (ksi == NULL || octet == NULL || prevLeaf == NULL || out == NULL) return KT_INVALID_ARGUMENT;
+
+	res = KSI_TlvElement_new(&header);
+	if (res != KSI_OK) goto cleanup;
+	header->ftlv.tag = 0x901;
+
+	res = tlv_element_set_uint(header, ksi, 0x01, algo);
+	if (res != KSI_OK) goto cleanup;
+	res = KSI_TlvElement_setOctetString(header, 0x02, octet);
+	if (res != KSI_OK) goto cleanup;
+	res = tlv_element_set_hash(header, ksi, 0x03, prevLeaf);
+	if (res != KSI_OK) goto cleanup;
+
+	res = KSI_TlvElement_serialize(header, buf, sizeof(buf), &len, KSI_TLV_OPT_NO_MOVE);
+	if (res != KSI_OK) goto cleanup;
+
+	ptr = buf + sizeof(buf) - len;
+
+	res = SMART_FILE_write(out, ptr, len, NULL);
+	if (res != SMART_FILE_OK) goto cleanup;
+
+	res = KT_OK;
+
+cleanup:
+
+	KSI_TlvElement_free(header);
+	return res;
+}
+
+int tlv_element_write_signature_block(KSI_CTX *ksi, uint64_t recCount, KSI_Signature *sig, SMART_FILE *out) {
+	int res = KT_UNKNOWN_ERROR;
+	unsigned char buf[0xffff];
+	size_t raw_len = 0;
+	KSI_TlvElement *tlvSig = NULL;
+
+	res = KSI_TlvElement_new(&tlvSig);
+	if (res != KSI_OK) goto cleanup;
+	tlvSig->ftlv.tag = 0x904;
+
+	res = tlv_element_set_uint(tlvSig, ksi, 0x01, recCount);
+	if (res != KSI_OK) goto cleanup;
+
+	res = tlv_element_set_signature(tlvSig, ksi, 0x905, sig);
+	if (res != KSI_OK) goto cleanup;
+
+	res = KSI_TlvElement_serialize(tlvSig, buf, sizeof(buf), &raw_len, 0);
+	if (res != KSI_OK) goto cleanup;
+
+	res = SMART_FILE_write(out, buf, raw_len, NULL);
+	if (res != SMART_FILE_OK) goto cleanup;
+
+	res = KT_OK;
+
+cleanup:
+
+	KSI_TlvElement_free(tlvSig);
+	return res;
 }

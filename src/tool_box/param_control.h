@@ -66,6 +66,10 @@ enum contentStatus {
 	FUNCTION_INVALID_ARG_1,
 	FUNCTION_INVALID_ARG_2,
 	INVALID_VERSION,
+	HASH_ALG_UNTRUSTED,
+	FILE_IS_NOT_DIR,
+	FILE_DIR_NOT_SUPPORTED,
+	FILE_DIR_DOES_NOT_EXIST,
 	PARAM_UNKNOWN_ERROR
 };
 
@@ -97,6 +101,7 @@ enum formatStatus_enum{
 	FORMAT_RECORD_WHITESPACE,
 	FORMAT_INVALID_RECORD,
 	FORMAT_RECORD_DESC_ORDER,
+	FORMAT_INVALID_DELIMITER,
 	FORMAT_UNKNOWN_ERROR
 };
 
@@ -107,6 +112,7 @@ int isFormatOk_hex(const char *hexin);
 
 int isFormatOk_hashAlg(const char *hashAlg);
 int isContentOk_hashAlg(const char *alg);
+int isContentOk_hashAlgRejectDeprecated(const char *alg);
 /** extra is not used.*/
 int extract_hashAlg(void **extra, const char* str, void** obj);
 
@@ -119,6 +125,8 @@ int isFormatOk_inputFile(const char *path);
 int isContentOk_inputFile(const char* path);
 int isContentOk_inputFileWithPipe(const char* path);
 int isContentOk_inputFileRestrictPipe(const char* path);
+int isContentOk_inputFileNoDir(const char* path);
+int isContentOk_dir(const char* path);
 
 int isFormatOk_path(const char *path);
 int convertRepair_path(const char* arg, char* buf, unsigned len);
@@ -143,7 +151,9 @@ int isContentOk_uint_can_be_null(const char* integer);
 int isContentOk_uint(const char* integer);
 int isContentOk_uint_not_zero(const char* integer);
 int isContentOk_int(const char* integer);
+int isContentOk_tree_level(const char* integer);
 int extract_int(void **extra, const char* str,  void** obj);
+int extract_uint(void **extra, const char* str, void** obj);
 
 int isContentOk_pduVersion(const char* version);
 
@@ -161,6 +171,7 @@ int extract_utcTime(void **extra, const char* str, void** obj);
 int isFormatOk_flag(const char *flag);
 int isFormatOk_constraint(const char *constraint);
 int isFormatOk_userPass(const char *uss_pass);
+int isFormatOk_fileNameDelimiter(const char *delimiter);
 
 int isFormatOk_recordExtract(const char *rec);
 

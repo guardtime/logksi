@@ -64,6 +64,18 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ (Error).*(Log file from stdin [(]--log-from-stdin[)] needs only ONE explicitly specified log signature file, but there are 2)  ]]
 }
 
+@test "verify CMD test: Try to verify --sig-dir and specify two input files" {
+	run ./src/logksi verify test/resource/logfiles/unsigned --sig-dir test/out -ddd test/resource/logfiles/unsigned
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ (Error).*(Signature from directory [(]--sig-dir[)] needs no explicitly specified log signature file, but there are 1)  ]]
+}
+
+@test "verify CMD test: Try to verify --log-from-stdin and --sig-dir and specify a input files" {
+	run bash -c "echo dummy signature | ./src/logksi verify --log-from-stdin --sig-dir test/out -ddd test/resource/logfiles/unsigned"
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ (Error).*(Log file from stdin [(]--log-from-stdin[)] and signature from directory [(]--sig-dir[)] needs no explicitly specified log signature file, but there are 1)  ]]
+}
+
 @test "verify CMD test: Try to verify log file from stdin and from input after --" {
 	run bash -c "echo dummy signature | ./src/logksi verify --log-from-stdin -ddd -- test/resource/logfiles/unsigned"
 	[ "$status" -eq 3 ]

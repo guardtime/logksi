@@ -500,7 +500,7 @@ int logsignature_extract(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_
 	res = MERKLE_TREE_new(&logksi.tree);
 	if (res != KT_OK) goto cleanup;
 
-	res = MERKLE_TREE_setCallbacks(logksi.tree, &logksi, logksi_extract_record_chain, logksi_new_record_chain);
+	res = MERKLE_TREE_setCallbacks(logksi.tree, &logksi, logksi_extract_record_chain, logksi_new_record_chain, NULL);
 	if (res != KT_OK) goto cleanup;
 
 
@@ -804,7 +804,400 @@ cleanup:
 	return res;
 }
 
+static int finalize_new_log_sig(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err,
+								KSI_CTX *ksi, IO_FILES *files, LOGKSI *logksi,
+								KSI_DataHash *theFirstInputHashInFile, int isBlock) {
+	int res = KT_UNKNOWN_ERROR;
+	KSI_Signature *sig = NULL;
+	KSI_DataHash *root = NULL;
+	KSI_DataHash *prevLeaf = NULL;
+	char buf[1024];
 
+	res = MERKLE_TREE_calculateRootHash(logksi->tree, &root);
+	ERR_CATCH_MSG(err, res, "Error: Could not calculate root hash of the tree.");
+
+	if (MULTI_PRINTER_hasDataByID(mp, MP_ID_BLOCK_PARSING_TREE_NODES)) {
+		print_debug_mp(mp, MP_ID_BLOCK_PARSING_TREE_NODES, DEBUG_LEVEL_3, "}\n");
+		MULTI_PRINTER_printByID(mp, MP_ID_BLOCK_PARSING_TREE_NODES);
+	}
+	//	printf(">>> Make KSI %zu\n", logksi->blockNo);
+	res = wrapper_LOGKSI_createSignature(set, mp, err, ksi, logksi, files, root, LOGKSI_get_aggregation_level(logksi), &sig);
+	ERR_CATCH_MSG(err, res, "Error: Could not sign tree root.");
+	logksi->sigNo++;
+
+	KSI_Integer *tmpInt = NULL;
+	KSI_Signature_getSigningTime(sig, &tmpInt);
+	logksi->block.sigTime_1 = KSI_Integer_getUInt64(tmpInt);
+
+	print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, "Block no. %3zu: signing time: (%llu) %s\n",
+		logksi->blockNo, logksi->block.sigTime_1,
+		LOGKSI_signature_sigTimeToString(sig, buf, sizeof(buf)));
+
+	res = tlv_element_write_signature_block(ksi, logksi->block.recordCount, sig, files->files.outSig);
+	ERR_CATCH_MSG(err, res, "Error: Could not sign tree root.");
+
+	if (isBlock) {
+		res = finalize_block(set, mp, err, logksi, files, ksi);
+		ERR_CATCH_MSG(err, res, "Error: Unable to finalize block.");
+	} else {
+		res = finalize_log_signature(set, mp, err, logksi, files, ksi, theFirstInputHashInFile);
+		ERR_CATCH_MSG(err, res, "Error: Unable to finalize file.");
+	}
+
+	res = MERKLE_TREE_getPrevLeaf(logksi->tree, &prevLeaf);
+	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to get previous leaf.", logksi->blockNo);
+
+	KSI_DataHash_free(logksi->block.inputHash);
+	logksi->block.inputHash = prevLeaf;
+	prevLeaf = NULL;
+
+	res = KT_OK;
+
+cleanup:
+
+	KSI_DataHash_free(root);
+	KSI_DataHash_free(prevLeaf);
+	KSI_Signature_free(sig);
+	return res;
+}
+
+static int finalize_new_log_sig_block(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err,
+									  KSI_CTX *ksi, IO_FILES *files, LOGKSI *logksi){
+	return finalize_new_log_sig(set, mp, err, ksi, files, logksi, NULL, 1);
+}
+
+static int finalize_new_log_sig_file(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err,
+									 KSI_CTX *ksi, IO_FILES *files, LOGKSI *logksi,
+									 KSI_DataHash *theFirstInputHashInFile) {
+	return finalize_new_log_sig(set, mp, err, ksi, files, logksi, theFirstInputHashInFile, 0);
+}
+
+struct helper_st {
+	IO_FILES *io;
+	ERR_TRCKR *err;
+	MULTI_PRINTER *mp;
+	int keepRecordHashes;
+	int keepTreeHashses;
+};
+
+static int logksi_store_hashes(MERKLE_TREE *tree, void *ctx, int tag, int isMeta, KSI_DataHash *recordHash) {
+	int res = KT_UNKNOWN_ERROR;
+	struct helper_st *helper = NULL;
+	const char *nodeType = NULL;;
+	nodeType = isMeta ? "Mr" : "r";
+	helper = ctx;
+	if (tag == 0x902 && !helper->keepRecordHashes) return KT_OK;
+	else if (tag == 0x903 && !helper->keepTreeHashses) return KT_OK;
+
+	res = tlv_element_write_hash(recordHash, tag, helper->io->files.outSig);
+	ERR_CATCH_MSG(helper->err, res, "Error: Could not write record hash to log signature file.");
+	print_debug_mp(helper->mp, MP_ID_BLOCK_PARSING_TREE_NODES, DEBUG_LEVEL_3, tag == 0x902 ? nodeType : ".");
+	res = KT_OK;
+cleanup:
+	return res;
+}
+
+/* MERKLE_TREE newTreeNode implementation. */
+static int logksi_store_tree_hashes(MERKLE_TREE *tree, void *ctx, unsigned char level, KSI_DataHash *hash) {
+	return logksi_store_hashes(tree, ctx, 0x903, 0, hash);
+}
+
+/* MERKLE_TREE newRecordChain implementation. */
+static int logksi_store_record_hashes(MERKLE_TREE *tree, void *ctx, int isMetaRecordHash, KSI_DataHash *hash) {
+	return logksi_store_hashes(tree, ctx, 0x902, isMetaRecordHash, hash);
+}
+
+static int add_metadata(LOGKSI *logksi, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files, const char *key, const char *value);
+
+void print_hash(const char *header, KSI_DataHash *hash) {
+	char buf[1024];
+	printf("%s%s\n", header, KSI_DataHash_toString(hash, buf, sizeof(buf)));
+}
+
+
+#include "param_control.h"
+
+
+int get_random_seed(IO_FILES *files, ERR_TRCKR *err, KSI_CTX *ksi, int len, KSI_OctetString **seed) {
+	int res = KT_UNKNOWN_ERROR;
+	unsigned char *seed_buf = NULL;
+	KSI_OctetString *tmp = NULL;
+	size_t c = 0;
+
+
+	seed_buf = malloc(len);
+	if (seed_buf == NULL) {
+		res = KT_OUT_OF_MEMORY;
+		goto cleanup;
+	}
+
+	res = SMART_FILE_read(files->files.inRandom, seed_buf, len, &c);
+	ERR_CATCH_MSG(err, res, "Error: Unable to read %i bytes of random from '%s'!", len, files->internal.inRandom);
+
+	if (c != len) {
+		res = KT_IO_ERROR;
+		ERR_CATCH_MSG(err, res, "Error: Only %zu/%i bytes of random read from '%s'!", c, len, files->internal.inRandom);
+	}
+
+	res = KSI_OctetString_new(ksi, seed_buf, c, &tmp);
+	if (res != KSI_OK) goto cleanup;
+
+	*seed = tmp;
+	tmp = NULL;
+	res = KT_OK;
+
+cleanup:
+
+	free(seed_buf);
+	KSI_OctetString_free(tmp);
+	return res;
+}
+
+int logsignature_create(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, LOGKSI *blocks, IO_FILES *files, KSI_HashAlgorithm aggrAlgo, KSI_DataHash *inputHash, KSI_DataHash **lastLeaf) {
+	int res = KT_UNKNOWN_ERROR;
+	KSI_DataHash *theFirstInputHashInFile = NULL;
+	KSI_DataHash *recordHash = NULL;
+	KSI_OctetString *seed = NULL;
+	int seed_len = 0;
+	int user_max_lvl = 0;
+	unsigned int user_block_size = 0;
+	size_t maxInputs = 0;
+	char buf[1024];
+	int lastError = KT_OK;
+	/* Maximum line size is 64K characters, without newline character. */
+	struct helper_st helper;
+
+	if (set == NULL || err == NULL || ksi == NULL || blocks == NULL || files == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	blocks->file.version = LOGSIG12;
+	blocks->taskId = TASK_CREATE;
+
+	helper.err = err;
+	helper.io = files;
+	helper.mp = mp;
+	helper.keepRecordHashes = PARAM_SET_isSetByName(set, "keep-record-hashes");
+	helper.keepTreeHashses = PARAM_SET_isSetByName(set, "keep-tree-hashes");
+
+	if (PARAM_SET_isSetByName(set, "seed-len")) {
+		res = PARAM_SET_getObjExtended(set, "seed-len", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, NULL, (void**)&seed_len);
+		ERR_CATCH_MSG(err, res, "Unable to extract random seed!");
+	} else {
+		seed_len = KSI_getHashLength(aggrAlgo);
+		if (seed_len == 0) {
+			res = KT_UNKNOWN_HASH_ALG;
+			ERR_CATCH_MSG(err, res, "Unable to get the size of hash algorithm %i!", (int)aggrAlgo);
+		}
+	}
+
+
+	blocks->block.inputHash = KSI_DataHash_ref(inputHash);
+	theFirstInputHashInFile = KSI_DataHash_ref(inputHash);
+
+	res = MERKLE_TREE_new(&blocks->tree);
+	if (res != KT_OK) goto cleanup;
+
+	res = MERKLE_TREE_setCallbacks(blocks->tree, &helper,
+		NULL,
+		logksi_store_record_hashes, logksi_store_tree_hashes);
+	if (res != KT_OK) goto cleanup;
+
+	res = MERKLE_TREE_reset(blocks->tree, aggrAlgo, NULL, NULL);
+	ERR_CATCH_MSG(err, res, "Error: Could not reset merkle tree object.");
+
+	if (PARAM_SET_isSetByName(set, "max-lvl")) {
+		res = PARAM_SET_getObj(set, "max-lvl", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, (void*)&user_max_lvl);
+		if (res != PST_OK) goto cleanup;
+
+		maxInputs = ((size_t)1 << user_max_lvl);
+	}
+
+	if (PARAM_SET_isSetByName(set, "blk-size")) {
+		res = PARAM_SET_getObj(set, "blk-size", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, (void*)&user_block_size);
+		if (res != PST_OK) goto cleanup;
+
+		if (maxInputs != 0 && maxInputs < user_block_size) {
+			res = KT_INVALID_CMD_PARAM;
+			ERR_CATCH_MSG(err, res, "Error: It is not possible to use blk-size (%u) as tree level (%i) results tree with maximum %zu leafs.",
+				user_block_size,
+				user_max_lvl,
+				maxInputs);
+		}
+
+		maxInputs = user_block_size;
+	}
+
+	res = SMART_FILE_write(files->files.outSig, (unsigned char*)LOGSIG_VERSION_toString(blocks->file.version), MAGIC_SIZE, NULL);
+	ERR_CATCH_MSG(err, res, "Error: Could not write magic number to log signature file.");
+
+	while (!SMART_FILE_isEof(files->files.inLog)) {
+		MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
+
+		if (blocks->block.recordCount == 0) {
+			blocks->blockNo++;
+
+			KSI_OctetString_free(seed);
+			seed = NULL;
+			res = get_random_seed(files, err, ksi, seed_len, &seed);
+			if (res != KT_OK) goto cleanup;
+
+			res = MERKLE_TREE_reset(blocks->tree, aggrAlgo,
+				KSI_DataHash_ref(blocks->block.inputHash),
+				KSI_OctetString_ref(seed));
+			ERR_CATCH_MSG(err, res, "Error: Could not reset merkle tree object.");
+
+			print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_LEVEL_3, "Block no. %3zu: processing block header... ", blocks->blockNo);
+			res = tlv_element_write_header(ksi, aggrAlgo, seed, blocks->block.inputHash, files->files.outSig);
+			ERR_CATCH_MSG(err, res, "Error: Could not write block header to log signature file.");
+			print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, res);
+			print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, "Block no. %3zu: input hash: %s.\n", blocks->blockNo,
+				LOGKSI_DataHash_toString(blocks->block.inputHash, buf, sizeof(buf)));
+
+			print_debug_mp(mp, MP_ID_BLOCK_PARSING_TREE_NODES, DEBUG_LEVEL_3, "Block no. %3zu: {", blocks->blockNo);
+		}
+
+		res = logksi_calculate_hash_of_logline_and_store_logline(blocks, files, &recordHash);
+		if (res == KT_UNEXPECTED_EOF) break;
+		ERR_CATCH_MSG(err, res, "Error: Unable to read from file %s.", files->internal.outLog);
+
+
+		res = MERKLE_TREE_addRecordHash(blocks->tree, 0, recordHash);
+		ERR_CATCH_MSG(err, res, "Error: Could not add record hash to tree.");
+		KSI_DataHash_free(recordHash);
+		recordHash = NULL;
+		blocks->currentLine++;
+		blocks->block.recordCount++;
+		blocks->file.nofTotalRecordHashes++;
+
+		if (blocks->block.firstLineNo == 0) {
+			blocks->block.firstLineNo = blocks->currentLine;
+		}
+
+		if (blocks->block.recordCount >= maxInputs) {
+			res = finalize_new_log_sig_block(set, mp, err, ksi, files, blocks);
+			 if (res != KT_OK) goto cleanup;
+
+			blocks->block.recordCount = 0;
+			blocks->block.firstLineNo = blocks->file.nofTotalRecordHashes + 1;
+		}
+	}
+
+	res = add_metadata(blocks, err, ksi, files,
+	META_DATA_BLOCK_CLOSE_REASON,
+	"Block closed due to file closure."	);
+	ERR_CATCH_MSG(err, res, "Error: Could not add metadata.");
+	blocks->block.nofMetaRecords++;
+	blocks->file.nofTotalMetarecords++;
+
+
+	res = finalize_new_log_sig_file(set, mp, err, ksi, files, blocks, theFirstInputHashInFile);
+	if (res != KT_OK) goto cleanup;
+
+	// The input hash is configured for the next block, so it can be interpreted as
+	// output hash of current block!
+	*lastLeaf = KSI_DataHash_ref(blocks->block.inputHash);
+
+
+	res = SMART_FILE_markConsistent(files->files.outSig);
+	ERR_CATCH_MSG(err, res, "Error: Could not close output log signature file %s.", files->internal.outSig);
+	blocks->task.sign.outSigModified = 1;
+	res = KT_OK;
+
+cleanup:
+	/**
+	 * + If there is error mark output file as inconsistent.
+	 * + Inconsistent state discards temporary file created.
+	 */
+	if (files->files.outSig != NULL && res != KT_OK) {
+		int tmp_res;
+		tmp_res = SMART_FILE_markInconsistent(files->files.outSig);
+		ERR_CATCH_MSG(err, tmp_res, "Error: Unable to mark output signature file as inconsistent.");
+	}
+
+	if (lastError != KT_OK) {
+		res = lastError;
+		ERR_TRCKR_ADD(err, res, "Error: Signing FAILED but was continued. All failed blocks are left unsigned!");
+	}
+
+	print_progressResult(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_3, res);
+	print_progressResult(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_2, res);
+	LOGKSI_freeAndClearInternals(blocks);
+	KSI_DataHash_free(theFirstInputHashInFile);
+	KSI_OctetString_free(seed);
+
+	KSI_DataHash_free(recordHash);
+
+	return res;
+}
+
+static int metarecord_hash(LOGKSI *logksi, KSI_CTX *ksi, const unsigned char *buf, size_t buf_len, KSI_DataHash **hash) {
+	int res;
+	KSI_DataHash *tmp = NULL;
+	KSI_DataHasher *pHasher = NULL;
+
+	if (logksi == NULL || ksi == NULL || buf == NULL || buf_len == 0 || hash == NULL) {
+		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	res = MERKLE_TREE_getHasher(logksi->tree, &pHasher);
+	if (res != KSI_OK) goto cleanup;
+
+	res = KSI_DataHasher_reset(pHasher);
+	if (res != KSI_OK) goto cleanup;
+
+	res = KSI_DataHasher_add(pHasher, buf, buf_len);
+	if (res != KSI_OK) goto cleanup;
+
+	res = KSI_DataHasher_close(pHasher, &tmp);
+	if (res != KSI_OK) goto cleanup;
+
+	*hash = tmp;
+	tmp = NULL;
+	res = KT_OK;
+
+cleanup:
+
+
+	KSI_DataHash_free(tmp);
+	return res;
+}
+
+static int add_metadata(LOGKSI *logksi, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files, const char *key, const char *value) {
+	int res = KT_UNKNOWN_ERROR;
+	MetaDataRecord *metaData = NULL;
+	KSI_DataHash *hash = NULL;
+	unsigned char *buf = NULL;
+	size_t buf_len = 0;
+
+	res = MetaDataRecord_new(ksi, logksi->block.recordCount, key, value, &metaData);
+	ERR_CATCH_MSG(err, res, "Error: Could not create metadata.");
+
+	res = MetaDataRecord_serialize(ksi, metaData, &buf, &buf_len);
+	if (res != KSI_OK) goto cleanup;
+
+	res = metarecord_hash(logksi, ksi, buf, buf_len, &hash);
+	if (res != KSI_OK) goto cleanup;
+
+	res = SMART_FILE_write(files->files.outSig, buf, buf_len, NULL);
+	ERR_CATCH_MSG(err, res, "Error: Could not write metadata log signature file.");
+
+	res = MERKLE_TREE_addRecordHash(logksi->tree, 1, hash);
+	ERR_CATCH_MSG(err, res, "Error: Could not add meta record hash to tree.");
+
+	logksi->block.recordCount++;
+
+	res = KT_OK;
+
+cleanup:
+
+	MetaDataRecord_free(metaData);
+	KSI_DataHash_free(hash);
+	free(buf);
+	return res;
+}
 
 
 static int count_blocks(ERR_TRCKR *err, KSI_CTX *ksi, LOGKSI *logksi, SMART_FILE *in) {
@@ -910,7 +1303,7 @@ static int skip_current_block_as_it_does_not_verify(LOGKSI *logksi, MULTI_PRINTE
 				print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, "Block no. %3zu: Skipping %zu log lines.\n", logksi->blockNo, logLinesToSkip);
 
 				for (i = 0; i < logLinesToSkip; i++) {
-					res = SMART_FILE_gets(files->files.inLog, buf, sizeof(buf), NULL);
+					res = SMART_FILE_readEveryLine(files->files.inLog, buf, sizeof(buf), NULL);
 					if (res != SMART_FILE_OK) goto cleanup;
 				}
 			}
@@ -1008,7 +1401,6 @@ static int logksi_new_record_chain(MERKLE_TREE *tree, void *ctx, int isMetaRecor
 	int res;
 	LOGKSI *logksi = ctx;
 	ERR_TRCKR *err = NULL;
-	KSI_DataHash *hshRef = NULL;
 	KSI_DataHash *prevMask = NULL;
 	char *logLineCopy = NULL;
 
@@ -1026,16 +1418,9 @@ static int logksi_new_record_chain(MERKLE_TREE *tree, void *ctx, int isMetaRecor
 	if (EXTRACT_INFO_isLastPosPending(logksi->task.extract.info) &&
 		EXTRACT_INFO_getNextPosition(logksi->task.extract.info) - logksi->file.nofTotalRecordHashes == logksi->block.nofRecordHashes) {
 		RECORD_INFO *recordInfo = NULL;
-		size_t index = 0;
-
-		hshRef = KSI_DataHash_ref(hash);
-		if (hshRef == NULL) {
-			res = KT_OUT_OF_MEMORY;
-			ERR_CATCH_MSG(err, res, "Error: Unable to create hash reference.");
-		}
 
 		/* Get reference to record info. */
-		res = EXTRACT_INFO_getNewRecord(logksi->task.extract.info, &index, &recordInfo);
+		res = EXTRACT_INFO_getNewRecord(logksi->task.extract.info, NULL, &recordInfo);
 		ERR_CATCH_MSG(err, res, "Error: Unable to create new extract info extractor.");
 
 		res = logksi_set_extract_record(logksi, recordInfo, isMetaRecordHash, hash);
@@ -1063,7 +1448,6 @@ static int logksi_new_record_chain(MERKLE_TREE *tree, void *ctx, int isMetaRecor
 
 cleanup:
 
-	KSI_DataHash_free(hshRef);
 	KSI_DataHash_free(prevMask);
 	free(logLineCopy);
 

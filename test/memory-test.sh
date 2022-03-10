@@ -81,7 +81,12 @@ generate_test verify_log_rec_time.bats
 generate_test verify_log_rec_time_debug_output.bats
 generate_test verify_no_resource.bats
 generate_test embedded_url.bats
-
+generate_test create_cmd.bats
+generate_test create_log_file_list_cmd.bats
+generate_test create_static_file.bats
+generate_test create_linking.bats
+generate_test create_log_file_list.bats
+generate_test create_rebuild.bats
 
 bats \
 $mem_test_dir/integrate.bats \
@@ -114,6 +119,12 @@ $mem_test_dir/verify_log_rec_time.bats \
 $mem_test_dir/verify_log_rec_time_debug_output.bats \
 $mem_test_dir/verify_no_resource.bats \
 $mem_test_dir/embedded_url.bats \
+$mem_test_dir/create_cmd.bats \
+$mem_test_dir/create_log_file_list_cmd.bats \
+$mem_test_dir/create_static_file.bats \
+$mem_test_dir/create_linking.bats \
+$mem_test_dir/create_log_file_list.bats \
+$mem_test_dir/create_rebuild.bats \
 $TEST_DEPENDING_ON_KSI_TOOL
 
 exit_code=$?

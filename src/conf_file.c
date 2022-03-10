@@ -54,7 +54,9 @@ char* CONF_generate_param_set_desc(char *description, const char *flags, char *b
 
 	if (is_S) {
 		count += KSI_snprintf(buf + count, buf_len - count,
-				"{S}{aggr-user}{aggr-key}{aggr-hmac-alg}{aggr-pdu-v}");
+				"{H}"
+				"{S}{aggr-user}{aggr-key}{aggr-hmac-alg}{aggr-pdu-v}"
+				"{max-lvl}");
 	}
 
 	if (is_X) {
@@ -139,7 +141,7 @@ int CONF_initialize_set_functions(PARAM_SET *conf, const char *flags) {
 	}
 
 	if (is_S) {
-		res = PARAM_SET_addControl(conf, "{aggr-hmac-alg}", isFormatOk_hashAlg, isContentOk_hashAlg, NULL, extract_hashAlg);
+		res = PARAM_SET_addControl(conf, "{H}{aggr-hmac-alg}", isFormatOk_hashAlg, isContentOk_hashAlgRejectDeprecated, NULL, extract_hashAlg);
 		if (res != PST_OK) goto cleanup;
 
 		res = PARAM_SET_addControl(conf, "{S}", isFormatOk_url, NULL, convertRepair_url, NULL);
@@ -148,7 +150,12 @@ int CONF_initialize_set_functions(PARAM_SET *conf, const char *flags) {
 		res = PARAM_SET_addControl(conf, "{aggr-user}{aggr-key}", isFormatOk_userPass, NULL, NULL, NULL);
 		if (res != PST_OK) goto cleanup;
 
+		res = PARAM_SET_addControl(conf, "{max-lvl}", isFormatOk_int, isContentOk_tree_level, NULL, extract_int);
+		if (res != PST_OK) goto cleanup;
+
+		PARAM_SET_setHelpText(conf, "H", NULL, "Use the given hash algorithm for hashing log records and aggregating the Merkle tree nodes. If not set, the default algorithm is used. Use logksi -h to get the list of supported hash algorithms. If used in combination with --apply-remote-conf, the algorithm parameter provided by the server will be ignored.");
 		PARAM_SET_setHelpText(conf, "S", "<URL>", "Signing service (KSI Aggregator) URL. Supported URL schemes are: http, https, ksi+http, ksi+https and ksi+tcp.");
+		PARAM_SET_setHelpText(conf, "max-lvl", "<int>", "Set the maximum depth (0 - 31) of the Merkle tree. If used in combination with --apply-remote-conf, where service maximum level is provided, the smaller value is applied.");
 		PARAM_SET_setHelpText(conf, "aggr-user", "<user>", "Username for signing service.");
 		PARAM_SET_setHelpText(conf, "aggr-key", "<key>", "HMAC key for signing service.");
 		PARAM_SET_setHelpText(conf, "aggr-hmac-alg", "<alg>", "Hash algorithm to be used for computing HMAC on outgoing messages towards KSI aggregator. If not set, default algorithm is used.");

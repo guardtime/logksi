@@ -27,6 +27,10 @@
 extern "C" {
 #endif
 
+#ifndef LINE_BUFFER_LIMIT
+#	define LINE_BUFFER_LIMIT 0x100000
+#endif
+
 enum LOGSIG_VER_enum {
 	/* Invalid value. */
 	LOGKSI_VER_RES_INVALID = 0,
@@ -50,6 +54,7 @@ enum LOGSIG_VER_enum {
 
 
 void LOGKSI_initialize(LOGKSI *block);
+int LOGKSI_readLine(LOGKSI *logksi, SMART_FILE *file);
 void LOGKSI_freeAndClearInternals(LOGKSI *logksi);
 int LOGKSI_initNextBlock(LOGKSI *logksi);
 int LOGKSI_get_aggregation_level(LOGKSI *logksi);

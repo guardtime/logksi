@@ -338,8 +338,12 @@ static int isContentOk_int_limits(const char* integer, int no_zero, int not_nega
 
 	tmp = strtol(integer, NULL, 10);
 	if (no_zero && tmp == 0) return INTEGER_TOO_SMALL;
-	if (not_negative && tmp < 0) return INTEGER_UNSIGNED;
-	if (tmp > INT_MAX) return INTEGER_TOO_LARGE;
+	if (not_negative) {
+		if (tmp < 0) return INTEGER_UNSIGNED;
+		if (tmp > UINT_MAX) return INTEGER_TOO_LARGE;
+	} else {
+		if (tmp > INT_MAX) return INTEGER_TOO_LARGE;
+	}
 
 	return PARAM_OK;
 }
@@ -370,12 +374,34 @@ int isContentOk_int(const char* integer) {
 	return PARAM_OK;
 }
 
-int extract_int(void **extra, const char* str, void** obj){
+int isContentOk_tree_level(const char* integer) {
+	long lvl = 0;
+
+	if (integer == NULL) return FORMAT_NULLPTR;
+
+	lvl = strtol(integer, NULL, 10);
+
+	if (lvl < 0 || lvl > 31) return TREE_DEPTH_OUT_OF_RANGE;
+
+	return PARAM_OK;
+}
+
+int extract_int(void **extra, const char* str, void** obj) {
 	long tmp;
 	int *pI = (int*)obj;
 	VARIABLE_IS_NOT_USED(extra);
 	tmp = str != NULL ? strtol(str, NULL, 10) : 0;
 	if (tmp < INT_MIN || tmp > INT_MAX) return KT_INVALID_CMD_PARAM;
+	*pI = (int)tmp;
+	return PST_OK;
+}
+
+int extract_uint(void **extra, const char* str, void** obj) {
+	long tmp;
+	int *pI = (int*)obj;
+	VARIABLE_IS_NOT_USED(extra);
+	tmp = str != NULL ? strtol(str, NULL, 10) : 0;
+	if (tmp < 0 || tmp > UINT_MAX) return KT_INVALID_CMD_PARAM;
 	*pI = (int)tmp;
 	return PST_OK;
 }
@@ -409,6 +435,34 @@ int isContentOk_inputFile(const char* path){
 
 	if (!SMART_FILE_isReadAccess(path)) {
 		return FILE_ACCESS_DENIED;
+	}
+
+	return PARAM_OK;
+}
+
+int isContentOk_inputFileNoDir(const char* path){
+	int res = PARAM_INVALID;
+
+	res = isContentOk_inputFile(path);
+	if (res != PARAM_OK) return res;
+
+	if (SMART_FILE_isFileType(path, SMART_FILE_TYPE_DIR)) {
+		return FILE_DIR_NOT_SUPPORTED;
+	}
+
+	return PARAM_OK;
+}
+
+int isContentOk_dir(const char* path){
+	int res = PARAM_INVALID;
+
+	res = isContentOk_inputFile(path);
+	if (res == FILE_DOES_NOT_EXIST) return FILE_DIR_DOES_NOT_EXIST;
+	if (res != PARAM_OK) return res;
+
+
+	if (!SMART_FILE_isFileType(path, SMART_FILE_TYPE_DIR)) {
+		return FILE_IS_NOT_DIR;
 	}
 
 	return PARAM_OK;
@@ -458,6 +512,19 @@ int isFormatOk_hashAlg(const char *hashAlg){
 int isContentOk_hashAlg(const char *alg){
 	if (KSI_isHashAlgorithmSupported(KSI_getHashAlgorithmByName(alg))) return PARAM_OK;
 	else return HASH_ALG_INVALID_NAME;
+}
+
+int isContentOk_hashAlgRejectDeprecated(const char *alg) {
+	int ret;
+
+	ret = isContentOk_hashAlg(alg);
+	if (ret != PARAM_OK) return ret;
+
+	if (!KSI_isHashAlgorithmTrusted(KSI_getHashAlgorithmByName(alg))) {
+		return HASH_ALG_UNTRUSTED;
+	}
+
+	return PARAM_OK;
 }
 
 int extract_hashAlg(void **extra, const char* str, void** obj) {
@@ -573,6 +640,20 @@ static int hex_string_to_bin(const char *hexin, unsigned char *buf, size_t buf_l
 cleanup:
 
 	return res;
+}
+
+int isFormatOk_fileNameDelimiter(const char *delimiter) {
+	size_t len = 0;
+	if (delimiter == NULL) return FORMAT_NULLPTR;
+	len = strlen(delimiter);
+	if (len == 0) return FORMAT_NOCONTENT;
+
+	if (strcmp(delimiter, "new-line") == 0 ||
+		strcmp(delimiter, "space") == 0) return FORMAT_OK;
+	if (len > 1) return FORMAT_INVALID_DELIMITER;
+	if (strchr(":;,|", delimiter[0]) == NULL) return FORMAT_INVALID_DELIMITER;
+
+	return FORMAT_OK;
 }
 
 static int imprint_get_hash_obj(const char *imprint, KSI_CTX *ksi, ERR_TRCKR *err, KSI_DataHash **hash){
@@ -1323,6 +1404,7 @@ const char *getParameterErrorString(int res) {
 		case PARAM_INVALID: return "Parameter is invalid";
 		case FORMAT_NOT_INTEGER: return "Invalid integer";
 		case HASH_ALG_INVALID_NAME: return "Algorithm name is incorrect";
+		case HASH_ALG_UNTRUSTED: return "Algorithm is not trusted";
 		case HASH_IMPRINT_INVALID_LEN: return "Hash length is incorrect";
 		case FORMAT_INVALID_HEX_CHAR: return "Invalid hex character";
 		case FORMAT_ODD_NUMBER_OF_HEX_CHARACTERS: return "There must be even number of hex characters";
@@ -1331,13 +1413,16 @@ const char *getParameterErrorString(int res) {
 		case FORMAT_IMPRINT_NO_HASH_ALG: return "Imprint format must be <alg>:<hash>. <alg> missing";
 		case FORMAT_IMPRINT_NO_HASH: return "Imprint format must be <alg>:<hash>. <hash> missing";
 		case FILE_ACCESS_DENIED: return "File access denied";
+		case FILE_IS_NOT_DIR: return "Not a directory";
+		case FILE_DIR_NOT_SUPPORTED: return "Directory not supported";
 		case FILE_DOES_NOT_EXIST: return "File does not exist";
+		case FILE_DIR_DOES_NOT_EXIST: return "Directory does not exist";
 		case FILE_INVALID_PATH: return "Invalid path";
 		case INTEGER_TOO_LARGE: return "Integer value is too large";
 		case INTEGER_TOO_SMALL: return "Integer value is too small";
 		case INTEGER_UNSIGNED: return "Integer must be unsigned";
 		case ONLY_REGULAR_FILES: return "Data from stdin not supported";
-		case TREE_DEPTH_OUT_OF_RANGE: return "Tree depth out of range [0 - 255]";
+		case TREE_DEPTH_OUT_OF_RANGE: return "Tree depth out of range [0 - 31]";
 		case UNKNOWN_FUNCTION: return "Unknown function";
 		case FUNCTION_INVALID_ARG_COUNT: return "Invalid function argument count";
 		case FUNCTION_INVALID_ARG_1: return "Argument 1 is invalid";
@@ -1345,6 +1430,7 @@ const char *getParameterErrorString(int res) {
 		case INVALID_VERSION: return "Invalid version";
 		case FORMAT_RECORD_WHITESPACE: return "List of positions must not contain whitespace. Use ',' and '-' as separators";
 		case FORMAT_INVALID_RECORD: return "Positions must be represented by positive decimal integers, using a list of comma-separated ranges";
+		case FORMAT_INVALID_DELIMITER: return "Invalid delimiter. Only 'new-line', 'space' or one of ':;,|' is supported";
 		case FORMAT_RECORD_DESC_ORDER: return "List of positions must be given in strictly ascending order";
 		default: return "Unknown error";
 	}

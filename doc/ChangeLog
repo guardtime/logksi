@@ -1,3 +1,7 @@
+(LOGKSI-152) * FEATURE: New command create to make a log signature from existing log file.
+(LOGKSI-152) * FEATURE: New option --sig-dir for verify and create to search log signatures from not default location.
+(LOGKSI-152) * FEATURE: New option --log-file-list for verify and create to feed input log file list as a file.
+(LOGKSI-152) * IMPROVEMENT: Log files with mac and windows line endings are supported.
 (LOGKSI-142) * IMPROVEMENT: Code refactored into decoupled modules to improve maintainability.
 (LOGKSI-131) * FEATURE: New option --ksi to extract pure KSI signature for log line.
 (LOGKSI-138) * FEATURE: Memory tests can be run with test/memory-test.sh.

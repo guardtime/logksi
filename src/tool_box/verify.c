@@ -77,13 +77,12 @@ static int signature_verify_key_based(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRC
 static int signature_verify_publication_based_with_user_pub(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, LOGKSI *blocks, IO_FILES *files, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
 static int signature_verify_publication_based_with_pubfile(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi,  LOGKSI *blocks, IO_FILES *files, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
 static int signature_verify_calendar_based(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, LOGKSI *blocks, IO_FILES *files, KSI_Signature *sig, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PolicyVerificationResult **out);
-static int generate_filenames(ERR_TRCKR *err, IO_FILES *files);
+static int generate_filenames(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, IO_FILES *files);
 static int open_log_and_signature_files(ERR_TRCKR *err, IO_FILES *files);
 static void close_log_and_signature_files(IO_FILES *files);
-static int save_output_hash(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *ioFiles, KSI_DataHash *hash, char * logFileName, char * sigFileName);
 static int getLogFiles(PARAM_SET *set, ERR_TRCKR *err, int i, IO_FILES *files);
 
-#define PARAMS "{warn-same-block-time}{warn-client-id-change}{ignore-desc-block-time}{multiple_logs}{input}{input-hash}{client-id}{output-hash}{log-from-stdin}{x}{d}{pub-str}{ver-int}{ver-cal}{ver-key}{ver-pub}{use-computed-hash-on-fail}{use-stored-hash-on-fail}{continue-on-fail}{conf}{time-form}{time-base}{time-diff}{time-disordered}{block-time-diff}{log}{h|help}{hex-to-str}"
+#define PARAMS "{log-file-list}{log-file-list-delimiter}{sig-dir}{warn-same-block-time}{warn-client-id-change}{ignore-desc-block-time}{logfile}{multiple_logs}{input}{input-hash}{client-id}{output-hash}{log-from-stdin}{x}{d}{pub-str}{ver-int}{ver-cal}{ver-key}{ver-pub}{use-computed-hash-on-fail}{use-stored-hash-on-fail}{continue-on-fail}{conf}{time-form}{time-base}{time-diff}{time-disordered}{block-time-diff}{log}{h|help}{hex-to-str}"
 
 int verify_run(int argc, char **argv, char **envp) {
 	int res;
@@ -103,8 +102,6 @@ int verify_run(int argc, char **argv, char **envp) {
 	IO_FILES files;
 	VERIFYING_FUNCTION verify_signature = NULL;
 	int i = 0;
-	char *logFileNameCpy = NULL;
-	char *sigFileNameCpy = NULL;
 	LOGKSI logksi;
 	MULTI_PRINTER *mp = NULL;
 	uint64_t las_rec_time = 0;
@@ -147,6 +144,9 @@ int verify_run(int argc, char **argv, char **envp) {
 
 	res = check_io_naming_and_type_errors(set, err);
 	if (res != KT_OK) goto cleanup;
+
+	res = extract_input_files_from_file(set, mp, err);
+	if (res != PST_OK) goto cleanup;
 
 	switch(TASK_getID(task)) {
 		case ANC_BASED_DEFAULT:
@@ -193,7 +193,7 @@ int verify_run(int argc, char **argv, char **envp) {
 		extra.ctx = ksi;
 		extra.err = err;
 		res = PARAM_SET_getObjExtended(set, "input-hash", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &extra, (void**)&inputHash);
-		ERR_CATCH_MSG(err, res, "Unable to extract input hash value!");
+		ERR_CATCH_MSG(err, res, "Error: Unable to extract input hash value!");
 	}
 
 	do {
@@ -205,7 +205,7 @@ int verify_run(int argc, char **argv, char **envp) {
 		ERR_CATCH_MSG(err, res, "Error: Unable to get file names for log and log signature file.");
 
 
-		res = generate_filenames(err, &files);
+		res = generate_filenames(set, mp, err, &files);
 		if (res != KT_OK) goto cleanup;
 
 		res = open_log_and_signature_files(err, &files);
@@ -239,8 +239,22 @@ int verify_run(int argc, char **argv, char **envp) {
 	} while(1);
 
 
-	res = save_output_hash(set, err, &files, pLastOutputHash, logFileNameCpy, sigFileNameCpy);
-	if (res != KT_OK) goto cleanup;
+
+	if (PARAM_SET_isSetByName(set, "output-hash")) {
+		char *fname = NULL;
+
+		res = PARAM_SET_getStr(set, "output-hash", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &fname);
+		ERR_CATCH_MSG(err, res, "Error: Unable to get file name for output hash.");
+
+		if (pLastOutputHash == NULL) {
+			res = KT_INVALID_CMD_PARAM;
+			ERR_TRCKR_ADD(err, res, "Error: --output-hash does not work with excerpt signature file.");
+			goto cleanup;
+		}
+
+		res = logksi_save_output_hash(err, pLastOutputHash, fname, files.previousLogFile, files.previousSigFileIn);
+		if (res != KT_OK) goto cleanup;
+	}
 
 cleanup:
 
@@ -267,8 +281,6 @@ cleanup:
 	SMART_FILE_close(logfile);
 	PARAM_SET_free(set);
 	TASK_SET_free(task_set);
-	free(logFileNameCpy);
-	free(sigFileNameCpy);
 	KSI_Signature_free(sig);
 	ERR_TRCKR_free(err);
 	KSI_CTX_free(ksi);
@@ -379,9 +391,12 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	res = CONF_initialize_set_functions(set, "XP");
 	if (res != KT_OK) goto cleanup;
 
+	PARAM_SET_setPrintName(set, "logfile", "--input", NULL);
+	PARAM_SET_setPrintName(set, "multiple_logs", "--input", NULL);
 	PARAM_SET_addControl(set, "{conf}", isFormatOk_inputFile, isContentOk_inputFileRestrictPipe, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{log}{output-hash}", isFormatOk_path, NULL, convertRepair_path, NULL);
-	PARAM_SET_addControl(set, "{input}{multiple_logs}", isFormatOk_inputFile, isContentOk_inputFileWithPipe, convertRepair_path, NULL);
+	PARAM_SET_addControl(set, "{logfile}{multiple_logs}", isFormatOk_inputFile, isContentOk_inputFileNoDir, convertRepair_path, NULL);
+	PARAM_SET_addControl(set, "{sig-dir}", isFormatOk_inputFile, isContentOk_dir, convertRepair_path, NULL);
 	PARAM_SET_addControl(set, "{input-hash}", isFormatOk_inputHash, isContentOk_inputHash, convertRepair_path, extract_inputHashFromImprintOrImprintInFile);
 	PARAM_SET_addControl(set, "{log-from-stdin}{d}{x}{ver-int}{ver-cal}{ver-key}{ver-pub}{use-computed-hash-on-fail}{use-stored-hash-on-fail}{continue-on-fail}{hex-to-str}", isFormatOk_flag, NULL, NULL, NULL);
 	PARAM_SET_addControl(set, "{pub-str}", isFormatOk_pubString, NULL, NULL, extract_pubString);
@@ -390,18 +405,30 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	PARAM_SET_addControl(set, "time-diff", isFormatOk_timeDiff, NULL, NULL, extract_timeDiff);
 	PARAM_SET_addControl(set, "block-time-diff", isFormatOk_timeDiffInfinity, NULL, NULL, extract_timeDiff);
 	PARAM_SET_addControl(set, "time-disordered", isFormatOk_timeValue, NULL, NULL, extract_timeValue);
+	PARAM_SET_addControl(set, "log-file-list-delimiter", isFormatOk_fileNameDelimiter, NULL, NULL, NULL);
 
 	PARAM_SET_setParseOptions(set, "time-form,time-base,time-diff,time-disordered,block-time-diff", PST_PRSCMD_HAS_VALUE);
 
 	/* Make input also collect same values as multiple_logs. It simplifies task handling. */
-	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_COLLECT_WHEN_PARSING_IS_CLOSED |PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
-	PARAM_SET_setParseOptions(set, "multiple_logs", PST_PRSCMD_CLOSE_PARSING | PST_PRSCMD_COLLECT_WHEN_PARSING_IS_CLOSED | PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
+	PARAM_SET_setParseOptions(set, "input",
+		PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS |
+		PST_PRSCMD_COLLECT_LOOSE_VALUES |
+		PST_PRSCMD_COLLECT_WHEN_PARSING_IS_CLOSED
+		);
+	PARAM_SET_setParseOptions(set, "logfile",  PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS | PST_PRSCMD_COLLECT_LOOSE_VALUES);
+	PARAM_SET_setParseOptions(set, "multiple_logs",
+		PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS |
+		PST_PRSCMD_CLOSE_PARSING | PST_PRSCMD_COLLECT_WHEN_PARSING_IS_CLOSED
+		);
+
 	PARAM_SET_setParseOptions(set, "d,x,h", PST_PRSCMD_HAS_NO_VALUE | PST_PRSCMD_NO_TYPOS);
-	PARAM_SET_setParseOptions(set, "warn-client-id-change,warn-same-block-time,ignore-desc-block-time,log-from-stdin,ver-int,ver-cal,ver-key,ver-pub,use-computed-hash-on-fail,"
+	PARAM_SET_setParseOptions(set, "warn-client-id-change,warn-same-block-time,ignore-desc-block-time,"
+								   "log-from-stdin,ver-int,ver-cal,ver-key,ver-pub,use-computed-hash-on-fail,"
 								   "use-stored-hash-on-fail,continue-on-fail,hex-to-str", PST_PRSCMD_HAS_NO_VALUE);
 
 
 	/*						ID						DESC								MAN							ATL		FORBIDDEN											IGN	*/
+	TASK_SET_add(task_set, ANC_BASED_DEFAULT,		"Verify, from file list.",			"log-file-list",				NULL, 	"input,log-from-stdin,ver-int,ver-cal,ver-key,ver-pub", NULL);
 	TASK_SET_add(task_set,	ANC_BASED_DEFAULT,		"Verify, from file.",				"input",						NULL,	"log-from-stdin,ver-int,ver-cal,ver-key,ver-pub,P,cnstr,pub-str",	NULL);
 	TASK_SET_add(task_set,	ANC_BASED_DEFAULT_STDIN,"Verify, from standard input",		"input,log-from-stdin",			NULL,	"ver-int,ver-cal,ver-key,ver-pub,P,cnstr,pub-str",	NULL);
 	TASK_SET_add(task_set,	ANC_BASED_PUB_FILE,		"Verify, "
@@ -898,10 +925,11 @@ cleanup:
 	return res;
 }
 
-static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
+static int generate_filenames(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, IO_FILES *files) {
 	int res;
 	IO_FILES tmp;
 	char *legacy_name = NULL;
+	char *sig_dir = NULL;
 
 	memset(&tmp.internal, 0, sizeof(tmp.internal));
 
@@ -910,6 +938,11 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 		goto cleanup;
 	}
 
+	files->user.bStdinLog = PARAM_SET_isSetByName(set, "log-from-stdin");
+
+	res = PARAM_SET_getStr(set, "sig-dir", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &sig_dir);
+	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
+
 	if (files->user.inLog) {
 		res = duplicate_name(files->user.inLog, &tmp.internal.inLog);
 		ERR_CATCH_MSG(err, res, "Error: Could not duplicate input log file name.");
@@ -917,17 +950,44 @@ static int generate_filenames(ERR_TRCKR *err, IO_FILES *files) {
 
 	/* If input log signature file name is not specified, it is generared from the input log file name. */
 	if (files->user.inSig == NULL) {
-		/* Generate input log signature file name. */
-		res = concat_names(files->user.inLog, ".logsig", &tmp.internal.inSig);
+		const char *pathComponents[2];
+		const char *fnameComponents[2] = {NULL, ".logsig"};
+		int sigExists = 0;
+		int legacySigExists = 0;
+		pathComponents[0] = sig_dir;
+
+		fnameComponents[0] = files->user.inLog;
+		if (files->user.bStdinLog) {
+			fnameComponents[0] = "stdin";
+		} else if (sig_dir) {
+			const char *pure_file_name = NULL;
+			pure_file_name = strrchr(files->user.inLog, '/');
+			if (pure_file_name == NULL) pure_file_name = files->user.inLog;
+			else pure_file_name++;
+			fnameComponents[0] = pure_file_name;
+		}
+
+		res = merge_path(pathComponents, 1, fnameComponents, 2, &tmp.internal.inSig);
 		ERR_CATCH_MSG(err, res, "Error: Could not generate input log signature file name.");
-		if (!SMART_FILE_doFileExist(tmp.internal.inSig)) {
-			res = concat_names(files->user.inLog, ".gtsig", &legacy_name);
-			ERR_CATCH_MSG(err, res, "Error: Could not generate input log signature file name.");
-			if (SMART_FILE_doFileExist(legacy_name)) {
-				KSI_free(tmp.internal.inSig);
-				tmp.internal.inSig = legacy_name;
-				legacy_name = NULL;
-			}
+
+		fnameComponents[1] = ".gtsig";
+		res = merge_path(pathComponents, 1, fnameComponents, 2, &legacy_name);
+		ERR_CATCH_MSG(err, res, "Error: Could not generate input log signature file name.");
+
+		sigExists = SMART_FILE_doFileExist(tmp.internal.inSig);
+		legacySigExists = SMART_FILE_doFileExist(legacy_name);
+
+		if (sigExists && legacySigExists) {
+			print_debug_mp(mp, MP_ID_LOGFILE_WARNINGS, DEBUG_LEVEL_0,
+				"Warning: Both possible auto generated log signature files exist (using .logsig):\n"
+				"         %s\n"
+				"         %s\n", tmp.internal.inSig, legacy_name);
+		}
+
+		if (!sigExists) {
+			KSI_free(tmp.internal.inSig);
+			tmp.internal.inSig = legacy_name;
+			legacy_name = NULL;
 		}
 	} else {
 		res = duplicate_name(files->user.inSig, &tmp.internal.inSig);
@@ -991,68 +1051,13 @@ static void close_log_and_signature_files(IO_FILES *files) {
 	}
 }
 
-
-static int save_output_hash(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *ioFiles, KSI_DataHash *hash, char * logFileName, char * sigFileName) {
-	int res;
-	SMART_FILE *out = NULL;
-
-	if (set == NULL || err == NULL || ioFiles == NULL) {
-		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
-
-	if (PARAM_SET_isSetByName(set, "output-hash")) {
-		char *fname = NULL;
-		char buf[0xfff];
-		char imprint[1024];
-		size_t count = 0;
-		size_t write_count = 0;
-
-		if (hash == NULL) {
-			res = KT_INVALID_CMD_PARAM;
-			ERR_TRCKR_ADD(err, res, "Error: --output-hash does not work with excerpt signature file.");
-			goto cleanup;
-		}
-
-		res = PARAM_SET_getStr(set, "output-hash", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &fname);
-		ERR_CATCH_MSG(err, res, "Error: Unable to get file name for output hash.");
-
-		LOGKSI_DataHash_toString(hash, imprint, sizeof(imprint));
-
-		count += KSI_snprintf(buf + count, sizeof(buf) - count, "# Log file (%s).\n", ioFiles->previousLogFile);
-		count += KSI_snprintf(buf + count, sizeof(buf) - count, "# Last leaf from previous log signature (%s).\n", ioFiles->previousSigFile);
-		count += KSI_snprintf(buf + count, sizeof(buf) - count, "%s", imprint);
-
-
-		res = SMART_FILE_open(fname, "ws", &out);
-		ERR_CATCH_MSG(err, res, "Error: Unable to open file '%s'.", fname);
-
-		res = SMART_FILE_write(out, (unsigned char*)buf, count, &write_count);
-		ERR_CATCH_MSG(err, res, "Error: Unable to write to file '%s'.", fname);
-
-		if (write_count != count) {
-			res = KT_IO_ERROR;
-			ERR_TRCKR_ADD(err, res, "Error: Only %zu bytes from %zu written.", write_count, count);
-			goto cleanup;
-		}
-	}
-
-	res = KT_OK;
-
-cleanup:
-
-	SMART_FILE_close(out);
-
-	return res;
-}
-
 static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err) {
 	int res;
 
 	res = get_pipe_out_error(set, err, NULL, "log,output-hash", "dump");
 	if (res != KT_OK) goto cleanup;
 
-	res = get_pipe_in_error(set, err, NULL, "input-hash", "log-from-stdin");
+	res = get_pipe_in_error(set, err, NULL, "input-hash,log-file-list", "log-from-stdin");
 	if (res != KT_OK) goto cleanup;
 
 cleanup:
@@ -1062,8 +1067,10 @@ cleanup:
 static int check_io_naming_and_type_errors(PARAM_SET *set, ERR_TRCKR *err) {
 	int res;
 	int in_count = 0;
+	int in_count_all = 0;
 	int isMultipleLogFiles = 0;
 	int isLogFromStdin = 0;
+	int isLogSigFromDir = 0;
 
 	if (set == NULL || err == NULL) {
 		ERR_TRCKR_ADD(err, res = KT_INVALID_ARGUMENT, NULL);
@@ -1073,19 +1080,28 @@ static int check_io_naming_and_type_errors(PARAM_SET *set, ERR_TRCKR *err) {
 	/**
 	 * Get the count of inputs and outputs for error handling.
 	 */
-	res = PARAM_SET_getValueCount(set, "input", NULL, PST_PRIORITY_NONE, &in_count);
+	res = PARAM_SET_getValueCount(set, "logfile", NULL, PST_PRIORITY_NONE, &in_count);
+	if (res != PST_OK) goto cleanup;
+	res = PARAM_SET_getValueCount(set, "input", NULL, PST_PRIORITY_NONE, &in_count_all);
 	if (res != PST_OK) goto cleanup;
 
 	isMultipleLogFiles = PARAM_SET_isSetByName(set, "multiple_logs");
 	isLogFromStdin = PARAM_SET_isSetByName(set, "log-from-stdin");
+	isLogSigFromDir = PARAM_SET_isSetByName(set, "sig-dir");
 
 	if (isMultipleLogFiles) {
 		if (isLogFromStdin) {
 			ERR_TRCKR_ADD(err, res = KT_INVALID_CMD_PARAM, "Error: It is not possible to verify both log file from stdin (--log-from-stdin) and log file(s) specified after --!");
 		}
 	} else {
-		if (isLogFromStdin && in_count > 1) ERR_TRCKR_ADD(err, res = KT_INVALID_CMD_PARAM, "Error: Log file from stdin (--log-from-stdin) needs only ONE explicitly specified log signature file, but there are %i!", in_count);
-		else if (in_count > 2) {
+		if (isLogFromStdin && isLogSigFromDir && in_count > 0) {
+			ERR_TRCKR_ADD(err, res = KT_INVALID_CMD_PARAM, "Error: Log file from stdin (--log-from-stdin) and signature from directory (--sig-dir) needs no explicitly specified log signature file, but there are %i!", in_count);
+		} else  if (isLogFromStdin && in_count > 1) {
+			ERR_TRCKR_ADD(err, res = KT_INVALID_CMD_PARAM, "Error: Log file from stdin (--log-from-stdin) needs only ONE explicitly specified log signature file, but there are %i!", in_count);
+		} else  if (isLogSigFromDir && in_count > 1) {
+			ERR_TRCKR_ADD(err, res = KT_INVALID_CMD_PARAM, "Error: Signature from directory (--sig-dir) needs no explicitly specified log signature file, but there are %i!", in_count - 1);
+			 ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion:  To verify multiple log files see parameter --.\n");
+		} else if (in_count > 2) {
 			 ERR_TRCKR_ADD(err, res = KT_INVALID_CMD_PARAM, "Error: Only two inputs (log and log signature file) are required, but there are %i!", in_count);
 			 ERR_TRCKR_addAdditionalInfo(err, "  * Suggestion:  To verify multiple log files see parameter --.\n");
 		}
@@ -1103,23 +1119,15 @@ cleanup:
 
 static int getLogFiles(PARAM_SET *set, ERR_TRCKR *err, int i, IO_FILES *files) {
 	int res = KT_UNKNOWN_ERROR;
-	int log_from_stdin = 0;
-
 
 	if (set == NULL || err == NULL || i < 0) {
 		res = KT_INVALID_ARGUMENT;
 		goto cleanup;
 	}
 
+	files->user.bStdinLog = PARAM_SET_isSetByName(set, "log-from-stdin") ? 1 : 0;
 
-	log_from_stdin = PARAM_SET_isSetByName(set, "log-from-stdin") ? 1 : 0;
-
-	if (PARAM_SET_isSetByName(set, "multiple_logs")) {
-		res = PARAM_SET_getStr(set, "multiple_logs", NULL, PST_PRIORITY_NONE, i, &files->user.inLog);
-		if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
-
-		files->user.inSig = NULL;
-	} else if (PARAM_SET_isSetByName(set, "input")) {
+	if (PARAM_SET_isSetByName(set, "logfile")) {
 		int count = 0;
 
 		if (i > 0) {
@@ -1127,24 +1135,28 @@ static int getLogFiles(PARAM_SET *set, ERR_TRCKR *err, int i, IO_FILES *files) {
 			goto cleanup;
 		}
 
-		res = PARAM_SET_getValueCount(set, "input", NULL, PST_PRIORITY_NONE, &count);
+		res = PARAM_SET_getValueCount(set, "logfile", NULL, PST_PRIORITY_NONE, &count);
 		if (res != KT_OK) goto cleanup;
 
-		if (!log_from_stdin) {
-			res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, 0, &files->user.inLog);
+		if (!files->user.bStdinLog) {
+			res = PARAM_SET_getStr(set, "logfile", NULL, PST_PRIORITY_NONE, 0, &files->user.inLog);
 			if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
 		}
 
-		if (count > (1 - log_from_stdin)) {
-			res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, (1 - log_from_stdin), &files->user.inSig);
+		if (count > (1 - files->user.bStdinLog)) {
+			res = PARAM_SET_getStr(set, "logfile", NULL, PST_PRIORITY_NONE, (1 - files->user.bStdinLog), &files->user.inSig);
 			if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
 		}
 
+	} else if (PARAM_SET_isSetByName(set, "input")) {
+		res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, i, &files->user.inLog);
+		if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
+
+		files->user.inSig = NULL;
 	} else {
 		res = PST_PARAMETER_EMPTY;
 		goto cleanup;
 	}
-
 
 
 	res = KT_OK;

@@ -59,6 +59,11 @@ struct MERKLE_TREE_st {
 	int (*newRecordChain)(MERKLE_TREE *tree, void *ctx, int isMetaRecordHash, KSI_DataHash *hash);
 
 	/**
+	 * Similar to extractRecordChain, but is called for every tree node calculated.
+	 */
+	int (*newTreeNode)(MERKLE_TREE *tree, void *ctx, unsigned char lvl, KSI_DataHash *hash);
+
+	/**
 	 * Is called within #MERKLE_TREE_addLeafHash and #MERKLE_TREE_calculateRootHash to
 	 * extract hash chain components. This function is called for higher level hash chain
 	 * components.
@@ -97,6 +102,7 @@ int MERKLE_TREE_new(MERKLE_TREE **tree) {
 	tmp->ctx = NULL;
 	tmp->extractRecordChain = NULL;
 	tmp->newRecordChain = NULL;
+	tmp->newTreeNode = NULL;
 	tmp->prevLeaf = NULL;
 	tmp->prevMask = NULL;
 	tmp->randomSeed = NULL;
@@ -133,12 +139,14 @@ int MERKLE_TREE_setHasher(MERKLE_TREE *tree, KSI_DataHasher *hsr) {
 int MERKLE_TREE_setCallbacks(MERKLE_TREE *tree,
 							void *ctx,
 							int (*extractRecordChain)(MERKLE_TREE*, void*, unsigned char, KSI_DataHash*),
-							int (*newRecordChain)(MERKLE_TREE*, void*, int, KSI_DataHash*)) {
-	if (tree == NULL || extractRecordChain == NULL || newRecordChain == NULL) return KT_INVALID_ARGUMENT;
+							int (*newRecordChain)(MERKLE_TREE*, void*, int, KSI_DataHash*),
+							int (*newTreeNode)(MERKLE_TREE*, void*, unsigned char, KSI_DataHash*)) {
+	if (tree == NULL || (extractRecordChain == NULL && newRecordChain == NULL && newTreeNode == NULL)) return KT_INVALID_ARGUMENT;
 
 	tree->ctx = ctx;
 	tree->extractRecordChain = extractRecordChain;
 	tree->newRecordChain = newRecordChain;
+	tree->newTreeNode = newTreeNode;
 
 	return KT_OK;
 }
@@ -293,11 +301,15 @@ int MERKLE_TREE_calculateRootHash(MERKLE_TREE *tree, KSI_DataHash **hash) {
 				res = MERKLE_TREE_calculateTreeHash(tree, tree->merkleTree[i], root, i + 2, &tmp);
 				if (res != KT_OK) goto cleanup;
 
+				if (tree->newTreeNode != NULL) {
+					res = tree->newTreeNode(tree, tree->ctx, i, tmp);
+					if (res != KT_OK) goto cleanup;
+				}
+
 				if (tree->extractRecordChain != NULL) {
 					res = tree->extractRecordChain(tree, tree->ctx, i, root);
 					if (res != KT_OK) goto cleanup;
 				}
-
 
 				KSI_DataHash_free(root);
 				root = tmp;
@@ -372,6 +384,11 @@ cleanup:
 		res = MERKLE_TREE_calculateTreeHash(tree, tree->merkleTree[i], right, i + 2, &tmp);
 		if (res != KT_OK) goto cleanup;
 
+		if (tree->newTreeNode != NULL) {
+			res = tree->newTreeNode(tree, tree->ctx, i, right);
+			if (res != KT_OK) goto cleanup;
+		}
+
 		if (tree->extractRecordChain != NULL) {
 			res = tree->extractRecordChain(tree, tree->ctx, i, right);
 			if (res != KT_OK) goto cleanup;
@@ -386,6 +403,11 @@ cleanup:
 		KSI_DataHash_free(tree->merkleTree[i]);
 		tree->merkleTree[i] = NULL;
 		i++;
+	}
+
+	if (tree->newTreeNode != NULL) {
+		res = tree->newTreeNode(tree, tree->ctx, i == 0 ? 0 : i + 2, right);
+		if (res != KT_OK) goto cleanup;
 	}
 
 	tree->merkleTree[i] = right;

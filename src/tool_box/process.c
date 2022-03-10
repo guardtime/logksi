@@ -782,6 +782,7 @@ int finalize_block(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *lo
 		int isSignTask = 0;
 		int isExtractTask = 0;
 		int isExtendTask = 0;
+		int isCreateTask = 0;
 		int shortIndentation = SIZE_OF_SHORT_INDENTENTION;
 		int longIndentation = SIZE_OF_LONG_INDENTATION;
 
@@ -791,6 +792,7 @@ int finalize_block(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *lo
 		isSignTask = logksi->taskId == TASK_SIGN;
 		isExtractTask = logksi->taskId == TASK_EXTRACT;
 		isExtendTask = logksi->taskId == TASK_EXTEND;
+		isCreateTask = logksi->taskId == TASK_CREATE;
 
 		if (logksi->file.version != RECSIG11 && logksi->file.version != RECSIG12 &&
 			((isSignTask && logksi->task.sign.curBlockJustReSigned) || (isExtractTask && EXTRACT_INFO_getPositionsInBlock(logksi->task.extract.info)) || (!isSignTask && !isExtractTask))) {
@@ -803,7 +805,7 @@ int finalize_block(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *lo
 
 			if (!isSignTask && !isExtractTask && !isExtendTask) {
 				print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", shortIndentation, "Input hash:", inHash);
-				if (logksi->block.signatureTLVReached) {
+				if (logksi->block.signatureTLVReached || isCreateTask) {
 					print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", shortIndentation, "Output hash:", outHash);
 				} else {
 					print_debug_mp(mp, MP_ID_BLOCK_SUMMARY, DEBUG_EQUAL | DEBUG_LEVEL_2, " * %-*s%s\n", shortIndentation, "Output hash:", "<not valid value>");
@@ -832,7 +834,7 @@ int finalize_block(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *lo
 	}
 
 	/* Print Output hash of previous block. */
-	if (prevLeaf != NULL && logksi->taskId == TASK_VERIFY && logksi->block.signatureTLVReached) {
+	if (prevLeaf != NULL && ((logksi->taskId == TASK_VERIFY && logksi->block.signatureTLVReached) || logksi->taskId == TASK_CREATE)) {
 		char buf[256];
 		LOGKSI_DataHash_toString(prevLeaf, buf, sizeof(buf));
 		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, "Block no. %3zu: output hash: %s.\n", logksi->blockNo, buf);
@@ -974,7 +976,7 @@ cleanup:
 	LOGKSI_DataHash_toString(inputHash, inHash, sizeof(inHash));
 	LOGKSI_DataHash_toString(prevLeaf, outHash, sizeof(outHash));
 
-	if (logksi->file.version != RECSIG11 && logksi->file.version != RECSIG12 && (logksi->taskId == TASK_VERIFY || logksi->taskId == TASK_INTEGRATE)) {
+	if (logksi->file.version != RECSIG11 && logksi->file.version != RECSIG12 && (logksi->taskId == TASK_VERIFY || logksi->taskId == TASK_INTEGRATE|| logksi->taskId == TASK_CREATE)) {
 		print_debug_mp(mp, MP_ID_LOGFILE_SUMMARY, DEBUG_SMALLER | DEBUG_LEVEL_3, " * %-*s%s\n", shortIndentation, "Input hash:", inHash);
 		print_debug_mp(mp, MP_ID_LOGFILE_SUMMARY, DEBUG_SMALLER | DEBUG_LEVEL_3, " * %-*s%s\n", shortIndentation, "Output hash:", outHash);
 	}
@@ -2086,40 +2088,10 @@ cleanup:
 	return res;
 }
 
-static int block_info_store_logline(LOGKSI *logksi, char *buf) {
-	int res;
-	char *tmp = NULL;
-
-	if (logksi == NULL || buf == NULL) {
-		res = KT_INVALID_ARGUMENT;
-		goto cleanup;
-	}
-
-	tmp = (char*)malloc(strlen(buf) + 1);
-	if (tmp == NULL) {
-		res = KT_OUT_OF_MEMORY;
-		goto cleanup;
-	}
-
-	strncpy(tmp, buf, strlen(buf) + 1);
-	free(logksi->logLine);
-	logksi->logLine = tmp;
-	tmp = NULL;
-
-	res = KT_OK;
-
-cleanup:
-
-	free(tmp);
-	return res;
-}
-
-static int logksi_calculate_hash_of_logline_and_store_logline(LOGKSI *logksi, IO_FILES *files, KSI_DataHash **hash) {
+int logksi_calculate_hash_of_logline_and_store_logline(LOGKSI *logksi, IO_FILES *files, KSI_DataHash **hash) {
 	int res;
 	KSI_DataHash *tmp = NULL;
 	KSI_DataHasher *pHasher = NULL;
-	/* Maximum line size is 64K characters, without newline character. */
-	char buf[0x10000 + 2] = "";
 
 	if (files == NULL || hash == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -2130,7 +2102,7 @@ static int logksi_calculate_hash_of_logline_and_store_logline(LOGKSI *logksi, IO
 	if (res != KSI_OK) goto cleanup;
 
 	if (files->files.inLog) {
-		res = SMART_FILE_gets(files->files.inLog, buf, sizeof(buf), NULL);
+		res = LOGKSI_readLine(logksi, files->files.inLog);
 		if (res != SMART_FILE_OK) goto cleanup;
 
 		if (SMART_FILE_isEof(files->files.inLog)) {
@@ -2138,19 +2110,13 @@ static int logksi_calculate_hash_of_logline_and_store_logline(LOGKSI *logksi, IO
 			goto cleanup;
 		}
 
+		/* Nnewline is not used in hash calculation! */
 		res = KSI_DataHasher_reset(pHasher);
 		if (res != KSI_OK) goto cleanup;
-
-		/* Last character (newline) is not used in hash calculation. */
-		res = KSI_DataHasher_add(pHasher, buf, strlen(buf) - 1);
+		res = KSI_DataHasher_add(pHasher, logksi->logLine, logksi->logLine_len - 1);
 		if (res != KSI_OK) goto cleanup;
-
 		res = KSI_DataHasher_close(pHasher, &tmp);
 		if (res != KSI_OK) goto cleanup;
-
-		/* Store logline for extraction. */
-		res = block_info_store_logline(logksi, buf);
-		if (res != KT_OK) goto cleanup;
 	}
 
 	*hash = tmp;
