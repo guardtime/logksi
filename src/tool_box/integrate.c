@@ -532,12 +532,15 @@ static int recover_procedure(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, 
 			size_t count = 0;
 			char buf[0x10000 + 2];
 
-			res = SMART_FILE_gets(originalLogFile, buf, sizeof(buf), &count);
+			res = SMART_FILE_readLine(originalLogFile, buf, sizeof(buf) - 2, &count);
 			if (res != SMART_FILE_OK) {
 				ERR_TRCKR_ADD(err, resIn, "Error: Unable read logline nr %3zu!", i);
 				goto cleanup;
 			}
-			res = SMART_FILE_write(files->files.outLog, (unsigned char*)buf, count, NULL);
+			buf[count] = '\n';
+			buf[count + 1] = '\0';
+
+			res = SMART_FILE_write(files->files.outLog, (unsigned char*)buf, count + 1, NULL);
 			if (res != SMART_FILE_OK) {
 				ERR_TRCKR_ADD(err, resIn, "Error: Unable write logline nr %3zu into recovered log file!", i);
 				goto cleanup;

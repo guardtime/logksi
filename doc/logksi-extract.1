@@ -34,10 +34,10 @@ Read the log signature file from \fIstdin\fR. If \fB--sig-from-stdin\fR is speci
 Names of output files will be derived from \fI<outfile>\fR by adding the appropriate suffixes. Name of the log records file will be \fI<outfile>.excerpt\fR. Name of the integrity proof file will be \fI<outfile>.excerpt.logsig\fR. If \fI<outfile>\fR is not specified, names of output files will be derived from \fI<logfile>\fR by adding the same suffixes. If \fB--log-from-stdin\fR is specified, \fI<outfile>\fR must also be specified.
 .TP
 \fB--out-log \fI<log.records>\fR
-Specify the name of the log records file. The log records file can be redirected to \fIstdout\fR by using '-' as the file name. If the log records file name is not specified with \fB--out-log\fR, its name will be derived from either \fI<outfile>\fR or \fI<logfile>\fR by adding the \fI.excerpt\fR suffix.
+Specify the name of the log records file. The log records file can be redirected to \fIstdout\fR by using '\fB-\fR' as the file name. If the log records file name is not specified with \fB--out-log\fR, its name will be derived from either \fI<outfile>\fR or \fI<logfile>\fR by adding the \fI.excerpt\fR suffix.
 .TP
 \fB--out-proof \fI<integrity.proof>\fR
-Specify the name of the integrity proof file. The integrity proof file can be redirected to \fIstdout\fR (unless the log records file is also redirected to \fIstdout\fR) by using '-' as the file name. If the integrity proof file name is not specified with \fB--out-proof\fR, its name will be derived from either \fI<outfile>\fR or \fI<logfile>\fR by adding the \fI.excerpt.logsig\fR suffix.
+Specify the name of the integrity proof file. The integrity proof file can be redirected to \fIstdout\fR (unless the log records file is also redirected to \fIstdout\fR) by using '\fB-\fR' as the file name. If the integrity proof file name is not specified with \fB--out-proof\fR, its name will be derived from either \fI<outfile>\fR or \fI<logfile>\fR by adding the \fI.excerpt.logsig\fR suffix.
 .TP
 \fB-r \fIrecords\fR
 Specify the position(s) of record(s) to be extracted. Position of the first record is 1 and all positions must be defined in a strictly ascending order, using positive decimal numbers. Positions to be extracted can be defined either:
@@ -52,7 +52,7 @@ Mixed: 1-4,8,9,10
 .\"
 .TP
 \fB--ksig\fR
-Extracts pure KSI signatures and corresponding log lines into separate files instead of single integrity proof file and single log records file. It enables possibility to verify log lines with basic KSI service and tools. File names can be derived from \fI<logfile>\fR, \fB-o\fR, \fB--out-log\fR and \fB--out-proof\fR by adding \fI.line.<nr>\fR and \fI.line.<nr>.ksig\fR suffix to log line file and KSI signature file respectively. If only one record is extracted, output of \fB--out-log\fR and \fB--out-proof\fR can be redirected to stdout by using '-' as the file name. As this feature may produce lots of different files, where direct output file name is derived from the user input, overwriting of existing file is restricted to avoid accidental corruption of data. It is not possible to extract pure KSI signature from RFC3161 timestamps (or from its converted form) as its aggregation hash chain level starts from 0. Because of that it is not possible to append any locally aggregated hash chains.
+Extracts pure KSI signatures and corresponding log lines into separate files instead of single integrity proof file and single log records file. It enables possibility to verify log lines with basic KSI service and tools. File names can be derived from \fI<logfile>\fR, \fB-o\fR, \fB--out-log\fR and \fB--out-proof\fR by adding \fI.line.<nr>\fR and \fI.line.<nr>.ksig\fR suffix to log line file and KSI signature file respectively. If only one record is extracted, output of \fB--out-log\fR and \fB--out-proof\fR can be redirected to stdout by using '\fB-\fR' as the file name. As this feature may produce lots of different files, where direct output file name is derived from the user input, overwriting of existing file is restricted to avoid accidental corruption of data. It is not possible to extract pure KSI signature from RFC3161 timestamps (or from its converted form) as its aggregation hash chain level starts from 0. Because of that it is not possible to append any locally aggregated hash chains.
 .\"
 .TP
 \fB-d\fR
@@ -64,7 +64,7 @@ Will encode applicable hex encoded data fields to ASCII string (e.g. meta-record
 .\"
 .TP
 \fB--log \fIfile\fR
-Write \fIlibksi\fR log to the given file. Use '-' as file name to redirect the log to \fIstdout\fR.
+Write \fIlibksi\fR log to the given file. Use '\fB-\fR' as file name to redirect the log to \fIstdout\fR.
 .br
 .\"
 .SH EXIT STATUS
@@ -112,4 +112,4 @@ Guardtime AS, http://www.guardtime.com/
 .LP
 .\"
 .SH SEE ALSO
-\fBlogksi\fR(1), \fBlogksi-extend\fR(1), \fBlogksi-integrate\fR(1), \fBlogksi-sign\fR(1), \fBlogksi-verify\fR(1), \fBlogksi-conf\fR(5)
+\fBlogksi\fR(1), \fBlogksi-create\fR(1), \fBlogksi-extend\fR(1), \fBlogksi-integrate\fR(1), \fBlogksi-sign\fR(1), \fBlogksi-verify\fR(1), \fBlogksi-conf\fR(5)

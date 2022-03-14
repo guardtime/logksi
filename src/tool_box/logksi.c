@@ -63,6 +63,8 @@ void LOGKSI_initialize(LOGKSI *obj) {
 	obj->err = NULL;
 	obj->tree = NULL;
 	obj->logLine = NULL;
+	obj->logLine_capacity = 0;
+	obj->logLine_len = 0;
 
 	obj->logksiVerRes = LOGKSI_VER_RES_INVALID;
 
@@ -76,6 +78,60 @@ void LOGKSI_initialize(LOGKSI *obj) {
 	block_info_initialize(&obj->block);
 
 	return;
+}
+
+static int logksi_get_line_buffer(LOGKSI *logksi, int incr, char **buf, size_t *capacity) {
+	char *tmp = NULL;
+	size_t new_cap = 0;
+
+	if (logksi == NULL || buf == NULL || capacity == NULL) return KT_INVALID_ARGUMENT;
+
+	if (logksi->logLine_capacity == 0 || incr) {
+		if (logksi->logLine_capacity == LINE_BUFFER_LIMIT) return KT_INDEX_OVF;
+
+		new_cap = logksi->logLine_capacity == 0 ? (1024) : (logksi->logLine_capacity * 2);
+		if (new_cap > LINE_BUFFER_LIMIT) new_cap = LINE_BUFFER_LIMIT;
+		tmp = realloc(logksi->logLine, new_cap);
+		if (tmp == NULL) return KT_OUT_OF_MEMORY;
+
+		logksi->logLine_capacity = new_cap;
+		logksi->logLine = tmp;
+		tmp = NULL;
+	}
+
+	*buf = logksi->logLine;
+	*capacity = logksi->logLine_capacity;
+
+	return KT_OK;
+}
+
+int LOGKSI_readLine(LOGKSI *logksi, SMART_FILE *file) {
+	int res = KT_UNKNOWN_ERROR;
+	int i = 0;
+	char *buf = NULL;
+	size_t buf_cap;
+	size_t read_count = 0;
+
+	if (logksi == NULL || file == NULL) return KT_INVALID_ARGUMENT;
+
+	do {
+		size_t c = 0;
+
+		res = logksi_get_line_buffer(logksi, i > 0, &buf, &buf_cap);
+		if (res != KT_OK) return res;
+
+		res = SMART_FILE_readLine(file, buf + read_count, buf_cap - read_count - 2, &c);
+		if (res != SMART_FILE_OK && res != SMART_FILE_BUFFER_TOO_SMALL) return res;
+
+		read_count += c;
+		i++;
+	} while(res == SMART_FILE_BUFFER_TOO_SMALL);
+
+	buf[read_count] = '\n';
+	buf[read_count + 1] = '\0';
+	logksi->logLine_len = read_count + 1;
+
+	return KT_OK;
 }
 
 void LOGKSI_freeAndClearInternals(LOGKSI *logksi) {

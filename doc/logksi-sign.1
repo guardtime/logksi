@@ -27,7 +27,7 @@ Use to read the log signature file from \fIstdin\fR. If no output file is specif
 .\"
 .TP
 \fB-o \fI<out.logsig>\fR
-Specify the name of the output log signature file; recommended file extension is \fI.logsig\fR. If not specified, the input file \fI<logfile>.logsig\fR is modified. At first output is written into temporary file without affecting original file at all. If there are some changes the original file is renamed to backup file \fI<logfile>.logsig.bak\fR, otherwise temporary file is discarded. If the output file name is explicitly specified, output file is created even without any changes and an existing file will always be overwritten and no backup file will be created. Use '-' as file name to redirect the output as a binary stream to \fIstdout\fR.
+Specify the name of the output log signature file; recommended file extension is \fI.logsig\fR. If not specified, the input file \fI<logfile>.logsig\fR is modified. At first output is written into temporary file without affecting original file at all. If there are some changes the original file is renamed to backup file \fI<logfile>.logsig.bak\fR, otherwise temporary file is discarded. If the output file name is explicitly specified, output file is created even without any changes and an existing file will always be overwritten and no backup file will be created. Use '\fB-\fR' as file name to redirect the output as a binary stream to \fIstdout\fR.
 .\"
 .TP
 \fB-S \fIURL\fR
@@ -71,7 +71,7 @@ Read configuration options from the given file. It must be noted that configurat
 .\"
 .TP
 \fB--log \fIfile\fR
-Write libksi log to the given file. Use '-' as file name to redirect the log to \fIstdout\fR.
+Write libksi log to the given file. Use '\fB-\fR' as file name to redirect the log to \fIstdout\fR.
 .br
 .\"
 .SH EXIT STATUS
@@ -103,4 +103,4 @@ Use the environment variable \fBKSI_CONF\fR to define the default configuration 
 Guardtime AS, http://www.guardtime.com/
 .LP
 .SH SEE ALSO
-\fBlogksi\fR(1), \fBlogksi-extend\fR(1), \fBlogksi-extract\fR(1), \fBlogksi-integrate\fR(1), \fBlogksi-verify\fR(1), \fBlogksi-conf\fR(5)
+\fBlogksi\fR(1), \fBlogksi-create\fR(1), \fBlogksi-extend\fR(1), \fBlogksi-extract\fR(1), \fBlogksi-integrate\fR(1), \fBlogksi-verify\fR(1), \fBlogksi-conf\fR(5)

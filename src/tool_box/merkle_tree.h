@@ -47,7 +47,9 @@ int MERKLE_TREE_setHasher(MERKLE_TREE *tree, KSI_DataHasher *hsr);
 int MERKLE_TREE_setCallbacks(MERKLE_TREE *tree,
 							void *ctx,
 							int (*extractRecordChain)(MERKLE_TREE*, void*, unsigned char, KSI_DataHash*),
-							int (*newRecordChain)(MERKLE_TREE*, void*, int, KSI_DataHash*));
+							int (*newRecordChain)(MERKLE_TREE*, void*, int, KSI_DataHash*),
+							int (*newTreeNode)(MERKLE_TREE*, void*, unsigned char, KSI_DataHash*));
+
 int MERKLE_TREE_getSubTreeRoot(MERKLE_TREE *tree, unsigned char level, KSI_DataHash **hsh);
 int MERKLE_TREE_getPrevLeaf(MERKLE_TREE *tree, KSI_DataHash **hsh);
 int MERKLE_TREE_getPrevMask(MERKLE_TREE *tree, KSI_DataHash **hsh);

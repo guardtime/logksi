@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <ksi/compatibility.h>
 #include <ksi/ksi.h>
 #include <ksi/net.h>
@@ -33,6 +34,8 @@
 #include "debug_print.h"
 #include "conf_file.h"
 #include "logksi_err.h"
+#include "api_wrapper.h"
+#include "smart_file.h"
 
 static int isKSIUserInfoInsideUrl(const char *url, char *buf_u, char *buf_k, size_t buf_len);
 static int extract_user_info_from_url_if_needed(PARAM_SET *set, const char *flag_name, const char *usr_name, const char *key_name);
@@ -345,6 +348,142 @@ int TASK_INITIALIZER_getPrinter(PARAM_SET *set, MULTI_PRINTER **mp) {
 cleanup:
 
 	MULTI_PRINTER_free(tmp);
+
+	return res;
+}
+
+static int read_next_file(const char *row, const char *delimiter, char *fname_buf, size_t fname_buf_len, const char **next) {
+	int res = KT_UNKNOWN_ERROR;
+	size_t i = 0;
+	size_t n = 0;
+	int isEscape = 0;
+	int isQuote = 0;
+	int isQuoteX2 = 0;
+	int lastNotWhiteChar = 0;
+
+	for(i = 0; row[i] != '\0'; i++) {
+		char c = row[i];
+
+		if (!isEscape) {
+			if (c == '\\') {
+				isEscape = 1;
+				continue;
+			}
+			if (!isQuoteX2 && c == '\'') {
+				isQuote = isQuote ? 0 : 1;
+				continue;
+			}
+			if (!isQuote && c == '"') {
+				isQuoteX2 = isQuoteX2 ? 0 : 1;
+				continue;
+			}
+		}
+
+		/* Check if is delimiter! */
+		if ((delimiter != NULL) && !isEscape && !isQuote && !isQuoteX2) {
+			if (strchr(delimiter, c) != NULL) {
+				if (n > 0) {
+					break;
+				}
+				continue;
+			}
+		}
+
+		if (n >= fname_buf_len - 1) {
+			res = KT_INDEX_OVF;
+			goto cleanup;
+		}
+
+		if(!isEscape && n == 0 && isspace(c)) continue;
+
+		if (!isspace(c)) {
+			lastNotWhiteChar = n;
+		}
+
+		fname_buf[n] = c;
+		n++;
+		if (isEscape) isEscape = 0;
+
+	}
+
+	fname_buf[lastNotWhiteChar + 1] = '\0';
+	*next = (row[i] == '\0') ? NULL : row + (i + 1);
+	res = KT_OK;
+
+cleanup:
+	return res;
+}
+
+int extract_input_files_from_file(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err) {
+	int res = KT_UNKNOWN_ERROR;
+	SMART_FILE *logFileList = NULL;
+	char *delimiter = " \t";
+
+	if (set == NULL) return KT_INVALID_ARGUMENT;
+
+	res = PARAM_SET_getStr(set, "log-file-list-delimiter", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &delimiter);
+	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
+
+	if (delimiter != NULL) {
+		if (strcmp(delimiter, "new-line") == 0) delimiter = NULL;
+		else if (strcmp(delimiter, "space") == 0) delimiter = " \t";
+	}
+
+	if (PARAM_SET_isSetByName(set, "log-file-list")) {
+		char *fname = NULL;
+		res = PARAM_SET_getStr(set, "log-file-list", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &fname);
+		if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
+
+		res = SMART_FILE_open(fname, "rbs", &logFileList);
+		ERR_CATCH_MSG(err, res, "Error: Could not open input log file list '%s'!", fname);
+
+		if (strcmp(fname, "-") == 0) {
+			fname = "<stdin>";
+		}
+
+		while(1) {
+			char buf_file_name[0x1000] = "";
+			size_t rowLen = 0;
+			const char *next = NULL;
+
+
+			res = SMART_FILE_readLineSkipEmpty(logFileList, buf_file_name, sizeof(buf_file_name), NULL, &rowLen);
+			if (SMART_FILE_isEof(logFileList)) break;
+			ERR_CATCH_MSG(err, res, "Error: Could no read input file from input log file list '%s'!", fname);
+			next = buf_file_name;
+			while(next != NULL) {
+				char buf_file_name2[0x1000] = "";
+				res = read_next_file(next, delimiter, buf_file_name2, sizeof(buf_file_name2), &next);
+				ERR_CATCH_MSG(err, res, "Error: Could no read input file from input log file list '%s'!", fname);
+				if (buf_file_name2[0] == '\0') continue;
+
+				if (!SMART_FILE_doFileExist(buf_file_name2)) {
+					print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_LEVEL_0,
+						"Error: Log file (from --log-file-list %s) '%s' does not exist!\n", fname, buf_file_name2);
+					continue;
+				} else if (SMART_FILE_isFileType(buf_file_name2, SMART_FILE_TYPE_DIR)) {
+					print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_LEVEL_0,
+						"Error: Log file (from --log-file-list %s) '%s' can not be a directory!\n", fname, buf_file_name2);
+					continue;
+				}
+
+				res = PARAM_SET_add(set, "input" , buf_file_name2, NULL, PRIORITY_CMD);
+				ERR_CATCH_MSG(err, res, "Error: Could no include input log file '%s' to list!", buf_file_name2);
+			}
+		}
+
+		if (MULTI_PRINTER_hasDataByID(mp, MP_ID_BLOCK_ERRORS)) {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: Unable to include input log files from log file list %s!", fname);
+		}
+
+	}
+
+	res = KT_OK;
+
+cleanup:
+
+	SMART_FILE_close(logFileList);
 
 	return res;
 }

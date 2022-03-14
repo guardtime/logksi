@@ -41,6 +41,7 @@ typedef enum {
 	TASK_EXTRACT,
 	TASK_SIGN,
 	TASK_INTEGRATE,
+	TASK_CREATE,
 } LOGKSI_TASK_ID;
 
 
@@ -136,7 +137,11 @@ typedef struct {
 	size_t blockNo;					/* Index of current block (incremented if block header or KSI signature in excerpt file is processed). */
 	size_t sigNo;					/* Index of block-signatures + ksi signatures + partial signatures. */
 	size_t currentLine;				/* Current line number in current block. */
+
 	char *logLine;
+	size_t logLine_capacity;
+	size_t logLine_len;
+
 	char isContinuedOnFail;			/* Option --continue-on-failure is set. */
 	int quietError;					/* In case of failure and --continue-on-fail, this option will keep the error code and block is not skipped. */
 	uint64_t sigTime_0;

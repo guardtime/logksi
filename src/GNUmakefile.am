@@ -21,6 +21,7 @@ man_MANS = \
 	../doc/logksi.1 \
 	../doc/logksi-conf.5 \
 	../doc/logksi-sign.1 \
+	../doc/logksi-create.1 \
 	../doc/logksi-extend.1 \
 	../doc/logksi-integrate.1 \
 	../doc/logksi-extract.1 \
@@ -60,6 +61,7 @@ logksi_SOURCES = \
 	tool_box.c \
 	tool_box.h \
 	tool_box/sign.c \
+	tool_box/create.c \
 	tool_box/verify.c \
 	tool_box/extend.c \
 	tool_box/conf.c \
