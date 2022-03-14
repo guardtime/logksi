@@ -120,7 +120,7 @@ int LOGKSI_readLine(LOGKSI *logksi, SMART_FILE *file) {
 		res = logksi_get_line_buffer(logksi, i > 0, &buf, &buf_cap);
 		if (res != KT_OK) return res;
 
-		res = SMART_FILE_readEveryLine(file, buf + read_count, buf_cap - read_count - 2, &c);
+		res = SMART_FILE_readLine(file, buf + read_count, buf_cap - read_count - 2, &c);
 		if (res != SMART_FILE_OK && res != SMART_FILE_BUFFER_TOO_SMALL) return res;
 
 		read_count += c;

@@ -131,9 +131,35 @@ int SMART_FILE_open(const char *fname, const char *mode, SMART_FILE **file);
 int SMART_FILE_close(SMART_FILE *file);
 int SMART_FILE_write(SMART_FILE *file, unsigned char *raw, size_t raw_len, size_t *count);
 int SMART_FILE_read(SMART_FILE *file, unsigned char *raw, size_t raw_len, size_t *count);
-// This one skips empty lines.
-int SMART_FILE_readLine(SMART_FILE *file, char *raw, size_t raw_len, size_t *row_pointer, size_t *count);
-int SMART_FILE_readEveryLine(SMART_FILE *file, char *raw, size_t raw_len, size_t *count);
+
+/**
+ * This function is used to read not empty lines from a file. The newline character
+ * (linux/mac/win) is dropped. The \c row_pointer is incremented with the count
+ * of lines processed (note that empty lines are skipped). When buffer is too small
+ * (SMART_FILE_BUFFER_TOO_SMALL) it is still filled with valid data and next read
+ * operation will continue reading the line.
+ * \param file			SMART_FILE object.
+ * \param raw			Buffer to store the line.
+ * \param raw_len		Size of the buffer.
+ * \param row_pointer	A pointer to increment the line number. Must start with 0.
+ * \param count			Return pointer of he size of the output string.
+ * \return SMART_FILE_OK if successful, error code otherwise. When buffer is too small
+ * SMART_FILE_BUFFER_TOO_SMALL is returned.
+ */
+int SMART_FILE_readLineSkipEmpty(SMART_FILE *file, char *raw, size_t raw_len, size_t *row_pointer, size_t *count);
+
+/**
+ * This function is used to read lines. The newline character (linux/mac/win)
+ * is dropped. When buffer is too small (SMART_FILE_BUFFER_TOO_SMALL) it is still
+ * filled with valid data and next read operation will continue reading the line.
+ * \param file			SMART_FILE object.
+ * \param raw			Buffer to store the line.
+ * \param raw_len		Size of the buffer.
+ * \param count			Return pointer of he size of the output string.
+ * \return SMART_FILE_OK if successful, error code otherwise. When buffer is too small
+ * SMART_FILE_BUFFER_TOO_SMALL is returned.
+ */
+int SMART_FILE_readLine(SMART_FILE *file, char *raw, size_t raw_len, size_t *count);
 int SMART_FILE_gets(SMART_FILE *file, char *raw, size_t raw_len, size_t *count);
 int SMART_FILE_rewind(SMART_FILE *file);
 int SMART_FILE_lock(SMART_FILE *file, int lock);

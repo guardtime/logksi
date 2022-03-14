@@ -2088,7 +2088,7 @@ cleanup:
 	return res;
 }
 
-int logksi_calculate_hash_of_logline_and_store_logline(LOGKSI *logksi, IO_FILES *files, KSI_DataHash **hash) {
+int logksi_logline_calculate_hash_and_store(LOGKSI *logksi, IO_FILES *files, KSI_DataHash **hash) {
 	int res;
 	KSI_DataHash *tmp = NULL;
 	KSI_DataHasher *pHasher = NULL;
@@ -2110,9 +2110,9 @@ int logksi_calculate_hash_of_logline_and_store_logline(LOGKSI *logksi, IO_FILES 
 			goto cleanup;
 		}
 
-		/* Nnewline is not used in hash calculation! */
 		res = KSI_DataHasher_reset(pHasher);
 		if (res != KSI_OK) goto cleanup;
+		/* Last character (newline) is not used in hash calculation. */
 		res = KSI_DataHasher_add(pHasher, logksi->logLine, logksi->logLine_len - 1);
 		if (res != KSI_OK) goto cleanup;
 		res = KSI_DataHasher_close(pHasher, &tmp);
@@ -2137,7 +2137,7 @@ static int block_info_calculate_hash_of_logline_and_store_logline_check_log_time
 		goto cleanup;
 	}
 
-	res = logksi_calculate_hash_of_logline_and_store_logline(logksi, files, hash);
+	res = logksi_logline_calculate_hash_and_store(logksi, files, hash);
 	ERR_CATCH_MSG(err, res, "Error: Block no. %zu: unable to calculate hash of logline no. %zu.", logksi->blockNo, LOGKSI_getNofLines(logksi));
 
 	res = check_log_line_embedded_time(set, mp, err, logksi);

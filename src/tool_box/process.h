@@ -53,7 +53,7 @@ int process_ksi_signature(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOG
 int process_log_signature(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi, IO_FILES *files, KSI_CTX *ksi);
 int process_log_signature_with_block_signature(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi, IO_FILES *files, KSI_CTX *ksi, SIGNATURE_PROCESSORS *processors, KSI_PublicationsFile *pubFile);
 
-int logksi_calculate_hash_of_logline_and_store_logline(LOGKSI *logksi, IO_FILES *files, KSI_DataHash **hash);
+int logksi_logline_calculate_hash_and_store(LOGKSI *logksi, IO_FILES *files, KSI_DataHash **hash);
 int finalize_block(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi, IO_FILES *files, KSI_CTX *ksi);
 int finalize_log_signature(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI *logksi, IO_FILES *files, KSI_CTX *ksi, KSI_DataHash *inputHash);
 

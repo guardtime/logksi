@@ -32,7 +32,7 @@
 int merge_path(const char *path[], size_t path_count, const char *fname[], size_t fname_count, char **path_out) {
 	size_t i = 0;
 	size_t c = 0;
-	size_t total_size = 0;	// Terminating NUL char.
+	size_t total_size = 0;
 	char *buf = NULL;
 	int firstValue = -1;
 
@@ -42,7 +42,7 @@ int merge_path(const char *path[], size_t path_count, const char *fname[], size_
 		size_t len = 0;
 
 		if (path[i] != NULL) {
-			len = strlen(path[i]) + 1;
+			len = strlen(path[i]) + 1; // Space for potential slash.
 		}
 
 		total_size += len;
@@ -54,7 +54,7 @@ int merge_path(const char *path[], size_t path_count, const char *fname[], size_
 
 	if (total_size == 0) return KT_INVALID_INPUT_FORMAT;
 
-	total_size += 1;
+	total_size += 1; // Space for terminating NUL char.
 	buf = malloc(total_size);
 	if (buf == NULL) return KT_OUT_OF_MEMORY;
 

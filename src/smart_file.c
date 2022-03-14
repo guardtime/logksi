@@ -363,7 +363,7 @@ cleanup:
 	return res;
 }
 
-static int smart_file_read_line_general(void *file, char *buf, size_t len, size_t *row_pointer, size_t *count, size_t *raw_count_out, int skipEmpty) {
+static int smart_file_read_line_common(void *file, char *buf, size_t len, size_t *row_pointer, size_t *count, size_t *raw_count_out, int skipEmpty) {
 	int res = SMART_FILE_UNKNOWN_ERROR;
 	int c;
 	FILE *fp = file;
@@ -435,11 +435,11 @@ cleanup:
 }
 
 static int smart_file_read_line(void *file, char *buf, size_t len, size_t *row_pointer, size_t *count, size_t *raw_count) {
-	return smart_file_read_line_general(file, buf, len, row_pointer, count, raw_count ,1);
+	return smart_file_read_line_common(file, buf, len, row_pointer, count, raw_count ,1);
 }
 
 static int smart_file_read_line_every(void *file, char *buf, size_t len, size_t *row_pointer, size_t *count,  size_t *raw_count) {
-	return smart_file_read_line_general(file, buf, len, row_pointer, count, raw_count, 0);
+	return smart_file_read_line_common(file, buf, len, row_pointer, count, raw_count, 0);
 }
 
 static int smart_file_write(void *file, unsigned  char *raw, size_t raw_len, size_t *count) {
@@ -1103,11 +1103,11 @@ cleanup:
 	return res;
 }
 
-int SMART_FILE_readLine(SMART_FILE *file, char *raw, size_t raw_len, size_t *row_pointer, size_t *count) {
+int SMART_FILE_readLineSkipEmpty(SMART_FILE *file, char *raw, size_t raw_len, size_t *row_pointer, size_t *count) {
 	return smart_file_read_line_skip_empty_or_not(file, raw, raw_len, row_pointer, count, 1);
 }
 
-int SMART_FILE_readEveryLine(SMART_FILE *file, char *raw, size_t raw_len, size_t *count) {
+int SMART_FILE_readLine(SMART_FILE *file, char *raw, size_t raw_len, size_t *count) {
 	return smart_file_read_line_skip_empty_or_not(file, raw, raw_len, NULL, count, 0);
 }
 

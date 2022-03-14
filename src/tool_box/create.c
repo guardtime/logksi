@@ -54,9 +54,9 @@ static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files);
 static void close_input_and_output_files(ERR_TRCKR *err, int res, IO_FILES *files);
 static int getLogFiles(PARAM_SET *set, ERR_TRCKR *err, int i, IO_FILES *files);
 static int check_io_naming_and_type_errors(PARAM_SET *set, ERR_TRCKR *err);
-static int check_if_output_files_will_no_be_overwritten_if_restricted(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err);
+static int check_if_output_files_will_not_be_overwritten_if_restricted(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err);
 
-#define PARAMS "{log-file-list}{log-file-list-delimiter}{sig-dir}{logfile}{input}{multiple_logs}{o}{input-hash}{output-hash}{force-overwrite}{blk-size}{keep-record-hashes}{seed}{seed-len}{keep-tree-hashes}{d}{show-progress}{log}{conf}{h|help}{log-from-stdin}"
+#define PARAMS "{log-file-list}{log-file-list-delimiter}{sig-dir}{logfile}{input}{multiple_logs}{o}{input-hash}{output-hash}{force-overwrite}{blk-size}{keep-record-hashes}{seed}{seed-len}{keep-tree-hashes}{d}{log}{conf}{h|help}{log-from-stdin}"
 
 int create_run(int argc, char** argv, char **envp) {
 	int res;
@@ -70,7 +70,6 @@ int create_run(int argc, char** argv, char **envp) {
 	int d = 0;
 	IO_FILES files;
 	MULTI_PRINTER *mp = NULL;
-	int noProgress = 1;
 	IO_FILES_init(&files);
 	LOGKSI logksi;
 	COMPOSITE extra;
@@ -116,10 +115,6 @@ int create_run(int argc, char** argv, char **envp) {
 	res = extract_input_files_from_file(set, mp, err);
 	if (res != PST_OK) goto cleanup;
 
-	if (d > 1) PARAM_SET_clearParameter(set, "show-progress");
-
-	noProgress = !PARAM_SET_isSetByName(set, "show-progress");
-
 
 	extra.ctx = ksi;
 	extra.err = err;
@@ -141,7 +136,7 @@ int create_run(int argc, char** argv, char **envp) {
 		ERR_CATCH_MSG(err, res, "Unable to create zero hash for input hash!");
 	}
 
-	res = check_if_output_files_will_no_be_overwritten_if_restricted(set, mp, err);
+	res = check_if_output_files_will_not_be_overwritten_if_restricted(set, mp, err);
 	if (res != KT_OK) goto cleanup;
 
 	do {
@@ -173,9 +168,9 @@ int create_run(int argc, char** argv, char **envp) {
 			isSigStream ? "<stdout>" : files.internal.outSig,
 			isSigStream ? "" : "'");
 
-		if (noProgress) print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_EQUAL | DEBUG_LEVEL_1, "Creating... ");
+		print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_EQUAL | DEBUG_LEVEL_1, "Creating... ");
 		res = logsignature_create(set, mp, err, ksi, &logksi, &files, aggrAlgo, inputHash, &outputHash);
-		if (noProgress) print_progressResult(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_1, res);
+		print_progressResult(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_1, res);
 		if (res != KT_OK) goto cleanup;
 
 		MULTI_PRINTER_printByID(mp, MP_ID_BLOCK);
@@ -327,7 +322,7 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 
 	res |= PARAM_SET_addControl(set, "{conf}", isFormatOk_inputFile, isContentOk_inputFileRestrictPipe, convertRepair_path, NULL);
 	res |= PARAM_SET_addControl(set, "{o}{log}{output-hash}", isFormatOk_path, NULL, convertRepair_path, NULL);
-	res |= PARAM_SET_addControl(set, "{d}{show-progress}{keep-record-hashes}{keep-tree-hashes}{log-from-stdin}{force-overwrite}", isFormatOk_flag, NULL, NULL, NULL);
+	res |= PARAM_SET_addControl(set, "{d}{keep-record-hashes}{keep-tree-hashes}{log-from-stdin}{force-overwrite}", isFormatOk_flag, NULL, NULL, NULL);
 	res |= PARAM_SET_addControl(set, "{logfile}{multiple_logs}", isFormatOk_inputFile, isContentOk_inputFileNoDir, convertRepair_path, NULL);
 	res |= PARAM_SET_addControl(set, "{sig-dir}", isFormatOk_inputFile, isContentOk_dir, convertRepair_path, NULL);
 	res |= PARAM_SET_addControl(set, "{input-hash}", isFormatOk_inputHash, isContentOk_inputHash, convertRepair_path, extract_inputHashFromImprintOrImprintInFile);
@@ -353,7 +348,7 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 		PST_PRSCMD_CLOSE_PARSING | PST_PRSCMD_COLLECT_WHEN_PARSING_IS_CLOSED
 		);
 	res |= PARAM_SET_setParseOptions(set, "d,h", PST_PRSCMD_HAS_NO_VALUE | PST_PRSCMD_NO_TYPOS);
-	res |= PARAM_SET_setParseOptions(set, "show-progress,log-from-stdin,keep-record-hashes,keep-tree-hashes,force-overwrite", PST_PRSCMD_HAS_NO_VALUE);
+	res |= PARAM_SET_setParseOptions(set, "log-from-stdin,keep-record-hashes,keep-tree-hashes,force-overwrite", PST_PRSCMD_HAS_NO_VALUE);
 
 	res |= TASK_SET_add(task_set,
 	/* ID:           */ 0,
@@ -459,7 +454,7 @@ cleanup:
 }
 
 
-static int check_if_output_files_will_no_be_overwritten_if_restricted(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err) {
+static int check_if_output_files_will_not_be_overwritten_if_restricted(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err) {
 	int res = KT_UNKNOWN_ERROR;
 	char *sig_dir = NULL;
 	char *user_out_sig = NULL;

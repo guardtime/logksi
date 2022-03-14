@@ -447,7 +447,7 @@ int extract_input_files_from_file(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *
 			const char *next = NULL;
 
 
-			res = SMART_FILE_readLine(logFileList, buf_file_name, sizeof(buf_file_name), NULL, &rowLen);
+			res = SMART_FILE_readLineSkipEmpty(logFileList, buf_file_name, sizeof(buf_file_name), NULL, &rowLen);
 			if (SMART_FILE_isEof(logFileList)) break;
 			ERR_CATCH_MSG(err, res, "Error: Could no read input file from input log file list '%s'!", fname);
 			next = buf_file_name;

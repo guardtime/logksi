@@ -885,7 +885,7 @@ static int file_get_hash_from_imprint_stored_in_file(ERR_TRCKR *err, KSI_CTX *ct
 	while(!SMART_FILE_isEof(in)) {
 		char *trim = NULL;
 		buf[0] = '\0';
-		res = SMART_FILE_readLine(in, buf, sizeof(buf) - 1, &row, &read_count);
+		res = SMART_FILE_readLineSkipEmpty(in, buf, sizeof(buf) - 1, &row, &read_count);
 		ERR_CATCH_MSG(err, res, "Error: Unable get line.");
 
 		/* Remove leading whitespace. */
