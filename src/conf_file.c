@@ -64,7 +64,12 @@ char* CONF_generate_param_set_desc(char *description, const char *flags, char *b
 	}
 
 	if (is_P) {
-		/*count += */KSI_snprintf(buf + count, buf_len - count, "{P}{cnstr}{V}{W}{publications-file-no-verify}");
+		count += KSI_snprintf(buf + count, buf_len - count, "{P}{cnstr}{V}{W}{publications-file-no-verify}");
+	}
+
+	if (is_X || is_S) {
+		count += KSI_snprintf(buf + count, buf_len - count,
+				"{apply-remote-conf}");
 	}
 
 	return buf;
@@ -175,6 +180,16 @@ int CONF_initialize_set_functions(PARAM_SET *conf, const char *flags) {
 		PARAM_SET_setHelpText(conf, "ext-user", "<user>", "Username for extending service.");
 		PARAM_SET_setHelpText(conf, "ext-key", "<key>", "HMAC key for extending service.");
 		PARAM_SET_setHelpText(conf, "ext-hmac-alg", "<alg>", "Hash algorithm to be used for computing HMAC on outgoing messages towards KSI extender. If not set, default algorithm is used.");
+	}
+
+	if (is_X || is_S) {
+		res = PARAM_SET_addControl(conf, "{apply-remote-conf}", isFormatOk_flag, NULL, NULL, NULL);
+		if (res != PST_OK) goto cleanup;
+
+		res = PARAM_SET_setParseOptions(conf, "apply-remote-conf", PST_PRSCMD_HAS_NO_VALUE);
+		if (res != PST_OK) goto cleanup;
+
+		PARAM_SET_setHelpText(conf, "apply-remote-conf", NULL, "Obtain and apply additional configuration data from service server.");
 	}
 
 	res = PARAM_SET_addControl(conf, "{c}{C}", isFormatOk_int, isContentOk_uint, NULL, extract_int);

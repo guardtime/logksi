@@ -344,3 +344,44 @@ void OBJPRINT_signatureVerificationResultDump(KSI_PolicyVerificationResult *resu
 	return;
 }
 
+void OBJPRINT_aggregatorConfDump(KSI_Config *config, int (*print)(const char *format, ... )) {
+	int res;
+	KSI_Integer *max_level = NULL;
+	KSI_Integer *aggr_algo = NULL;
+	KSI_Integer *aggr_period = NULL;
+	KSI_Integer *max_req = NULL;
+	KSI_Utf8StringList *parent_uri = NULL;
+	size_t i;
+
+	print("Aggregator configuration:\n");
+
+	res = KSI_Config_getAggrAlgo(config, &aggr_algo);
+	if (res != KSI_OK) return;
+	if (aggr_algo) print("  Hash algorithm: %s\n", KSI_getHashAlgorithmName((KSI_HashAlgorithm)KSI_Integer_getUInt64(aggr_algo)));
+
+	res = KSI_Config_getMaxLevel(config, &max_level);
+	if (res != KSI_OK) return;
+	if (max_level) print("  Maximum level: %llu\n", KSI_Integer_getUInt64(max_level));
+
+	res = KSI_Config_getAggrPeriod(config, &aggr_period);
+	if (res != KSI_OK) return;
+	if (aggr_period) print("  Aggregation period: %llu\n", KSI_Integer_getUInt64(aggr_period));
+
+	res = KSI_Config_getMaxRequests(config, &max_req);
+	if (res != KSI_OK) return;
+	if (max_req) print("  Maximum requests: %llu\n", KSI_Integer_getUInt64(max_req));
+
+	res = KSI_Config_getParentUri(config, &parent_uri);
+	if (res != KSI_OK) return;
+	if (parent_uri) {
+		print("  Parent URI:\n");
+		for (i = 0; i < KSI_Utf8StringList_length(parent_uri); i++) {
+			KSI_Utf8String *uri = NULL;
+
+			res = KSI_Utf8StringList_elementAt(parent_uri, i, &uri);
+			if (res != KSI_OK) return;
+			print("    %s\n", KSI_Utf8String_cstr(uri));
+		}
+	}
+	print("\n");
+}

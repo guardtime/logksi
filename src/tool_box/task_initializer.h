@@ -44,6 +44,9 @@ enum service_info_priorities {
 	/* Priority of KSI configuration file given with --conf option. */
 	PRIORITY_KSI_CONF_FILE,
 
+	/* Priority for values read from servers conf. */
+	PRIORITY_KSI_CONF_REMOTE,
+
 	/* Priority of values defined on command-line. */
 	PRIORITY_CMD,
 };
@@ -70,7 +73,7 @@ int TASK_INITIALIZER_getServiceInfo(PARAM_SET *set, int argc, char **argv, char 
 int TASK_INITIALIZER_getPrinter(PARAM_SET *set, MULTI_PRINTER **mp);
 
 int extract_input_files_from_file(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err);
-
+int apply_aggregator_conf(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi);
 #ifdef	__cplusplus
 }
 #endif

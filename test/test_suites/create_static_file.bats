@@ -26,6 +26,16 @@ f_summary_of_logfile_short () {
 	 echo "(Summary of logfile:).( . Count of blocks:             $1).( . Count of record hashes:      $2).( . Count of meta-records:       $3).( . Input hash:  $4).( . Output hash: $5)"
 }
 
+@test "create --dump-conf" {
+	run ./src/logksi create --dump-conf -S file://test/resource/server/ok_aggr_conf.tlv
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ (Aggregator configuration:) ]]
+	[[ "$output" =~ (Hash algorithm).*(SHA-256) ]]
+	[[ "$output" =~ (Maximum level).*(17) ]]
+	[[ "$output" =~ (Aggregation period).*(400) ]]
+	[[ "$output" =~ (Maximum requests).*(4096) ]]
+}
+
 @test "create new logsig: from totally empty file" {
 	run ./src/logksi create test/out/empty-log-files/empty-totally --seed test/resource/random/seed_aa --blk-size 5 --keep-record-hashes -ddd
 	[ "$status" -eq 0 ]

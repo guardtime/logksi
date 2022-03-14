@@ -114,6 +114,44 @@ mkdir -p test/out/dummy_dir
 	[[ "$output" =~ (It is not possible to use blk-size).*(4294967295).*(as tree level).*(31).*(results tree with).*(2147483648).*(leafs) ]]
 }
 
+@test "create CMD test: try to use blk-size larger than provided by --apply-remote-conf" {
+	run src/logksi create test/out/dummy_cmd --blk-size 4294967295 --seed test/resource/random/seed_aa -S file://test/resource/server/ok_aggr_conf.tlv --apply-remote-conf
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ (It is not possible to use blk-size).*(4294967295).*(as tree level).*(17).*(results tree with).*(131072).*(leafs) ]]
+}
+
+@test "create CMD test: override --apply-remote-conf with --max-lvl" {
+	run src/logksi create test/out/dummy_cmd --blk-size 4294967295 --seed test/resource/random/seed_aa -S file://test/resource/server/ok_aggr_conf.tlv --max-lvl 8 --apply-remote-conf
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ (It is not possible to use blk-size).*(4294967295).*(as tree level).*(8).*(results tree with).*(256).*(leafs) ]]
+
+run src/logksi create test/out/dummy_cmd --blk-size 4294967295 --seed test/resource/random/seed_aa -S file://test/resource/server/ok_aggr_conf.tlv --apply-remote-conf --max-lvl 8
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ (It is not possible to use blk-size).*(4294967295).*(as tree level).*(8).*(results tree with).*(256).*(leafs) ]]
+}
+
+@test "create CMD test: override --max-lvl from conf file with --apply-remote-conf" {
+	run src/logksi create test/out/dummy_cmd --blk-size 4294967295 --seed test/resource/random/seed_aa --conf test/resource/conf/max-lvl-5.cfg
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ (It is not possible to use blk-size).*(4294967295).*(as tree level).*(5).*(results tree with).*(32).*(leafs) ]]
+	
+	run src/logksi create test/out/dummy_cmd --blk-size 4294967295 --seed test/resource/random/seed_aa --conf test/resource/conf/max-lvl-5.cfg --apply-remote-conf
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ (It is not possible to use blk-size).*(4294967295).*(as tree level).*(17).*(results tree with).*(131072).*(leafs) ]]
+}
+
+@test "create CMD test: override --max-lvl from conf file with --max-lvl on cmd" {
+	run src/logksi create test/out/dummy_cmd --blk-size 4294967295 --seed test/resource/random/seed_aa --conf test/resource/conf/max-lvl-5.cfg --max-lvl 8
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ (It is not possible to use blk-size).*(4294967295).*(as tree level).*(8).*(results tree with).*(256).*(leafs) ]]
+}
+
+@test "create CMD test: try to use blk-size larger than provided by --apply-remote-conf" {
+	run src/logksi create test/out/dummy_cmd --blk-size 4294967295 --seed test/resource/random/seed_aa -S file://test/resource/server/ok_aggr_conf.tlv --apply-remote-conf
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ (It is not possible to use blk-size).*(4294967295).*(as tree level).*(17).*(results tree with).*(131072).*(leafs) ]]
+}
+
 @test "create CMD test: try to use only one not existing input file"  {
 	run src/logksi create i_do_not_exist do_not_exist2 --blk-size 4 --seed test/resource/random/seed_aa
 	[ "$status" -eq 3 ]

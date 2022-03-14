@@ -36,6 +36,8 @@ void OBJPRINT_signatureDump(KSI_Signature *sig, int (*print)(const char *format,
 
 void OBJPRINT_Hash(KSI_DataHash *hsh, const char *prefix, int (*print)(const char *format, ... ));
 
+void OBJPRINT_aggregatorConfDump(KSI_Config *config, int (*print)(const char *format, ... ));
+
 const char *OBJPRINT_getVerificationErrorCode(KSI_VerificationErrorCode code);
 const char *OBJPRINT_getVerificationErrorDescription(KSI_VerificationErrorCode code);
 

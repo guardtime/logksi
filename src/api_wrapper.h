@@ -71,6 +71,8 @@ int LOGKSI_SignatureVerify_keyBased(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX 
 int LOGKSI_SignatureVerify_publicationsFileBased(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel, int extperm, KSI_PolicyVerificationResult **result);
 int LOGKSI_SignatureVerify_userProvidedPublicationBased(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel, KSI_PublicationData *pubdata, int extperm, KSI_PolicyVerificationResult **result);
 
+int LOGKSI_Aggregator_getConf(ERR_TRCKR *err, KSI_CTX *ctx, KSI_Config **config);
+
 int LOGKSI_createSignature(ERR_TRCKR *err, KSI_CTX *ctx, KSI_DataHash *dataHash, KSI_uint64_t rootLevel, KSI_Signature **sig);
 
 char *LOGKSI_DataHash_toString(KSI_DataHash *hsh, char *buf, size_t buf_len);
