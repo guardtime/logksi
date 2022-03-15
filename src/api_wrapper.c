@@ -292,6 +292,25 @@ int LOGKSI_RequestHandle_getExtendResponse(ERR_TRCKR *err, KSI_CTX *ctx, KSI_Req
 	return res;
 }
 
+int LOGKSI_Aggregator_getConf(ERR_TRCKR *err, KSI_CTX *ctx, KSI_Config **config) {
+	int res;
+
+	if (err == NULL || ctx == NULL || config == NULL) {
+		ERR_TRCKR_ADD(err, res = KT_INVALID_ARGUMENT, NULL);
+		return res;
+	}
+
+	res = KSI_receiveAggregatorConfig(ctx, config);
+	if (res != KSI_OK) LOGKSI_KSI_ERRTrace_save(ctx);
+
+	if (appendBaseErrorIfPresent(err, res, ctx, __LINE__) == 0) {
+		appendNetworkErrors(err, res);
+		appendAggreErrors(err, res);
+	}
+
+	return res;
+}
+
 int LOGKSI_SignatureVerify_general(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
 									KSI_PublicationsFile* pubFile, KSI_PublicationData *pubdata, int extperm,
 									KSI_PolicyVerificationResult **result) {

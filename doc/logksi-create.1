@@ -14,6 +14,8 @@
 \fBlogksi create \fB--log-file-list\fR \fI<file>\fR [\fB--log-file-list-delimiter\fR \fI<delimiter>\fR] \fR[\fImore_options\fR]
 .HP 4
 \fBlogksi create \fB--log-from-stdin\fR [\fB-o\fR \fI<file>]\fR \fR[\fImore_options\fR]
+.HP 4
+\fBlogksi create -S \fIURL \fR[\fB--aggr-user \fIuser \fB--aggr-key \fIkey\fR] \fB--dump-conf
 .\"
 .SH DESCRIPTION
 Creates a new log signature from given log file \fI<logfile>\fR (or from \fIstdin\fR) by aggregating log records into Merkle tree and signing the root hash value with KSI signature. Aggregation is made using default hash algorithm or it can be specified using option \fB-H\fR. Each aggregation round takes 3 inputs - log file, a random seed (\fB--seed\fR) for masking of log records and optional input hash (\fB--input-hash\fR) for cryptographic linking of aggrgeation rounds. If \fB--input-hash\fR is omitted zero hash is used instead. Each aggregation round has 2 outputs - root value for signing and output hash for cryptographic linking of aggregation rounds (\fB--output-hash\fR).
@@ -58,7 +60,7 @@ Size of the random seed. If not set size of the seed is the size of the output o
 .\"
 .TP
 \fB--max-lvl \fIint\fR
-Set the maximum depth (0 - 255) of the Merkle tree. If used in combination with --apply-remote-conf, where service maximum level is provided, the smaller value is applied.
+Set the maximum depth (0 - 31) of the Merkle tree. If used in combination with \fB--apply-remote-conf\fR, where service maximum level is provided, the smaller value is applied.
 .\"
 .TP
 \fB--blk-size \fIint\fR
@@ -113,12 +115,30 @@ Hash algorithm to be used for computing HMAC on outgoing messages towards KSI ag
 Print detailed information about processes and errors to \fIstderr\fR. To make output more verbose increase debug level with \fB-dd\fR or \fB-ddd\fR. With debug level 1 a summary of log file is displayed. With debug level 2 a summary of each block and the log file is displayed. Debug level 3 will display the whole parsing of the log signature file. The parsing of \fIrecord hashes (r)\fR, \fItree hashes (.)\fR, \fIfinal tree hashes (:)\fR and \fImeta-records (M)\fR is displayed inside curly brackets in following manner \fI{r.Mr..:}\fR. In case of a failure \fI(X)\fR is displayed and closing curly bracket is omitted.
 .\"
 .TP
+\fB--dump-conf\fR
+Dump aggregator (URL specified by \fB-S\fR parameter) configuration in human-readable format to \fIstdout\fR.
+.\"
+.TP
 \fB--show-progress\fR
 Print signing progress. Only valid with -d and debug level 1.\fR
 .\"
 .TP
 \fB--conf \fIfile\fR
 Read configuration options from the given file. It must be noted that configuration options given explicitly on command line will override the ones in the configuration file. See \fBlogksi-conf\fR(5) for more information.
+.\"
+.TP
+\fB--apply-remote-conf\fR
+Obtain and apply additional configuration data from the aggregator. Following configuration parameters can be received:
+.RS
+.IP \(bu 4
+\fBmaximum level\fR - Maximum allowed depth of the local aggregation tree. This can be set to a lower value with \fB--max-lvl\fR.
+.LP
+.IP \(bu 4
+\fBaggregation hash algorithm\fR - Recommended hash function identifier to be used for hashing the file to be signed. This parameter can be overridden with \fB-H\fR.
+.LP
+Note that the described parameters are optional and may not be provided by the aggregator that you turn to. Use \fB--dump-conf\fR to view the provided configuration parameters.
+.RE
+.TP
 .\"
 .TP
 \fB--log \fIfile\fR

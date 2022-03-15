@@ -28,12 +28,14 @@
 
 #include "param_set/param_set.h"
 #include "param_set/task_def.h"
+#include "param_set/strn.h"
 #include "tool_box/param_control.h"
 #include "tool_box.h"
 #include "printer.h"
 #include "debug_print.h"
 #include "conf_file.h"
 #include "logksi_err.h"
+#include "obj_printer.h"
 #include "api_wrapper.h"
 #include "smart_file.h"
 
@@ -484,6 +486,115 @@ int extract_input_files_from_file(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *
 cleanup:
 
 	SMART_FILE_close(logFileList);
+
+	return res;
+}
+
+static int get_remote_aggr_conf(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ctx, int *remote_max_lvl, KSI_HashAlgorithm *remote_algo) {
+	#define TREE_DEPTH_INVALID (-1)
+	int res = KT_UNKNOWN_ERROR;
+	KSI_Config *config = NULL;
+	KSI_Integer *conf_id = NULL;
+	KSI_Integer *conf_lvl = NULL;
+	int dump = 0;
+	const char *suggestion_useDump = "  * Suggestion: Use --dump-conf for more information.";
+	const char *suggestion_useH    = "  * Suggestion: Use -H to override aggregator configuration hash function.";
+
+
+	if (set == NULL || err == NULL || ctx == NULL) {
+		ERR_TRCKR_ADD(err, res = KT_INVALID_ARGUMENT, NULL);
+		goto cleanup;
+	}
+
+	res = LOGKSI_Aggregator_getConf(err, ctx, &config);
+	ERR_CATCH_MSG(err, res, "Error: Unable to receive remote configuration.");
+
+	dump = PARAM_SET_isSetByName(set, "dump-conf");
+	if (dump) {
+		OBJPRINT_aggregatorConfDump(config, print_result);
+	}
+
+	res = KSI_Config_getAggrAlgo(config, &conf_id);
+	ERR_CATCH_MSG(err, res, "Error: Unable to get aggregator algorithm id configuration.");
+
+	res = KSI_Config_getMaxLevel(config, &conf_lvl);
+	ERR_CATCH_MSG(err, res, "Error: Unable to get aggregator maximum level configuration.");
+
+	if (remote_max_lvl) {
+		if (conf_lvl) {
+			size_t lvl = KSI_Integer_getUInt64(conf_lvl);
+
+			if (lvl > 0xff) {
+				ERR_CATCH_MSG(err, (res = KT_INVALID_CONF), "Error: Remote configuration tree depth is out of range.\n");
+				if (!dump) ERR_TRCKR_addAdditionalInfo(err, "%s\n", suggestion_useDump);
+				*remote_max_lvl = TREE_DEPTH_INVALID;
+			} else {
+				*remote_max_lvl = (int)lvl;
+			}
+		} else {
+			*remote_max_lvl = TREE_DEPTH_INVALID;
+		}
+	}
+
+	if (remote_algo) {
+		if (conf_id) {
+			int H = PARAM_SET_isSetByName(set, "H");
+			KSI_HashAlgorithm alg_id = (KSI_HashAlgorithm)KSI_Integer_getUInt64(conf_id);
+
+			if (!KSI_isHashAlgorithmSupported(alg_id)) {
+				if (!H) {
+					ERR_TRCKR_ADD(err, (res = KT_INVALID_CONF), "Error: Remote configuration algorithm is not supported.");
+					if (!dump) ERR_TRCKR_addAdditionalInfo(err, "%s\n", suggestion_useDump);
+					ERR_TRCKR_addAdditionalInfo(err, "%s\n", suggestion_useH);
+					goto cleanup;
+				}
+			} else if (!KSI_isHashAlgorithmTrusted(alg_id)) {
+				if (!H) {
+					ERR_TRCKR_addWarning(err, "  * Warning: Remote configuration algorithm is not trusted.\n");
+					if (!dump) ERR_TRCKR_addAdditionalInfo(err, "%s\n", suggestion_useDump);
+					ERR_TRCKR_addAdditionalInfo(err, "%s\n", suggestion_useH);
+				}
+			}
+			*remote_algo = alg_id;
+		} else {
+			*remote_algo = KSI_HASHALG_INVALID_VALUE;
+		}
+	}
+
+cleanup:
+	KSI_Config_free(config);
+
+	return res;
+#undef TREE_DEPTH_INVALID
+}
+
+int apply_aggregator_conf(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi) {
+	int res = KT_UNKNOWN_ERROR;
+	KSI_HashAlgorithm remote_algo = KSI_HASHALG_INVALID_VALUE;
+	int remote_max_lvl = -1;
+	char buf[32] = "";
+
+	if (set == NULL || err == NULL || ksi == NULL) return KT_INVALID_ARGUMENT;
+
+	res = get_remote_aggr_conf(set, err, ksi, &remote_max_lvl, &remote_algo);
+	if (res != KT_OK) goto cleanup;
+
+	if (PARAM_SET_isSetByName(set, "dump-conf")) goto cleanup;
+	PST_snprintf(buf, sizeof(buf), "%i", remote_max_lvl);
+
+	res = PARAM_SET_add(set, "max-lvl",
+		buf,
+		"remote-conf", PRIORITY_KSI_CONF_REMOTE);
+	if (res != KT_OK) goto cleanup;
+
+	res = PARAM_SET_add(set, "H",
+		KSI_getHashAlgorithmName(remote_algo),
+		"remote-conf", PRIORITY_KSI_CONF_REMOTE);
+	if (res != KT_OK) goto cleanup;
+
+
+	res = KT_OK;
+cleanup:
 
 	return res;
 }

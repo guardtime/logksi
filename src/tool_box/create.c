@@ -56,7 +56,7 @@ static int getLogFiles(PARAM_SET *set, ERR_TRCKR *err, int i, IO_FILES *files);
 static int check_io_naming_and_type_errors(PARAM_SET *set, ERR_TRCKR *err);
 static int check_if_output_files_will_not_be_overwritten_if_restricted(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err);
 
-#define PARAMS "{log-file-list}{log-file-list-delimiter}{sig-dir}{logfile}{input}{multiple_logs}{o}{input-hash}{output-hash}{force-overwrite}{blk-size}{keep-record-hashes}{seed}{seed-len}{keep-tree-hashes}{d}{log}{conf}{h|help}{log-from-stdin}"
+#define PARAMS "{log-file-list}{log-file-list-delimiter}{sig-dir}{logfile}{input}{multiple_logs}{o}{input-hash}{output-hash}{force-overwrite}{blk-size}{keep-record-hashes}{seed}{seed-len}{keep-tree-hashes}{d}{log}{conf}{h|help}{log-from-stdin}{dump-conf}"
 
 int create_run(int argc, char** argv, char **envp) {
 	int res;
@@ -120,6 +120,12 @@ int create_run(int argc, char** argv, char **envp) {
 	extra.err = err;
 
 	LOGKSI_initialize(&logksi);
+
+	if (PARAM_SET_isOneOfSetByName(set, "apply-remote-conf,dump-conf")) {
+		res = apply_aggregator_conf(set, err, ksi);
+		if (res != KT_OK) goto cleanup;
+		if (PARAM_SET_isSetByName(set, "dump-conf")) goto cleanup;
+	}
 
 	if (PARAM_SET_isSetByName(set, "H")) {
 		res = PARAM_SET_getObjExtended(set, "H", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, NULL, (void**)&aggrAlgo);
@@ -279,6 +285,7 @@ char *create_help_toString(char*buf, size_t len) {
 	PARAM_SET_setHelpText(set, "o", "<out.logsig>", "Specify the name of the created log signature file; recommended file extension is '.logsig'. If not specified, the log signature file is saved as '<logfile>.logsig' in the same folder where the <logfile> is located. An attempt to overwrite an existing log signature file will result in an error (see --force-overwrite). Use '-' as file name to redirect the output as a binary stream to stdout. This option can only be used when a single log file is used as input (exept with --log-file-list).");
 	PARAM_SET_setHelpText(set, "force-overwrite", NULL, "Force overwriting of existing log signature file.");
 	PARAM_SET_setHelpText(set, "d", NULL, "Print detailed information about processes and errors to stderr. To make output more verbose use -dd or -ddd.");
+	PARAM_SET_setHelpText(set, "dump-conf", NULL, "Dump aggregator configuration to stdout.");
 	PARAM_SET_setHelpText(set, "conf", "<file>", "Read configuration options from the given file. It must be noted that configuration options given explicitly on command line will override the ones in the configuration file.");
 	PARAM_SET_setHelpText(set, "log", "<file>", "Write libksi log to the given file. Use '-' as file name to redirect the log to stdout.");
 
@@ -289,7 +296,7 @@ char *create_help_toString(char*buf, size_t len) {
 		"--aggr-key <key>] [more_options]\\>1\n\\>8"
 		"\\>\n\n\n");
 
-	ret = PARAM_SET_helpToString(set, "input,multiple_logs,log-file-list,log-file-list-delimiter,log-from-stdin,seed,seed-len,max-lvl,blk-size,keep-record-hashes,keep-tree-hashes,input-hash,output-hash,H,o,force-overwrite,S,aggr-user,aggr-key,aggr-hmac-alg,d,conf,log", 1, 13, 80, buf + count, len - count);
+	ret = PARAM_SET_helpToString(set, "input,multiple_logs,log-file-list,log-file-list-delimiter,log-from-stdin,seed,seed-len,max-lvl,blk-size,keep-record-hashes,keep-tree-hashes,input-hash,output-hash,H,o,force-overwrite,S,aggr-user,aggr-key,aggr-hmac-alg,d,dump-conf,conf,apply-remote-conf,log", 1, 13, 80, buf + count, len - count);
 
 cleanup:
 	if (res != PST_OK || ret == NULL) {
@@ -305,6 +312,7 @@ const char *create_get_desc(void) {
 
 static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	int res;
+	int task_id = 0;
 
 	if (set == NULL || task_set == NULL) {
 		res = KT_INVALID_ARGUMENT;
@@ -322,7 +330,7 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 
 	res |= PARAM_SET_addControl(set, "{conf}", isFormatOk_inputFile, isContentOk_inputFileRestrictPipe, convertRepair_path, NULL);
 	res |= PARAM_SET_addControl(set, "{o}{log}{output-hash}", isFormatOk_path, NULL, convertRepair_path, NULL);
-	res |= PARAM_SET_addControl(set, "{d}{keep-record-hashes}{keep-tree-hashes}{log-from-stdin}{force-overwrite}", isFormatOk_flag, NULL, NULL, NULL);
+	res |= PARAM_SET_addControl(set, "{d}{keep-record-hashes}{keep-tree-hashes}{log-from-stdin}{force-overwrite}{dump-conf}", isFormatOk_flag, NULL, NULL, NULL);
 	res |= PARAM_SET_addControl(set, "{logfile}{multiple_logs}", isFormatOk_inputFile, isContentOk_inputFileNoDir, convertRepair_path, NULL);
 	res |= PARAM_SET_addControl(set, "{sig-dir}", isFormatOk_inputFile, isContentOk_dir, convertRepair_path, NULL);
 	res |= PARAM_SET_addControl(set, "{input-hash}", isFormatOk_inputHash, isContentOk_inputHash, convertRepair_path, extract_inputHashFromImprintOrImprintInFile);
@@ -348,38 +356,46 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 		PST_PRSCMD_CLOSE_PARSING | PST_PRSCMD_COLLECT_WHEN_PARSING_IS_CLOSED
 		);
 	res |= PARAM_SET_setParseOptions(set, "d,h", PST_PRSCMD_HAS_NO_VALUE | PST_PRSCMD_NO_TYPOS);
-	res |= PARAM_SET_setParseOptions(set, "log-from-stdin,keep-record-hashes,keep-tree-hashes,force-overwrite", PST_PRSCMD_HAS_NO_VALUE);
+	res |= PARAM_SET_setParseOptions(set, "log-from-stdin,keep-record-hashes,keep-tree-hashes,force-overwrite,dump-conf", PST_PRSCMD_HAS_NO_VALUE);
 
 	res |= TASK_SET_add(task_set,
-	/* ID:           */ 0,
+	/* ID:           */ task_id++,
 	/* Desc:         */ "Create from files.",
 	/* Man:          */ "input,seed,S",
-	/* At least one: */ "max-lvl,blk-size",
-	/* Forbidden:    */ "log-from-stdin,log-file-list",
+	/* At least one: */ "max-lvl,blk-size,apply-remote-conf",
+	/* Forbidden:    */ "log-from-stdin,log-file-list,dump-conf",
 	/* Ignore:       */ NULL);
 
 	res |= TASK_SET_add(task_set,
-	/* ID:           */ 0,
+	/* ID:           */ task_id++,
 	/* Desc:         */ "Create from stdin 1.",
 	/* Man:          */ "seed,S",
-	/* At least one: */ "max-lvl,blk-size",
-	/* Forbidden:    */ "input,log-from-stdin,log-file-list",
+	/* At least one: */ "max-lvl,blk-size,apply-remote-conf",
+	/* Forbidden:    */ "input,log-from-stdin,log-file-list,dump-conf",
 	/* Ignore:       */ NULL);
 
 	res |= TASK_SET_add(task_set,
-	/* ID:           */ 0,
+	/* ID:           */ task_id++,
 	/* Desc:         */ "Create from stdin 2.",
 	/* Man:          */ "seed,S,log-from-stdin",
-	/* At least one: */ "max-lvl,blk-size",
-	/* Forbidden:    */ "input,log-file-list",
+	/* At least one: */ "max-lvl,blk-size,apply-remote-conf",
+	/* Forbidden:    */ "input,log-file-list,dump-conf",
 	/* Ignore:       */ NULL);
 
 	res |= TASK_SET_add(task_set,
-	/* ID:           */ 0,
+	/* ID:           */ task_id++,
 	/* Desc:         */ "Create from log file list.",
 	/* Man:          */ "seed,S,log-file-list",
-	/* At least one: */ "max-lvl,blk-size",
-	/* Forbidden:    */ "input,log-from-stdin",
+	/* At least one: */ "max-lvl,blk-size,apply-remote-conf",
+	/* Forbidden:    */ "input,log-from-stdin,dump-conf",
+	/* Ignore:       */ NULL);
+
+	res |= TASK_SET_add(task_set,
+	/* ID:           */ task_id++,
+	/* Desc:         */ "Dump aggregator conf.",
+	/* Man:          */ "dump-conf",
+	/* At least one: */ NULL,
+	/* Forbidden:    */ NULL,
 	/* Ignore:       */ NULL);
 
 	/* Development time error handling. */
