@@ -30,7 +30,15 @@ struct magic_reference_st {
 };
 
 #define _LGVR(v) {#v, v}
-struct magic_reference_st magic_reference[NOF_VERS] = {_LGVR(LOGSIG11), _LGVR(LOGSIG12), _LGVR(RECSIG11), _LGVR(RECSIG12), _LGVR(LOG12BLK), _LGVR(LOG12SIG)};
+struct magic_reference_st magic_reference[NOF_VERS] = {
+	_LGVR(LOGSIG11),
+	_LGVR(LOGSIG12),
+	_LGVR(RECSIG11),
+	_LGVR(RECSIG12),
+	_LGVR(LOG12BLK),
+	_LGVR(LOG12SIG),
+	_LGVR(KSISTAT10)
+};
 #undef _LGVR
 
 static LOGSIG_VERSION file_version_by_string(const char *str) {
@@ -69,7 +77,7 @@ LOGSIG_VERSION LOGSIG_VERSION_getIntProofVer(LOGSIG_VERSION ver) {
  */
 LOGSIG_VERSION LOGSIG_VERSION_getFileVer(SMART_FILE *in) {
 	int res = KT_UNKNOWN_ERROR;
-	char magic_from_file[MAGIC_SIZE + 1];
+	char magic_from_file[MAGIC_SIZE + 2];
 	size_t count = 0xff;
 
 	if (in == NULL)	return UNKN_VER;
@@ -77,6 +85,13 @@ LOGSIG_VERSION LOGSIG_VERSION_getFileVer(SMART_FILE *in) {
 	res = SMART_FILE_read(in, (unsigned char*)magic_from_file, MAGIC_SIZE, &count);
 	if (res != SMART_FILE_OK || count != MAGIC_SIZE) return UNKN_VER;
 
+	/* Handle magic bytes that do not match with common style. */
 	magic_from_file[MAGIC_SIZE] = '\0';
+	if (strcmp(magic_from_file, "KSISTAT1") == 0) {
+		res = SMART_FILE_read(in, (unsigned char*)magic_from_file + MAGIC_SIZE, 1, &count);
+		if (res != SMART_FILE_OK || count != 1) return UNKN_VER;
+		magic_from_file[MAGIC_SIZE + 1] = '\0';
+	}
+
 	return file_version_by_string(magic_from_file);
 }

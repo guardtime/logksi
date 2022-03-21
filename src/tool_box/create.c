@@ -49,6 +49,7 @@
 static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
 static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err);
 static int generate_filenames(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files);
+static int open_state(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files, STATE_FILE **state);
 static int open_input_and_output_files(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files);
 static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files);
 static void close_input_and_output_files(ERR_TRCKR *err, int res, IO_FILES *files);
@@ -56,7 +57,7 @@ static int getLogFiles(PARAM_SET *set, ERR_TRCKR *err, int i, IO_FILES *files);
 static int check_io_naming_and_type_errors(PARAM_SET *set, ERR_TRCKR *err);
 static int check_if_output_files_will_not_be_overwritten_if_restricted(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err);
 
-#define PARAMS "{log-file-list}{log-file-list-delimiter}{sig-dir}{logfile}{input}{multiple_logs}{o}{input-hash}{output-hash}{force-overwrite}{blk-size}{keep-record-hashes}{seed}{seed-len}{keep-tree-hashes}{d}{log}{conf}{h|help}{log-from-stdin}{dump-conf}"
+#define PARAMS "{log-file-list}{log-file-list-delimiter}{sig-dir}{logfile}{input}{multiple_logs}{o}{input-hash}{output-hash}{force-overwrite}{blk-size}{keep-record-hashes}{seed}{seed-len}{keep-tree-hashes}{d}{log}{conf}{h|help}{log-from-stdin}{dump-conf}{state}{state-file-name}"
 
 int create_run(int argc, char** argv, char **envp) {
 	int res;
@@ -72,11 +73,7 @@ int create_run(int argc, char** argv, char **envp) {
 	MULTI_PRINTER *mp = NULL;
 	IO_FILES_init(&files);
 	LOGKSI logksi;
-	COMPOSITE extra;
-	KSI_HashAlgorithm aggrAlgo = KSI_HASHALG_INVALID_VALUE;
-	KSI_DataHash *inputHash = NULL;
-	KSI_DataHash *outputHash = NULL;
-	KSI_DataHash *pLastOutputHash = NULL;
+	STATE_FILE *state = NULL;
 	size_t i = 0;
 	/**
 	 * Extract command line parameters.
@@ -116,9 +113,6 @@ int create_run(int argc, char** argv, char **envp) {
 	if (res != PST_OK) goto cleanup;
 
 
-	extra.ctx = ksi;
-	extra.err = err;
-
 	LOGKSI_initialize(&logksi);
 
 	if (PARAM_SET_isOneOfSetByName(set, "apply-remote-conf,dump-conf")) {
@@ -127,22 +121,10 @@ int create_run(int argc, char** argv, char **envp) {
 		if (PARAM_SET_isSetByName(set, "dump-conf")) goto cleanup;
 	}
 
-	if (PARAM_SET_isSetByName(set, "H")) {
-		res = PARAM_SET_getObjExtended(set, "H", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, NULL, (void**)&aggrAlgo);
-		if (res != PST_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
-	} else {
-		aggrAlgo = /*(KSI_isHashAlgorithmSupported(remote_algo)) ? remote_algo :*/ KSI_getHashAlgorithmByName("default");
-	}
-
-	if (PARAM_SET_isSetByName(set, "input-hash")) {
-		res = PARAM_SET_getObjExtended(set, "input-hash", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &extra, (void**)&inputHash);
-		ERR_CATCH_MSG(err, res, "Error: Unable to extract input hash value!");
-	} else {
-		res = KSI_DataHash_createZero(ksi, aggrAlgo, &inputHash);
-		ERR_CATCH_MSG(err, res, "Unable to create zero hash for input hash!");
-	}
-
 	res = check_if_output_files_will_not_be_overwritten_if_restricted(set, mp, err);
+	if (res != KT_OK) goto cleanup;
+
+	res = open_state(set, err, ksi, &files, &state);
 	if (res != KT_OK) goto cleanup;
 
 	do {
@@ -175,7 +157,7 @@ int create_run(int argc, char** argv, char **envp) {
 			isSigStream ? "" : "'");
 
 		print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_EQUAL | DEBUG_LEVEL_1, "Creating... ");
-		res = logsignature_create(set, mp, err, ksi, &logksi, &files, aggrAlgo, inputHash, &outputHash);
+		res = logsignature_create(set, mp, err, ksi, &logksi, &files, STATE_FILE_hashAlgo(state), state);
 		print_progressResult(mp, MP_ID_BLOCK, DEBUG_EQUAL | DEBUG_LEVEL_1, res);
 		if (res != KT_OK) goto cleanup;
 
@@ -184,11 +166,6 @@ int create_run(int argc, char** argv, char **envp) {
 			print_debug("\n");
 			MULTI_PRINTER_printByID(mp, MP_ID_LOGFILE_WARNINGS);
 		}
-
-		KSI_DataHash_free(inputHash);
-		inputHash = outputHash;
-		pLastOutputHash = outputHash;
-		outputHash = NULL;
 
 		IO_FILES_StorePreviousFileNames(&files);
 		close_input_and_output_files(err, KT_OK, &files);
@@ -204,7 +181,7 @@ int create_run(int argc, char** argv, char **envp) {
 		res = PARAM_SET_getStr(set, "output-hash", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &fname);
 		ERR_CATCH_MSG(err, res, "Error: Unable to get file name for output hash.");
 
-		res = logksi_save_output_hash(err, pLastOutputHash, fname, files.previousLogFile, files.previousSigFileOut);
+		res = logksi_save_output_hash(err, STATE_FILE_lastLeaf(state), fname, files.previousLogFile, files.previousSigFileOut);
 		if (res != KT_OK) goto cleanup;
 	}
 
@@ -241,8 +218,7 @@ cleanup:
 	TASK_SET_free(task_set);
 	PARAM_SET_free(set);
 	ERR_TRCKR_free(err);
-	KSI_DataHash_free(inputHash);
-	KSI_DataHash_free(outputHash);
+	STATE_FILE_close(state);
 	KSI_CTX_free(ksi);
 
 	return LOGKSI_errToExitCode(res);
@@ -282,6 +258,10 @@ char *create_help_toString(char*buf, size_t len) {
 	PARAM_SET_setHelpText(set, "keep-tree-hashes", NULL, "Include intermediate Merkle tree (every tree node) hash values into log signature file. Log signature without tree hashes can still be verified but the diagnostics in case of failure is more difficult.");
 	PARAM_SET_setHelpText(set, "input-hash", "<hash>", "Specify hash imprint for inter-linking (the last leaf from the previous log signature). Hash can be specified on command line or from a file containing its string representation. Hash format: <alg>:<hash in hex>. Use '-' as file name to read the imprint from stdin. Call logksi -h to get the list of supported hash algorithms. See --output-hash to see how to extract the hash imprint from the previous log file. When used together with -- or --log-file-list, only the first block uses the value as input hash.");
 	PARAM_SET_setHelpText(set, "output-hash", "<file>", "Output the last leaf from the log signature into file. Use '-' as file name to redirect hash imprint to stdout. See --input-hash to use the output hash as input hash to next log signature. When used together with -- or --log-file-list, only the output hash of the last block is returned. Will always overwrite existing file.");
+	PARAM_SET_setHelpText(set, "state", NULL, "Creates a binary state file that keeps aggregation hash algorithm and last leaf from the Merkle tree being built. State file helps to continue signing the logs and keeps cryptographic linking between different calls to logksi. Functionality is similar to using --input-hash and --output-hash but it requires less scripting and also configures aggregation hash algorithm. It must be noted that state file requires more frequent disk access as every log line will update the state!\n\n"
+		"The state file name is generated by appending '.state' extension to the log files name. If --sig-dir is specified state file is stored there. In case of multiple input log files state file name must be specified explicitly (see --state-file-name). State file is always overwritten.\n\n"
+		"If state file does not exist it is created and initialized (with --input-hash or zero hash). If state file already exists it is loaded and input hash and aggregation hash algorithm is used to initialize log signing process. Using option -H will override aggregation hash algorithm. With existing state file --input-hash can not be used.");
+	PARAM_SET_setHelpText(set, "state-file-name", "<file>", "Same as --state but state file is always stored at given location no matter what the log files name is, making it suitable for signing multiple log files in sequence (in one or multiple calls to logksi).");
 	PARAM_SET_setHelpText(set, "o", "<out.logsig>", "Specify the name of the created log signature file; recommended file extension is '.logsig'. If not specified, the log signature file is saved as '<logfile>.logsig' in the same folder where the <logfile> is located. An attempt to overwrite an existing log signature file will result in an error (see --force-overwrite). Use '-' as file name to redirect the output as a binary stream to stdout. This option can only be used when a single log file is used as input (exept with --log-file-list).");
 	PARAM_SET_setHelpText(set, "force-overwrite", NULL, "Force overwriting of existing log signature file.");
 	PARAM_SET_setHelpText(set, "d", NULL, "Print detailed information about processes and errors to stderr. To make output more verbose use -dd or -ddd.");
@@ -296,7 +276,7 @@ char *create_help_toString(char*buf, size_t len) {
 		"--aggr-key <key>] [more_options]\\>1\n\\>8"
 		"\\>\n\n\n");
 
-	ret = PARAM_SET_helpToString(set, "input,multiple_logs,log-file-list,log-file-list-delimiter,log-from-stdin,seed,seed-len,max-lvl,blk-size,keep-record-hashes,keep-tree-hashes,input-hash,output-hash,H,o,force-overwrite,S,aggr-user,aggr-key,aggr-hmac-alg,d,dump-conf,conf,apply-remote-conf,log", 1, 13, 80, buf + count, len - count);
+	ret = PARAM_SET_helpToString(set, "input,multiple_logs,log-file-list,log-file-list-delimiter,log-from-stdin,seed,seed-len,max-lvl,blk-size,keep-record-hashes,keep-tree-hashes,input-hash,output-hash,state,state-file-name,H,o,force-overwrite,S,aggr-user,aggr-key,aggr-hmac-alg,d,dump-conf,conf,apply-remote-conf,log", 1, 13, 80, buf + count, len - count);
 
 cleanup:
 	if (res != PST_OK || ret == NULL) {
@@ -329,8 +309,8 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	res |= PARAM_SET_setPrintName(set, "multiple_logs", "--", NULL);
 
 	res |= PARAM_SET_addControl(set, "{conf}", isFormatOk_inputFile, isContentOk_inputFileRestrictPipe, convertRepair_path, NULL);
-	res |= PARAM_SET_addControl(set, "{o}{log}{output-hash}", isFormatOk_path, NULL, convertRepair_path, NULL);
-	res |= PARAM_SET_addControl(set, "{d}{keep-record-hashes}{keep-tree-hashes}{log-from-stdin}{force-overwrite}{dump-conf}", isFormatOk_flag, NULL, NULL, NULL);
+	res |= PARAM_SET_addControl(set, "{o}{log}{output-hash}{state-file-name}", isFormatOk_path, NULL, convertRepair_path, NULL);
+	res |= PARAM_SET_addControl(set, "{d}{keep-record-hashes}{keep-tree-hashes}{log-from-stdin}{force-overwrite}{dump-conf}{state}", isFormatOk_flag, NULL, NULL, NULL);
 	res |= PARAM_SET_addControl(set, "{logfile}{multiple_logs}", isFormatOk_inputFile, isContentOk_inputFileNoDir, convertRepair_path, NULL);
 	res |= PARAM_SET_addControl(set, "{sig-dir}", isFormatOk_inputFile, isContentOk_dir, convertRepair_path, NULL);
 	res |= PARAM_SET_addControl(set, "{input-hash}", isFormatOk_inputHash, isContentOk_inputHash, convertRepair_path, extract_inputHashFromImprintOrImprintInFile);
@@ -356,7 +336,7 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 		PST_PRSCMD_CLOSE_PARSING | PST_PRSCMD_COLLECT_WHEN_PARSING_IS_CLOSED
 		);
 	res |= PARAM_SET_setParseOptions(set, "d,h", PST_PRSCMD_HAS_NO_VALUE | PST_PRSCMD_NO_TYPOS);
-	res |= PARAM_SET_setParseOptions(set, "log-from-stdin,keep-record-hashes,keep-tree-hashes,force-overwrite,dump-conf", PST_PRSCMD_HAS_NO_VALUE);
+	res |= PARAM_SET_setParseOptions(set, "log-from-stdin,keep-record-hashes,keep-tree-hashes,force-overwrite,dump-conf,state", PST_PRSCMD_HAS_NO_VALUE);
 
 	res |= TASK_SET_add(task_set,
 	/* ID:           */ task_id++,
@@ -428,20 +408,21 @@ cleanup:
 	return res;
 }
 
-static int get_output_signature_name(char *sig_dir, char *outSigName, const char *inLogName, ERR_TRCKR *err, char **out) {
+static int get_state_or_logsig_file_name(int isState, char *sig_dir, char *explicitFileName, const char *inLogName, ERR_TRCKR *err, char **out) {
 	int res = KT_UNKNOWN_ERROR;
 	char *tmp = NULL;
+	const char *fnameComponents[2] = {"stdin", ".logsig"};
+	const char *pathComponents[1] = {NULL};
 
 	if (out == NULL) return KT_INVALID_ARGUMENT;
 
-	if (outSigName == NULL) {
-		const char *pathComponents[2];
+	if (explicitFileName == NULL) {
+		if (isState) fnameComponents[1] = ".state";
 		pathComponents[0] = sig_dir;
 
 		if (inLogName == NULL) {
-			res = merge_path(pathComponents, 1, (const char*[]){"stdin.logsig"}, 1, &tmp);
+			res = merge_path(pathComponents, 1, fnameComponents, 2, &tmp);
 		} else {
-			const char *fnameComponents[2] = {NULL, ".logsig"};
 			fnameComponents[0] = inLogName;
 			if (sig_dir) {
 				const char *pure_file_name = NULL;
@@ -452,10 +433,10 @@ static int get_output_signature_name(char *sig_dir, char *outSigName, const char
 			}
 			res = merge_path(pathComponents, 1, fnameComponents, 2, &tmp);
 		}
-		ERR_CATCH_MSG(err, res, "Error: Could not generate output log signature file name.");
+		ERR_CATCH_MSG(err, res, "Error: Could not generate %s file name.", isState ? "state" : "output log signature");
 	} else {
-		res = duplicate_name(outSigName, &tmp);
-		ERR_CATCH_MSG(err, res, "Error: Could not duplicate output log signature file name.");
+		res = duplicate_name(explicitFileName, &tmp);
+		ERR_CATCH_MSG(err, res, "Error: Could not duplicate %s file name.", isState ? "state" : "output log signature");
 	}
 
 	*out = tmp;
@@ -469,6 +450,13 @@ cleanup:
 	return res;
 }
 
+static int get_state_file_name(char *sig_dir, char *stateFileName, const char *inLogName, ERR_TRCKR *err, char **out) {
+	return get_state_or_logsig_file_name(1, sig_dir, stateFileName, inLogName, err, out);
+}
+
+static int get_output_signature_name(char *sig_dir, char *outSigName, const char *inLogName, ERR_TRCKR *err, char **out) {
+	return get_state_or_logsig_file_name(0, sig_dir, outSigName, inLogName, err, out);
+}
 
 static int check_if_output_files_will_not_be_overwritten_if_restricted(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err) {
 	int res = KT_UNKNOWN_ERROR;
@@ -514,6 +502,97 @@ static int check_if_output_files_will_not_be_overwritten_if_restricted(PARAM_SET
 cleanup:
 
 	KSI_free(out_sig);
+
+	return res;
+}
+static int open_state(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files, STATE_FILE **state) {
+	STATE_FILE *tmp = NULL;
+	int res = KT_UNKNOWN_ERROR;
+	int inputCount = 0;
+	KSI_HashAlgorithm aggrAlgo = KSI_HASHALG_INVALID_VALUE;
+	KSI_DataHash *inputHash = NULL;
+	COMPOSITE extra;
+	char *userStateFileName = NULL;
+	char *stateFileName = NULL;
+
+	if (set == NULL || err == NULL || files == NULL || state == NULL) return KT_INVALID_ARGUMENT;
+
+	extra.ctx = ksi;
+	extra.err = err;
+
+	res = PARAM_SET_getValueCount(set, "input", NULL, PST_PRIORITY_NONE, &inputCount);
+	if (res != KT_OK) goto cleanup;
+
+	if (inputCount > 1 && PARAM_SET_isSetByName(set, "state") && !PARAM_SET_isSetByName(set, "state-file-name")) {
+		res = KT_INVALID_CMD_PARAM;
+		ERR_CATCH_MSG(err, res, "Error: In case of multiple log files --state-file-name <file> has to be used.");
+	}
+
+	if (PARAM_SET_isOneOfSetByName(set, "state,state-file-name")) {
+		char *sig_dir = NULL;
+		char *inLog = NULL;
+
+		res = PARAM_SET_getStr(set, "state-file-name", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &userStateFileName);
+		if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
+		res = PARAM_SET_getStr(set, "sig-dir", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &sig_dir);
+		if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
+		res = PARAM_SET_getStr(set, "input", NULL, PST_PRIORITY_NONE, 0, &inLog);
+		if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
+
+		res = get_state_file_name(
+			sig_dir,
+			userStateFileName,
+			inLog, err, &stateFileName
+			);
+		if (res != KT_OK) goto cleanup;
+	}
+
+	if (PARAM_SET_isSetByName(set, "input-hash")) {
+		if (SMART_FILE_doFileExist(stateFileName)) {
+			res = KT_INVALID_CMD_PARAM;
+			ERR_CATCH_MSG(err, res, "Error: As state file '%s' exists it is not possible to use --input-hash.", stateFileName);
+		}
+	}
+
+	/* State file opened without file name will keep state info internally. */
+	res = STATE_FILE_open(0, stateFileName, ksi, &tmp);
+	ERR_CATCH_MSG(err, res, "Error: Unable to open state file '%s'!", stateFileName);
+
+	/* If there is explicitly specified aggregation hash algorithm override
+	   even the value read from state file. Note that original input hash is
+	   not affected in any way. */
+	if (PARAM_SET_isSetByName(set, "H")) {
+		res = PARAM_SET_getObjExtended(set, "H", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, NULL, (void**)&aggrAlgo);
+		if (res != PST_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
+
+		res = STATE_FILE_setHashAlgo(tmp, aggrAlgo);
+		ERR_CATCH_MSG(err, res, "Error: Unable to set hash algorithm '%s'!", KSI_getHashAlgorithmName(aggrAlgo));
+	}
+
+	/* If the state file is created, init input hash. */
+	if(STATE_FILE_lastLeaf(tmp) == NULL) {
+		if (PARAM_SET_isSetByName(set, "input-hash")) {
+			res = PARAM_SET_getObjExtended(set, "input-hash", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &extra, (void**)&inputHash);
+			ERR_CATCH_MSG(err, res, "Error: Unable to extract input hash value!");
+		} else {
+			aggrAlgo = (aggrAlgo != KSI_HASHALG_INVALID_VALUE) ? aggrAlgo : KSI_getHashAlgorithmByName("default");
+			res = KSI_DataHash_createZero(ksi, aggrAlgo, &inputHash);
+			ERR_CATCH_MSG(err, res, "Error: Unable to create zero hash for input hash!");
+		}
+
+		res = STATE_FILE_update(tmp, inputHash);
+		ERR_CATCH_MSG(err, res, "Error: Unable to update state file '%s'!", stateFileName);
+	}
+
+	*state = tmp;
+	tmp = NULL;
+	res = KT_OK;
+
+cleanup:
+
+	KSI_DataHash_free(inputHash);
+	STATE_FILE_close(tmp);
+	free(stateFileName);
 
 	return res;
 }

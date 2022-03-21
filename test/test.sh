@@ -51,6 +51,8 @@ test/test_suites/create_static_file.bats \
 test/test_suites/create_linking.bats \
 test/test_suites/create_log_file_list.bats \
 test/test_suites/create_rebuild.bats \
+test/test_suites/create_state_file.bats \
+test/test_suites/create_state_file_cmd.bats \
 $TEST_DEPENDING_ON_KSI_TOOL
 
 exit_code=$?

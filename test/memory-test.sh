@@ -87,6 +87,8 @@ generate_test create_static_file.bats
 generate_test create_linking.bats
 generate_test create_log_file_list.bats
 generate_test create_rebuild.bats
+generate_test create_state_file.bats
+generate_test create_state_file_cmd.bats
 
 bats \
 $mem_test_dir/integrate.bats \
@@ -125,6 +127,8 @@ $mem_test_dir/create_static_file.bats \
 $mem_test_dir/create_linking.bats \
 $mem_test_dir/create_log_file_list.bats \
 $mem_test_dir/create_rebuild.bats \
+$mem_test_dir/create_state_file.bats \
+$mem_test_dir/create_state_file_cmd.bats \
 $TEST_DEPENDING_ON_KSI_TOOL
 
 exit_code=$?

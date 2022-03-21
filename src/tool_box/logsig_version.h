@@ -37,6 +37,7 @@ typedef enum {
 	RECSIG12 = 3,
 	LOG12BLK = 4,
 	LOG12SIG = 5,
+	KSISTAT10 = 6,
 	NOF_VERS,
 	UNKN_VER = 0xff
 } LOGSIG_VERSION;
