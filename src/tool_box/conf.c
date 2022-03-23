@@ -142,7 +142,7 @@ char *conf_help_toString(char *buf, size_t len) {
 
 	/* Format configuration file parameters. */
 	count += PST_snhiprintf(buf + count, len - count, 80, 0, 0, NULL, ' ', "\n\nAll known parameters:\n\n");
-	ret = PARAM_SET_helpToString(set, "S,aggr-user,aggr-key,aggr-hmac-alg,X,ext-user,ext-key,ext-hmac-alg,P,cnstr,V,W,C,c,publications-file-no-verify", 1, 13, 80, buf + count, len - count);
+	ret = PARAM_SET_helpToString(set, "S,aggr-user,aggr-key,aggr-hmac-alg,max-lvl,X,ext-user,ext-key,ext-hmac-alg,P,cnstr,V,W,C,c,publications-file-no-verify", 1, 13, 80, buf + count, len - count);
 	if (ret == NULL) goto cleanup;
 	count += strlen(buf + count);
 

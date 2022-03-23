@@ -12,6 +12,14 @@ else
 	echo Warning: KSI tool is not installed. Tests depending on KSI tool are ignored.
 fi
 
+if gttlvdump -h > /dev/null && gttlvgrep -h > /dev/null; then
+	TEST_DEPENDING_ON_TLVUTIL="\
+		test/test_suites/create-tlvutil.bats"
+	echo Info: Extra tests depending on gttlvutil added.
+else
+	TEST_DEPENDING_ON_TLVUTIL=""
+	echo Warning: gttlvutil is not installed. Tests depending on gttlvutil are ignored.
+fi
 
 bats \
 test/test_suites/conf_invalid.bats \
@@ -51,7 +59,10 @@ test/test_suites/create_static_file.bats \
 test/test_suites/create_linking.bats \
 test/test_suites/create_log_file_list.bats \
 test/test_suites/create_rebuild.bats \
-$TEST_DEPENDING_ON_KSI_TOOL
+test/test_suites/create_state_file.bats \
+test/test_suites/create_state_file_cmd.bats \
+$TEST_DEPENDING_ON_KSI_TOOL \
+$TEST_DEPENDING_ON_TLVUTIL
 
 exit_code=$?
 

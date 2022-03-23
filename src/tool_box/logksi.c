@@ -433,3 +433,215 @@ static void logksi_reset_block_info(LOGKSI *logksi) {
 	sign_task_reset_block_info(&logksi->task.sign);
 	extend_task_reset_block_info(&logksi->task.extend);
 }
+
+struct STATE_FILE_st {
+	LOGSIG_VERSION ver;
+	SMART_FILE *state_file;
+	KSI_DataHash *hash;
+	KSI_HashAlgorithm aggrAlgo;
+};
+
+int STATE_FILE_open(int readOnly, const char *fname, KSI_CTX *ksi, STATE_FILE **state) {
+	int res = KT_OK;
+	SMART_FILE *tmp_in_out_file = NULL;
+	KSI_DataHash *tmp_hash = NULL;
+	STATE_FILE *tmp = NULL;
+	LOGSIG_VERSION ver = KSISTAT10;		/* Init with default version. */
+	uint8_t algo = 0;
+	uint8_t digest_len = 0;
+	KSI_HashAlgorithm aggrAlgo = KSI_HASHALG_INVALID_VALUE;
+	size_t read_count = 0;
+
+
+	if (state == NULL) return KT_INVALID_ARGUMENT;
+
+	if (SMART_FILE_doFileExist(fname)) {
+		unsigned char digest[256];
+		unsigned char dummy;
+
+		res = SMART_FILE_open(fname, "rb", &tmp_in_out_file);
+		if (res != SMART_FILE_OK) goto cleanup;
+
+		ver = LOGSIG_VERSION_getFileVer(tmp_in_out_file);
+		switch(ver) {
+			case KSISTAT10:
+				res = SMART_FILE_read(tmp_in_out_file, (unsigned char*)&algo, 1, &read_count);
+				if (res != SMART_FILE_OK) goto cleanup;
+
+				if (read_count != 1) {
+					res = KT_UNEXPECTED_EOF;
+					goto cleanup;
+				}
+
+				if (KSI_getHashLength(algo) == 0) {
+					res = KSI_UNKNOWN_HASH_ALGORITHM_ID;
+					goto cleanup;
+				}
+
+				if (!KSI_isHashAlgorithmSupported(algo)) {
+					res = KSI_UNAVAILABLE_HASH_ALGORITHM;
+					goto cleanup;
+				}
+
+				if (!KSI_isHashAlgorithmTrusted(algo)) {
+					res = KSI_UNTRUSTED_HASH_ALGORITHM;
+					goto cleanup;
+				}
+
+				res = SMART_FILE_read(tmp_in_out_file, (unsigned char*)&digest_len, 1, &read_count);
+				if (res != SMART_FILE_OK) goto cleanup;
+
+				if (read_count != 1) {
+					res = KT_UNEXPECTED_EOF;
+					goto cleanup;
+				}
+
+				if (digest_len != KSI_getHashLength(algo)) {
+					res = KT_INVALID_INPUT_FORMAT;
+					goto cleanup;
+				}
+
+				res = SMART_FILE_read(tmp_in_out_file, digest, digest_len, &read_count);
+				if (res != SMART_FILE_OK) goto cleanup;
+
+				if (read_count != digest_len) {
+					res = KT_UNEXPECTED_EOF;
+					goto cleanup;
+				}
+
+				res = SMART_FILE_read(tmp_in_out_file, &dummy, 1, &read_count);
+				if (res != SMART_FILE_OK) goto cleanup;
+
+				if (!SMART_FILE_isEof(tmp_in_out_file)) {
+					res = KT_INVALID_INPUT_FORMAT;
+					goto cleanup;
+				}
+
+				res = KSI_DataHash_fromDigest(ksi, algo, digest, digest_len, &tmp_hash);
+				if (res != SMART_FILE_OK) goto cleanup;
+
+				res = KSI_DataHash_getHashAlg(tmp_hash, &aggrAlgo);
+				if (res != SMART_FILE_OK) goto cleanup;
+
+				res = SMART_FILE_close(tmp_in_out_file);
+				if (res != SMART_FILE_OK) goto cleanup;
+
+				tmp_in_out_file = NULL;
+			break;
+			default:
+				res = KT_INVALID_INPUT_FORMAT;
+				goto cleanup;
+		}
+	} else if (readOnly && fname != NULL) {
+		res = KT_IO_ERROR;
+		goto cleanup;
+	}
+
+	if (!readOnly && fname != NULL) {
+		res = SMART_FILE_open(fname, "wb", &tmp_in_out_file);
+		if (res != SMART_FILE_OK) goto cleanup;
+	}
+
+	tmp = malloc(sizeof(STATE_FILE));
+	if (tmp == NULL) {
+		res = KT_OUT_OF_MEMORY;
+		goto cleanup;
+	}
+
+	tmp->ver = ver;
+	tmp->state_file = tmp_in_out_file;
+	tmp->hash = tmp_hash;
+	tmp->aggrAlgo = aggrAlgo;
+	tmp_in_out_file = NULL;
+	tmp_hash = NULL;
+	*state = tmp;
+	tmp = NULL;
+
+	res = KT_OK;
+
+cleanup:
+
+	SMART_FILE_close(tmp_in_out_file);
+	KSI_DataHash_free(tmp_hash);
+	free(tmp);
+
+	return res;
+}
+
+int STATE_FILE_update(STATE_FILE *state, KSI_DataHash *hash) {
+	int res = KT_UNKNOWN_ERROR;
+	if(state == NULL || hash == NULL) return KT_INVALID_ARGUMENT;
+
+	KSI_DataHash_free(state->hash);
+	state->hash = KSI_DataHash_ref(hash);
+
+	if (state->aggrAlgo == KSI_HASHALG_INVALID_VALUE) {
+		res = KSI_DataHash_getHashAlg(hash, &state->aggrAlgo);
+		if (res != KSI_OK) goto cleanup;
+	}
+
+	if (state->state_file != NULL) {
+		const char *magic = NULL;
+		KSI_HashAlgorithm algo = 0;
+		const unsigned char *digest = NULL;
+		size_t digest_len = 0;
+		uint8_t algo_and_len[2];
+
+		magic = LOGSIG_VERSION_toString(state->ver);
+		if (magic == NULL) {
+			res = KT_UNKNOWN_ERROR;
+			goto cleanup;
+		}
+
+		res = KSI_DataHash_extract(hash, &algo, &digest, &digest_len);
+		if (res != KT_OK) goto cleanup;
+
+		if (digest_len > 0xff) {
+			res = KT_UNKNOWN_ERROR;
+			goto cleanup;
+		}
+
+		algo_and_len[0] = algo;
+		algo_and_len[1] = digest_len;
+
+		res = SMART_FILE_rewind(state->state_file);
+		if (res != KT_OK) goto cleanup;
+		res = SMART_FILE_write(state->state_file, (const unsigned char*)magic, strlen(magic), NULL);
+		if (res != KT_OK) goto cleanup;
+		res = SMART_FILE_write(state->state_file, algo_and_len, 2, NULL);
+		if (res != KT_OK) goto cleanup;
+		res = SMART_FILE_write(state->state_file, digest, digest_len, NULL);
+		if (res != KT_OK) goto cleanup;
+	}
+
+	res = KT_OK;
+
+cleanup:
+
+	return res;
+
+}
+
+void STATE_FILE_close(STATE_FILE *state) {
+	if (state == NULL) return;
+	SMART_FILE_close(state->state_file);
+	KSI_DataHash_free(state->hash);
+	free(state);
+	return;
+}
+
+KSI_DataHash* STATE_FILE_lastLeaf(STATE_FILE *state) {
+	if (state == NULL) return NULL;
+	return state->hash;
+}
+
+KSI_HashAlgorithm STATE_FILE_hashAlgo(STATE_FILE *state) {
+	if (state == NULL) return KSI_HASHALG_INVALID_VALUE;
+	return state->aggrAlgo;
+}
+
+int STATE_FILE_setHashAlgo(STATE_FILE *state, KSI_HashAlgorithm algo) {
+	if (state == NULL) return KT_INVALID_ARGUMENT;
+	state->aggrAlgo = algo;
+	return KT_OK;
+}

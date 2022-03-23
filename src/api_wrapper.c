@@ -819,6 +819,7 @@ int LOGKSI_KSI_ERR_toExitCode(int error_code) {
 		/**
 		 * General cryptographic errors.
 		 */
+		case KSI_UNKNOWN_HASH_ALGORITHM_ID:
 		case KSI_UNTRUSTED_HASH_ALGORITHM:
 		case KSI_UNAVAILABLE_HASH_ALGORITHM:
 		case KSI_PUBLICATIONS_FILE_NOT_SIGNED_WITH_PKI:

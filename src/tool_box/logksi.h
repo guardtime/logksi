@@ -52,6 +52,13 @@ enum LOGSIG_VER_enum {
 	LOGKSI_VER_RES_COUNT,
 };
 
+typedef struct STATE_FILE_st STATE_FILE;
+int STATE_FILE_open(int readOnly, const char *fname, KSI_CTX *ksi, STATE_FILE **state);
+int STATE_FILE_update(STATE_FILE *state, KSI_DataHash *hash);
+void STATE_FILE_close(STATE_FILE *state);
+KSI_DataHash* STATE_FILE_lastLeaf(STATE_FILE *state);
+int STATE_FILE_setHashAlgo(STATE_FILE *state, KSI_HashAlgorithm algo);
+KSI_HashAlgorithm STATE_FILE_hashAlgo(STATE_FILE *state);
 
 void LOGKSI_initialize(LOGKSI *block);
 int LOGKSI_readLine(LOGKSI *logksi, SMART_FILE *file);

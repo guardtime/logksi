@@ -46,7 +46,7 @@ struct SMART_FILE_st {
 	int (*file_reposition)(void *file, size_t offset);
 	int (*file_get_current_position)(void *file, size_t *pos);
 	int (*file_truncate)(void *file, size_t pos);
-	int (*file_write)(void *file, unsigned char *raw, size_t raw_len, size_t *count);
+	int (*file_write)(void *file, const unsigned char *raw, size_t raw_len, size_t *count);
 	int (*file_read)(void *file, unsigned char *raw, size_t raw_len, size_t *count);
 	int (*file_read_line)(void *file, char *raw, size_t raw_len, size_t *row_pointer, size_t *count, size_t *raw_count);
 	int (*file_read_line_every)(void *file, char *raw, size_t raw_len, size_t *row_pointer, size_t *count, size_t *raw_count);
@@ -74,7 +74,7 @@ static int smart_file_read(void *file, unsigned char *raw, size_t raw_len, size_
 static int smart_file_read_line_every(void *file, char *buf, size_t len, size_t *row_pointer, size_t *count, size_t *raw_count);
 static int smart_file_read_line(void *file, char *buf, size_t len, size_t *row_pointer, size_t *count, size_t *raw_count);
 static int smart_file_gets(void *file, char *raw, size_t raw_len, int *eof);
-static int smart_file_write(void *file, unsigned char *raw, size_t raw_len, size_t *count);
+static int smart_file_write(void *file, const unsigned char *raw, size_t raw_len, size_t *count);
 static int smart_file_get_stream(const char *mode, void **stream, int *is_close_mandatory);
 static int smart_file_get_error(void);
 static char* get_pure_mode(const char *mode, char *buf, size_t buf_len);
@@ -442,7 +442,7 @@ static int smart_file_read_line_every(void *file, char *buf, size_t len, size_t 
 	return smart_file_read_line_common(file, buf, len, row_pointer, count, raw_count, 0);
 }
 
-static int smart_file_write(void *file, unsigned  char *raw, size_t raw_len, size_t *count) {
+static int smart_file_write(void *file, const unsigned  char *raw, size_t raw_len, size_t *count) {
 	int res;
 	FILE *fp = file;
 	size_t write_count = 0;
@@ -998,7 +998,7 @@ int SMART_FILE_markInconsistent(SMART_FILE *file) {
 	return SMART_FILE_OK;
 }
 
-int SMART_FILE_write(SMART_FILE *file, unsigned char *raw, size_t raw_len, size_t *count) {
+int SMART_FILE_write(SMART_FILE *file, const unsigned char *raw, size_t raw_len, size_t *count) {
 	int res;
 	size_t c = 0;
 

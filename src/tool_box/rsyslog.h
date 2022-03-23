@@ -24,7 +24,7 @@
 #include "debug_print.h"
 #include "io_files.h"
 #include "err_trckr.h"
-
+#include "logksi.h"
 
 #define SOF_FTLV_BUFFER (0xffff + 4)
 
@@ -40,4 +40,4 @@ int logsignature_verify(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 int logsignature_extract(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files);
 int logsignature_integrate(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, LOGKSI* blocks, IO_FILES *files);
 int logsignature_sign(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files);
-int logsignature_create(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, LOGKSI *blocks, IO_FILES *files, KSI_HashAlgorithm aggrAlgo, KSI_DataHash *inputHash, KSI_DataHash **lastLeaf);
+int logsignature_create(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_CTX *ksi, LOGKSI *blocks, IO_FILES *files, KSI_HashAlgorithm aggrAlgo, STATE_FILE *state);
