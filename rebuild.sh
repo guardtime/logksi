@@ -1,7 +1,7 @@
 #!/bin/sh
 
 #
-# Copyright 2013-2019 Guardtime, Inc.
+# Copyright 2013-2022 Guardtime, Inc.
 #
 # This file is part of the Guardtime client SDK.
 #
