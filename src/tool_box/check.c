@@ -724,7 +724,7 @@ int logksi_datahash_compare(ERR_TRCKR *err, MULTI_PRINTER *mp, LOGKSI* logksi, i
 			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: Failed to verify logline no. %zu:\n"
 																				  "   + Logline:\n"
 																				  "     '%.*s'\n", LOGKSI_getNofLines(logksi), (strlen(logksi->logLine) - 1), logksi->logLine);
-			if (differentHashAlg) print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "   + Hash algorithms differ!%s\n");
+			if (differentHashAlg) print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "   + Hash algorithms differ!\n");
 			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "   + %s\n"
 																				  "     %s\n", helpLeft, LOGKSI_DataHash_toString(left, buf, sizeof(buf)));
 			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "   + %s\n"
@@ -734,7 +734,7 @@ int logksi_datahash_compare(ERR_TRCKR *err, MULTI_PRINTER *mp, LOGKSI* logksi, i
 			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_EQUAL | DEBUG_LEVEL_3, "Block no. %3zu: Error: failed to verify logline no. %zu: %s", logksi->blockNo, LOGKSI_getNofLines(logksi), logksi->logLine);
 		} else {
 			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "\n x Error: %s:\n", failureReason);
-			if (differentHashAlg) print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "   + Hash algorithms differ!%s\n");
+			if (differentHashAlg) print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "   + Hash algorithms differ!\n");
 			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "   + %s\n"
 																				  "     %s\n", helpLeft, LOGKSI_DataHash_toString(left, buf, sizeof(buf)));
 			print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_SMALLER | DEBUG_LEVEL_3, "   + %s\n"

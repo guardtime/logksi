@@ -204,3 +204,11 @@ export KSI_CONF=test/test.cfg
 	[ "$status" -ge 1 ]
 	[[ "$output" =~ (Error: Block no. 1: unable to calculate hash of logline no. 4. .Unexpected end of file.) ]]
 }
+
+# Test checking for a fixed bug. It used to be crashing.
+@test "try to verify log signature with invalid aggregation hash algorithm (bug in v1.5.649)" {
+	run src/logksi verify test/resource/logs_and_signatures/invalid-aggr-algo
+	[ "$status" -ge 6 ]
+	[[ "$output" =~ (Hash algorithms differ) ]]
+	[[ "$output" =~ (Error: Block no. 1: record hashes not equal for logline no. 1.) ]]
+}
