@@ -7,6 +7,7 @@
 (LOGKSI-131) * FEATURE: New option --ksi to extract pure KSI signature for log line.
 (LOGKSI-138) * FEATURE: Memory tests can be run with test/memory-test.sh.
 (LOGKSI-120) * FEATURE: Extending of Excerpt file implemented.
+(LOGKSI-155) * IMPROVEMENT: Copyright updated with year 2022.
 (LOGKSI-134) * IMPROVEMENT: General verification is based on libksi verification policy.
 (LOGKSI-133) * IMPROVEMENT: Wording for inconclusive verification result message improved.
 (LOGKSI-133) * IMPROVEMENT: Inconclusive verification result will return EXIT_FAILURE as exit code.
