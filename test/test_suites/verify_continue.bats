@@ -159,3 +159,11 @@ export KSI_CONF=test/test.cfg
 	[ "$status" -eq 1 ]
 	[[ "$output" =~ (Verifying... failed.)..( x Error: Block 5 is unsigned!)..( x Error: Skipping block 5!)..( x Error: Block 6 is unsigned!)..( x Error: Skipping block 6!)..( x Error: Block 25 is unsigned!)..( x Error: Skipping block 25!)..(Summary of logfile) ]]
 }
+
+@test "verify skipping log lines larger than 1024 bytes (bug in v1.5.649)" {
+	run src/logksi verify --ver-int test/resource/logs_and_signatures/large-line-skipping --continue-on-fail -dd
+	[ "$status" -eq 6 ]
+	[[ "$output" =~ (Verifying block no).*(1... failed).*(x Error: Failed to verify logline no. 1:).*(Verifying block no).*(2... ok.) ]]
+	[[ "$output" =~ (Verification is continued. Failure may be caused by the error in the previous block 1. Using input hash of the current block instead.) ]]
+	[[ "$output" =~ (Count of blocks).*(2) ]]
+}

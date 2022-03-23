@@ -1317,8 +1317,10 @@ static int skip_current_block_as_it_does_not_verify(LOGKSI *logksi, MULTI_PRINTE
 				print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_3, "Block no. %3zu: Skipping %zu log lines.\n", logksi->blockNo, logLinesToSkip);
 
 				for (i = 0; i < logLinesToSkip; i++) {
-					res = SMART_FILE_readLine(files->files.inLog, buf, sizeof(buf), NULL);
-					if (res != SMART_FILE_OK) goto cleanup;
+					do {
+						res = SMART_FILE_readLine(files->files.inLog, buf, sizeof(buf), NULL);
+						if (res != SMART_FILE_OK && res != SMART_FILE_NO_EOL) goto cleanup;
+					} while (res == SMART_FILE_NO_EOL);
 				}
 			}
 		break;
