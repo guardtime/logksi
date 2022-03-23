@@ -121,11 +121,11 @@ int LOGKSI_readLine(LOGKSI *logksi, SMART_FILE *file) {
 		if (res != KT_OK) return res;
 
 		res = SMART_FILE_readLine(file, buf + read_count, buf_cap - read_count - 2, &c);
-		if (res != SMART_FILE_OK && res != SMART_FILE_BUFFER_TOO_SMALL) return res;
+		if (res != SMART_FILE_OK && res != SMART_FILE_NO_EOL) return res;
 
 		read_count += c;
 		i++;
-	} while(res == SMART_FILE_BUFFER_TOO_SMALL);
+	} while(res == SMART_FILE_NO_EOL);
 
 	buf[read_count] = '\n';
 	buf[read_count + 1] = '\0';

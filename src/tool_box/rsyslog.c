@@ -1319,8 +1319,8 @@ static int skip_current_block_as_it_does_not_verify(LOGKSI *logksi, MULTI_PRINTE
 				for (i = 0; i < logLinesToSkip; i++) {
 					do {
 						res = SMART_FILE_readLine(files->files.inLog, buf, sizeof(buf), NULL);
-						if (res != SMART_FILE_OK && res != SMART_FILE_BUFFER_TOO_SMALL) goto cleanup;
-					} while (res == SMART_FILE_BUFFER_TOO_SMALL);
+						if (res != SMART_FILE_OK && res != SMART_FILE_NO_EOL) goto cleanup;
+					} while (res == SMART_FILE_NO_EOL);
 				}
 			}
 		break;

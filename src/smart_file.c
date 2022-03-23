@@ -392,7 +392,7 @@ static int smart_file_read_line_common(void *file, char *buf, size_t len, size_t
 				buf[len - 1] = '\0';
 				*count = lineSize;
 				*raw_count_out = raw_count;
-				res = SMART_FILE_BUFFER_TOO_SMALL;
+				res = SMART_FILE_NO_EOL;
 				goto cleanup;
 			}
 
@@ -1096,7 +1096,7 @@ static int smart_file_read_line_skip_empty_or_not(SMART_FILE *file, char *raw, s
 
 cleanup:
 
-	if (count != NULL && (res == SMART_FILE_OK || res == SMART_FILE_BUFFER_TOO_SMALL)) {
+	if (count != NULL && (res == SMART_FILE_OK || res == SMART_FILE_NO_EOL)) {
 		*count = c;
 	}
 
@@ -1311,8 +1311,8 @@ const char* SMART_FILE_errorToString(int error_code) {
 			return "Unable truncate file.";
 		case SMART_FILE_UNABLE_TO_LOCK:
 			return "Unable set file lock.";
-		case SMART_FILE_BUFFER_TOO_SMALL:
-			return "Insufficient buffer size.";
+		case SMART_FILE_NO_EOL:
+			return "End of line not reached.";
 		case SMART_FILE_NOT_OPEND:
 			return "File is not opened.";
 		case SMART_FILE_DOES_NOT_EXIST:
