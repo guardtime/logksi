@@ -31,6 +31,7 @@ else
 fi
 
 bats \
+test/test_suites/conf_ok.bats \
 test/test_suites/conf_invalid.bats \
 test/test_suites/integrate.bats \
 test/test_suites/integrate_recover.bats \
