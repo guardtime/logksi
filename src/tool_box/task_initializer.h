@@ -33,7 +33,7 @@ extern "C" {
 
 enum service_info_priorities {
 	/* Priority level for default values. */
-	PRIORITY_KSI_DEFAULT,
+	PRIORITY_DEFAULT,
 
 	/* Priority of KSI configuration file read from KSI_CONF environment variable. */
 	PRIORITY_KSI_CONF,

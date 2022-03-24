@@ -47,9 +47,10 @@
 #include "io_files.h"
 
 static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
+static int set_defaults(PARAM_SET *set);
 static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err);
 static int generate_filenames(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files);
-static int open_state(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files, STATE_FILE **state);
+static int open_state(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, STATE_FILE **state);
 static int open_input_and_output_files(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files);
 static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files);
 static void close_input_and_output_files(ERR_TRCKR *err, int res, IO_FILES *files);
@@ -89,6 +90,9 @@ int create_run(int argc, char** argv, char **envp) {
 	res = generate_tasks_set(set, task_set);
 	if (res != PST_OK) goto cleanup;
 
+	res = set_defaults(set);
+	if (res != PST_OK) goto cleanup;
+
 	res = TASK_INITIALIZER_getServiceInfo(set, argc, argv, envp);
 	if (res != PST_OK) goto cleanup;
 
@@ -124,7 +128,7 @@ int create_run(int argc, char** argv, char **envp) {
 	res = check_if_output_files_will_not_be_overwritten_if_restricted(set, mp, err);
 	if (res != KT_OK) goto cleanup;
 
-	res = open_state(set, err, ksi, &files, &state);
+	res = open_state(set, err, ksi, &state);
 	if (res != KT_OK) goto cleanup;
 
 	do {
@@ -174,6 +178,10 @@ int create_run(int argc, char** argv, char **envp) {
 		if (files.user.bStdinLog) break;
 		i++;
 	} while(1);
+
+	/* Approve that temporary state file is OK and old one can be replaced. */
+	res = STATE_FILE_approve(state);
+	ERR_CATCH_MSG(err, res, "Error: Unable to approve state file.");
 
 	if (PARAM_SET_isSetByName(set, "output-hash")) {
 		char *fname = NULL;
@@ -251,7 +259,7 @@ char *create_help_toString(char*buf, size_t len) {
 	PARAM_SET_setHelpText(set, "log-file-list", "<file>", "Same as -- but log file list is read from a file or from stdin (use '-' as file name to read log file list from stdin). This option can be useful when the list of log files is too long to represent it on the command line. By default file names are separated by whitespace characters (including new line). Empty lines are ignored. Quote (') and double quote (\") can be used to include strings containing delimiters or delimiters can be escaped with backslash (\\\\). To change the delimiter see --log-file-list-delimiter. It can not be combined with other log file inputs and log file output -o.");
 	PARAM_SET_setHelpText(set, "log-file-list-delimiter", "<str>", "To change how the file names are separated from each other in log file list (see --log-file-list) specify the delimiter. There are two magical strings 'new-line', where each line contains one log file name, and 'space' (default), where whitespace characters separates log file names. Otherwise the user can specify a single character from {:;,|}.");
 	PARAM_SET_setHelpText(set, "log-from-stdin", NULL, "Read log file from stdin (same as input log file is omitted). This option can not be used together with file inputs (<logfile>, -- and --log-file-list). If output file name is not specified, log signature is stored as stdin.logsig.");
-	PARAM_SET_setHelpText(set, "seed", "<file>", "Specify random seed for masking. Random seed is a file containing enough bytes to provide a sequence of bytes, in the size of the output of hash algorithm used to build Merkle tree, for every block (see -H). Use '-' as file name to read the random from stdin.");
+	PARAM_SET_setHelpText(set, "seed", "<file>", "Specify random seed for masking. Random seed is a file containing enough bytes to provide a sequence of bytes, in the size of the output of hash algorithm used to build Merkle tree, for every block (see -H). Use '-' as file name to read the random from stdin. If not specified '/dev/urandom' is used as default (only if such file exists).");
 	PARAM_SET_setHelpText(set, "seed-len", "<int>", "Size of the random seed. If not set size of the seed is the size of the output of hash algorithm used to build Merkle tree (see -H).");
 	PARAM_SET_setHelpText(set, "blk-size", "<int>", "The maximum size of the block (how many log records are aggregated into single Merkle tree).");
 	PARAM_SET_setHelpText(set, "keep-record-hashes", NULL, "Include record hashes (hash value directly calculated from log line without any masking) into log signature file. Log signature without record hashes can still be verified but the diagnostics in case of failure is more difficult.");
@@ -259,9 +267,10 @@ char *create_help_toString(char*buf, size_t len) {
 	PARAM_SET_setHelpText(set, "input-hash", "<hash>", "Specify hash imprint for inter-linking (the last leaf from the previous log signature). Hash can be specified on command line or from a file containing its string representation. Hash format: <alg>:<hash in hex>. Use '-' as file name to read the imprint from stdin. Call logksi -h to get the list of supported hash algorithms. See --output-hash to see how to extract the hash imprint from the previous log file. When used together with -- or --log-file-list, only the first block uses the value as input hash.");
 	PARAM_SET_setHelpText(set, "output-hash", "<file>", "Output the last leaf from the log signature into file. Use '-' as file name to redirect hash imprint to stdout. See --input-hash to use the output hash as input hash to next log signature. When used together with -- or --log-file-list, only the output hash of the last block is returned. Will always overwrite existing file.");
 	PARAM_SET_setHelpText(set, "state", NULL, "Creates a binary state file that keeps aggregation hash algorithm and last leaf from the Merkle tree being built. State file helps to continue signing the logs and keeps cryptographic linking between different calls to logksi. Functionality is similar to using --input-hash and --output-hash but it requires less scripting and also configures aggregation hash algorithm. It must be noted that state file requires more frequent disk access as every log line will update the state!\n\n"
-		"The state file name is generated by appending '.state' extension to the log files name. If --sig-dir is specified state file is stored there. In case of multiple input log files state file name must be specified explicitly (see --state-file-name). State file is always overwritten.\n\n"
+		"The state file name is generated by appending '.state' extension to the log files name. If --sig-dir is specified state file is stored there. In case of multiple input log files state file name must be specified explicitly (see --state-file-name). On success state file is always overwritten. In case of failure old state file is preserved.\n\n"
 		"If state file does not exist it is created and initialized (with --input-hash or zero hash). If state file already exists it is loaded and input hash and aggregation hash algorithm is used to initialize log signing process. Using option -H will override aggregation hash algorithm. With existing state file --input-hash can not be used.");
 	PARAM_SET_setHelpText(set, "state-file-name", "<file>", "Same as --state but state file is always stored at given location no matter what the log files name is, making it suitable for signing multiple log files in sequence (in one or multiple calls to logksi).");
+	PARAM_SET_setHelpText(set, "sig-dir", "<dir>", "Specify the directory to store the log signatures into. Using this option signature file names are generated by appending '.logsig' extension to the log file; This option can not work with -o. If used together with implicit state file name (--state) state file is stored next to the signature.");
 	PARAM_SET_setHelpText(set, "o", "<out.logsig>", "Specify the name of the created log signature file; recommended file extension is '.logsig'. If not specified, the log signature file is saved as '<logfile>.logsig' in the same folder where the <logfile> is located. An attempt to overwrite an existing log signature file will result in an error (see --force-overwrite). Use '-' as file name to redirect the output as a binary stream to stdout. This option can only be used when a single log file is used as input (exept with --log-file-list).");
 	PARAM_SET_setHelpText(set, "force-overwrite", NULL, "Force overwriting of existing log signature file.");
 	PARAM_SET_setHelpText(set, "d", NULL, "Print detailed information about processes and errors to stderr. To make output more verbose use -dd or -ddd.");
@@ -272,11 +281,14 @@ char *create_help_toString(char*buf, size_t len) {
 
 	/* Format synopsis and parameters. */
 	count += PST_snhiprintf(buf + count, len - count, 80, 0, 0, NULL, ' ', "Usage:\\>1\n\\>8"
-		"logksi create <logfile> [-o <out.logsig>] -S <URL> [--aggr-user <user>\n"
+		"logksi create <logfile> --blk-size  <int> [--max-lvl  <int>] [--seed <file>]\n[-o <out.logsig>] -S <URL> [--aggr-user <user>"
 		"--aggr-key <key>] [more_options]\\>1\n\\>8"
+		"logksi create [more_options] -- <logfile>...\\>1\n\\>8"
+		"logksi create --log-file-list <file> [--log-file-list-delimiter <delimiter>] [more_options]\\>1\n\\>8"
+		"logksi create -S URL [--aggr-user user --aggr-key key] --dump-conf\\>1\n\\>8"
 		"\\>\n\n\n");
 
-	ret = PARAM_SET_helpToString(set, "input,multiple_logs,log-file-list,log-file-list-delimiter,log-from-stdin,seed,seed-len,max-lvl,blk-size,keep-record-hashes,keep-tree-hashes,input-hash,output-hash,state,state-file-name,H,o,force-overwrite,S,aggr-user,aggr-key,aggr-hmac-alg,d,dump-conf,conf,apply-remote-conf,log", 1, 13, 80, buf + count, len - count);
+	ret = PARAM_SET_helpToString(set, "input,multiple_logs,log-file-list,log-file-list-delimiter,log-from-stdin,seed,seed-len,max-lvl,blk-size,keep-record-hashes,keep-tree-hashes,input-hash,output-hash,state,state-file-name,H,sig-dir,o,force-overwrite,S,aggr-user,aggr-key,aggr-hmac-alg,d,dump-conf,conf,apply-remote-conf,log", 1, 13, 80, buf + count, len - count);
 
 cleanup:
 	if (res != PST_OK || ret == NULL) {
@@ -386,6 +398,20 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 
 cleanup:
 
+	return res;
+}
+
+static int set_defaults(PARAM_SET *set) {
+	int res = KT_UNKNOWN_ERROR;
+
+	if(SMART_FILE_doFileExist("/dev/urandom")) {
+		res = PARAM_SET_add(set, "seed", "/dev/urandom", NULL, PRIORITY_DEFAULT);
+		if (res != PST_OK) goto cleanup;
+	}
+
+	res = KT_OK;
+
+cleanup:
 	return res;
 }
 
@@ -505,7 +531,7 @@ cleanup:
 
 	return res;
 }
-static int open_state(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *files, STATE_FILE **state) {
+static int open_state(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, STATE_FILE **state) {
 	STATE_FILE *tmp = NULL;
 	int res = KT_UNKNOWN_ERROR;
 	int inputCount = 0;
@@ -515,7 +541,7 @@ static int open_state(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi, IO_FILES *fi
 	char *userStateFileName = NULL;
 	char *stateFileName = NULL;
 
-	if (set == NULL || err == NULL || files == NULL || state == NULL) return KT_INVALID_ARGUMENT;
+	if (set == NULL || err == NULL || state == NULL) return KT_INVALID_ARGUMENT;
 
 	extra.ctx = ksi;
 	extra.err = err;

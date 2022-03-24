@@ -8,6 +8,8 @@ mkdir -p test/out/state/sigdir_B
 mkdir -p test/out/state/sigdir_C
 mkdir -p test/out/state/sigdir_D
 mkdir -p test/out/state/sigdir_E
+mkdir -p test/out/state/sigdir_F
+mkdir -p test/out/state/sigdir_G
 mkdir -p test/out/state/invalid-state_files
 cp test/resource/logfiles/treehash1 test/out/state/logfile_1A
 cp test/resource/logfiles/treehash2 test/out/state/logfile_2A
@@ -68,6 +70,23 @@ f_summary_of_logfile_short () {
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Verifying... ok." ]]
 	[[ "$output" =~ `f_summary_of_logfile_short 1 4 1 "SHA-256:000000.*000000" "SHA-256:20c46e.*498552"` ]]
+}
+
+# @SKIP_MEMORY_TEST
+@test "create with state file: use previous signature to initialize state file"  {
+	run src/logksi create test/out/state/logfile_2A --blk-size 16 --seed test/resource/random/seed_aa --state --sig-dir test/out/state/sigdir_G --input-hash $(src/logksi verify --ver-int test/out/state/logfile_1A --output-hash - | tail -n 1) -d
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Creating... ok." ]]
+	[[ "$output" =~ `f_summary_of_logfile_short 1 5 1 "SHA-256:20c46e.*498552" "SHA-256:44883d.*7afe98"` ]]
+
+	run xxd -p -c 100 test/out/state/sigdir_G/logfile_2A.state
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ (4b5349535441543130)(01)(20)(44883d33f25a470c6fd0c9d6bb5404fe8762ef85a4b27cd901695919ac7afe98) ]]
+
+	run ./src/logksi verify test/out/state/logfile_2A --sig-dir test/out/state/sigdir_G -d
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Verifying... ok." ]]
+	[[ "$output" =~ `f_summary_of_logfile_short 1 5 1 "SHA-256:20c46e.*498552" "SHA-256:44883d.*7afe98"` ]]
 }
 
 @test "create with state file: default state files name 2 logs with simulated log rotation" {
@@ -267,4 +286,45 @@ f_summary_of_logfile_short () {
 	run ./src/logksi create --seed test/resource/random/seed_aa --blk-size 5 -d --state --state-file-name test/out/state/invalid-state_files/only-magic.state --force-overwrite -o test/out/state/dummy.logsig -- test/out/state/logfile_1A
 	[ "$status" -eq 1 ]
 	[[ "$output" =~ (Error).*(Unable to open state file).*(only-magic.state).*(Unexpected end of file) ]]
+}
+
+@test "create with state file: use additional --output-hash to export value of the last leaf" {
+	run ./src/logksi create --seed test/resource/random/seed_aa --blk-size 5 -d test/out/state/logfile_1A -o test/out/state/logfile_1A_with_output_hash.logsig --state-file-name test/out/state/logfile_1A_with_output_hash.state --output-hash -
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Creating... ok." ]]
+	[[ "$output" =~ `f_summary_of_logfile_short 1 4 1 "SHA-256:000000.*000000" "SHA-256:20c46e.*498552"` ]]
+	[[ "$output" =~ "SHA-256:20c46e471b9c26c192797aff00f2ad8633500a365c64f0fd4177df0b34498552" ]]
+
+	run xxd -p -c 100 test/out/state/logfile_1A_with_output_hash.state
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ (4b5349535441543130)(01)(20)(20c46e471b9c26c192797aff00f2ad8633500a365c64f0fd4177df0b34498552) ]]
+
+	run ./src/logksi verify test/out/state/logfile_1A test/out/state/logfile_1A_with_output_hash.logsig -d
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Verifying... ok." ]]
+	[[ "$output" =~ `f_summary_of_logfile_short 1 4 1 "SHA-256:000000.*000000" "SHA-256:20c46e.*498552"` ]]
+}
+
+@test "create with state file: check if failure will not create any state file" {
+	run ./src/logksi create --seed test/resource/random/seed_aa --blk-size 16 -d --sig-dir test/out/state/sigdir_F -S http://this-url-does-not-exist --state -- test/out/state/logfile_2A
+	[ "$status" -eq 5 ]
+	[[ "$output" =~ "Creating... failed." ]]
+	[[ "$output" =~ (Error: Could not resolve host).*(this-url-does-not-exist) ]]
+
+	run test -f test/out/state/sigdir_F/logfile_2A.state
+	[ "$status" -ne 0 ]
+}
+
+@test "create with state file: check if failure will preserve original state file" {
+	run cp test/resource/state_file/sha512.state test/out/state/sigdir_F/logfile_2A.state
+	[ "$status" -eq 0 ]
+
+	run ./src/logksi create --seed test/resource/random/seed_aa --blk-size 16 -d --sig-dir test/out/state/sigdir_F -S http://this-url-does-not-exist --state -- test/out/state/logfile_2A
+	[ "$status" -eq 5 ]
+	[[ "$output" =~ "Creating... failed." ]]
+	[[ "$output" =~ (Error: Could not resolve host).*(this-url-does-not-exist) ]]
+
+	run xxd -p -c 100 test/out/state/sigdir_F/logfile_2A.state
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ (4b5349535441543130)(05)(40)(88fffc8a82c342ce65b687e117fedc45953bbf302505525ffd359e16a293a9accd1f0dab2dda7b0a1d13b1b97f2d950cfbd2c70b6075d987b00c37a339e0fbc5) ]]
 }
