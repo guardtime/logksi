@@ -21,6 +21,15 @@ else
 	echo Warning: gttlvutil is not installed. Tests depending on gttlvutil are ignored.
 fi
 
+if test -e /dev/urandom; then
+	TEST_DEPENDING_ON_URANDOM="\
+		test/test_suites/create-urandom.bats"
+	echo Info: Extra tests depending on /dev/urandom added.
+else
+	TEST_DEPENDING_ON_URANDOM=""
+	echo Warning: /dev/urandom does not exists. Tests depending on /dev/urandom are ignored.
+fi
+
 bats \
 test/test_suites/conf_invalid.bats \
 test/test_suites/integrate.bats \
@@ -62,7 +71,8 @@ test/test_suites/create_rebuild.bats \
 test/test_suites/create_state_file.bats \
 test/test_suites/create_state_file_cmd.bats \
 $TEST_DEPENDING_ON_KSI_TOOL \
-$TEST_DEPENDING_ON_TLVUTIL
+$TEST_DEPENDING_ON_TLVUTIL \
+$TEST_DEPENDING_ON_URANDOM
 
 exit_code=$?
 

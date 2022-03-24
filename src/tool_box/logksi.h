@@ -58,6 +58,7 @@ int STATE_FILE_update(STATE_FILE *state, KSI_DataHash *hash);
 void STATE_FILE_close(STATE_FILE *state);
 KSI_DataHash* STATE_FILE_lastLeaf(STATE_FILE *state);
 int STATE_FILE_setHashAlgo(STATE_FILE *state, KSI_HashAlgorithm algo);
+int STATE_FILE_approve(STATE_FILE *state);
 KSI_HashAlgorithm STATE_FILE_hashAlgo(STATE_FILE *state);
 
 void LOGKSI_initialize(LOGKSI *block);

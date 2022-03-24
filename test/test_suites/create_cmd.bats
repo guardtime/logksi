@@ -56,12 +56,6 @@ mkdir -p test/out/dummy_dir
 	[[ "$output" =~ (Error: Multiple different simultaneous inputs from stdin).*(--input-hash -, --log-from-stdin) ]]
 }
 
-@test "create CMD test: try to use create without seed" {
-	run src/logksi create test/out/dummy_cmd --blk-size 4
-	[ "$status" -eq 3 ]
-	[[ "$output" =~ "You have to define flag(s) '--seed'." ]]
-}
-
 @test "create CMD test: try to use create without block size" {
 	run src/logksi create test/out/dummy_cmd --seed test/resource/random/seed_aa
 	[ "$status" -eq 3 ]

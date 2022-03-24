@@ -538,7 +538,7 @@ int STATE_FILE_open(int readOnly, const char *fname, KSI_CTX *ksi, STATE_FILE **
 	}
 
 	if (!readOnly && fname != NULL) {
-		res = SMART_FILE_open(fname, "wb", &tmp_in_out_file);
+		res = SMART_FILE_open(fname, "wbT", &tmp_in_out_file);
 		if (res != SMART_FILE_OK) goto cleanup;
 	}
 
@@ -644,4 +644,9 @@ int STATE_FILE_setHashAlgo(STATE_FILE *state, KSI_HashAlgorithm algo) {
 	if (state == NULL) return KT_INVALID_ARGUMENT;
 	state->aggrAlgo = algo;
 	return KT_OK;
+}
+
+int STATE_FILE_approve(STATE_FILE *state) {
+	if (state == NULL) return KT_INVALID_ARGUMENT;
+	return 	(state->state_file  == NULL) ? KT_OK : SMART_FILE_markConsistent(state->state_file);
 }
