@@ -56,7 +56,9 @@ char* CONF_generate_param_set_desc(char *description, const char *flags, char *b
 		count += KSI_snprintf(buf + count, buf_len - count,
 				"{H}"
 				"{S}{aggr-user}{aggr-key}{aggr-hmac-alg}{aggr-pdu-v}"
-				"{max-lvl}");
+				"{max-lvl}"
+				/* The following options are recognized but ignored .*/
+				"{max-aggr-rounds}{mdata-cli-id}{mdata-mac-id}{mdata-sqn-nr}{mdata-req-tm}");
 	}
 
 	if (is_X) {
@@ -69,7 +71,9 @@ char* CONF_generate_param_set_desc(char *description, const char *flags, char *b
 
 	if (is_X || is_S) {
 		count += KSI_snprintf(buf + count, buf_len - count,
-				"{apply-remote-conf}");
+				"{apply-remote-conf}"
+				/* The following options are recognized but ignored .*/
+				"{inst-id}{msg-id}");
 	}
 
 	return buf;
@@ -158,6 +162,9 @@ int CONF_initialize_set_functions(PARAM_SET *conf, const char *flags) {
 		res = PARAM_SET_addControl(conf, "{max-lvl}", isFormatOk_int, isContentOk_tree_level, NULL, extract_int);
 		if (res != PST_OK) goto cleanup;
 
+		res = PARAM_SET_setParseOptions(conf, "{max-aggr-rounds}{mdata-cli-id}{mdata-mac-id}{mdata-sqn-nr}{mdata-req-tm}", PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
+		if (res != PST_OK) goto cleanup;
+
 		PARAM_SET_setHelpText(conf, "H", NULL, "Use the given hash algorithm for hashing log records and aggregating the Merkle tree nodes. If not set, the default algorithm is used. Use logksi -h to get the list of supported hash algorithms. If used in combination with --apply-remote-conf, the algorithm parameter provided by the server will be ignored.");
 		PARAM_SET_setHelpText(conf, "S", "<URL>", "Signing service (KSI Aggregator) URL. Supported URL schemes are: http, https, ksi+http, ksi+https and ksi+tcp.");
 		PARAM_SET_setHelpText(conf, "max-lvl", "<int>", "Set the maximum depth (0 - 31) of the Merkle tree. If used in combination with --apply-remote-conf, where service maximum level is provided, the smaller value is applied.");
@@ -187,6 +194,9 @@ int CONF_initialize_set_functions(PARAM_SET *conf, const char *flags) {
 		if (res != PST_OK) goto cleanup;
 
 		res = PARAM_SET_setParseOptions(conf, "apply-remote-conf", PST_PRSCMD_HAS_NO_VALUE);
+		if (res != PST_OK) goto cleanup;
+
+		res = PARAM_SET_setParseOptions(conf, "{inst-id}{msg-id}", PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
 		if (res != PST_OK) goto cleanup;
 
 		PARAM_SET_setHelpText(conf, "apply-remote-conf", NULL, "Obtain and apply additional configuration data from service server.");

@@ -16,6 +16,7 @@
 (LOGKSI-135) * IMPROVEMENT: libparamset 1.1 is used to parse command-line parameters and to generate help.
 (LOGKSI-127) * IMPROVEMENT: At least libksi 3.20 is needed to build logksi.
 (LOGKSI-144,LOGKSI-146) * BUGFIX: When unsigned block interrupts verification with flag --continue-on-fail, correct summary of block and file is displayed.
+(LOGKSI-154) * BUGFIX: Options not supported by logksi but found in KSI tool configuration file will not result in an error.
 (LOGKSI-153) * BUGFIX: When log lines are skipped on error (with --continue-on-fail) due to record hash mismatch, log lines larger than 1024 bytes are skipped correctly.
 (LOGKSI-147) * BUGFIX: It is not possible to remove lines from log file containing only identical log lines.
 (LOGKSI-132) * BUGFIX: When verifying and --continue-on-fail is set, error trace is not crowded with detailed error messages.
