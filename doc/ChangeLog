@@ -1,6 +1,6 @@
 Version 1.6
 
-2022-04-01 1.5.649
+2022-04-01 1.6.752
 
 * FEATURE: New command create to make a log signature from existing log file.
 * FEATURE: New option --sig-dir for verify and create to search log signatures from not default location.
