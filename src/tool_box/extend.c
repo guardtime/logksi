@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2017 Guardtime, Inc.
+ * Copyright 2013-2022 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -25,9 +25,10 @@
 #include <ksi/ksi.h>
 #include <ksi/compatibility.h>
 #include <ksi/policy.h>
-#include "param_set/param_set.h"
-#include "param_set/parameter.h"
-#include "param_set/task_def.h"
+#include <param_set/param_set.h>
+#include <param_set/parameter.h>
+#include <param_set/task_def.h>
+#include <param_set/strn.h>
 #include "tool_box/ksi_init.h"
 #include "tool_box/param_control.h"
 #include "tool_box/task_initializer.h"
@@ -44,9 +45,9 @@
 #include <inttypes.h>
 #include "io_files.h"
 
-static int extend_to_nearest_publication(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_PublicationsFile *pubFile, KSI_VerificationContext *context, KSI_Signature **ext);
-static int extend_to_specified_time(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_PublicationsFile *pubFile, KSI_VerificationContext *context, KSI_Signature **ext);
-static int extend_to_specified_publication(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_PublicationsFile *pubFile, KSI_VerificationContext *context, KSI_Signature **ext);
+static int extend_to_nearest_publication(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, LOGKSI *logksi, IO_FILES *files, KSI_Signature *sig, KSI_PublicationsFile *pubFile, KSI_VerificationContext *context, KSI_Signature **ext);
+static int extend_to_specified_time(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, LOGKSI *logksi, IO_FILES *files, KSI_Signature *sig, KSI_PublicationsFile *pubFile, KSI_VerificationContext *context, KSI_Signature **ext);
+static int extend_to_specified_publication(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, LOGKSI *logksi, IO_FILES *files, KSI_Signature *sig, KSI_PublicationsFile *pubFile, KSI_VerificationContext *context, KSI_Signature **ext);
 static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
 static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err);
 static int check_io_naming_and_type_errors(PARAM_SET *set, ERR_TRCKR *err);
@@ -54,6 +55,8 @@ static int generate_filenames(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files);
 static int open_input_and_output_files(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files);
 static int rename_temporary_and_backup_files(ERR_TRCKR *err, IO_FILES *files);
 static void close_input_and_output_files(ERR_TRCKR *err, int res, IO_FILES *files);
+
+#define PARAMS "{input}{o}{sig-from-stdin}{enable-rfc3161-conversion}{d}{x}{T}{pub-str}{conf}{log}{h|help}{hex-to-str}"
 
 enum {
 	EXT_TO_EAV_PUBLICATION_FROM_FILE = 0x00,
@@ -85,7 +88,7 @@ int extend_run(int argc, char** argv, char **envp) {
 	 * Extract command line parameters.
 	 */
 	res = PARAM_SET_new(
-			CONF_generate_param_set_desc("{input}{o}{sig-from-stdin}{enable-rfc3161-conversion}{d}{x}{T}{pub-str}{conf}{log}{h|help}{hex-to-str}", "XP", buf, sizeof(buf)),
+			CONF_generate_param_set_desc(PARAMS, "XP", buf, sizeof(buf)),
 			&set);
 	if (res != KT_OK) goto cleanup;
 
@@ -202,78 +205,63 @@ cleanup:
 	return LOGKSI_errToExitCode(res);
 }
 char *extend_help_toString(char*buf, size_t len) {
-	KSI_snprintf(buf, len,
-		"Usage:\n"
-		" %s extend <logfile> [-o <out.logsig>] -X <URL>\n"
-		"    [--ext-user <user> --ext-key <key>] -P <URL> [--cnstr <oid=value>]... [more_options]\n"
-		" %s extend <logfile> [-o <out.logsig>] -X <URL>\n"
-		"    [--ext-user <user> --ext-key <key>] -P <URL> [--cnstr <oid=value>]... [--pub-str <str>] [more_options]\n"
-		" %s extend --sig-from-stdin [-o <out.logsig>] [more_options]\n"
-		"\n"
-		" <logfile>\n"
-		"           - Name of the log file whose log signature file is to be extended. Log signature file name is\n"
-		"             derived by adding either '.logsig' or '.gtsig' to '<logfile>'. The file is expected to be found in\n"
-		"             the same folder as the '<logfile>'. If specified, the '--sig-from-stdin' switch cannot be used.\n"
-		" --sig-from-stdin\n"
-		"             The log signature file is read from stdin.\n"
-		" -o <out.logsig>\n"
-		"           - Name of the extended output log signature file. An existing log signature file is always overwritten.\n"
-		"             If not specified, the log signature is saved to '<logfile>.logsig' while a backup of '<logfile>.logsig'\n"
-		"             is saved in '<logfile>.logsig.bak'.\n"
-		"             Use '-' to redirect the extended log signature binary stream to stdout.\n"
-		"             If input is read from stdin and output is not specified, stdout is used for output.\n"
-		" -X <URL>\n"
-		"           - Extending service (KSI Extender) URL.\n"
-		" --ext-user <user>\n"
-		"           - Username for extending service.\n"
-		" --ext-key <key>\n"
-		"           - HMAC key for extending service.\n"
-		" --ext-hmac-alg <alg>\n"
-		"           - Hash algorithm to be used for computing HMAC on outgoing messages\n"
-		"             towards KSI extender. If not set, default algorithm is used.\n"
-		" -P <URL>\n"
-		"           - Publications file URL (or file with URI scheme 'file://').\n"
-		" --cnstr <oid=value>\n"
-		"           - OID of the PKI certificate field (e.g. e-mail address) and the expected\n"
-		"             value to qualify the certificate for verification of publications file\n"
-		"             PKI signature. At least one constraint must be defined.\n"
-		" --pub-str <str>\n"
-		"           - Publication record as publication string to extend the signature to.\n"
-		" -V\n"
-		"           - Certificate file in PEM format for publications file verification.\n"
-		"             All values from lower priority sources are ignored.\n"
-		" --enable-rfc3161-conversion\n"
-		"           - Enable conversion, extending and replacing of RFC3161 timestamps with KSI signatures.\n"
-		"             Note: this flag is not required if a different output log signature file name is specified\n"
-		"             with '-o' to avoid overwriting of the original log signature file.\n"
-		" -d\n"
-		"           - Print detailed information about processes and errors to stderr.\n"
-		"             To make output more verbose use -dd or -ddd.\n"
-		" --conf <file>\n"
-		"             Read configuration options from the given file.\n"
-		"             Configuration options given explicitly on command line will\n"
-		"             override the ones in the configuration file.\n"
-		" --log <file>\n"
-		"           - Write libksi log to the given file. Use '-' as file name to redirect the log to stdout.\n",
-		TOOL_getName(),
-		TOOL_getName(),
-		TOOL_getName(),
-		TOOL_getName()
-	);
+	int res;
+	char *ret = NULL;
+	PARAM_SET *set;
+	size_t count = 0;
+	char tmp[1024];
 
+	if (buf == NULL || len == 0) return NULL;
+
+
+	/* Create set with documented parameters. */
+	res = PARAM_SET_new(CONF_generate_param_set_desc(PARAMS, "XP", tmp, sizeof(tmp)), &set);
+	if (res != PST_OK) goto cleanup;
+
+	res = CONF_initialize_set_functions(set, "XP");
+	if (res != PST_OK) goto cleanup;
+
+	/* Temporary name change for formatting help text. */
+	PARAM_SET_setPrintName(set, "input", "<logfile>", NULL);
+	PARAM_SET_setHelpText(set, "input", NULL, "Name of the log file whose log signature file is to be extended. Log signature file name is derived by adding either '.logsig' or '.gtsig' to '<logfile>'. The file is expected to be found in the same folder as the '<logfile>'. If specified, the '--sig-from-stdin' switch cannot be used.");
+	PARAM_SET_setHelpText(set, "sig-from-stdin", NULL, "The log signature file is read from stdin.");
+	PARAM_SET_setHelpText(set, "o", "<out.logsig>", "Name of the extended output log signature file. An existing log signature file is always overwritten. If not specified, the log signature is saved to '<logfile>.logsig' while a backup of '<logfile>.logsig' is saved in '<logfile>.logsig.bak'. Use '-' to redirect the extended log signature binary stream to stdout. If input is read from stdin and output is not specified, stdout is used for output.");
+	PARAM_SET_setHelpText(set, "pub-str", "<str>", "Publication record as publication string to extend the signature to.");
+	PARAM_SET_setHelpText(set, "enable-rfc3161-conversion", NULL, "Enable conversion, extending and replacing of RFC3161 timestamps with KSI signatures. Note: this flag is not required if a different output log signature file name is specified with '-o' to avoid overwriting of the original log signature file.");
+	PARAM_SET_setHelpText(set, "d", NULL, "Print detailed information about processes and errors to stderr. To make output more verbose use -dd or -ddd.");
+	PARAM_SET_setHelpText(set, "conf", NULL, "Read configuration options from the given file. Configuration options given explicitly on command line will override the ones in the configuration file.");
+	PARAM_SET_setHelpText(set, "log", NULL, "Write libksi log to the given file. Use '-' as file name to redirect the log to stdout.");
+
+
+	/* Format synopsis and parameters. */
+	count += PST_snhiprintf(buf + count, len - count, 80, 0, 0, NULL, ' ', "Usage:\\>1\n\\>8"
+	"logksi extend <logfile> [-o <out.logsig>] -X <URL> [--ext-user <user>\n"
+	"--ext-key <key>] -P <URL> [--cnstr <oid=value>]... [more_options]\\>1\n\\>8"
+	"logksi extend <logfile> [-o <out.logsig>] -X <URL> [--ext-user <user>\n"
+	"--ext-key <key>] -P <URL> [--cnstr <oid=value>]... [--pub-str <str>] [more_options]\\>1\n\\>8"
+	"logksi extend --sig-from-stdin [-o <out.logsig>] [more_options]"
+	"\\>\n\n\n");
+
+	ret = PARAM_SET_helpToString(set, "input,sig-from-stdin,o,X,ext-user,ext-key,ext-hmac-alg,P,cnstr,pub-str,V,enable-rfc3161-conversion,d,conf,log", 1, 13, 80, buf + count, len - count);
+
+cleanup:
+	if (res != PST_OK || ret == NULL) {
+		PST_snprintf(buf + count, len - count, "\nError: There were failures while generating help by PARAM_SET.\n");
+	}
+	PARAM_SET_free(set);
 	return buf;
 }
 const char *extend_get_desc(void) {
 	return "Extends KSI signatures in a log signature file to the desired publication.";
 }
-static int extend_to_nearest_publication(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_PublicationsFile *pubFile, KSI_VerificationContext *context, KSI_Signature **ext) {
+static int extend_to_nearest_publication(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, LOGKSI *logksi, IO_FILES *files, KSI_Signature *sig, KSI_PublicationsFile *pubFile, KSI_VerificationContext *context, KSI_Signature **ext) {
 	int res;
 	KSI_Signature *tmp = NULL;
 	KSI_Integer *sigTime = NULL;
 	KSI_PublicationRecord *pubRec = NULL;
 	char buf[256];
 
-	if (set == NULL || ksi == NULL || blocks == NULL || files == NULL || err == NULL || sig == NULL || ext == NULL) {
+	if (set == NULL || ksi == NULL || logksi == NULL || files == NULL || err == NULL || sig == NULL || ext == NULL) {
 		ERR_TRCKR_ADD(err, res = KT_INVALID_ARGUMENT, NULL);
 		goto cleanup;
 	}
@@ -287,8 +275,8 @@ static int extend_to_nearest_publication(PARAM_SET *set, MULTI_PRINTER *mp, ERR_
 
 
 	if (pubRec == NULL) {
-		print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_LEVEL_3, "Block no. %3zu: extending KSI signature to the earliest available publication (na)... ", blocks->blockNo);
-		print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_EQUAL | DEBUG_LEVEL_2, "Extending Block no. %3zu to the earliest available publication... ", blocks->blockNo);
+		print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_LEVEL_3, "Block no. %3zu: extending KSI signature to the earliest available publication (na)... ", logksi->blockNo);
+		print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_EQUAL | DEBUG_LEVEL_2, "Extending Block no. %3zu to the earliest available publication... ", logksi->blockNo);
 		res = KSI_EXTEND_NO_SUITABLE_PUBLICATION;
 		ERR_TRCKR_ADD(err, res, "No suitable publication found from publications file to extend the signature to (signing time %s (%llu)).", KSI_Integer_toDateString(sigTime, buf, sizeof(buf)), (unsigned long long)KSI_Integer_getUInt64(sigTime));
 	} else {
@@ -301,13 +289,12 @@ static int extend_to_nearest_publication(PARAM_SET *set, MULTI_PRINTER *mp, ERR_
 		res = KSI_PublicationData_getTime(pubData, &pubTime);
 		ERR_CATCH_MSG(err, res, "Error: Unable to get publication time.");
 
-		print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_LEVEL_3, "Block no. %3zu: extending KSI signature to the earliest available publication: %s (%llu)... ", blocks->blockNo, KSI_Integer_toDateString(pubTime, buf, sizeof(buf)), (unsigned long long)KSI_Integer_getUInt64(pubTime));
-		print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_EQUAL | DEBUG_LEVEL_2, "Extending Block no. %3zu to the earliest available publication... ", blocks->blockNo);
+		print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_LEVEL_3, "Block no. %3zu: extending KSI signature to the earliest available publication: %s (%llu)... ", logksi->blockNo, KSI_Integer_toDateString(pubTime, buf, sizeof(buf)), (unsigned long long)KSI_Integer_getUInt64(pubTime));
+		print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_EQUAL | DEBUG_LEVEL_2, "Extending Block no. %3zu to the earliest available publication... ", logksi->blockNo);
 	}
 
 
-	LOGKSI_Signature_extend(err, sig, ksi, pubRec, context, &tmp);
-
+	res = LOGKSI_Signature_extend(err, sig, ksi, pubRec, context, &tmp);
 	ERR_CATCH_MSG(err, res, "Error: Unable to extend signature.");
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
 
@@ -324,7 +311,7 @@ cleanup:
 	return res;
 }
 
-static int extend_to_specified_time(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_PublicationsFile* pubFile, KSI_VerificationContext *context, KSI_Signature **ext) {
+static int extend_to_specified_time(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, LOGKSI *logksi, IO_FILES *files, KSI_Signature *sig, KSI_PublicationsFile* pubFile, KSI_VerificationContext *context, KSI_Signature **ext) {
 	int res;
 	KSI_Signature *tmp = NULL;
 	KSI_Integer *pubTime = NULL;
@@ -332,7 +319,7 @@ static int extend_to_specified_time(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR
 	COMPOSITE extra;
 
 
-	if (set == NULL || ksi == NULL || blocks == NULL || files == NULL || err == NULL || sig == NULL || ext == NULL) {
+	if (set == NULL || ksi == NULL || logksi == NULL || files == NULL || err == NULL || sig == NULL || ext == NULL) {
 		ERR_TRCKR_ADD(err, res = KT_INVALID_ARGUMENT, NULL);
 		goto cleanup;
 	}
@@ -350,12 +337,12 @@ static int extend_to_specified_time(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR
 	/* Extend the signature. */
 
 	print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_LEVEL_3, "Block no. %3zu: extending KSI signature to time %s (%llu)... ",
-		blocks->blockNo,
+		logksi->blockNo,
 		KSI_Integer_toDateString(pubTime, buf, sizeof(buf)),
 		(unsigned long long)KSI_Integer_getUInt64(pubTime));
 
 	print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_EQUAL | DEBUG_LEVEL_2, "Extending Block no. %3zu to time %s (%llu)... ",
-		blocks->blockNo,
+		logksi->blockNo,
 		KSI_Integer_toDateString(pubTime, buf, sizeof(buf)),
 		(unsigned long long)KSI_Integer_getUInt64(pubTime));
 	res = LOGKSI_Signature_extendTo(err, sig, ksi, pubTime, context, &tmp);
@@ -376,7 +363,7 @@ cleanup:
 	return res;
 }
 
-static int extend_to_specified_publication(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, BLOCK_INFO *blocks, IO_FILES *files, KSI_Signature *sig, KSI_PublicationsFile *pubFile, KSI_VerificationContext *context, KSI_Signature **ext) {
+static int extend_to_specified_publication(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, KSI_CTX *ksi, LOGKSI *logksi, IO_FILES *files, KSI_Signature *sig, KSI_PublicationsFile *pubFile, KSI_VerificationContext *context, KSI_Signature **ext) {
 	int res;
 	KSI_Signature *tmp = NULL;
 	KSI_PublicationRecord *pub_rec = NULL;
@@ -385,7 +372,7 @@ static int extend_to_specified_publication(PARAM_SET *set, MULTI_PRINTER *mp, ER
 	KSI_Integer *pubTime = NULL;
 	char buf[256];
 
-	if (set == NULL || ksi == NULL || blocks == NULL || files == NULL || err == NULL || sig == NULL || ext == NULL) {
+	if (set == NULL || ksi == NULL || logksi == NULL || files == NULL || err == NULL || sig == NULL || ext == NULL) {
 		ERR_TRCKR_ADD(err, res = KT_INVALID_ARGUMENT, NULL);
 		goto cleanup;
 	}
@@ -393,7 +380,7 @@ static int extend_to_specified_publication(PARAM_SET *set, MULTI_PRINTER *mp, ER
 	res = PARAM_SET_getStr(set, "pub-str", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &pubs_str);
 	ERR_CATCH_MSG(err, res, "Error: Unable get publication string.");
 
-	print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_LEVEL_3, "Block no. %3zu: Searching for a publication record from publications file... ", blocks->blockNo);
+	print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_LEVEL_3, "Block no. %3zu: Searching for a publication record from publications file... ", logksi->blockNo);
 	res = KSI_PublicationsFile_getPublicationDataByPublicationString(pubFile, pubs_str, &pub_rec);
 	ERR_CATCH_MSG(err, res, "Error: Unable get publication record from publications file.");
 	if (pub_rec == NULL) {
@@ -408,8 +395,8 @@ static int extend_to_specified_publication(PARAM_SET *set, MULTI_PRINTER *mp, ER
 	res = KSI_PublicationData_getTime(pubData, &pubTime);
 	ERR_CATCH_MSG(err, res, "Error: Unable to get publication time.");
 
-	print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_LEVEL_3, "Block no. %3zu: extending KSI signature to the specified publication: %s (%llu)... ", blocks->blockNo, KSI_Integer_toDateString(pubTime, buf, sizeof(buf)), (unsigned long long)KSI_Integer_getUInt64(pubTime));
-	print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_EQUAL | DEBUG_LEVEL_2, "Extending Block no. %3zu to the specified publication... ", blocks->blockNo);
+	print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_LEVEL_3, "Block no. %3zu: extending KSI signature to the specified publication: %s (%llu)... ", logksi->blockNo, KSI_Integer_toDateString(pubTime, buf, sizeof(buf)), (unsigned long long)KSI_Integer_getUInt64(pubTime));
+	print_progressDesc(mp, MP_ID_BLOCK, 1, DEBUG_EQUAL | DEBUG_LEVEL_2, "Extending Block no. %3zu to the specified publication... ", logksi->blockNo);
 	res = LOGKSI_Signature_extend(err, sig, ksi, pub_rec, context, &tmp);
 	ERR_CATCH_MSG(err, res, "Error: Unable to extend signature.");
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, res);
@@ -451,8 +438,8 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 	PARAM_SET_addControl(set, "{pub-str}", isFormatOk_pubString, NULL, NULL, extract_pubString);
 
 	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
-	PARAM_SET_setParseOptions(set, "d", PST_PRSCMD_HAS_NO_VALUE | PST_PRSCMD_NO_TYPOS);
-	PARAM_SET_setParseOptions(set, "sig-from-stdin,enable-rfc3161-conversion", PST_PRSCMD_HAS_NO_VALUE);
+	PARAM_SET_setParseOptions(set, "d,h", PST_PRSCMD_HAS_NO_VALUE | PST_PRSCMD_NO_TYPOS);
+	PARAM_SET_setParseOptions(set, "sig-from-stdin,enable-rfc3161-conversion,hex-to-str", PST_PRSCMD_HAS_NO_VALUE);
 
 	/**
 	 * Define possible tasks.

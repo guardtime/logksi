@@ -17,7 +17,7 @@ f_summary_of_block_hash_fail () {
 	echo "(Summary of block $1:).( . Sig time:    $2).( . Input hash:  $3).( . Output hash: $4).( . Line[s]?:[ ]{23,24}$5 - $6 .$7.).( . Count of hash failures:      $8)"
 }
 
-# block_num sigtime hin hout lo l1 dl
+# block_num sigtime hin hout
 f_summary_of_block_ok_only_metadata () {
 	f_summary_of_block $1 ".$2..*UTC.00.00" $3 $4 "n/a" ".( . Count of meta-records:       1)"
 	#echo "(Summary of block 4:).( . Sig time:    .1517928885..*UTC.00.00).( . Input hash:  SHA-512:1dfeae.*43e987).( . Output hash: SHA-512:f7f5b4.*b2b596).( . Line[s]?:[ ]{23,24}n.a)"
@@ -31,6 +31,11 @@ f_summary_of_block_ok () {
 # block_num sigtime hin hout lo l1 dl first_rec_time last_rec_time duration
 f_summary_of_block_rec_time_check_ok () {
 	f_summary_of_block $1 ".$2..*UTC.00.00" $3 $4 "$5 - $6 .$7." ".( . First record time:           .$8.*UTC.00.00).( . Last record time:            .$9.*UTC.00.00).( . Block duration:              ${10})"
+}
+
+# block_count, rec_hash_count, meta_rec_count, ih, oh
+f_summary_of_logfile_short () {
+	 echo "(Summary of logfile:).( . Count of blocks:             $1).( . Count of record hashes:      $2).( . Count of meta-records:       $3).( . Input hash:  $4).( . Output hash: $5)"
 }
 
 # block_count, fail_count, rec_hash_count, meta_rec_count, first_rec_time, last_rec_time, duration, ih, oh
@@ -169,27 +174,27 @@ err_failed_b2_b3_too_apart=`f_failed_sig_time_diff_check 2 3 "apart" 1554200225 
 #}
 
 @test "Debug output for continuated verification: Wrong KSI signature for block 2. Debug lvl 1." {
-	run src/logksi verify test/resource/continue-verification/log test/resource/continue-verification/log-sig-no2-wrong.logsig -d --continue-on-fail
+	run src/logksi verify --ver-int test/resource/continue-verification/log test/resource/continue-verification/log-sig-no2-wrong.logsig -d --continue-on-fail
 	[ "$status" -eq 6 ]
-	[[ "$output" =~ (Verifying... failed.)..( x Error: Verification of block 2 KSI signature failed!)..( x Error: Skipping block 2!)..$summary_of_logfile_1_sig_fail ]]
+	[[ "$output" =~ (Verifying... failed.)..( x Error: Signature internal verification: .GEN-01. Wrong document.).( x Error: Verification of block 2 KSI signature failed!)..( x Error: Skipping block 2!)..$summary_of_logfile_1_sig_fail ]]
 }
 
 @test "Debug output for continuated verification: Wrong KSI signature for block 2. Debug lvl 2." {
-	run src/logksi verify test/resource/continue-verification/log test/resource/continue-verification/log-sig-no2-wrong.logsig -dd --continue-on-fail
+	run src/logksi verify --ver-int test/resource/continue-verification/log test/resource/continue-verification/log-sig-no2-wrong.logsig -dd --continue-on-fail
 	[ "$status" -eq 6 ]
 	[[ "$output" =~ (Verifying block no.   1... ok.)..$summary_of_block_1_ok..(Verifying block no.   2... failed.) ]]
-	[[ "$output" =~ (Verifying block no.   2... failed.)..( x Error: Verification of block 2 KSI signature failed!) ]]
+	[[ "$output" =~ (Verifying block no.   2... failed.)..( x Error: Signature internal verification: .GEN-01. Wrong document.).( x Error: Verification of block 2 KSI signature failed!) ]]
 	[[ "$output" =~ ( x Error: Skipping block 2!)..`f_summary_of_block 2 ".no signature data available." "SHA-512:20cfea.*88944a" "SHA-512:9c1ea0.*42e444" "(4 - 6 .3.)"` ]]
 	[[ "$output" =~ (Verifying block no.   3... ok.)..$summary_of_block_3_ok..(Verifying block no.   4... ok.)..$summary_of_block_4_ok...$summary_of_logfile_1_sig_fail ]]
 }
 
 @test "Debug output for continuated verification: Verify signatures that contains unsigned blocks." {
-	run ./src/logksi verify test/resource/logs_and_signatures/unsigned -d --continue-on-fail
-	[ "$status" -eq 6 ]
+	run ./src/logksi verify --ver-int test/resource/logs_and_signatures/unsigned -d --continue-on-fail
+	[ "$status" -eq 1 ]
 	[[ "$output" =~ (Verifying... failed.)..( x Error: Block 5 is unsigned!)..( x Error: Skipping block 5!)..( x Error: Block 6 is unsigned!)..( x Error: Skipping block 6!).*( x Error: Block 25 is unsigned!)..( x Error: Skipping block 25!) ]]
 
 	[[ "$output" =~ (Summary of logfile:).( . Count of blocks:             30).( . Count of failures:           1).( . Count of record hashes:      88).( . Count of meta-records:       1).( . Input hash:  SHA-512:dd4e87.*e2b137).( . Output hash: SHA-512:7f5a17.*cd7827) ]]
-	[[ "$output" =~ (2[\)]).*(Error: Verification FAILED but was continued for further analysis)  ]]
+	[[ "$output" =~ (2[\)]).*(Error: Verification inconclusive but was continued for further analysis)  ]]
 }
 
 @test "Debug output for continuated verification: Client ID mismatch. Debug level 1." {
@@ -274,4 +279,31 @@ prev_file_rec_time_check_fail=`f_log_line_from_previous_file_more_recent_than_cu
 	[ "$status" -eq 6 ]
 	[[ ! "$output" =~ "Block no.   1: checking signing time with previous block" ]]
 	[[ "$output" =~ (Block no.   2: verifying KSI signature... ok.*ms.).(Block no.   2: signing time: .1554200225.*UTC).(Block no.   2: time difference relative to previous block: 00:00:01).(Block no.   2: checking signing time with previous block... failed.).(Block no.   2: output hash: SHA-512:9c1e.*444.).(Block no.   2: Warning: all final tree hashes are missing.).(Block no.   2: Error: signing times difference .00:00:01. relative to previous block out of range .00:00:10 - 00:15:00..).(Block no.   3: processing block header... ok.) ]]
+}
+
+@test "verify block with unsigned marker and metadata - debug level 1." {
+	run src/logksi verify --ver-int --continue-on-fail -d test/resource/logs_and_signatures/log-sign-network-error
+	[ "$status" -eq 1 ]
+	[[ "$output" =~ ( x Error: Skipping block 1!)..`f_summary_of_logfile_short 1 1 1 "SHA-256:000000.*000000" "SHA-256:9ab546.*010fb0"` ]]
+}
+
+@test "verify block with unsigned marker and metadata - debug level 2." {
+	run src/logksi verify --ver-int --continue-on-fail -dd test/resource/logs_and_signatures/log-sign-network-error
+	[ "$status" -eq 1 ]
+	[[ "$output" =~ ( x Error: Skipping block 1!)..`f_summary_of_block 1 "<unsigned>" "SHA-256:000000.*000000" "SHA-256:9ab546.*010fb0" "1"`.( . Count of meta-records:       1) ]]
+	[[ "$output" =~ `f_summary_of_logfile_short 1 1 1 "SHA-256:000000.*000000" "SHA-256:9ab546.*010fb0"` ]]
+}
+
+@test "verify block with unsigned marker and only metadata - debug level 1." {
+	run src/logksi verify --ver-int --continue-on-fail -d test/resource/logs_and_signatures/log_no_rec_timeout_short1
+	[ "$status" -eq 1 ]
+	[[ "$output" =~ ( x Error: Skipping block 2!)..`f_summary_of_logfile_short 2 0 2 "SHA-256:000000.*000000" "SHA-256:0129d5.*fa511c"` ]]
+}
+
+@test "verify block with unsigned marker and only metadata - debug level 2." {
+	run src/logksi verify --ver-int --continue-on-fail -dd test/resource/logs_and_signatures/log_no_rec_timeout_short1
+	[ "$status" -eq 1 ]
+	[[ "$output" =~ `f_summary_of_block_ok_only_metadata 1 1581516164 "SHA-256:000000.*000000" "SHA-256:8e67db.*05e2f5"` ]]
+	[[ "$output" =~ `f_summary_of_block 2 "<unsigned>" "SHA-256:8e67db.*05e2f5" "SHA-256:0129d5.*fa511c" "n/a" ".( . Count of meta-records:       1)"` ]]
+	[[ "$output" =~ `f_summary_of_logfile_short 2 0 2 "SHA-256:000000.*000000" "SHA-256:0129d5.*fa511c"` ]]
 }

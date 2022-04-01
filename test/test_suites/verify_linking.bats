@@ -4,6 +4,19 @@ export KSI_CONF=test/test.cfg
 
 echo SHA-512:dd4e870e7e0c998f160688b97c7bdeef3d6d01b1c5f02db117018058ad51996777ae3dc8008d70b3e11c172b0049e8158571cea1b8a439593b67c41ebbe2b137 > test/out/input-hash.txt
 
+mkdir -p test/out/verify_interlink_sig
+mkdir -p test/out/verify_interlink_log
+cp test/resource/interlink/ok-testlog-interlink-1.logsig test/out/verify_interlink_sig/ok-testlog-interlink-1_separate_sig.logsig
+cp test/resource/interlink/ok-testlog-interlink-1        test/out/verify_interlink_log/ok-testlog-interlink-1_separate_sig
+cp test/resource/interlink/ok-testlog-interlink-2.logsig test/out/verify_interlink_sig/ok-testlog-interlink-2_separate_sig.logsig
+cp test/resource/interlink/ok-testlog-interlink-2        test/out/verify_interlink_log/ok-testlog-interlink-2_separate_sig
+
+@test "verify inter-linking automatically by giving 2 log files after -- and signature search path" {
+	run src/logksi verify -ddd --sig-dir test/out/verify_interlink_sig -- test/out/verify_interlink_log/ok-testlog-interlink-1_separate_sig test/out/verify_interlink_log/ok-testlog-interlink-2_separate_sig
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ (Log file.*ok-testlog-interlink-1_separate_sig).*(Finalizing log signature... ok).*(Log file.*ok-testlog-interlink-2_separate_sig).*(verifying inter-linking input hash... ok).*(Finalizing log signature... ok) ]]
+}
+
 @test "verify log_repaired.logsig with input hash from command line" {
 	run ./src/logksi verify test/resource/logs_and_signatures/log_repaired -ddd --input-hash SHA-512:dd4e870e7e0c998f160688b97c7bdeef3d6d01b1c5f02db117018058ad51996777ae3dc8008d70b3e11c172b0049e8158571cea1b8a439593b67c41ebbe2b137 --ignore-desc-block-time
 	[ "$status" -eq 0 ]
@@ -20,13 +33,13 @@ echo SHA-512:dd4e870e7e0c998f160688b97c7bdeef3d6d01b1c5f02db117018058ad51996777a
 	run ./src/logksi verify test/resource/logs_and_signatures/log_repaired -ddd --output-hash test/out/output-hash.txt --ignore-desc-block-time
 	[ "$status" -eq 0 ]
 	run cat test/out/output-hash.txt
-	[[ "$output" =~ (Log file).*(test\/resource\/logs_and_signatures\/log_repaired).*(Last leaf from previous log signature).*(test\/resource\/logs_and_signatures\/log_repaired.logsig).*(SHA-512:7f5a178f581de2aed0d36739f908733643b316aac8bed0c9f89c040ad1d1e601ae8fd1ae1e177c2cdf9ebf59a2f43df00614893723d5019b6326b225bbcd7827) ]]
+	[[ "$output" =~ (Log file).*(test\/resource\/logs_and_signatures\/log_repaired).*(Last leaf from log signature).*(test\/resource\/logs_and_signatures\/log_repaired.logsig).*(SHA-512:7f5a178f581de2aed0d36739f908733643b316aac8bed0c9f89c040ad1d1e601ae8fd1ae1e177c2cdf9ebf59a2f43df00614893723d5019b6326b225bbcd7827) ]]
 }
 
 @test "verify log_repaired.logsig output last leaf hash to stdout" {
 	run ./src/logksi verify test/resource/logs_and_signatures/log_repaired -ddd --output-hash - --ignore-desc-block-time
 	[ "$status" -eq 0 ]
-	[[ "$output" =~ (Log file).*(test\/resource\/logs_and_signatures\/log_repaired).*(Last leaf from previous log signature).*(test\/resource\/logs_and_signatures\/log_repaired.logsig).*(SHA-512:7f5a178f581de2aed0d36739f908733643b316aac8bed0c9f89c040ad1d1e601ae8fd1ae1e177c2cdf9ebf59a2f43df00614893723d5019b6326b225bbcd7827) ]]
+	[[ "$output" =~ "SHA-512:7f5a178f581de2aed0d36739f908733643b316aac8bed0c9f89c040ad1d1e601ae8fd1ae1e177c2cdf9ebf59a2f43df00614893723d5019b6326b225bbcd7827" ]]
 }
 
 @test "verify log_repaired.logsig with wrong input hash" {
@@ -37,7 +50,7 @@ echo SHA-512:dd4e870e7e0c998f160688b97c7bdeef3d6d01b1c5f02db117018058ad51996777a
 }
 
 @test "try to write excerpt signature output hash to stdout. It must fail" {
-	run ./src/logksi verify test/out/extract.base.10.excerpt --output-hash -
+	run ./src/logksi verify --ver-int test/out/extract.base.10.excerpt --output-hash -
 	[ "$status" -eq 3 ]
 	[[ "$output" =~ "Error: --output-hash does not work with excerpt signature file" ]]
 }
@@ -151,7 +164,7 @@ echo SHA-512:dd4e870e7e0c998f160688b97c7bdeef3d6d01b1c5f02db117018058ad51996777a
 }
 
 @test "verify inter-linking with --block-time-diff where last block of previous file are more recent than expected" {
-	run ./src/logksi verify  --block-time-diff -6d,oo -- test/resource/interlink/ok-testlog-interlink-resigned-1 test/resource/interlink/ok-testlog-interlink-2
+	run ./src/logksi verify --block-time-diff -6d,oo -- test/resource/interlink/ok-testlog-interlink-resigned-1 test/resource/interlink/ok-testlog-interlink-2
 	[ "$status" -eq 6 ]
 		[[ "$output" =~ (Error: Signing times from last block of previous file is more recent than expected relative to first block of current file).*(Previous file).*(ok-testlog-interlink-resigned-1).*(Sig time).*(1540301997).*(Current file).*(ok-testlog-interlink-2).*(Sig time).*(1539771503).*(Time diff).*(-6d 03:21:34).*(Expected time diff).*(-6d 00:00:00 - oo) ]]
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2017 Guardtime, Inc.
+ * Copyright 2013-2022 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -25,6 +25,7 @@
 #include "param_set/task_def.h"
 #include "logksi_err.h"
 #include "debug_print.h"
+#include "err_trckr.h"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -32,7 +33,7 @@ extern "C" {
 
 enum service_info_priorities {
 	/* Priority level for default values. */
-	PRIORITY_KSI_DEFAULT,
+	PRIORITY_DEFAULT,
 
 	/* Priority of KSI configuration file read from KSI_CONF environment variable. */
 	PRIORITY_KSI_CONF,
@@ -42,6 +43,9 @@ enum service_info_priorities {
 
 	/* Priority of KSI configuration file given with --conf option. */
 	PRIORITY_KSI_CONF_FILE,
+
+	/* Priority for values read from servers conf. */
+	PRIORITY_KSI_CONF_REMOTE,
 
 	/* Priority of values defined on command-line. */
 	PRIORITY_CMD,
@@ -68,6 +72,8 @@ int TASK_INITIALIZER_getServiceInfo(PARAM_SET *set, int argc, char **argv, char 
 
 int TASK_INITIALIZER_getPrinter(PARAM_SET *set, MULTI_PRINTER **mp);
 
+int extract_input_files_from_file(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err);
+int apply_aggregator_conf(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi);
 #ifdef	__cplusplus
 }
 #endif

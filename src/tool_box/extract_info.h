@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2019 Guardtime, Inc.
+ * Copyright 2013-2022 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -22,17 +22,45 @@
 
 #include <stddef.h>
 #include <ksi/ksi.h>
-#include "blocks_info_impl.h"
-#include "err_trckr.h"
+#include <ksi/tlv_element.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-int block_info_extract_update_record_chain(BLOCK_INFO *blocks, unsigned char level, int finalize, KSI_DataHash *leftLink);
-int block_info_extract_next_position(BLOCK_INFO *blocks, ERR_TRCKR *err, char *range);
-int block_info_extract_update(BLOCK_INFO *blocks, ERR_TRCKR *err, int isMetaRecordHash, KSI_DataHash *hash);
-int block_info_extract_verify_positions(ERR_TRCKR *err, char *records);
+typedef struct RECORD_INFO_st RECORD_INFO;
+typedef struct EXTRACT_INFO_st EXTRACT_INFO;
+
+typedef enum {
+	LEFT_LINK = 0,
+	RIGHT_LINK = 1
+} LINK_DIRECTION;
+
+int EXTRACT_INFO_new(const char *range, EXTRACT_INFO **info);
+void EXTRACT_INFO_free(EXTRACT_INFO *extract);
+int EXTRACT_INFO_getNewRecord(EXTRACT_INFO *extract, size_t *index, RECORD_INFO **info);
+int EXTRACT_INFO_getRecord(EXTRACT_INFO *extract, size_t index, RECORD_INFO **pRec);
+void EXTRACT_INFO_resetBlockInfo(EXTRACT_INFO *extract);
+int EXTRACT_INFO_isLastPosPending(EXTRACT_INFO *info);
+int EXTRACT_INFO_moveToNext(EXTRACT_INFO *info);
+size_t EXTRACT_INFO_getNextPosition(EXTRACT_INFO *info);
+size_t EXTRACT_INFO_getPositionsInBlock(EXTRACT_INFO *info);
+size_t EXTRACT_INFO_getPositionsExtracted(EXTRACT_INFO *info);
+
+int RECORD_INFO_setRecordHash(RECORD_INFO *extractInfo, size_t pos, size_t offs, KSI_DataHash *hsh, const char *logLine);
+int RECORD_INFO_setMetaRecordHash(RECORD_INFO *extractInfo, size_t pos, size_t offs, KSI_DataHash *hsh, unsigned char *raw, size_t raw_len);
+int RECORD_INFO_addHash(RECORD_INFO *extracts, LINK_DIRECTION dir, KSI_DataHash *hash, int corr);
+int RECORD_INFO_getLine(RECORD_INFO *record, size_t *lineNr, char **logLine);
+int RECORD_INFO_getPositionInTree(RECORD_INFO *record, size_t *recordOffset, size_t *recordRootLvl);
+int RECORD_INFO_getRecordHash(RECORD_INFO *record, KSI_DataHash **extractRecord);
+int RECORD_INFO_getMetadata(RECORD_INFO *record, KSI_TlvElement **metaRecord);
+
+int RECORD_INFO_foldl(RECORD_INFO *record,
+					void *acc,
+					int (*f)(void *, LINK_DIRECTION, KSI_DataHash*, size_t));
+
+int RECORD_INFO_getAggregationHashChain(RECORD_INFO *record, KSI_CTX *ksi, KSI_AggregationHashChain **aggrChain);
+
 
 #ifdef	__cplusplus
 }

@@ -43,28 +43,28 @@ cp -r test/resource/logfiles/treehash? test/out
 }
 
 @test "final hashes: verify record hashes(NO), tree hashes(NO)" {
-	run ./src/logksi verify test/out/treehash1 test/out/none_1.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash1 test/out/none_1.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run ./src/logksi verify test/out/treehash2 test/out/none_2.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash2 test/out/none_2.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run ./src/logksi verify test/out/treehash3 test/out/none_3.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash3 test/out/none_3.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run ./src/logksi verify test/out/treehash4 test/out/none_4.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash4 test/out/none_4.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run ./src/logksi verify test/out/treehash5 test/out/none_5.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash5 test/out/none_5.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run ./src/logksi verify test/out/treehash6 test/out/none_6.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash6 test/out/none_6.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run ./src/logksi verify test/out/treehash7 test/out/none_7.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash7 test/out/none_7.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run ./src/logksi verify test/out/treehash8 test/out/none_8.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash8 test/out/none_8.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 }
@@ -97,28 +97,28 @@ cp -r test/resource/logfiles/treehash? test/out
 }
 
 @test "final hashes: verify record hashes(YES), tree hashes(NO)" {
-	run ./src/logksi verify test/out/treehash1 test/out/rec_1.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash1 test/out/rec_1.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run ./src/logksi verify test/out/treehash2 test/out/rec_2.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash2 test/out/rec_2.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run ./src/logksi verify test/out/treehash3 test/out/rec_3.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash3 test/out/rec_3.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run ./src/logksi verify test/out/treehash4 test/out/rec_4.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash4 test/out/rec_4.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run ./src/logksi verify test/out/treehash5 test/out/rec_5.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash5 test/out/rec_5.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run ./src/logksi verify test/out/treehash6 test/out/rec_6.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash6 test/out/rec_6.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run ./src/logksi verify test/out/treehash7 test/out/rec_7.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash7 test/out/rec_7.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run ./src/logksi verify test/out/treehash8 test/out/rec_8.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash8 test/out/rec_8.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 }
@@ -156,32 +156,32 @@ cp -r test/resource/logfiles/treehash? test/out
 }
 
 @test "final hashes: verify record hashes(NO), tree hashes(YES), final hashes(NO)" {
-	run ./src/logksi verify test/out/treehash1 test/out/tree_1.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash1 test/out/tree_1.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
-	run ./src/logksi verify test/out/treehash2 test/out/tree_2.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash2 test/out/tree_2.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
-	run ./src/logksi verify test/out/treehash3 test/out/tree_3.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash3 test/out/tree_3.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
-	run ./src/logksi verify test/out/treehash4 test/out/tree_4.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash4 test/out/tree_4.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
-	run ./src/logksi verify test/out/treehash5 test/out/tree_5.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash5 test/out/tree_5.logsig -ddd
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "File does not exist." ]]
-	run ./src/logksi verify test/out/treehash6 test/out/tree_6.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash6 test/out/tree_6.logsig -ddd
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "File does not exist." ]]
-	run ./src/logksi verify test/out/treehash7 test/out/tree_7.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash7 test/out/tree_7.logsig -ddd
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "File does not exist." ]]
-	run ./src/logksi verify test/out/treehash8 test/out/tree_8.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash8 test/out/tree_8.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
@@ -220,32 +220,32 @@ cp -r test/resource/logfiles/treehash? test/out
 }
 
 @test "final hashes: verify record hashes(NO), tree hashes(YES), final hashes(INSERTED)" {
-	run ./src/logksi verify test/out/treehash1 test/out/tree_1.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash1 test/out/tree_1.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
-	run ./src/logksi verify test/out/treehash2 test/out/tree_2.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash2 test/out/tree_2.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
-	run ./src/logksi verify test/out/treehash3 test/out/tree_3.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash3 test/out/tree_3.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
-	run ./src/logksi verify test/out/treehash4 test/out/tree_4.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash4 test/out/tree_4.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
-	run ./src/logksi verify test/out/treehash5 test/out/tree_5.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash5 test/out/tree_5.logsig -ddd
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "File does not exist." ]]
-	run ./src/logksi verify test/out/treehash6 test/out/tree_6.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash6 test/out/tree_6.logsig -ddd
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "File does not exist." ]]
-	run ./src/logksi verify test/out/treehash7 test/out/tree_7.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash7 test/out/tree_7.logsig -ddd
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "File does not exist." ]]
-	run ./src/logksi verify test/out/treehash8 test/out/tree_8.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash8 test/out/tree_8.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
@@ -284,32 +284,32 @@ cp -r test/resource/logfiles/treehash? test/out
 }
 
 @test "final hashes: verify record hashes(NO), tree hashes(YES), final hashes(YES)" {
-	run ./src/logksi verify test/out/treehash1 test/out/final_tree_1.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash1 test/out/final_tree_1.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
-	run ./src/logksi verify test/out/treehash2 test/out/final_tree_2.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash2 test/out/final_tree_2.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
-	run ./src/logksi verify test/out/treehash3 test/out/final_tree_3.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash3 test/out/final_tree_3.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
-	run ./src/logksi verify test/out/treehash4 test/out/final_tree_4.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash4 test/out/final_tree_4.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
-	run ./src/logksi verify test/out/treehash5 test/out/final_tree_5.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash5 test/out/final_tree_5.logsig -ddd
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "File does not exist." ]]
-	run ./src/logksi verify test/out/treehash6 test/out/final_tree_6.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash6 test/out/final_tree_6.logsig -ddd
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "File does not exist." ]]
-	run ./src/logksi verify test/out/treehash7 test/out/final_tree_7.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash7 test/out/final_tree_7.logsig -ddd
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "File does not exist." ]]
-	run ./src/logksi verify test/out/treehash8 test/out/final_tree_8.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash8 test/out/final_tree_8.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
@@ -351,35 +351,35 @@ cp -r test/resource/logfiles/treehash? test/out
 }
 
 @test "final hashes: verify record hashes(YES), tree hashes(YES), final hashes(NO)" {
-	run ./src/logksi verify test/out/treehash1 test/out/rec_tree_1.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash1 test/out/rec_tree_1.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
-	run ./src/logksi verify test/out/treehash2 test/out/rec_tree_2.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash2 test/out/rec_tree_2.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
-	run ./src/logksi verify test/out/treehash3 test/out/rec_tree_3.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash3 test/out/rec_tree_3.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
-	run ./src/logksi verify test/out/treehash4 test/out/rec_tree_4.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash4 test/out/rec_tree_4.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
-	run ./src/logksi verify test/out/treehash5 test/out/rec_tree_5.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash5 test/out/rec_tree_5.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
-	run ./src/logksi verify test/out/treehash6 test/out/rec_tree_6.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash6 test/out/rec_tree_6.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
-	run ./src/logksi verify test/out/treehash7 test/out/rec_tree_7.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash7 test/out/rec_tree_7.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: Warning: all final tree hashes are missing." ]]
-	run ./src/logksi verify test/out/treehash8 test/out/rec_tree_8.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash8 test/out/rec_tree_8.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
@@ -421,35 +421,35 @@ cp -r test/resource/logfiles/treehash? test/out
 }
 
 @test "final hashes: verify record hashes(YES), tree hashes(YES), final hashes(INSERTED)" {
-	run ./src/logksi verify test/out/treehash1 test/out/rec_tree_1.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash1 test/out/rec_tree_1.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
-	run ./src/logksi verify test/out/treehash2 test/out/rec_tree_2.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash2 test/out/rec_tree_2.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
-	run ./src/logksi verify test/out/treehash3 test/out/rec_tree_3.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash3 test/out/rec_tree_3.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
-	run ./src/logksi verify test/out/treehash4 test/out/rec_tree_4.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash4 test/out/rec_tree_4.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
-	run ./src/logksi verify test/out/treehash5 test/out/rec_tree_5.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash5 test/out/rec_tree_5.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
-	run ./src/logksi verify test/out/treehash6 test/out/rec_tree_6.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash6 test/out/rec_tree_6.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
-	run ./src/logksi verify test/out/treehash7 test/out/rec_tree_7.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash7 test/out/rec_tree_7.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
-	run ./src/logksi verify test/out/treehash8 test/out/rec_tree_8.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash8 test/out/rec_tree_8.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
@@ -491,35 +491,35 @@ cp -r test/resource/logfiles/treehash? test/out
 }
 
 @test "final hashes: verify record hashes(YES), tree hashes(YES), final hashes(YES)" {
-	run ./src/logksi verify test/out/treehash1 test/out/final_rec_tree_1.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash1 test/out/final_rec_tree_1.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
-	run ./src/logksi verify test/out/treehash2 test/out/final_rec_tree_2.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash2 test/out/final_rec_tree_2.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
-	run ./src/logksi verify test/out/treehash3 test/out/final_rec_tree_3.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash3 test/out/final_rec_tree_3.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
-	run ./src/logksi verify test/out/treehash4 test/out/final_rec_tree_4.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash4 test/out/final_rec_tree_4.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
-	run ./src/logksi verify test/out/treehash5 test/out/final_rec_tree_5.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash5 test/out/final_rec_tree_5.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
-	run ./src/logksi verify test/out/treehash6 test/out/final_rec_tree_6.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash6 test/out/final_rec_tree_6.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
-	run ./src/logksi verify test/out/treehash7 test/out/final_rec_tree_7.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash7 test/out/final_rec_tree_7.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]
-	run ./src/logksi verify test/out/treehash8 test/out/final_rec_tree_8.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/treehash8 test/out/final_rec_tree_8.logsig -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	[[ "$output" =~ "Block no.   1: all final tree hashes are present." ]]

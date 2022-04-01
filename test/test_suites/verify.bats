@@ -41,7 +41,7 @@ export KSI_CONF=test/test.cfg
 }
 
 @test "verify log_repaired.logsig against key" {
-	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/log_repaired -ddd --ignore-desc-block-time
+	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/totally-resigned -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 }
@@ -196,4 +196,19 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ "Verifying... ok." ]]
 	[[ ! "$output" =~ (are too apart) ]]
 	[[ ! "$output" =~ (are too close) ]]
+}
+
+# Test checking for a fixed bug. It must not be possible to remove log lines from the log file containing identical records.
+@test "try to verify log file containing identical records where the last one is removed" {
+	run ./src/logksi verify --ver-int test/resource/logs_and_signatures/equal-log-lines-one-missing -d
+	[ "$status" -ge 1 ]
+	[[ "$output" =~ (Error: Block no. 1: unable to calculate hash of logline no. 4. .Unexpected end of file.) ]]
+}
+
+# Test checking for a fixed bug. It used to be crashing.
+@test "try to verify log signature with invalid aggregation hash algorithm (bug in v1.5.649)" {
+	run src/logksi verify test/resource/logs_and_signatures/invalid-aggr-algo
+	[ "$status" -ge 6 ]
+	[[ "$output" =~ (Hash algorithms differ) ]]
+	[[ "$output" =~ (Error: Block no. 1: record hashes not equal for logline no. 1.) ]]
 }

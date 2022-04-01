@@ -1,5 +1,5 @@
 #
-# Copyright 2013-2018 Guardtime, Inc.
+# Copyright 2013-2022 Guardtime, Inc.
 #
 # This file is part of the Guardtime client SDK.
 #
@@ -22,11 +22,11 @@ Section: utils
 Priority: optional
 Maintainer: Guardtime <support@guardtime.com>
 Standards-Version: 3.9.8
-Build-Depends: @KSI_DEB_BUILD_DEPENDENCY@, @GTRFC3161_DEB_BUILD_DEPENDENCY@
+Build-Depends: @KSI_DEB_BUILD_DEPENDENCY@, @GTRFC3161_DEB_BUILD_DEPENDENCY@, @PST_DEB_BUILD_DEPENDENCY@
 
 Package: @PACKAGE@
 Architecture: any
 Section: utils
 Priority: optional
 Description: Log signature command-line tool for KSI Blockchain.
-Build-Depends: @KSI_DEB_RUN_DEPENDENCY@, @GTRFC3161_DEB_RUN_DEPENDENCY@
+Build-Depends: @KSI_DEB_RUN_DEPENDENCY@, @GTRFC3161_DEB_RUN_DEPENDENCY@, @PST_DEB_RUN_DEPENDENCY@

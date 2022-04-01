@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2017 Guardtime, Inc.
+ * Copyright 2013-2022 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -21,18 +21,23 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <ksi/compatibility.h>
 #include <ksi/ksi.h>
 #include <ksi/net.h>
 
 #include "param_set/param_set.h"
 #include "param_set/task_def.h"
+#include "param_set/strn.h"
 #include "tool_box/param_control.h"
 #include "tool_box.h"
 #include "printer.h"
 #include "debug_print.h"
 #include "conf_file.h"
 #include "logksi_err.h"
+#include "obj_printer.h"
+#include "api_wrapper.h"
+#include "smart_file.h"
 
 static int isKSIUserInfoInsideUrl(const char *url, char *buf_u, char *buf_k, size_t buf_len);
 static int extract_user_info_from_url_if_needed(PARAM_SET *set, const char *flag_name, const char *usr_name, const char *key_name);
@@ -53,7 +58,7 @@ int TASK_INITIALIZER_check_analyze_report(PARAM_SET *set, TASK_SET *task_set, do
 	 * Check for typos and unknown parameters.
 	 */
 	if (PARAM_SET_isTypoFailure(set)) {
-			print_errors("%s\n", PARAM_SET_typosToString(set, PST_TOSTR_DOUBLE_HYPHEN, NULL, buf, sizeof(buf)));
+			print_errors("%s\n", PARAM_SET_typosToString(set, NULL, buf, sizeof(buf)));
 			res = KT_INVALID_CMD_PARAM;
 			goto cleanup;
 	} else if (PARAM_SET_isUnknown(set)){
@@ -133,8 +138,8 @@ int TASK_INITIALIZER_getServiceInfo(PARAM_SET *set, int argc, char **argv, char 
 	 * Read conf from command line.
      */
 	res = PARAM_SET_parseCMD(set, argc, argv, "CMD", PRIORITY_CMD);
-	if (res != KT_OK) {
-		print_errors("Error: Unable to parse command-line.\n");
+	if (res != PST_OK) {
+		print_errors("Error: Unable to parse command-line %x.\n", res);
 		goto cleanup;
 	}
 
@@ -345,6 +350,251 @@ int TASK_INITIALIZER_getPrinter(PARAM_SET *set, MULTI_PRINTER **mp) {
 cleanup:
 
 	MULTI_PRINTER_free(tmp);
+
+	return res;
+}
+
+static int read_next_file(const char *row, const char *delimiter, char *fname_buf, size_t fname_buf_len, const char **next) {
+	int res = KT_UNKNOWN_ERROR;
+	size_t i = 0;
+	size_t n = 0;
+	int isEscape = 0;
+	int isQuote = 0;
+	int isQuoteX2 = 0;
+	int lastNotWhiteChar = 0;
+
+	for(i = 0; row[i] != '\0'; i++) {
+		char c = row[i];
+
+		if (!isEscape) {
+			if (c == '\\') {
+				isEscape = 1;
+				continue;
+			}
+			if (!isQuoteX2 && c == '\'') {
+				isQuote = isQuote ? 0 : 1;
+				continue;
+			}
+			if (!isQuote && c == '"') {
+				isQuoteX2 = isQuoteX2 ? 0 : 1;
+				continue;
+			}
+		}
+
+		/* Check if is delimiter! */
+		if ((delimiter != NULL) && !isEscape && !isQuote && !isQuoteX2) {
+			if (strchr(delimiter, c) != NULL) {
+				if (n > 0) {
+					break;
+				}
+				continue;
+			}
+		}
+
+		if (n >= fname_buf_len - 1) {
+			res = KT_INDEX_OVF;
+			goto cleanup;
+		}
+
+		if(!isEscape && n == 0 && isspace(c)) continue;
+
+		if (!isspace(c)) {
+			lastNotWhiteChar = n;
+		}
+
+		fname_buf[n] = c;
+		n++;
+		if (isEscape) isEscape = 0;
+
+	}
+
+	fname_buf[lastNotWhiteChar + 1] = '\0';
+	*next = (row[i] == '\0') ? NULL : row + (i + 1);
+	res = KT_OK;
+
+cleanup:
+	return res;
+}
+
+int extract_input_files_from_file(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err) {
+	int res = KT_UNKNOWN_ERROR;
+	SMART_FILE *logFileList = NULL;
+	char *delimiter = " \t";
+
+	if (set == NULL) return KT_INVALID_ARGUMENT;
+
+	res = PARAM_SET_getStr(set, "log-file-list-delimiter", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &delimiter);
+	if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
+
+	if (delimiter != NULL) {
+		if (strcmp(delimiter, "new-line") == 0) delimiter = NULL;
+		else if (strcmp(delimiter, "space") == 0) delimiter = " \t";
+	}
+
+	if (PARAM_SET_isSetByName(set, "log-file-list")) {
+		char *fname = NULL;
+		res = PARAM_SET_getStr(set, "log-file-list", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, &fname);
+		if (res != KT_OK && res != PST_PARAMETER_EMPTY) goto cleanup;
+
+		res = SMART_FILE_open(fname, "rbs", &logFileList);
+		ERR_CATCH_MSG(err, res, "Error: Could not open input log file list '%s'!", fname);
+
+		if (strcmp(fname, "-") == 0) {
+			fname = "<stdin>";
+		}
+
+		while(1) {
+			char buf_file_name[0x1000] = "";
+			size_t rowLen = 0;
+			const char *next = NULL;
+
+
+			res = SMART_FILE_readLineSkipEmpty(logFileList, buf_file_name, sizeof(buf_file_name), NULL, &rowLen);
+			if (SMART_FILE_isEof(logFileList)) break;
+			ERR_CATCH_MSG(err, res, "Error: Could no read input file from input log file list '%s'!", fname);
+			next = buf_file_name;
+			while(next != NULL) {
+				char buf_file_name2[0x1000] = "";
+				res = read_next_file(next, delimiter, buf_file_name2, sizeof(buf_file_name2), &next);
+				ERR_CATCH_MSG(err, res, "Error: Could no read input file from input log file list '%s'!", fname);
+				if (buf_file_name2[0] == '\0') continue;
+
+				if (!SMART_FILE_doFileExist(buf_file_name2)) {
+					print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_LEVEL_0,
+						"Error: Log file (from --log-file-list %s) '%s' does not exist!\n", fname, buf_file_name2);
+					continue;
+				} else if (SMART_FILE_isFileType(buf_file_name2, SMART_FILE_TYPE_DIR)) {
+					print_debug_mp(mp, MP_ID_BLOCK_ERRORS, DEBUG_LEVEL_0,
+						"Error: Log file (from --log-file-list %s) '%s' can not be a directory!\n", fname, buf_file_name2);
+					continue;
+				}
+
+				res = PARAM_SET_add(set, "input" , buf_file_name2, NULL, PRIORITY_CMD);
+				ERR_CATCH_MSG(err, res, "Error: Could no include input log file '%s' to list!", buf_file_name2);
+			}
+		}
+
+		if (MULTI_PRINTER_hasDataByID(mp, MP_ID_BLOCK_ERRORS)) {
+			res = KT_IO_ERROR;
+			ERR_CATCH_MSG(err, res, "Error: Unable to include input log files from log file list %s!", fname);
+		}
+
+	}
+
+	res = KT_OK;
+
+cleanup:
+
+	SMART_FILE_close(logFileList);
+
+	return res;
+}
+
+static int get_remote_aggr_conf(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ctx, int *remote_max_lvl, KSI_HashAlgorithm *remote_algo) {
+	#define TREE_DEPTH_INVALID (-1)
+	int res = KT_UNKNOWN_ERROR;
+	KSI_Config *config = NULL;
+	KSI_Integer *conf_id = NULL;
+	KSI_Integer *conf_lvl = NULL;
+	int dump = 0;
+	const char *suggestion_useDump = "  * Suggestion: Use --dump-conf for more information.";
+	const char *suggestion_useH    = "  * Suggestion: Use -H to override aggregator configuration hash function.";
+
+
+	if (set == NULL || err == NULL || ctx == NULL) {
+		ERR_TRCKR_ADD(err, res = KT_INVALID_ARGUMENT, NULL);
+		goto cleanup;
+	}
+
+	res = LOGKSI_Aggregator_getConf(err, ctx, &config);
+	ERR_CATCH_MSG(err, res, "Error: Unable to receive remote configuration.");
+
+	dump = PARAM_SET_isSetByName(set, "dump-conf");
+	if (dump) {
+		OBJPRINT_aggregatorConfDump(config, print_result);
+	}
+
+	res = KSI_Config_getAggrAlgo(config, &conf_id);
+	ERR_CATCH_MSG(err, res, "Error: Unable to get aggregator algorithm id configuration.");
+
+	res = KSI_Config_getMaxLevel(config, &conf_lvl);
+	ERR_CATCH_MSG(err, res, "Error: Unable to get aggregator maximum level configuration.");
+
+	if (remote_max_lvl) {
+		if (conf_lvl) {
+			size_t lvl = KSI_Integer_getUInt64(conf_lvl);
+
+			if (lvl > 0xff) {
+				ERR_CATCH_MSG(err, (res = KT_INVALID_CONF), "Error: Remote configuration tree depth is out of range.\n");
+				if (!dump) ERR_TRCKR_addAdditionalInfo(err, "%s\n", suggestion_useDump);
+				*remote_max_lvl = TREE_DEPTH_INVALID;
+			} else {
+				*remote_max_lvl = (int)lvl;
+			}
+		} else {
+			*remote_max_lvl = TREE_DEPTH_INVALID;
+		}
+	}
+
+	if (remote_algo) {
+		if (conf_id) {
+			int H = PARAM_SET_isSetByName(set, "H");
+			KSI_HashAlgorithm alg_id = (KSI_HashAlgorithm)KSI_Integer_getUInt64(conf_id);
+
+			if (!KSI_isHashAlgorithmSupported(alg_id)) {
+				if (!H) {
+					ERR_TRCKR_ADD(err, (res = KT_INVALID_CONF), "Error: Remote configuration algorithm is not supported.");
+					if (!dump) ERR_TRCKR_addAdditionalInfo(err, "%s\n", suggestion_useDump);
+					ERR_TRCKR_addAdditionalInfo(err, "%s\n", suggestion_useH);
+					goto cleanup;
+				}
+			} else if (!KSI_isHashAlgorithmTrusted(alg_id)) {
+				if (!H) {
+					ERR_TRCKR_addWarning(err, "  * Warning: Remote configuration algorithm is not trusted.\n");
+					if (!dump) ERR_TRCKR_addAdditionalInfo(err, "%s\n", suggestion_useDump);
+					ERR_TRCKR_addAdditionalInfo(err, "%s\n", suggestion_useH);
+				}
+			}
+			*remote_algo = alg_id;
+		} else {
+			*remote_algo = KSI_HASHALG_INVALID_VALUE;
+		}
+	}
+
+cleanup:
+	KSI_Config_free(config);
+
+	return res;
+#undef TREE_DEPTH_INVALID
+}
+
+int apply_aggregator_conf(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi) {
+	int res = KT_UNKNOWN_ERROR;
+	KSI_HashAlgorithm remote_algo = KSI_HASHALG_INVALID_VALUE;
+	int remote_max_lvl = -1;
+	char buf[32] = "";
+
+	if (set == NULL || err == NULL || ksi == NULL) return KT_INVALID_ARGUMENT;
+
+	res = get_remote_aggr_conf(set, err, ksi, &remote_max_lvl, &remote_algo);
+	if (res != KT_OK) goto cleanup;
+
+	if (PARAM_SET_isSetByName(set, "dump-conf")) goto cleanup;
+	PST_snprintf(buf, sizeof(buf), "%i", remote_max_lvl);
+
+	res = PARAM_SET_add(set, "max-lvl",
+		buf,
+		"remote-conf", PRIORITY_KSI_CONF_REMOTE);
+	if (res != KT_OK) goto cleanup;
+
+	res = PARAM_SET_add(set, "H",
+		KSI_getHashAlgorithmName(remote_algo),
+		"remote-conf", PRIORITY_KSI_CONF_REMOTE);
+	if (res != KT_OK) goto cleanup;
+
+
+	res = KT_OK;
+cleanup:
 
 	return res;
 }

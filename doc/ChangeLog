@@ -1,3 +1,39 @@
+Version 1.6
+
+2022-04-01 1.6.752
+
+* FEATURE: New command create to make a log signature from existing log file.
+* FEATURE: New option --sig-dir for verify and create to search log signatures from not default location.
+* FEATURE: New option --log-file-list for verify and create to feed input log file list as a file.
+* FEATURE: New option --ksi to extract pure KSI signature for log line.
+* FEATURE: Extending of Excerpt file implemented.
+* FEATURE: Memory tests can be run with test/memory-test.sh.
+* IMPROVEMENT: Usage of ksi+ (e.g. ksi+http) URL schemes documented.
+* IMPROVEMENT: Configuration file supports option --max-lvl for command create.
+* IMPROVEMENT: General verification is based on libksi verification policy.
+* IMPROVEMENT: Inconclusive verification result will return EXIT_FAILURE as exit code.
+* IMPROVEMENT: Log files with mac and windows line endings are supported.
+* IMPROVEMENT: Wording for inconclusive verification result message improved.
+* IMPROVEMENT: Detailed verification errors are displayed before error trace.
+* IMPROVEMENT: libparamset 1.1 is used to parse command-line parameters and to generate help.
+* IMPROVEMENT: At least libksi 3.20 is needed to build logksi.
+* IMPROVEMENT: Code refactored into decoupled modules to improve maintainability.
+* IMPROVEMENT: Copyright updated with year 2022.
+* BUGFIX: It is not possible to remove lines from log file containing only identical log lines.
+* BUGFIX: Invalid hash algorithm in 901.01 does not make logksi crash anymore.
+* BUGFIX: rebuild.sh --get-dep-online fixed.
+* BUGFIX: When verifying and --continue-on-fail is set, error trace is not crowded with detailed error messages.
+* BUGFIX: Duplicate suggestions messages are not displayed.
+* BUGFIX: Options not supported by logksi but found in KSI tool configuration file will not result in an error.
+* BUGFIX: When unsigned block interrupts verification with flag --continue-on-fail, correct summary of block and file is displayed.
+* BUGFIX: When during verification resource is not available due to user error, verification is stopped.
+* BUGFIX: When log lines are skipped on error (with --continue-on-fail) due to record hash mismatch, log lines larger than 1024 bytes are skipped correctly.
+* BUGFIX: There is no default user and key as anon anymore.
+* BUGFIX: Options -h, --hex-to-str and --continue-on-fail can be followed by input file.
+* BUGFIX: When extending RFC3161 timestamps without --enable-rfc3161-conversion original file is restored from backup.
+* BUGFIX: Legacy signature tests fixed.
+* BUGFIX: Several test signatures extended to fix tests.
+
 Version 1.5
 
 2019-10-07 1.5.649

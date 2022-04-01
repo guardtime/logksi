@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2017 Guardtime, Inc.
+ * Copyright 2013-2022 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -195,8 +195,17 @@ static int verify_signature(KSI_Signature *sig, KSI_CTX *ctx,
 	res = KSI_SignatureVerifier_verify(policy, &info, result);
 	if (res != KSI_OK) goto cleanup;
 
-	if (*result && (*result)->finalResult.resultCode != KSI_VER_RES_OK) {
-		res = KSI_VERIFICATION_FAILURE;
+
+	res = KT_VERIFICATION_NA;
+
+	if (*result) {
+		KSI_VerificationResultCode resCode = (*result)->finalResult.resultCode;
+
+		if (resCode == KSI_VER_RES_OK) {
+			res = KT_OK;
+		} else if (resCode == KSI_VER_RES_FAIL) {
+			res = KT_VERIFICATION_FAILURE;
+		}
 	}
 
 cleanup:
@@ -283,30 +292,44 @@ int LOGKSI_RequestHandle_getExtendResponse(ERR_TRCKR *err, KSI_CTX *ctx, KSI_Req
 	return res;
 }
 
+int LOGKSI_Aggregator_getConf(ERR_TRCKR *err, KSI_CTX *ctx, KSI_Config **config) {
+	int res;
+
+	if (err == NULL || ctx == NULL || config == NULL) {
+		ERR_TRCKR_ADD(err, res = KT_INVALID_ARGUMENT, NULL);
+		return res;
+	}
+
+	res = KSI_receiveAggregatorConfig(ctx, config);
+	if (res != KSI_OK) LOGKSI_KSI_ERRTrace_save(ctx);
+
+	if (appendBaseErrorIfPresent(err, res, ctx, __LINE__) == 0) {
+		appendNetworkErrors(err, res);
+		appendAggreErrors(err, res);
+	}
+
+	return res;
+}
+
 int LOGKSI_SignatureVerify_general(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX *ctx, KSI_DataHash *hsh, KSI_uint64_t rootLevel,
-									KSI_PublicationData *pubdata, int extperm,
+									KSI_PublicationsFile* pubFile, KSI_PublicationData *pubdata, int extperm,
 									KSI_PolicyVerificationResult **result) {
 	int res;
+
 
 	if (err == NULL || sig == NULL || ctx == NULL || result == NULL) {
 		ERR_TRCKR_ADD(err, res = KT_INVALID_ARGUMENT, NULL);
 		return res;
 	}
 
-	/* First check if user has provided publications */
-	if (pubdata != NULL) {
-		res = LOGKSI_SignatureVerify_userProvidedPublicationBased(err, sig, ctx, hsh, rootLevel, pubdata, extperm, result);
-	} else {
-		/* Get available trust anchor from the signature */
-		if (LOGKSI_Signature_isCalendarAuthRecPresent(sig)) {
-			res = LOGKSI_SignatureVerify_keyBased(err, sig, ctx, hsh, rootLevel, result);
-		} else if (LOGKSI_Signature_isPublicationRecordPresent(sig)) {
-			res = LOGKSI_SignatureVerify_publicationsFileBased(err, sig, ctx, hsh, rootLevel, extperm, result);
-		} else {
-			res = LOGKSI_SignatureVerify_calendarBased(err, sig, ctx, hsh, rootLevel, result);
-		}
-	}
+	res = verify_signature(sig, ctx, hsh, rootLevel, extperm, pubFile, pubdata, KSI_VERIFICATION_POLICY_GENERAL, result);
+	if (res != KSI_OK) LOGKSI_KSI_ERRTrace_save(ctx);
 
+	if (appendBaseErrorIfPresent(err, res, ctx, __LINE__) == 0) {
+		appendPubFileErros(err, res);
+		appendNetworkErrors(err, res);
+		appendExtenderErrors(err, res);
+	}
 	return res;
 }
 
@@ -321,7 +344,6 @@ int LOGKSI_SignatureVerify_internally(ERR_TRCKR *err, KSI_Signature *sig, KSI_CT
 
 	res = verify_signature(sig, ctx, hsh, rootLevel, 0, NULL, NULL, KSI_VERIFICATION_POLICY_INTERNAL, result);
 	if (res != KSI_OK) LOGKSI_KSI_ERRTrace_save(ctx);
-	appendBaseErrorIfPresent(err, res, ctx, __LINE__);
 
 	return res;
 }
@@ -338,10 +360,6 @@ int LOGKSI_SignatureVerify_calendarBased(ERR_TRCKR *err, KSI_Signature *sig, KSI
 	res = verify_signature(sig, ctx, hsh, rootLevel, 1, NULL, NULL, KSI_VERIFICATION_POLICY_CALENDAR_BASED, result);
 	if (res != KSI_OK) LOGKSI_KSI_ERRTrace_save(ctx);
 
-	if (appendBaseErrorIfPresent(err, res, ctx, __LINE__) == 0) {
-		appendNetworkErrors(err, res);
-		appendExtenderErrors(err, res);
-	}
 	return res;
 }
 
@@ -357,9 +375,6 @@ int LOGKSI_SignatureVerify_keyBased(ERR_TRCKR *err, KSI_Signature *sig, KSI_CTX 
 	res = verify_signature(sig, ctx, hsh, rootLevel, 0, NULL, NULL, KSI_VERIFICATION_POLICY_KEY_BASED, result);
 	if (res != KSI_OK) LOGKSI_KSI_ERRTrace_save(ctx);
 
-	if (appendBaseErrorIfPresent(err, res, ctx, __LINE__) == 0) {
-		appendPubFileErros(err, res);
-	}
 	return res;
 }
 
@@ -376,11 +391,6 @@ int LOGKSI_SignatureVerify_publicationsFileBased(ERR_TRCKR *err, KSI_Signature *
 	res = verify_signature(sig, ctx, hsh, rootLevel, extperm, NULL, NULL, KSI_VERIFICATION_POLICY_PUBLICATIONS_FILE_BASED, result);
 	if (res != KSI_OK) LOGKSI_KSI_ERRTrace_save(ctx);
 
-	if (appendBaseErrorIfPresent(err, res, ctx, __LINE__) == 0) {
-		appendPubFileErros(err, res);
-		appendNetworkErrors(err, res);
-		appendExtenderErrors(err, res);
-	}
 	return res;
 }
 
@@ -399,10 +409,6 @@ int LOGKSI_SignatureVerify_userProvidedPublicationBased(ERR_TRCKR *err, KSI_Sign
 	res = verify_signature(sig, ctx, hsh, rootLevel, extperm, NULL, pubdata, KSI_VERIFICATION_POLICY_USER_PUBLICATION_BASED, result);
 	if (res != KSI_OK) LOGKSI_KSI_ERRTrace_save(ctx);
 
-	if (appendBaseErrorIfPresent(err, res, ctx, __LINE__) == 0) {
-		appendNetworkErrors(err, res);
-		appendExtenderErrors(err, res);
-	}
 	return res;
 }
 
@@ -813,6 +819,7 @@ int LOGKSI_KSI_ERR_toExitCode(int error_code) {
 		/**
 		 * General cryptographic errors.
 		 */
+		case KSI_UNKNOWN_HASH_ALGORITHM_ID:
 		case KSI_UNTRUSTED_HASH_ALGORITHM:
 		case KSI_UNAVAILABLE_HASH_ALGORITHM:
 		case KSI_PUBLICATIONS_FILE_NOT_SIGNED_WITH_PKI:

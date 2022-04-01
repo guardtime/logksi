@@ -15,7 +15,7 @@
 Guardtime's KSI Blockchain is an industrial scale blockchain platform that cryptographically ensures data integrity and proves time of existence. The KSI signatures, based on hash chains, link data to this global calendar blockchain. 
 The checkpoints of the blockchain, published in newspapers and electronic media, enable long term integrity of any digital asset where only trusted publications file or a publication string in printed media is needed to perform the verification.
 .LP
-Log signature tool is used to perform operations related to log signature files created according to the log signature specification, for instance by KSI Rsyslog module. It provides the following functions:
+Log signature tool is used to perform operations related to log signature files created according to the log signature specification, for instance by KSI Rsyslog module or logksi itself. It provides the following functions:
 .LP
 .IP \(bu 4
 Extending of KSI signatures in a log signature file (\fBlogksi-extend\fR(1)).
@@ -27,6 +27,8 @@ Recovery signing of unsigned blocks in a log signature file (\fBlogksi-sign\fR(1
 Integrating of temporary files containing log signature blocks and KSI signatures into one final log signature file (\fBlogksi-integrate\fR(1)).
 .IP \(bu 4
 Extracting log records to be individually verified (\fBlogksi-extract\fR(1)).
+.IP \(bu 4
+Creating log signature from log file (\fBlogksi-create\fR(1)).
 .\"
 .SH LOGKSI COMMANDS
 .LP
@@ -49,6 +51,11 @@ Integrates temporary blocks file and signatures file (created as a result of asy
 .TP
 \fBextract\fR
 Extracts log records and corresponding hash chains from the log files protected by KSI signatures. See \fBlogksi-extract\fR(1) for more information.
+.\"
+.TP
+\fBcreate\fR
+Creates a log signature from existing logfile. See \fBlogksi-create\fR(1) for more information.
+.\"
 .TP
 \fBconf\fR
 Prints the KSI service parameters. See \fBlogksi-conf\fR(5) for more information.
@@ -135,4 +142,4 @@ Guardtime AS, http://www.guardtime.com/
 .LP
 .\"
 .SH SEE ALSO
-\fBlogksi-extend\fR(1), \fBlogksi-extract\fR(1), \fBlogksi-integrate\fR(1), \fBlogksi-sign\fR(1), \fBlogksi-verify\fR(1), \fBlogksi-conf\fR(5)
+ \fBlogksi-create\fR(1), \fBlogksi-extend\fR(1), \fBlogksi-extract\fR(1), \fBlogksi-integrate\fR(1), \fBlogksi-sign\fR(1), \fBlogksi-verify\fR(1), \fBlogksi-conf\fR(5)

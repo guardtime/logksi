@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2019 Guardtime, Inc.
+ * Copyright 2013-2022 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -27,8 +27,12 @@ extern "C" {
 #include <ksi/ksi.h>
 #include <ksi/tlv_element.h>
 #include <ksi/fast_tlv.h>
+#include <ksi/hash.h>
 #include "err_trckr.h"
 #include "smart_file.h"
+#include "tool_box/extract_info.h"
+
+typedef struct MetaDataRecord_st MetaDataRecord;
 
 int tlv_element_get_uint(KSI_TlvElement *tlv, KSI_CTX *ksi, unsigned tag, size_t *out);
 int tlv_element_get_octet_string(KSI_TlvElement *tlv, KSI_CTX *ksi, unsigned tag, KSI_OctetString **out);
@@ -36,10 +40,19 @@ int tlv_element_get_hash(ERR_TRCKR *err, KSI_TlvElement *tlv, KSI_CTX *ksi, unsi
 int tlv_element_set_uint(KSI_TlvElement *tlv, KSI_CTX *ksi, unsigned tag, KSI_uint64_t val);
 int tlv_element_set_hash(KSI_TlvElement *tlv, KSI_CTX *ksi, unsigned tag, KSI_DataHash *hash);
 int tlv_element_set_signature(KSI_TlvElement *tlv, KSI_CTX *ksi, unsigned tag, KSI_Signature *sig);
+int tlv_element_set_record_hash_chain(KSI_TlvElement *parentTlv, KSI_CTX *ksi, RECORD_INFO *record);
 int tlv_element_create_hash(KSI_DataHash *hash, unsigned tag, KSI_TlvElement **tlv);
+
 int tlv_element_write_hash(KSI_DataHash *hash, unsigned tag, SMART_FILE *out);
+int tlv_element_write_header(KSI_CTX *ksi, KSI_HashAlgorithm algo, KSI_OctetString *octet, KSI_DataHash *prevLeaf, SMART_FILE *out);
+int tlv_element_write_signature_block(KSI_CTX *ksi, uint64_t recCount, KSI_Signature *sig, SMART_FILE *out);
+
 int tlv_element_parse_and_check_sub_elements(ERR_TRCKR *err, KSI_CTX *ksi, unsigned char *dat, size_t dat_len, size_t hdr_len, KSI_TlvElement **out);
 int LOGKSI_FTLV_smartFileRead(SMART_FILE *sf, unsigned char *buf, size_t len, size_t *consumed, struct fast_tlv_s *t);
+
+int MetaDataRecord_new(KSI_CTX *ksi, uint64_t recIndex, const char *key, const char *value, MetaDataRecord **obj);
+void MetaDataRecord_free(MetaDataRecord *obj);
+int MetaDataRecord_serialize(KSI_CTX *ksi, MetaDataRecord *rec, unsigned char **raw, size_t *raw_len);
 
 #ifdef	__cplusplus
 }

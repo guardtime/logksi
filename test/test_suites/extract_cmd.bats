@@ -21,6 +21,13 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ "Suggestion:  Use ONLY '--out-log -' OR '--out-proof -' to redirect desired output to stdout." ]]
 }
 
+@test "extract CMD: attempt to redirect both outputs to stdout via -o - --ksig" {
+	run bash -c "./src/logksi extract test/resource/logs_and_signatures/log_repaired -o - -r 1"
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ "Error: Both output files cannot be redirected to stdout." ]]
+	[[ "$output" =~ "Suggestion:  Use ONLY '--out-log -' OR '--out-proof -' to redirect desired output to stdout." ]]
+}
+
 @test "extract CMD: attempt to redirect multiple outputs to stdout 2" {
 	run bash -c "./src/logksi extract test/resource/logs_and_signatures/log_repaired --out-log - --out-proof - -r 1"
 	[ "$status" -eq 3 ]
@@ -34,6 +41,21 @@ export KSI_CONF=test/test.cfg
 	run bash -c "./src/logksi extract test/resource/logs_and_signatures/log_repaired --out-log - --log - -r 1"
 	[ "$status" -eq 3 ]
 	[[ "$output" =~ "Multiple different simultaneous outputs to stdout (--log -, --out-log -)." ]]
+}
+
+@test "extract CMD: attempt to redirect multiple outputs to stdout with --ksig and -r 1,2" {
+	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired --ksig --out-log - --out-proof - -r 1,2
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ "Error: Multiple different simultaneous outputs to stdout (--out-log -, --out-proof -)." ]]
+	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired --ksig --out-log - -o test/out/dummy -r 1,2
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ "Error: Multiple different simultaneous outputs to stdout (--ksig, --out-log -, -r 1,2)." ]]
+	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired --ksig --out-proof - -o test/out/dummy -r 1,2
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ "Error: Multiple different simultaneous outputs to stdout (--ksig, --out-proof -, -r 1,2)." ]]
+	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired --ksig --out-proof - -o test/out/dummy -r 1-2
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ "Error: Multiple different simultaneous outputs to stdout (--ksig, --out-proof -, -r 1-2)." ]]
 }
 
 @test "extract CMD: attempt to read both files from stdin" {
@@ -66,140 +88,140 @@ export KSI_CONF=test/test.cfg
 @test "extract CMD: attempt to extract a range given in descending order" {
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r 7-3
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: List of positions must be given in strictly ascending order." ]]
+	[[ "$output" =~ "List of positions must be given in strictly ascending order." ]]
 }
 
 @test "extract CMD: attempt to extract a list that contains duplicates" {
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r 3,4,5-7,7
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: List of positions must be given in strictly ascending order." ]]
+	[[ "$output" =~ "List of positions must be given in strictly ascending order." ]]
 }
 
 @test "extract CMD: attempt to extract a list of ranges given in descending order" {
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r 6-7,3-5
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: List of positions must be given in strictly ascending order." ]]
+	[[ "$output" =~ "List of positions must be given in strictly ascending order." ]]
 }
 
 @test "extract CMD: attempt to extract a list that contains non-positive numbers" {
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r 6,-7
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	[[ "$output" =~ "Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r 6,7-8,-9
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	[[ "$output" =~ "Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r 6,7--8,9
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	[[ "$output" =~ "Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r 0,3
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	[[ "$output" =~ "Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r 0-3
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	[[ "$output" =~ "Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r -3-3
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	[[ "$output" =~ "Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
 }
 
 @test "extract CMD: attempt to extract a list that contains syntax errors" {
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r ,
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	[[ "$output" =~ "Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r 5,
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	[[ "$output" =~ "Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r -
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	[[ "$output" =~ "Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r 6-
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	[[ "$output" =~ "Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r 5,,6
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	[[ "$output" =~ "Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r 5-6-7
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	[[ "$output" =~ "Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
 }
 
-@test "extract CMD: attempt to extract a list that contains whitepace" {
+@test "extract CMD: attempt to extract a list that contains whitespace" {
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r "5 6"
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
+	[[ "$output" =~ "List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r "5 ,6"
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
+	[[ "$output" =~ "List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r "5, 6"
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
+	[[ "$output" =~ "List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r "5 -7"
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
+	[[ "$output" =~ "List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r "5- 7"
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
+	[[ "$output" =~ "List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r "5,7 "
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
+	[[ "$output" =~ "List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r " 5-7"
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
+	[[ "$output" =~ "List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r " 5\t7"
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
+	[[ "$output" =~ "List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r " 5\n7"
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
+	[[ "$output" =~ "List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r " 5\v7"
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
+	[[ "$output" =~ "List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r " 5\f7"
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
+	[[ "$output" =~ "List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r " 5\r7"
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
+	[[ "$output" =~ "List of positions must not contain whitespace. Use ',' and '-' as separators." ]]
 }
 
 @test "extract CMD: attempt to extract a list that contains non-decimal integers" {
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r 0x5
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	[[ "$output" =~ "Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r 0X5
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	[[ "$output" =~ "Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r 5,0x6
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	[[ "$output" =~ "Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r 5-0X6
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	[[ "$output" =~ "Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
 }
 
 @test "extract CMD: attempt to extract a list that contains illegal characters" {
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r a
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	[[ "$output" =~ "Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r Z
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	[[ "$output" =~ "Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r +
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	[[ "$output" =~ "Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r \*
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	[[ "$output" =~ "Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r %
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	[[ "$output" =~ "Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r $
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	[[ "$output" =~ "Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r .
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	[[ "$output" =~ "Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
 	run ./src/logksi extract test/resource/logs_and_signatures/log_repaired -r :
 	[ "$status" -ne 0 ]
-	[[ "$output" =~ "Error: Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
+	[[ "$output" =~ "Positions must be represented by positive decimal integers, using a list of comma-separated ranges." ]]
 }

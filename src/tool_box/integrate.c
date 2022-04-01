@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2017 Guardtime, Inc.
+ * Copyright 2013-2022 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -23,9 +23,10 @@
 #include <ksi/ksi.h>
 #include <ksi/compatibility.h>
 #include <unistd.h>
-#include "param_set/param_set.h"
-#include "param_set/task_def.h"
-#include "param_set/parameter.h"
+#include <param_set/param_set.h>
+#include <param_set/task_def.h>
+#include <param_set/parameter.h>
+#include <param_set/strn.h>
 #include "tool_box/ksi_init.h"
 #include "tool_box/param_control.h"
 #include "tool_box/task_initializer.h"
@@ -37,17 +38,19 @@
 #include "debug_print.h"
 #include "tool.h"
 #include "rsyslog.h"
-#include "blocks_info.h"
+#include "logksi.h"
 #include "io_files.h"
 
 static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set);
 static int generate_filenames(PARAM_SET* set, ERR_TRCKR *err, IO_FILES *files);
 static int open_input_and_output_files(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files, int forceOverwrite);
 static int acquire_file_locks(ERR_TRCKR *err, MULTI_PRINTER *mp, IO_FILES *files);
-static int recover_procedure(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, BLOCK_INFO* blocks, IO_FILES *files, int resIn);
+static int recover_procedure(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI* blocks, IO_FILES *files, int resIn);
 static int rename_temporary_and_backup_files(PARAM_SET *set, ERR_TRCKR *err, IO_FILES *files);
 static void close_input_and_output_files(ERR_TRCKR *err, int res, IO_FILES *files);
 static int check_pipe_errors(PARAM_SET *set, ERR_TRCKR *err);
+
+#define PARAMS "{input}{o}{out-log}{insert-missing-hashes}{force-overwrite}{use-computed-hash-on-fail}{use-stored-hash-on-fail}{recover}{d}{log}{h|help}{hex-to-str}"
 
 int integrate_run(int argc, char **argv, char **envp) {
 	int res;
@@ -62,18 +65,18 @@ int integrate_run(int argc, char **argv, char **envp) {
 	int d = 0;
 	int forceOverwrite = 0;
 	IO_FILES files;
-	BLOCK_INFO blocks;
+	LOGKSI logksi;
 	MULTI_PRINTER *mp = NULL;
 
 
-	BLOCK_INFO_clearAll(&blocks);
+	LOGKSI_initialize(&logksi);
 	IO_FILES_init(&files);
 
 	/**
 	 * Extract command line parameters.
 	 */
 	res = PARAM_SET_new(
-			CONF_generate_param_set_desc("{input}{o}{out-log}{insert-missing-hashes}{force-overwrite}{use-computed-hash-on-fail}{use-stored-hash-on-fail}{recover}{d}{log}{h|help}{hex-to-str}", "", buf, sizeof(buf)),
+			CONF_generate_param_set_desc(PARAMS, "", buf, sizeof(buf)),
 			&set);
 	if (res != KT_OK) goto cleanup;
 
@@ -116,9 +119,9 @@ int integrate_run(int argc, char **argv, char **envp) {
 
 
 	print_progressDesc(mp, MP_ID_BLOCK, 0, DEBUG_EQUAL | DEBUG_LEVEL_1, "Integrating... ");
-	integrate_res = logsignature_integrate(set, mp, err, ksi, &blocks, &files);
+	integrate_res = logsignature_integrate(set, mp, err, ksi, &logksi, &files);
 	print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, integrate_res);
-	res = recover_procedure(set, mp, err, &blocks, &files, integrate_res);
+	res = recover_procedure(set, mp, err, &logksi, &files, integrate_res);
 	if (res != KT_OK) goto cleanup;
 
 	res = rename_temporary_and_backup_files(set, err, &files);
@@ -145,7 +148,7 @@ cleanup:
 	}
 	ERR_TRCKR_print(err, d);
 
-	BLOCK_INFO_freeAndClearInternals(&blocks);
+	LOGKSI_freeAndClearInternals(&logksi);
 	SMART_FILE_close(logfile);
 	PARAM_SET_free(set);
 	TASK_SET_free(task_set);
@@ -157,45 +160,50 @@ cleanup:
 }
 
 char *integrate_help_toString(char *buf, size_t len) {
-	KSI_snprintf(buf, len,
-		"Usage:\n"
-		" %s integrate <logfile> [-o <out.logsig>]\n"
-		" %s integrate <logfile> --recover [-o <out.logsig>] [--out-log <out.recovered.logsig>]\n"
-		"\n"
-		" <logfile>\n"
-		"           - Name of the log file whose temporary files are to be integrated.\n"
-		"             The two temporary files created while asynchronously signing are:\n"
-		"               * the log signature blocks file: '<logfile>.logsig.parts/blocks.dat'; and\n"
-		"               * the log signature file containing the respective KSI signatures: \n"
-		"                 '<logfile>.logsig.parts/block-signatures.dat'.\n"
-		" -o <out.logsig>\n"
-		"           - Name of the integrated output log signature file. If not specified,\n"
-		"             the log signature file is saved as '<logfile>.logsig' in the same folder where\n"
-		"             the '<logfile>' is located. An attempt to overwrite an existing log signature file will\n"
-		" --out-log <out.logsig>\n"
-		"           - Specify the name of recovered log file (only valid with --recover). If not specified,\n"
-		"             the log signature file is saved as <logfile>.recovered in the same folder where the\n"
-		"             <logfile> is located. An attempt to overwrite an existing log file will result in an\n"
-		"             error. Use '-' as file name to redirect the output as a binary stream to stdout\n"
-		"             result in an error. Use '-' to redirect the integrated log signature binary stream to\n"
-		"             stdout.\n"
-		" --recover - Tries to recover as many blocks as possible from corrupted log and log signature\n"
-		"             temporary files. For example if block no. 6 is corrupted it is possible to recover log\n"
-		"             records and log signatures until the end of the block no. 5. By default output\n"
-		"             file names are derived from the log file name: <logfile>.recovered and\n"
-		"             <logfile>.recovered.logsig for log and log signature file accordingly. If the files\n"
-		"             already exist, error is returned (see --force-overwrite).\n"
-		" --force-overwrite\n"
-		"           - Force overwriting of existing log signature file.\n"
-		" -d\n"
-		"           - Print detailed information about processes and errors to stderr.\n"
-		"             To make output more verbose use -dd or -ddd.\n"
-		" --log <file>\n"
-		"           - Write libksi log to the given file. Use '-' as file name to redirect the log to stdout.\n",
-		TOOL_getName(),
-		TOOL_getName()
-	);
+	int res;
+	char *ret = NULL;
+	PARAM_SET *set;
+	size_t count = 0;
+	char tmp[1024];
 
+	if (buf == NULL || len == 0) return NULL;
+
+
+	/* Create set with documented parameters. */
+	res = PARAM_SET_new(CONF_generate_param_set_desc(PARAMS, "", tmp, sizeof(tmp)), &set);
+	if (res != PST_OK) goto cleanup;
+
+	res = CONF_initialize_set_functions(set, "");
+	if (res != PST_OK) goto cleanup;
+
+	/* Temporary name change for formatting help text. */
+	PARAM_SET_setPrintName(set, "input", "<logfile>", NULL);
+	PARAM_SET_setHelpText(set, "input", NULL, "Name of the log file whose temporary files are to be integrated. The two temporary files created while asynchronously signing are:\\>2\n\\>4"
+		"* the log signature blocks file: '<logfile>.logsig.parts/blocks.dat'; and\\>2\n\\>4"
+		"* the log signature file containing the respective KSI signatures: '<logfile>.logsig.parts/block-signatures.dat'.");
+
+	PARAM_SET_setHelpText(set, "o", "<out.logsig>", "Name of the integrated output log signature file. If not specified, the log signature file is saved as '<logfile>.logsig' in the same folder where the '<logfile>' is located. An attempt to overwrite an existing log signature file will result in an error. Use '-' as file name to redirect the output as a binary stream to stdout.");
+	PARAM_SET_setHelpText(set, "out-log", "<out.logsig>", "Specify the name of recovered log file (only valid with --recover). If not specified, the log signature file is saved as <logfile>.recovered in the same folder where the <logfile> is located. An attempt to overwrite an existing log file will result in an error. Use '-' as file name to redirect the output as a binary stream to stdout result in an error. Use '-' to redirect the integrated log signature binary stream to stdout.");
+	PARAM_SET_setHelpText(set, "recover", NULL, "Tries to recover as many blocks as possible from corrupted log and log signature temporary files. For example if block no. 6 is corrupted it is possible to recover log records and log signatures until the end of the block no. 5. By default output file names are derived from the log file name: <logfile>.recovered and <logfile>.recovered.logsig for log and log signature file accordingly. If the files already exist, error is returned (see --force-overwrite).");
+	PARAM_SET_setHelpText(set, "force-overwrite", NULL, "Force overwriting of existing log signature file.");
+	PARAM_SET_setHelpText(set, "d", NULL, "Print detailed information about processes and errors to stderr. To make output more verbose use -dd or -ddd.");
+	PARAM_SET_setHelpText(set, "log", "<file>", "Write libksi log to the given file. Use '-' as file name to redirect the log to stdout.");
+
+
+	/* Format synopsis and parameters. */
+	count += PST_snhiprintf(buf + count, len - count, 80, 0, 0, NULL, ' ', "Usage:\\>1\n\\>8"
+	"logksi integrate <logfile> [-o <out.logsig>]\\>1\n\\>8"
+	"logksi integrate <logfile> --recover [-o <out.logsig>]\n"
+	"[--out-log <out.recovered.logsig>]"
+	"\\>\n\n\n");
+
+	ret = PARAM_SET_helpToString(set, "input,o,out-log,recover,force-overwrite,d,log", 1, 13, 80, buf + count, len - count);
+
+cleanup:
+	if (res != PST_OK || ret == NULL) {
+		PST_snprintf(buf + count, len - count, "\nError: There were failures while generating help by PARAM_SET.\n");
+	}
+	PARAM_SET_free(set);
 	return buf;
 }
 
@@ -221,8 +229,8 @@ static int generate_tasks_set(PARAM_SET *set, TASK_SET *task_set) {
 
 	PARAM_SET_setParseOptions(set, "input", PST_PRSCMD_COLLECT_LOOSE_VALUES | PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
 
-	PARAM_SET_setParseOptions(set, "insert-missing-hashes,force-overwrite,use-computed-hash-on-fail,use-stored-hash-on-fail,recover", PST_PRSCMD_HAS_NO_VALUE);
-	PARAM_SET_setParseOptions(set, "d", PST_PRSCMD_HAS_NO_VALUE | PST_PRSCMD_NO_TYPOS);
+	PARAM_SET_setParseOptions(set, "insert-missing-hashes,force-overwrite,use-computed-hash-on-fail,use-stored-hash-on-fail,recover,hex-to-str", PST_PRSCMD_HAS_NO_VALUE);
+	PARAM_SET_setParseOptions(set, "d,h", PST_PRSCMD_HAS_NO_VALUE | PST_PRSCMD_NO_TYPOS);
 
 	/**
 	 * Define possible tasks.
@@ -470,14 +478,14 @@ cleanup:
 
 
 }
-static int recover_procedure(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, BLOCK_INFO* blocks, IO_FILES *files, int resIn) {
+static int recover_procedure(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, LOGKSI* logksi, IO_FILES *files, int resIn) {
 	int res = KT_UNKNOWN_ERROR;
 	int returnCode = resIn;
 	SMART_FILE *originalLogFile = NULL;
 	size_t i = 0;
 
 
-	if (set == NULL || mp == NULL || err == NULL || blocks == NULL || files == NULL) {
+	if (set == NULL || mp == NULL || err == NULL || logksi == NULL || files == NULL) {
 		goto cleanup;
 	}
 
@@ -491,10 +499,10 @@ static int recover_procedure(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, 
 		/* Check if there is a need and possibility to do something. */
 		if (resIn == KT_OK) {
 			print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, 0);
-			print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, "All blocks (%zu) have successfully integrated - no recovery process needed.\n", blocks->partNo);
+			print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, "All blocks (%zu) have successfully integrated - no recovery process needed.\n", logksi->task.integrate.partNo);
 			returnCode = KT_OK;
 			goto cleanup;
-		} else if (blocks->blockNo < 2) {
+		} else if (logksi->blockNo < 2) {
 			print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, 1);
 			ERR_TRCKR_ADD(err, resIn, "Error: Unable to recover any blocks as the first block is already corrupted!");
 			goto cleanup;
@@ -519,17 +527,20 @@ static int recover_procedure(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, 
 			goto cleanup;
 		}
 
-		for (i = 0; i < blocks->firstLineInBlock - 1; i++) {
+		for (i = 0; i < logksi->block.firstLineNo - 1; i++) {
 			/* Maximum line size is 64K characters, without newline character. */
 			size_t count = 0;
 			char buf[0x10000 + 2];
 
-			res = SMART_FILE_gets(originalLogFile, buf, sizeof(buf), &count);
+			res = SMART_FILE_readLine(originalLogFile, buf, sizeof(buf) - 2, &count);
 			if (res != SMART_FILE_OK) {
 				ERR_TRCKR_ADD(err, resIn, "Error: Unable read logline nr %3zu!", i);
 				goto cleanup;
 			}
-			res = SMART_FILE_write(files->files.outLog, (unsigned char*)buf, count, NULL);
+			buf[count] = '\n';
+			buf[count + 1] = '\0';
+
+			res = SMART_FILE_write(files->files.outLog, (unsigned char*)buf, count + 1, NULL);
 			if (res != SMART_FILE_OK) {
 				ERR_TRCKR_ADD(err, resIn, "Error: Unable write logline nr %3zu into recovered log file!", i);
 				goto cleanup;
@@ -540,7 +551,7 @@ static int recover_procedure(PARAM_SET *set, MULTI_PRINTER *mp, ERR_TRCKR *err, 
 		ERR_CATCH_MSG(err, res, "Error: Could not close output log file %s.", files->internal.outLog);
 
 		print_progressResult(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, 0);
-		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, "It was possible to recover %zu blocks (lines 1 - %zu).\n", blocks->blockNo - 1, blocks->firstLineInBlock - 1);
+		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, "It was possible to recover %zu blocks (lines 1 - %zu).\n", logksi->blockNo - 1, logksi->block.firstLineNo - 1);
 		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, "Recovered log signature saved to '%s'\n", files->internal.outSig);
 		print_debug_mp(mp, MP_ID_BLOCK, DEBUG_LEVEL_1, "Recovered Log file saved to '%s'\n", files->internal.outLog);
 

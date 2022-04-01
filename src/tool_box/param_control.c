@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2017 Guardtime, Inc.
+ * Copyright 2013-2022 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -178,6 +178,70 @@ cleanup:
 	return res;
 }
 
+int isFormatOk_recordExtract(const char *rec) {
+	long last = -1;
+	int expectingInteger = 1;
+	int expectingSeparator = 0;
+	int isRangeOpen = 0;
+	int isRangeJustClosed = 0;
+	const char *pRec = rec;
+	size_t i = 0;
+
+
+	if (rec == NULL) return FORMAT_NULLPTR;
+	if (strlen(rec) == 0) return FORMAT_NOCONTENT;
+
+	/* Check character set. */
+	while(rec[i]) {
+		if (isspace(rec[i])) return FORMAT_RECORD_WHITESPACE;
+		if (!isdigit(rec[i]) && rec[i] != '-' && rec[i] != ',') return FORMAT_INVALID_RECORD;
+		i++;
+	}
+
+	/* Check parsebility. */
+	while(*pRec) {
+		if (expectingInteger) {
+			long next = 0;
+			char *pEnd = NULL;
+
+			next = strtol(pRec, &pEnd, 10);
+
+			if (next <= 0) return FORMAT_INVALID_RECORD;
+			if (pRec == pEnd) return FORMAT_INVALID_RECORD;
+			if (last >= next) return FORMAT_RECORD_DESC_ORDER;
+
+			last = next;
+			pRec = pEnd;
+			expectingSeparator = 1;
+			expectingInteger = 0;
+
+			if (isRangeOpen) {
+				isRangeOpen = 0;
+				isRangeJustClosed = 1;
+			}
+			continue;
+		}
+
+		if (expectingSeparator) {
+			expectingSeparator = 0;
+			expectingInteger = 1;
+			if (*pRec == ',') {
+				isRangeJustClosed = 0;
+			} else if (*pRec == '-' && !isRangeJustClosed) {
+				isRangeOpen = 1;
+			} else {
+				return FORMAT_INVALID_RECORD;
+			}
+		}
+
+		pRec++;
+	}
+
+	if (isRangeOpen || expectingInteger || last == -1) return FORMAT_INVALID_RECORD;
+
+	return FORMAT_OK;
+}
+
 int isInteger(const char *str) {
 	int i = 0;
 	int C;
@@ -213,21 +277,27 @@ int convertRepair_url(const char* arg, char* buf, unsigned len) {
 	unsigned i = 0;
 	int isFile;
 
-	if (arg == NULL || buf == NULL) return 0;
+	if (arg == NULL) return PST_PARAM_CONVERT_NOT_PERFORMED;
+	if (buf == NULL) return PST_INVALID_ARGUMENT;
 	scheme = strstr(arg, "://");
 	isFile = (strstr(arg, "file://") == arg);
 
 	if (scheme == NULL) {
 		KSI_strncpy(buf, "http://", len-1);
 		if (strlen(buf)+strlen(arg) < len)
-			strncat(buf, arg, strlen(arg));
+			strcat(buf, arg);
 		else
-			return 0;
+			return PST_PARAM_CONVERT_NOT_PERFORMED;
 	} else {
 		while (arg[i] && i < len - 1) {
 			if (&arg[i] < scheme) {
 				buf[i] = (char)tolower(arg[i]);
+#ifdef _WIN32
+			} else if (arg[i] == '\\' && isFile) {
+				buf[i] = '/';
+#else
 				VARIABLE_IS_NOT_USED(isFile);
+#endif
 			} else {
 				buf[i] = arg[i];
 			}
@@ -236,7 +306,7 @@ int convertRepair_url(const char* arg, char* buf, unsigned len) {
 		}
 		buf[i] = 0;
 	}
-	return 1;
+	return PST_OK;
 }
 
 
@@ -268,8 +338,12 @@ static int isContentOk_int_limits(const char* integer, int no_zero, int not_nega
 
 	tmp = strtol(integer, NULL, 10);
 	if (no_zero && tmp == 0) return INTEGER_TOO_SMALL;
-	if (not_negative && tmp < 0) return INTEGER_UNSIGNED;
-	if (tmp > INT_MAX) return INTEGER_TOO_LARGE;
+	if (not_negative) {
+		if (tmp < 0) return INTEGER_UNSIGNED;
+		if (tmp > UINT_MAX) return INTEGER_TOO_LARGE;
+	} else {
+		if (tmp > INT_MAX) return INTEGER_TOO_LARGE;
+	}
 
 	return PARAM_OK;
 }
@@ -300,12 +374,34 @@ int isContentOk_int(const char* integer) {
 	return PARAM_OK;
 }
 
-int extract_int(void *extra, const char* str,  void** obj){
+int isContentOk_tree_level(const char* integer) {
+	long lvl = 0;
+
+	if (integer == NULL) return FORMAT_NULLPTR;
+
+	lvl = strtol(integer, NULL, 10);
+
+	if (lvl < 0 || lvl > 31) return TREE_DEPTH_OUT_OF_RANGE;
+
+	return PARAM_OK;
+}
+
+int extract_int(void **extra, const char* str, void** obj) {
 	long tmp;
 	int *pI = (int*)obj;
 	VARIABLE_IS_NOT_USED(extra);
-	tmp = strtol(str, NULL, 10);
+	tmp = str != NULL ? strtol(str, NULL, 10) : 0;
 	if (tmp < INT_MIN || tmp > INT_MAX) return KT_INVALID_CMD_PARAM;
+	*pI = (int)tmp;
+	return PST_OK;
+}
+
+int extract_uint(void **extra, const char* str, void** obj) {
+	long tmp;
+	int *pI = (int*)obj;
+	VARIABLE_IS_NOT_USED(extra);
+	tmp = str != NULL ? strtol(str, NULL, 10) : 0;
+	if (tmp < 0 || tmp > UINT_MAX) return KT_INVALID_CMD_PARAM;
 	*pI = (int)tmp;
 	return PST_OK;
 }
@@ -344,6 +440,34 @@ int isContentOk_inputFile(const char* path){
 	return PARAM_OK;
 }
 
+int isContentOk_inputFileNoDir(const char* path){
+	int res = PARAM_INVALID;
+
+	res = isContentOk_inputFile(path);
+	if (res != PARAM_OK) return res;
+
+	if (SMART_FILE_isFileType(path, SMART_FILE_TYPE_DIR)) {
+		return FILE_DIR_NOT_SUPPORTED;
+	}
+
+	return PARAM_OK;
+}
+
+int isContentOk_dir(const char* path){
+	int res = PARAM_INVALID;
+
+	res = isContentOk_inputFile(path);
+	if (res == FILE_DOES_NOT_EXIST) return FILE_DIR_DOES_NOT_EXIST;
+	if (res != PARAM_OK) return res;
+
+
+	if (!SMART_FILE_isFileType(path, SMART_FILE_TYPE_DIR)) {
+		return FILE_IS_NOT_DIR;
+	}
+
+	return PARAM_OK;
+}
+
 int isContentOk_inputFileWithPipe(const char* path){
 	if (path == NULL) return FORMAT_NULLPTR;
 	if (strcmp(path, "-") == 0)	return PARAM_OK;
@@ -359,7 +483,8 @@ int isContentOk_inputFileRestrictPipe(const char* path){
 int convertRepair_path(const char* arg, char* buf, unsigned len){
 	char *toBeReplaced = NULL;
 
-	if (arg == NULL || buf == NULL) return 0;
+	if (arg == NULL) return PST_PARAM_CONVERT_NOT_PERFORMED;
+	if (buf == NULL) return PST_INVALID_ARGUMENT;
 	KSI_strncpy(buf, arg, len - 1);
 
 
@@ -369,7 +494,7 @@ int convertRepair_path(const char* arg, char* buf, unsigned len){
 		toBeReplaced++;
 	}
 
-	return 1;
+	return PST_OK;
 }
 
 int isFormatOk_path(const char *path) {
@@ -389,20 +514,29 @@ int isContentOk_hashAlg(const char *alg){
 	else return HASH_ALG_INVALID_NAME;
 }
 
-int extract_hashAlg(void *extra, const char* str, void** obj) {
+int isContentOk_hashAlgRejectDeprecated(const char *alg) {
+	int ret;
+
+	ret = isContentOk_hashAlg(alg);
+	if (ret != PARAM_OK) return ret;
+
+	if (!KSI_isHashAlgorithmTrusted(KSI_getHashAlgorithmByName(alg))) {
+		return HASH_ALG_UNTRUSTED;
+	}
+
+	return PARAM_OK;
+}
+
+int extract_hashAlg(void **extra, const char* str, void** obj) {
 	const char *hash_alg_name = NULL;
 	KSI_HashAlgorithm *hash_id = (KSI_HashAlgorithm*)obj;
-	KSI_HashAlgorithm tmp = KSI_HASHALG_INVALID_VALUE;
+	VARIABLE_IS_NOT_USED(extra);
 
-	if (obj == NULL) return KT_INVALID_ARGUMENT;
-
-	if (extra);
 	hash_alg_name = str != NULL ? (str) : ("default");
+	*hash_id = KSI_getHashAlgorithmByName(hash_alg_name);
 
-	tmp = KSI_getHashAlgorithmByName(hash_alg_name);
-	if (!KSI_isHashAlgorithmSupported(tmp)) return KT_UNKNOWN_HASH_ALG;
+	if (!KSI_isHashAlgorithmSupported(*hash_id)) return KT_UNKNOWN_HASH_ALG;
 
-	*hash_id = tmp;
 	return PST_OK;
 }
 
@@ -506,6 +640,20 @@ static int hex_string_to_bin(const char *hexin, unsigned char *buf, size_t buf_l
 cleanup:
 
 	return res;
+}
+
+int isFormatOk_fileNameDelimiter(const char *delimiter) {
+	size_t len = 0;
+	if (delimiter == NULL) return FORMAT_NULLPTR;
+	len = strlen(delimiter);
+	if (len == 0) return FORMAT_NOCONTENT;
+
+	if (strcmp(delimiter, "new-line") == 0 ||
+		strcmp(delimiter, "space") == 0) return FORMAT_OK;
+	if (len > 1) return FORMAT_INVALID_DELIMITER;
+	if (strchr(":;,|", delimiter[0]) == NULL) return FORMAT_INVALID_DELIMITER;
+
+	return FORMAT_OK;
 }
 
 static int imprint_get_hash_obj(const char *imprint, KSI_CTX *ksi, ERR_TRCKR *err, KSI_DataHash **hash){
@@ -637,7 +785,7 @@ cleanup:
 	return res;
 }
 
-int extract_imprint(void *extra, const char* str, void** obj) {
+int extract_imprint(void **extra, const char* str, void** obj) {
 	int res;
 	void **extra_array = (void**)extra;
 	COMPOSITE *comp = NULL;
@@ -737,7 +885,7 @@ static int file_get_hash_from_imprint_stored_in_file(ERR_TRCKR *err, KSI_CTX *ct
 	while(!SMART_FILE_isEof(in)) {
 		char *trim = NULL;
 		buf[0] = '\0';
-		res = SMART_FILE_readLine(in, buf, sizeof(buf) - 1, &row, &read_count);
+		res = SMART_FILE_readLineSkipEmpty(in, buf, sizeof(buf) - 1, &row, &read_count);
 		ERR_CATCH_MSG(err, res, "Error: Unable get line.");
 
 		/* Remove leading whitespace. */
@@ -785,7 +933,7 @@ cleanup:
 }
 
 
-static int extract_input_hash(void *extra, const char* str, void** obj, int no_imprint, int no_stream) {
+static int extract_input_hash(void **extra, const char* str, void** obj, int no_imprint, int no_stream) {
 	int res;
 	void **extra_array = (void**)extra;
 	COMPOSITE *comp = (COMPOSITE*)(extra_array[1]);
@@ -820,7 +968,7 @@ cleanup:
 	return res;
 }
 
-int extract_inputHashFromImprintOrImprintInFile(void *extra, const char* str, void** obj) {
+int extract_inputHashFromImprintOrImprintInFile(void **extra, const char* str, void** obj) {
 	return extract_input_hash(extra, str, obj, 0, 0);
 }
 
@@ -840,7 +988,7 @@ int isFormatOk_pubString(const char *str) {
 	return FORMAT_OK;
 }
 
-int extract_pubString(void *extra, const char* str, void** obj) {
+int extract_pubString(void **extra, const char* str, void** obj) {
 	int res;
 	void **extra_array = extra;
 	COMPOSITE *comp = (COMPOSITE*)(extra_array[1]);
@@ -1040,7 +1188,7 @@ static const char* extract_seconds(const char *str, int64_t *value, int *isInfin
 	return (str[i] == '\0') ? NULL : &str[i];
 }
 
-int extract_timeDiff(void *extra, const char* time_diff,  void** obj) {
+int extract_timeDiff(void **extra, const char* time_diff,  void** obj) {
 	int64_t result_1 = 0;
 	int64_t result_2 = 0;
 	MIN_MAX_INT *pObj = (MIN_MAX_INT*)obj;
@@ -1086,7 +1234,7 @@ int extract_timeDiff(void *extra, const char* time_diff,  void** obj) {
 	return PST_OK;
 }
 
-int extract_timeValue(void *extra, const char* time_diff,  void** obj) {
+int extract_timeValue(void **extra, const char* time_diff,  void** obj) {
 	int64_t result = 0;
 	int isInfinity = 0;
 	int *pI = (int*)obj;
@@ -1120,7 +1268,7 @@ int isContentOk_utcTime(const char *time) {
 	}
 }
 
-int extract_utcTime(void *extra, const char* str, void** obj) {
+int extract_utcTime(void **extra, const char* str, void** obj) {
 	int res;
 	void **extra_array = extra;
 	COMPOSITE *comp = (COMPOSITE*)(extra_array[1]);
@@ -1215,19 +1363,22 @@ int convertRepair_constraint(const char* arg, char* buf, unsigned len) {
 	char *value = NULL;
 	const char *oid = NULL;
 
-	if (arg == NULL || buf == NULL) return 0;
-	KSI_strncpy(buf, arg, len-1);
+	if (arg == NULL) return PST_PARAM_CONVERT_NOT_PERFORMED;
+	if (buf == NULL) return PST_INVALID_ARGUMENT;
 
 	value = strchr(arg, '=');
-	if (value == NULL) return 0;
+	if (value == NULL) return PST_PARAM_CONVERT_NOT_PERFORMED;
 	else value++;
 
 	oid = OID_getFromString(arg);
 
-	if (oid != NULL && value != NULL)
+	if (oid != NULL && value != NULL) {
 		KSI_snprintf(buf, len, "%s=%s", oid, value);
+	} else {
+		return PST_PARAM_CONVERT_NOT_PERFORMED;
+	}
 
-	return 1;
+	return PST_OK;
 }
 
 
@@ -1253,6 +1404,7 @@ const char *getParameterErrorString(int res) {
 		case PARAM_INVALID: return "Parameter is invalid";
 		case FORMAT_NOT_INTEGER: return "Invalid integer";
 		case HASH_ALG_INVALID_NAME: return "Algorithm name is incorrect";
+		case HASH_ALG_UNTRUSTED: return "Algorithm is not trusted";
 		case HASH_IMPRINT_INVALID_LEN: return "Hash length is incorrect";
 		case FORMAT_INVALID_HEX_CHAR: return "Invalid hex character";
 		case FORMAT_ODD_NUMBER_OF_HEX_CHARACTERS: return "There must be even number of hex characters";
@@ -1261,18 +1413,25 @@ const char *getParameterErrorString(int res) {
 		case FORMAT_IMPRINT_NO_HASH_ALG: return "Imprint format must be <alg>:<hash>. <alg> missing";
 		case FORMAT_IMPRINT_NO_HASH: return "Imprint format must be <alg>:<hash>. <hash> missing";
 		case FILE_ACCESS_DENIED: return "File access denied";
+		case FILE_IS_NOT_DIR: return "Not a directory";
+		case FILE_DIR_NOT_SUPPORTED: return "Directory not supported";
 		case FILE_DOES_NOT_EXIST: return "File does not exist";
+		case FILE_DIR_DOES_NOT_EXIST: return "Directory does not exist";
 		case FILE_INVALID_PATH: return "Invalid path";
 		case INTEGER_TOO_LARGE: return "Integer value is too large";
 		case INTEGER_TOO_SMALL: return "Integer value is too small";
 		case INTEGER_UNSIGNED: return "Integer must be unsigned";
 		case ONLY_REGULAR_FILES: return "Data from stdin not supported";
-		case TREE_DEPTH_OUT_OF_RANGE: return "Tree depth out of range [0 - 255]";
+		case TREE_DEPTH_OUT_OF_RANGE: return "Tree depth out of range [0 - 31]";
 		case UNKNOWN_FUNCTION: return "Unknown function";
 		case FUNCTION_INVALID_ARG_COUNT: return "Invalid function argument count";
 		case FUNCTION_INVALID_ARG_1: return "Argument 1 is invalid";
 		case FUNCTION_INVALID_ARG_2: return "Argument 2 is invalid";
 		case INVALID_VERSION: return "Invalid version";
+		case FORMAT_RECORD_WHITESPACE: return "List of positions must not contain whitespace. Use ',' and '-' as separators";
+		case FORMAT_INVALID_RECORD: return "Positions must be represented by positive decimal integers, using a list of comma-separated ranges";
+		case FORMAT_INVALID_DELIMITER: return "Invalid delimiter. Only 'new-line', 'space' or one of ':;,|' is supported";
+		case FORMAT_RECORD_DESC_ORDER: return "List of positions must be given in strictly ascending order";
 		default: return "Unknown error";
 	}
 }

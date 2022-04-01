@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2017 Guardtime, Inc.
+ * Copyright 2013-2022 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -19,8 +19,10 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <ksi/compatibility.h>
-#include "param_set/param_set.h"
+#include <param_set/param_set.h>
+#include <param_set/strn.h>
 #include "logksi_err.h"
 #include "printer.h"
 #include "conf_file.h"
@@ -30,15 +32,18 @@
 
 static void print_conf_file(const char *fname, int (*print)(const char *format, ... ));
 
+#define PARAMS "{h|help}{dump}{d}"
+
 int conf_run(int argc, char** argv, char **envp) {
 	int res;
 	PARAM_SET *set = NULL;
 	PARAM_SET *configuration = NULL;
 	char buf[0xffff];
 
-	res = PARAM_SET_new("{h|help}{dump}{d}", &set);
+	res = PARAM_SET_new(PARAMS, &set);
 	if (res != PST_OK) goto cleanup;
 
+	PARAM_SET_setParseOptions(set, "h,dump,d", PST_PRSCMD_HAS_NO_VALUE);
 
 	res = PARAM_SET_parseCMD(set, argc, argv, "CMD", 3);
 	if (res != PST_OK) {
@@ -53,7 +58,7 @@ int conf_run(int argc, char** argv, char **envp) {
 	 * Check for typos and unknown parameters.
      */
 	if (PARAM_SET_isTypoFailure(set)) {
-			print_errors("%s\n", PARAM_SET_typosToString(set, PST_TOSTR_DOUBLE_HYPHEN, NULL, buf, sizeof(buf)));
+			print_errors("%s\n", PARAM_SET_typosToString(set, NULL, buf, sizeof(buf)));
 			res = KT_INVALID_CMD_PARAM;
 			goto cleanup;
 	} else if (PARAM_SET_isUnknown(set)){
@@ -91,104 +96,85 @@ cleanup:
 }
 
 char *conf_help_toString(char *buf, size_t len) {
+	int res;
+	char *ret = NULL;
+	PARAM_SET *set;
 	size_t count = 0;
+	char tmp[1024];
 
 	if (buf == NULL || len == 0) return NULL;
 
-	count += KSI_snprintf(buf + count, len - count,
-		"Usage:\n"
-		" %s conf -h | -d | --dump \n"
-		" -d        - Print KSI_CONF value to stderr if is configured.\n"
-		" --dump    - Dump configuration file pointed by KSI_CONF to stdout.\n"
-		" -h        - Print the current help message.\n",
-		TOOL_getName()
+
+	/* Create set with documented parameters. */
+	res = PARAM_SET_new(CONF_generate_param_set_desc(PARAMS, "SXP", tmp, sizeof(tmp)), &set);
+	if (res != PST_OK) goto cleanup;
+
+	res = CONF_initialize_set_functions(set, "SXP");
+	if (res != PST_OK) goto cleanup;
+
+	PARAM_SET_setHelpText(set, "d", NULL, "Print KSI_CONF value to stderr if is configured.");
+	PARAM_SET_setHelpText(set, "dump", NULL, "Dump configuration file pointed by KSI_CONF to stdout.");
+	PARAM_SET_setHelpText(set, "h", NULL, "Print the current help message.");
+
+
+	/* Format synopsis and parameters. */
+	count += PST_snhiprintf(buf + count, len - count, 80, 0, 0, NULL, ' ', "Usage:\\>1\n"
+		"logksi conf -h | -d | --dump"
+		"\\>\n\n\n");
+
+	ret = PARAM_SET_helpToString(set, "d,dump,h", 1, 13, 80, buf + count, len - count);
+	if (ret == NULL) goto cleanup;
+	count += strlen(buf + count);
+
+
+	/* Format configuration file description. */
+	count += PST_snhiprintf(buf + count, len - count, 80, 0, 0, NULL, ' ', "\n\nKSI configuration file help:\n\\>2\n"
+	"The log signature command-line tool has several configuration options related to the KSI service configuration (e.g. KSI signing service URL and access credentials). The configuration options are described below. There are following ways to specify these configuration options:\n");
+
+	count += PST_snhiprintf(buf + count, len - count, 80, 0, 0, NULL, ' ', "\\>3\n\\>5* directly on command line (highest priority);");
+	count += PST_snhiprintf(buf + count, len - count, 80, 0, 0, NULL, ' ', "\\>3\n\\>5* in a file specified by the '--conf' command-line argument;");
+	count += PST_snhiprintf(buf + count, len - count, 80, 0, 0, NULL, ' ', "\\>3\n\\>5* in a file specified by the KSI_CONF environment variable (lowest priority).");
+
+	count += PST_snhiprintf(buf + count, len - count, 80, 0, 0, NULL, ' ', "\n\\>2\nIf a configuration option is specified in more than one source (e.g. both directly on command-line argument and in a configuration file) the source with the highest priority will be used. A short parameter or multiple flags must have prefix '-' and long parameters have prefix '--'. If some parameter values contain whitespace characters double quote marks (\") must be used to wrap the entire value. If double quote mark or backslash have to be used inside the value part an escape character (\\\\) must be typed before the character(\\\\\" or \\\\\\\\). If configuration option with unknown or invalid key-value pairs is used, an error is generated.\n");
+
+	count += PST_snhiprintf(buf + count, len - count, 80, 0, 0, NULL, ' ', "\\>2\nIn configuration file each key-value pair must be placed on a single line. Start the line with # to write a comment. Not full paths (V, W and P with URI scheme 'file://') are interpreted as relative to the configuration file.\n");
+
+
+	/* Format configuration file parameters. */
+	count += PST_snhiprintf(buf + count, len - count, 80, 0, 0, NULL, ' ', "\n\nAll known parameters:\n\n");
+	ret = PARAM_SET_helpToString(set, "S,aggr-user,aggr-key,aggr-hmac-alg,max-lvl,X,ext-user,ext-key,ext-hmac-alg,P,cnstr,V,W,C,c,publications-file-no-verify", 1, 13, 80, buf + count, len - count);
+	if (ret == NULL) goto cleanup;
+	count += strlen(buf + count);
+
+
+	/* Format example. */
+	KSI_snprintf(buf + count, len - count,
+	"\n\nAn example configuration file:\n\n"
+	" # --- BEGINNING ---\n"
+	" # KSI Signing service parameters:\n"
+	" -S http://example.gateway.com:3333/gt-signingservice\n"
+	" --aggr-user anon\n"
+	" --aggr-key anon\n"
+	"\n"
+	" # KSI Extending service:\n"
+	" # Note that ext-key real value is &h/J\"kv\\G##\n"
+	" -X http://example.gateway.com:8010/gt-extendingservice\n"
+	" --ext-user anon\n"
+	" --ext-key \"&h/J\\\"kv\\\\G##\"\n"
+	"\n"
+	" # KSI Publications file:\n"
+	" -P http://verify.guardtime.com/ksi-publications.bin\n"
+	" --cnstr email=publications@guardtime.com\n"
+	" --cnstr \"org=Guardtime AS\"\n"
+	" # --- END ---\n"
+	"\n"
 	);
 
-	count += KSI_snprintf(buf + count, len - count,
-		"KSI configuration file help:\n\n"
-		"  The log signature command-line tool has several configuration options related to\n"
-		"  the KSI service configuration (e.g. KSI signing service URL and access credentials).\n"
-		"  The configuration options are described below. There are following ways to specify\n"
-		"  these configuration options:\n\n"
-
-		"   * directly on command line (highest priority);\n"
-		"   * in a file specified by the '--conf' command-line argument;\n"
-		"   * in a file specified by the KSI_CONF environment variable (lowest priority).\n\n"
-
-		"  If a configuration option is specified in more than one source (e.g. both directly\n"
-		"  on command-line argument and in a configuration file) the source with the highest\n"
-		"  priority will be used. A short parameter or multiple flags must have prefix '-' and\n"
-		"  long parameters have prefix '--'. If some parameter values contain whitespace\n"
-		"  characters double quote marks (\") must be used to wrap the entire value. If double\n"
-		"  quote mark or backslash have to be used inside the value part an escape character\n"
-		"  (\\) must be typed before the character(\\\" or \\\\). If configuration option with\n"
-		"  unknown or invalid key-value pairs is used, an error is generated.\n\n"
-
-		"  In configuration file each key-value pair must be placed on a single line. Start\n"
-		"  the line with # to write a comment. Not full paths (V, W and P with URI scheme\n"
-		"  'file://') are interpreted as relative to the configuration file.\n\n"
-
-		"All known parameters:\n"
-		);
-
-	count += KSI_snprintf(buf + count, len - count,
-		" -S <URL>  - Signing service (KSI Aggregator) URL.\n"
-		" --aggr-user <user>\n"
-		"           - Username for signing service.\n"
-		" --aggr-key <key>\n"
-		"           - HMAC key for signing service.\n"
-		" --aggr-hmac-alg <alg>\n"
-		"           - Hash algorithm to be used for computing HMAC on outgoing messages towards\n"
-		"             KSI aggregator. If not set, default algorithm is used.\n"
-		" -X <URL>  - Extending service (KSI Extender) URL.\n"
-		" --ext-user <user>\n"
-		"           - Username for extending service.\n"
-		" --ext-key <key>\n"
-		"           - HMAC key for extending service.\n"
-		" --ext-hmac-alg <alg>\n"
-		"           - Hash algorithm to be used for computing HMAC on outgoing messages towards\n"
-		"             KSI extender. If not set, default algorithm is used.\n"
-		" -P <URL>  - Publications file URL (or file with URI scheme 'file://').\n"
-		" --cnstr <oid=value>\n"
-		"           - OID of the PKI certificate field (e.g. e-mail address) and the expected\n"
-		"             value to qualify the certificate for verification of publications file\n"
-		"             PKI signature. At least one constraint must be defined.\n"
-		" -V        - Certificate file in PEM format for publications file verification.\n"
-		" -W <dir>  - OpenSSL-style trust store directory for publications file verification.\n"
-		" -C <int>  - Set network connect timeout in seconds (is not supported with TCP client).\n"
-		" -c <int>  - Set network transfer timeout, after successful connect, in seconds.\n"
-		" --publications-file-no-verify\n"
-		"           - A flag to force the tool to trust the publications file without\n"
-		"             verifying it. The flag can only be defined on command-line to avoid\n"
-		"             the usage of insecure configuration files. It must be noted that the\n"
-		"             option is insecure and may only be used for testing.\n"
-		"\n"
-		"\n"
-		);
-
-	/*count += */KSI_snprintf(buf + count, len - count,
-		"An example configuration file:\n\n"
-		" # --- BEGINNING ---\n"
-		" # KSI Signing service parameters:\n"
-		" -S http://example.gateway.com:3333/gt-signingservice\n"
-		" --aggr-user anon\n"
-		" --aggr-key anon\n"
-		"\n"
-		" # KSI Extending service:\n"
-		" # Note that ext-key real value is &h/J\"kv\\G##\n"
-		" -X http://example.gateway.com:8010/gt-extendingservice\n"
-		" --ext-user anon\n"
-		" --ext-key \"&h/J\\\"kv\\\\G##\"\n"
-		"\n"
-		" # KSI Publications file:\n"
-		" -P http://verify.guardtime.com/ksi-publications.bin\n"
-		" --cnstr email=publications@guardtime.com\n"
-		" --cnstr \"org=Guardtime AS\"\n"
-		" # --- END ---\n"
-		"\n"
-		);
-
-
+cleanup:
+	if (res != PST_OK || ret == NULL) {
+		PST_snprintf(buf + count, len - count, "\nError: There were failures while generating help by PARAM_SET.\n");
+	}
+	PARAM_SET_free(set);
 	return buf;
 }
 

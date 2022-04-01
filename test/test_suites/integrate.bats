@@ -66,6 +66,7 @@ cp -r test/resource/logsignatures/signed.logsig.parts test/out
 	[ "$status" -eq 0 ]
 }
 
+# @SKIP_MEMORY_TEST
 @test "integrate signed.parts (again) to stdout" {
 	run bash -c "./src/logksi integrate test/out/signed -ddd -o - > test/out/integrated_stdout.logsig"
 	[ "$status" -eq 0 ]

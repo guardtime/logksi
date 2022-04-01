@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2017 Guardtime, Inc.
+ * Copyright 2013-2022 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -35,6 +35,8 @@ void OBJPRINT_signatureCertificate(const KSI_Signature *sig, int (*print)(const 
 void OBJPRINT_signatureDump(KSI_Signature *sig, int (*print)(const char *format, ... ));
 
 void OBJPRINT_Hash(KSI_DataHash *hsh, const char *prefix, int (*print)(const char *format, ... ));
+
+void OBJPRINT_aggregatorConfDump(KSI_Config *config, int (*print)(const char *format, ... ));
 
 const char *OBJPRINT_getVerificationErrorCode(KSI_VerificationErrorCode code);
 const char *OBJPRINT_getVerificationErrorDescription(KSI_VerificationErrorCode code);

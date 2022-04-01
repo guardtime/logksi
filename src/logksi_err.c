@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2017 Guardtime, Inc.
+ * Copyright 2013-2022 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -34,9 +34,12 @@ static int logksi_ErrToExitcode(int error_code) {
 		case KT_OUT_OF_MEMORY:
 			return EXIT_OUT_OF_MEMORY;
 		case KT_INVALID_ARGUMENT:
+		case KT_VERIFICATION_NA:
 		case KT_INDEX_OVF:
+		case KT_TREE_LEVEL_OVF:
 		case KT_UNKNOWN_ERROR:
 		case KT_SIGNING_FAILURE:
+		case KT_USER_INPUT_FAILURE:
 			return EXIT_FAILURE;
 		case KT_IO_ERROR:
 			return EXIT_IO_ERROR;
@@ -136,8 +139,12 @@ static const char* logksiErrToString(int error_code) {
 			return "Invalid configuration file.";
 		case KT_VERIFICATION_FAILURE:
 			return "Log signature verification failed.";
+		case KT_VERIFICATION_NA:
+			return "Log signature verification inconclusive.";
 		case KT_SIGNING_FAILURE:
 			return "Log signature signing failed.";
+		case KT_USER_INPUT_FAILURE:
+			return "User input error.";
 		case KT_VERIFICATION_SKIPPED:
 			return "Verification skipped.";
 		case KT_PUBFILE_HAS_NO_PUBREC_TO_EXTEND_TO:
@@ -152,6 +159,10 @@ static const char* logksiErrToString(int error_code) {
 			return "Multi printer channel does not exist.";
 		case KT_INTEGRATION_PURPOSELY_STOPPED:
 			return "Integration purposely stopped.";
+		case KT_TREE_LEVEL_OVF:
+			return "Tree too large.";
+		case KT_UNEXPECTED_EOF:
+			return "Unexpected end of file.";
 		case KT_UNKNOWN_ERROR:
 			return "Unknown error.";
 		default:

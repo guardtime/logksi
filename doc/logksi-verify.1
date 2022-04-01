@@ -49,6 +49,8 @@ Publication-based verification (\fB--ver-pub\fR). The signature must be extended
 .LP
 It must be noted that only publication-based verification should be preferred in the long term as it does not rely on any keys and trusted services. The other policies can be used temporarily when the signature is created and there is not yet a publication to extend the signature to.
 .LP
+When verification policy is not explicitly specified libksi default verification policy is used (internal verification followed by publication-based or key-based verificaton).
+.LP
 .SH LOG SIGNATURE VERIFICATION DETAILS
 .SS VERIFY LOG RECORDS EMBEDDED TIME
 Using option \fB--time-form\fR together with \fB--time-diff\fR, it is possible to extract and verify the date embedded into log lines. If only \fB--time-form\fR is specified, log block and file summary is updated with extracted time data (lowest and highest log record time in block and log file) and verification of embedded time is not performed. Option \fB--time-diff\fR together with signing time of the KSI signature forms a time window where all the log records in signed block must fit. In following examples \fILn\fR and \fISn\fR stand for log record and KSI signature accordingly. Log records are placed on time line by the embedded time, and KSI signature by the signing time. NB! Following representation is explanatory only and does not describe the actual order of objects inside the log signature.
@@ -150,7 +152,7 @@ Specify hash imprint for inter-linking (the last leaf from the previous log sign
 .\"
 .TP
 \fB--output-hash \fIfile\fR
-Output the last leaf from the log signature into file. Use '\fB-\fR' as file name to redirect hash imprint to \fIstdout\fR. See \fB--input-hash\fR to see how to verify that log signature is bound with this log signature (where from the output hash was extracted). When used together with \fB--\fR, only the output hash of the last log file is returned.
+Output the last leaf from the log signature into file. Use '\fB-\fR' as file name to redirect hash imprint to \fIstdout\fR. See \fB--input-hash\fR to see how to verify that log signature is bound with this log signature (where from the output hash was extracted). When used together with \fB--\fR, only the output hash of the last log file is returned. Will always overwrite existing file.
 .\"
 .TP
 \fB--ignore-desc-block-time\fR
@@ -282,7 +284,7 @@ Read configuration options from the given file. It must be noted that configurat
 .\"
 .TP
 \fB--log \fIfile\fR
-Write libksi log to the given file. Use '-' as file name to redirect log to \fIstdout\fR.
+Write libksi log to the given file. Use '\fB-\fR' as file name to redirect log to \fIstdout\fR.
 .br
 .\"
 .SH EXIT STATUS
@@ -325,7 +327,7 @@ In the following examples it is assumed that KSI service configuration options (
 .\"
 .TP 2
 \fB5
-To verify \fI/var/log/secure\fR using any policy possible, depending on the current state of the signatures:
+To verify \fI/var/log/secure\fR against strongest trust anchor depending on the current state of the signatures:
 .LP
 .RS 4
 \fBlogksi verify \fI/var/log/secure\fR
@@ -333,7 +335,7 @@ To verify \fI/var/log/secure\fR using any policy possible, depending on the curr
 .\"
 .TP 2
 \fB6
-To verify log records extracted from \fI/var/log/secure\fR using any policy possible, depending on the current state of the signatures:
+To verify log records extracted from \fI/var/log/secure\fR against strongest trust anchor depending on the current state of the signatures:
 .LP
 .RS 4
 \fBlogksi verify \fI/var/log/secure.excerpt\fR
@@ -341,7 +343,7 @@ To verify log records extracted from \fI/var/log/secure\fR using any policy poss
 .\"
 .TP 2
 \fB7
-To verify the compressed log file \fI/var/log/secure.gz\fR using any policy possible, depending on the current state of the signatures:
+To verify the compressed log file \fI/var/log/secure.gz\fR against strongest trust anchor depending on the current state of the signatures:
 .LP
 .RS 4
 \fBzcat \fI/var/log/secure.gz\fR | \fBlogksi verify \fI/var/log/secure.logsig \fB--log-from-stdin
@@ -441,4 +443,4 @@ Guardtime AS, http://www.guardtime.com/
 .LP
 .\"
 .SH SEE ALSO
-\fBlogksi\fR(1), \fBlogksi-extend\fR(1), \fBlogksi-extract\fR(1), \fBlogksi-integrate\fR(1), \fBlogksi-sign\fR(1), \fBlogksi-conf\fR(5)
+\fBlogksi\fR(1), \fBlogksi-create\fR(1), \fBlogksi-extend\fR(1), \fBlogksi-extract\fR(1), \fBlogksi-integrate\fR(1), \fBlogksi-sign\fR(1), \fBlogksi-conf\fR(5)

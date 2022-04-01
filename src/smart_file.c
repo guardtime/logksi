@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2017 Guardtime, Inc.
+ * Copyright 2013-2022 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -46,9 +46,10 @@ struct SMART_FILE_st {
 	int (*file_reposition)(void *file, size_t offset);
 	int (*file_get_current_position)(void *file, size_t *pos);
 	int (*file_truncate)(void *file, size_t pos);
-	int (*file_write)(void *file, unsigned char *raw, size_t raw_len, size_t *count);
+	int (*file_write)(void *file, const unsigned char *raw, size_t raw_len, size_t *count);
 	int (*file_read)(void *file, unsigned char *raw, size_t raw_len, size_t *count);
-	int (*file_read_line)(void *file, char *raw, size_t raw_len, size_t *row_pointer, size_t *count);
+	int (*file_read_line)(void *file, char *raw, size_t raw_len, size_t *row_pointer, size_t *count, size_t *raw_count);
+	int (*file_read_line_every)(void *file, char *raw, size_t raw_len, size_t *row_pointer, size_t *count, size_t *raw_count);
 	int (*file_gets)(void *file, char *raw, size_t raw_len, int *eof);
 	int (*file_set_lock)(void *file, int lockType);
 	int (*file_get_stream)(const char *mode, void **stream, int *is_close_mandatory);
@@ -70,9 +71,10 @@ static int smart_file_open(const char *fname, const char *mode, char* fname_out_
 static void smart_file_close(void *file);
 static int smart_file_reposition(void *file, size_t offset);
 static int smart_file_read(void *file, unsigned char *raw, size_t raw_len, size_t *count);
-static int smart_file_read_line(void *file, char *buf, size_t len, size_t *row_pointer, size_t *count);
+static int smart_file_read_line_every(void *file, char *buf, size_t len, size_t *row_pointer, size_t *count, size_t *raw_count);
+static int smart_file_read_line(void *file, char *buf, size_t len, size_t *row_pointer, size_t *count, size_t *raw_count);
 static int smart_file_gets(void *file, char *raw, size_t raw_len, int *eof);
-static int smart_file_write(void *file, unsigned char *raw, size_t raw_len, size_t *count);
+static int smart_file_write(void *file, const unsigned char *raw, size_t raw_len, size_t *count);
 static int smart_file_get_stream(const char *mode, void **stream, int *is_close_mandatory);
 static int smart_file_get_error(void);
 static char* get_pure_mode(const char *mode, char *buf, size_t buf_len);
@@ -100,6 +102,7 @@ static int smart_file_init(SMART_FILE *file) {
 	file->file_close = smart_file_close;
 	file->file_read = smart_file_read;
 	file->file_read_line = smart_file_read_line;
+	file->file_read_line_every = smart_file_read_line_every;
 	file->file_gets = smart_file_gets;
 	file->file_write = smart_file_write;
 	file->file_get_stream = smart_file_get_stream;
@@ -360,12 +363,13 @@ cleanup:
 	return res;
 }
 
-static int smart_file_read_line(void *file, char *buf, size_t len, size_t *row_pointer, size_t *count) {
+static int smart_file_read_line_common(void *file, char *buf, size_t len, size_t *row_pointer, size_t *count, size_t *raw_count_out, int skipEmpty) {
 	int res = SMART_FILE_UNKNOWN_ERROR;
 	int c;
 	FILE *fp = file;
 	size_t lineSize = 0;
 	size_t line_count = 0;
+	size_t raw_count = 0;
 	int is_line_open = 0;
 
 	if (file == NULL || buf == NULL || len == 0 || count == NULL) {
@@ -380,12 +384,17 @@ static int smart_file_read_line(void *file, char *buf, size_t len, size_t *row_p
 	 * Mac LF and possibly CR.
 	 */
 	while ((c = fgetc(fp)) != 0) {
-		if (c != EOF && lineSize >= len - 1) {
-			buf[len - 1] = '\0';
-			*count = lineSize;
-			res = SMART_FILE_BUFFER_TOO_SMALL;
-			goto cleanup;
+		if (c != EOF) {
+			raw_count++;
 		}
+		if (c != EOF && lineSize >= len - 1) {
+				ungetc(c, fp);
+				buf[len - 1] = '\0';
+				*count = lineSize;
+				*raw_count_out = raw_count;
+				res = SMART_FILE_NO_EOL;
+				goto cleanup;
+			}
 
 		if (c == EOF || (c == '\r' || c == '\n')) {
 			if (c == '\r') {
@@ -406,7 +415,7 @@ static int smart_file_read_line(void *file, char *buf, size_t len, size_t *row_p
 		if (c != '\r' && c != '\n') {
 			is_line_open = 1;
 			buf[lineSize++] = (char)c;
-		} else if (is_line_open) {
+		} else if (!skipEmpty || is_line_open) {
 			break;
 		}
 	}
@@ -417,6 +426,7 @@ static int smart_file_read_line(void *file, char *buf, size_t len, size_t *row_p
 	}
 
 	*count = lineSize;
+	*raw_count_out = raw_count;
 	res = SMART_FILE_OK;
 
 cleanup:
@@ -424,7 +434,15 @@ cleanup:
 	return res;
 }
 
-static int smart_file_write(void *file, unsigned  char *raw, size_t raw_len, size_t *count) {
+static int smart_file_read_line(void *file, char *buf, size_t len, size_t *row_pointer, size_t *count, size_t *raw_count) {
+	return smart_file_read_line_common(file, buf, len, row_pointer, count, raw_count ,1);
+}
+
+static int smart_file_read_line_every(void *file, char *buf, size_t len, size_t *row_pointer, size_t *count,  size_t *raw_count) {
+	return smart_file_read_line_common(file, buf, len, row_pointer, count, raw_count, 0);
+}
+
+static int smart_file_write(void *file, const unsigned  char *raw, size_t raw_len, size_t *count) {
 	int res;
 	FILE *fp = file;
 	size_t write_count = 0;
@@ -980,7 +998,7 @@ int SMART_FILE_markInconsistent(SMART_FILE *file) {
 	return SMART_FILE_OK;
 }
 
-int SMART_FILE_write(SMART_FILE *file, unsigned char *raw, size_t raw_len, size_t *count) {
+int SMART_FILE_write(SMART_FILE *file, const unsigned char *raw, size_t raw_len, size_t *count) {
 	int res;
 	size_t c = 0;
 
@@ -1045,9 +1063,10 @@ cleanup:
 	return res;
 }
 
-int SMART_FILE_readLine(SMART_FILE *file, char *raw, size_t raw_len, size_t *row_pointer, size_t *count) {
+static int smart_file_read_line_skip_empty_or_not(SMART_FILE *file, char *raw, size_t raw_len, size_t *row_pointer, size_t *count, int skipEmpty) {
 	int res;
 	size_t c = 0;
+	size_t raw_count = 0;
 
 	if (file == NULL || raw == NULL) {
 		res = SMART_FILE_INVALID_ARG;
@@ -1055,7 +1074,11 @@ int SMART_FILE_readLine(SMART_FILE *file, char *raw, size_t raw_len, size_t *row
 	}
 
 	if (file->file != NULL && file->isOpen) {
-		res = file->file_read_line(file->file, raw, raw_len, row_pointer, &c);
+		if (skipEmpty) {
+			res = file->file_read_line(file->file, raw, raw_len, row_pointer, &c, &raw_count);
+		} else {
+			res = file->file_read_line_every(file->file, raw, raw_len, row_pointer, &c, &raw_count);
+		}
 		if (res != SMART_FILE_OK) goto cleanup;
 	} else {
 		return SMART_FILE_NOT_OPEND;
@@ -1064,18 +1087,28 @@ int SMART_FILE_readLine(SMART_FILE *file, char *raw, size_t raw_len, size_t *row
 	/**
 	 * EOF is detected as Read finished without an error and read count is zero.
 	 */
-	if (c == 0) {
+	if (raw_count == 0) {
 		file->isEOF = 1;
 	}
 
-	if (count != NULL) {
-		*count = c;
-	}
+
 	res = SMART_FILE_OK;
 
 cleanup:
 
+	if (count != NULL && (res == SMART_FILE_OK || res == SMART_FILE_NO_EOL)) {
+		*count = c;
+	}
+
 	return res;
+}
+
+int SMART_FILE_readLineSkipEmpty(SMART_FILE *file, char *raw, size_t raw_len, size_t *row_pointer, size_t *count) {
+	return smart_file_read_line_skip_empty_or_not(file, raw, raw_len, row_pointer, count, 1);
+}
+
+int SMART_FILE_readLine(SMART_FILE *file, char *raw, size_t raw_len, size_t *count) {
+	return smart_file_read_line_skip_empty_or_not(file, raw, raw_len, NULL, count, 0);
 }
 
 int SMART_FILE_gets(SMART_FILE *file, char *raw, size_t raw_len, size_t *count) {
@@ -1278,8 +1311,8 @@ const char* SMART_FILE_errorToString(int error_code) {
 			return "Unable truncate file.";
 		case SMART_FILE_UNABLE_TO_LOCK:
 			return "Unable set file lock.";
-		case SMART_FILE_BUFFER_TOO_SMALL:
-			return "Insufficient buffer size.";
+		case SMART_FILE_NO_EOL:
+			return "End of line not reached.";
 		case SMART_FILE_NOT_OPEND:
 			return "File is not opened.";
 		case SMART_FILE_DOES_NOT_EXIST:

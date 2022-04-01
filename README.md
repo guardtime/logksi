@@ -4,7 +4,7 @@ Guardtime's KSI Blockchain is an industrial scale blockchain platform that crypt
 
 There are many applications for KSI, a classical example is signing of any type of logs - system logs, financial transactions, call records, etc. For more, see [https://guardtime.com](https://guardtime.com)
 
-Log signature command-line tool `logksi` provides the functions for signing recovery; extension of KSI signatures in the log signature file; verification of logs; extraction of record-level signatures; integration of log signature files.
+Log signature command-line tool `logksi` provides the functions for creating log signatures; signing recovery; extension of KSI signatures in the log signature file; verification of logs; extraction of record-level signatures; integration of log signature files.
 
 
 ## INSTALLATION
@@ -16,11 +16,11 @@ In order to install the `logksi` CentOS/RHEL packages directly from the Guardtim
 ```
 cd /etc/yum.repos.d
 
-# In case of RHEL/CentOS 6
-sudo curl -O https://download.guardtime.com/ksi/configuration/guardtime.el6.repo
-
 # In case of RHEL/CentOS 7
 sudo curl -O https://download.guardtime.com/ksi/configuration/guardtime.el7.repo
+
+# In case of RHEL/CentOS 8
+sudo curl -O https://download.guardtime.com/ksi/configuration/guardtime.el8.repo
 
 yum install logksi
 ```
@@ -68,7 +68,7 @@ See `CONTRIBUTING.md` file.
 ```
 Library   Version    License type  Source
 
-libksi       >=3.18     Apache 2.0    https://github.com/GuardTime/libksi
+libksi       >=3.20     Apache 2.0    https://github.com/GuardTime/libksi
 libgtrfc3161 >=1.0      Apache 2.0    https://github.com/GuardTime/libgtrfc3161
 OpenSSL      >=0.9.8    BSD           https://github.com/openssl/
 Curl         >=7.37.0   MIT           https://github.com/curl/curl.git
@@ -88,9 +88,9 @@ Curl         >=7.37.0   MIT           https://github.com/curl/curl.git
 ```
 OS/Platform                         Compatibility
 
-RHEL 6 and 7, x86_64 architecture   Fully compatible and tested.
-CentOS 6 and 7, x86_64 architecture Fully Compatible and tested.
+RHEL 7 and 8, x86_64 architecture   Fully compatible and tested.
+CentOS 7 and 8, x86_64 architecture Fully Compatible and tested.
 Debian                              Compatible but not tested on regular basis.
-OS X                                Not supported.
+OS X                                Compatible but not tested on regular basis.
 Windows                             Not supported.
 ```

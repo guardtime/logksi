@@ -1,5 +1,5 @@
 #
-# Copyright 2013-2019 Guardtime, Inc.
+# Copyright 2013-2022 Guardtime, Inc.
 #
 # This file is part of the Guardtime client SDK.
 #
@@ -21,6 +21,7 @@ man_MANS = \
 	../doc/logksi.1 \
 	../doc/logksi-conf.5 \
 	../doc/logksi-sign.1 \
+	../doc/logksi-create.1 \
 	../doc/logksi-extend.1 \
 	../doc/logksi-integrate.1 \
 	../doc/logksi-extract.1 \
@@ -36,13 +37,21 @@ logksi_SOURCES = \
 	smart_file.h \
 	tlv_object.c \
 	tlv_object.h \
-	tool_box/blocks_info.c \
-	tool_box/blocks_info.h \
+	tool_box/merkle_tree.c \
+	tool_box/merkle_tree.h \
+	tool_box/logksi.c \
+	tool_box/logsig_version.c \
+	tool_box/logsig_version.h \
+	tool_box/process.c \
+	tool_box/process.h \
+	tool_box/check.h \
+	tool_box/check.c \
+	tool_box/logksi.h \
 	tool_box/io_files.c \
 	tool_box/io_files.h \
 	tool_box/extract_info.c \
 	tool_box/extract_info.h \
-	tool_box/blocks_info_impl.h \
+	tool_box/logksi_impl.h \
 	tool_box/param_control.c \
 	tool_box/param_control.h \
 	tool_box/ksi_init.c \
@@ -52,6 +61,7 @@ logksi_SOURCES = \
 	tool_box.c \
 	tool_box.h \
 	tool_box/sign.c \
+	tool_box/create.c \
 	tool_box/verify.c \
 	tool_box/extend.c \
 	tool_box/conf.c \
@@ -64,17 +74,6 @@ logksi_SOURCES = \
 	component.h \
 	tool_box/task_initializer.c \
 	tool_box/task_initializer.h \
-	param_set/param_set_obj_impl.h \
-	param_set/param_value.c \
-	param_set/param_value.h \
-	param_set/parameter.c \
-	param_set/parameter.h \
-	param_set/param_set.c \
-	param_set/param_set.h \
-	param_set/task_def.c \
-	param_set/task_def.h \
-	param_set/strn.c \
-	param_set/strn.h \
 	tool.h \
 	common.h \
 	conf_file.c \

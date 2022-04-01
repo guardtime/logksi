@@ -104,6 +104,7 @@ cp -r test/resource/logfiles/legacy_extract test/out
 	[ "$status" -eq 0 ]
 }
 
+# @SKIP_MEMORY_TEST
 @test "extract record 1, redirect log records to stdout" {
 	run bash -c "./src/logksi extract test/out/extract.base.7 --out-log - -r 1 -ddd > test/out/extract.user.7.stdout"
 	[ "$status" -eq 0 ]
@@ -115,6 +116,7 @@ cp -r test/resource/logfiles/legacy_extract test/out
 	[ "$status" -eq 0 ]
 }
 
+# @SKIP_MEMORY_TEST
 @test "extract record 1, redirect integrity proof to stdout" {
 	run bash -c "./src/logksi extract test/out/extract.base.8 --out-proof - -r 1 -ddd > test/out/extract.user.8.stdout"
 	[ "$status" -eq 0 ]
@@ -126,6 +128,7 @@ cp -r test/resource/logfiles/legacy_extract test/out
 	[ "$status" -eq 0 ]
 }
 
+# @SKIP_MEMORY_TEST
 @test "extract record 1, read log file from stdin" {
 	run bash -c "cat test/out/extract.base.9 | ./src/logksi extract --log-from-stdin test/out/extract.base.9.logsig -o test/out/extract.user.9 -r 1 -ddd"
 	[ "$status" -eq 0 ]
@@ -137,6 +140,7 @@ cp -r test/resource/logfiles/legacy_extract test/out
 	[ "$status" -eq 0 ]
 }
 
+# @SKIP_MEMORY_TEST
 @test "extract record 1, read signature file from stdin" {
 	run bash -c "cat test/out/extract.base.10.logsig | ./src/logksi extract test/out/extract.base.10 --sig-from-stdin -r 1 -ddd"
 	[ "$status" -eq 0 ]
@@ -166,42 +170,42 @@ cp -r test/resource/logfiles/legacy_extract test/out
 }
 
 @test "verify proof wrong record hash" {
-	run ./src/logksi verify test/out/extract.base.excerpt test/resource/logsignatures/proof_wrong_record_hash.excerpt.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/extract.base.excerpt test/resource/logsignatures/proof_wrong_record_hash.excerpt.logsig -ddd
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: Block no. 1: record hashes not equal." ]]
 	[[ "$output" =~ "Log signature verification failed." ]]
 }
 
 @test "verify proof wrong sibling hash 1" {
-	run ./src/logksi verify test/out/extract.base.excerpt test/resource/logsignatures/proof_wrong_sibling_hash_1.excerpt.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/extract.base.excerpt test/resource/logsignatures/proof_wrong_sibling_hash_1.excerpt.logsig -ddd
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: Block no. 1: root hashes not equal." ]]
 	[[ "$output" =~ "Log signature verification failed." ]]
 }
 
 @test "verify proof wrong sibling hash 3" {
-	run ./src/logksi verify test/out/extract.base.excerpt test/resource/logsignatures/proof_wrong_sibling_hash_3.excerpt.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/extract.base.excerpt test/resource/logsignatures/proof_wrong_sibling_hash_3.excerpt.logsig -ddd
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: Block no. 1: root hashes not equal." ]]
 	[[ "$output" =~ "Log signature verification failed." ]]
 }
 
 @test "verify proof wrong level correction 1" {
-	run ./src/logksi verify test/out/extract.base.excerpt test/resource/logsignatures/proof_wrong_level_correction_1.excerpt.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/extract.base.excerpt test/resource/logsignatures/proof_wrong_level_correction_1.excerpt.logsig -ddd
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: Block no. 1: root hashes not equal." ]]
 	[[ "$output" =~ "Log signature verification failed." ]]
 }
 
 @test "verify proof wrong level correction 2" {
-	run ./src/logksi verify test/out/extract.base.excerpt test/resource/logsignatures/proof_wrong_level_correction_2.excerpt.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/extract.base.excerpt test/resource/logsignatures/proof_wrong_level_correction_2.excerpt.logsig -ddd
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: Block no. 1: root hashes not equal." ]]
 	[[ "$output" =~ "Log signature verification failed." ]]
 }
 
 @test "verify proof wrong link direction" {
-	run ./src/logksi verify test/out/extract.base.excerpt test/resource/logsignatures/proof_wrong_link_direction.excerpt.logsig -ddd
+	run ./src/logksi verify --ver-int test/out/extract.base.excerpt test/resource/logsignatures/proof_wrong_link_direction.excerpt.logsig -ddd
 	[ "$status" -ne 0 ]
 	[[ "$output" =~ "Error: Block no. 1: root hashes not equal." ]]
 	[[ "$output" =~ "Log signature verification failed." ]]
@@ -263,7 +267,7 @@ cp -r test/resource/logfiles/legacy_extract test/out
 }
 
 @test "extract records from non-extended legacy.gtsig" {
-	run ./src/logksi verify test/out/legacy_extract -ddd
+	run ./src/logksi verify --ver-int test/out/legacy_extract -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Warning: RFC3161 timestamp(s) found in log signature." ]]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
@@ -271,7 +275,7 @@ cp -r test/resource/logfiles/legacy_extract test/out
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Warning: RFC3161 timestamp(s) found in log signature." ]]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
-	run ./src/logksi verify test/out/legacy_extract.excerpt -ddd
+	run ./src/logksi verify --ver-int test/out/legacy_extract.excerpt -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 	run diff test/out/legacy_extract.excerpt test/resource/logfiles/legacy_extract.r1-20.excerpt

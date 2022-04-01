@@ -1,5 +1,5 @@
 #
-# Copyright 2013-2018 Guardtime, Inc.
+# Copyright 2013-2022 Guardtime, Inc.
 #
 # This file is part of the Guardtime client SDK.
 #
@@ -44,7 +44,8 @@ BuildRoot: %{_tmppath}/%{name_package}-%{version}-build
 @KSI_RPM_RUN_DEPENDENCY@
 @GTRFC3161_RPM_BUILD_DEPENDENCY@
 @GTRFC3161_RPM_RUN_DEPENDENCY@
-
+@PST_RPM_RUN_DEPENDENCY@
+@PST_RPM_BUILD_DEPENDENCY@
 
 %description
 Log signature command-line tool for KSI blockchain. Provides the
@@ -75,8 +76,9 @@ make install DESTDIR=%{buildroot}
 %{_mandir}/man1/logksi-extend.1*
 %{_mandir}/man1/logksi-verify.1*
 %{_mandir}/man1/logksi-integrate.1*
-%{_mandir}/man1/logksi-extract.1*
+%{_mandir}/man1/logksi-create.1*
 %{_mandir}/man5/logksi-conf.5*
+%{_mandir}/man1/logksi-extract.1*
 %{_docdir}/%{name_package}/LICENSE
 %{_docdir}/%{name_package}/README.md
 %{_docdir}/%{name_package}/ChangeLog

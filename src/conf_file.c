@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2017 Guardtime, Inc.
+ * Copyright 2013-2022 Guardtime, Inc.
  *
  * This file is part of the Guardtime client SDK.
  *
@@ -28,6 +28,7 @@
 #include "tool_box.h"
 #include "logksi_err.h"
 #include "printer.h"
+#include "smart_file.h"
 
 char* CONF_generate_param_set_desc(char *description, const char *flags, char *buf, size_t buf_len) {
 	char *extra_desc = NULL;
@@ -53,7 +54,11 @@ char* CONF_generate_param_set_desc(char *description, const char *flags, char *b
 
 	if (is_S) {
 		count += KSI_snprintf(buf + count, buf_len - count,
-				"{S}{aggr-user}{aggr-key}{aggr-hmac-alg}{aggr-pdu-v}");
+				"{H}"
+				"{S}{aggr-user}{aggr-key}{aggr-hmac-alg}{aggr-pdu-v}"
+				"{max-lvl}"
+				/* The following options are recognized but ignored .*/
+				"{max-aggr-rounds}{mdata-cli-id}{mdata-mac-id}{mdata-sqn-nr}{mdata-req-tm}");
 	}
 
 	if (is_X) {
@@ -61,7 +66,14 @@ char* CONF_generate_param_set_desc(char *description, const char *flags, char *b
 	}
 
 	if (is_P) {
-		/*count += */KSI_snprintf(buf + count, buf_len - count, "{P}{cnstr}{V}{W}{publications-file-no-verify}");
+		count += KSI_snprintf(buf + count, buf_len - count, "{P}{cnstr}{V}{W}{publications-file-no-verify}");
+	}
+
+	if (is_X || is_S) {
+		count += KSI_snprintf(buf + count, buf_len - count,
+				"{apply-remote-conf}"
+				/* The following options are recognized but ignored .*/
+				"{inst-id}{msg-id}");
 	}
 
 	return buf;
@@ -129,10 +141,16 @@ int CONF_initialize_set_functions(PARAM_SET *conf, const char *flags) {
 
 		res = PARAM_SET_addControl(conf, "{cnstr}", isFormatOk_constraint, NULL, convertRepair_constraint, NULL);
 		if (res != PST_OK) goto cleanup;
+
+		PARAM_SET_setHelpText(conf, "P", "<URL>", "Publications file URL (or file with URI scheme 'file://').");
+		PARAM_SET_setHelpText(conf, "cnstr", "<oid=value>", "OID of the PKI certificate field (e.g. e-mail address) and the expected value to qualify the certificate for verification of publications file PKI signature. At least one constraint must be defined.");
+		PARAM_SET_setHelpText(conf, "V", "<file>", "Certificate file in PEM format for publications file verification. All values from lower priority source are ignored.");
+		PARAM_SET_setHelpText(conf, "W", "<dir>", "Specify an OpenSSL-style trust store directory for publications file verification.");
+		PARAM_SET_setHelpText(conf, "publications-file-no-verify", NULL, "A flag to force the tool to trust the publications file without verifying it. The flag can only be defined on command-line to avoid the usage of insecure configuration files. It must be noted that the option is insecure and may only be used for testing.");
 	}
 
 	if (is_S) {
-		res = PARAM_SET_addControl(conf, "{aggr-hmac-alg}", isFormatOk_hashAlg, isContentOk_hashAlg, NULL, extract_hashAlg);
+		res = PARAM_SET_addControl(conf, "{H}{aggr-hmac-alg}", isFormatOk_hashAlg, isContentOk_hashAlgRejectDeprecated, NULL, extract_hashAlg);
 		if (res != PST_OK) goto cleanup;
 
 		res = PARAM_SET_addControl(conf, "{S}", isFormatOk_url, NULL, convertRepair_url, NULL);
@@ -140,6 +158,19 @@ int CONF_initialize_set_functions(PARAM_SET *conf, const char *flags) {
 
 		res = PARAM_SET_addControl(conf, "{aggr-user}{aggr-key}", isFormatOk_userPass, NULL, NULL, NULL);
 		if (res != PST_OK) goto cleanup;
+
+		res = PARAM_SET_addControl(conf, "{max-lvl}", isFormatOk_int, isContentOk_tree_level, NULL, extract_int);
+		if (res != PST_OK) goto cleanup;
+
+		res = PARAM_SET_setParseOptions(conf, "{max-aggr-rounds}{mdata-cli-id}{mdata-mac-id}{mdata-sqn-nr}{mdata-req-tm}", PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
+		if (res != PST_OK) goto cleanup;
+
+		PARAM_SET_setHelpText(conf, "H", NULL, "Use the given hash algorithm for hashing log records and aggregating the Merkle tree nodes. If not set, the default algorithm is used. Use logksi -h to get the list of supported hash algorithms. If used in combination with --apply-remote-conf, the algorithm parameter provided by the server will be ignored.");
+		PARAM_SET_setHelpText(conf, "S", "<URL>", "Signing service (KSI Aggregator) URL. Supported URL schemes are: http, https, ksi+http, ksi+https and ksi+tcp.");
+		PARAM_SET_setHelpText(conf, "max-lvl", "<int>", "Set the maximum depth (0 - 31) of the Merkle tree. If used in combination with --apply-remote-conf, where service maximum level is provided, the smaller value is applied.");
+		PARAM_SET_setHelpText(conf, "aggr-user", "<user>", "Username for signing service.");
+		PARAM_SET_setHelpText(conf, "aggr-key", "<key>", "HMAC key for signing service.");
+		PARAM_SET_setHelpText(conf, "aggr-hmac-alg", "<alg>", "Hash algorithm to be used for computing HMAC on outgoing messages towards KSI aggregator. If not set, default algorithm is used.");
 	}
 
 	if (is_X) {
@@ -151,11 +182,31 @@ int CONF_initialize_set_functions(PARAM_SET *conf, const char *flags) {
 
 		res = PARAM_SET_addControl(conf, "{ext-key}{ext-user}", isFormatOk_userPass, NULL, NULL, NULL);
 		if (res != PST_OK) goto cleanup;
+
+		PARAM_SET_setHelpText(conf, "X", "<URL>", "Extending service (KSI Extender) URL. Supported URL schemes are: http, https, ksi+http, ksi+https and ksi+tcp.");
+		PARAM_SET_setHelpText(conf, "ext-user", "<user>", "Username for extending service.");
+		PARAM_SET_setHelpText(conf, "ext-key", "<key>", "HMAC key for extending service.");
+		PARAM_SET_setHelpText(conf, "ext-hmac-alg", "<alg>", "Hash algorithm to be used for computing HMAC on outgoing messages towards KSI extender. If not set, default algorithm is used.");
+	}
+
+	if (is_X || is_S) {
+		res = PARAM_SET_addControl(conf, "{apply-remote-conf}", isFormatOk_flag, NULL, NULL, NULL);
+		if (res != PST_OK) goto cleanup;
+
+		res = PARAM_SET_setParseOptions(conf, "apply-remote-conf", PST_PRSCMD_HAS_NO_VALUE);
+		if (res != PST_OK) goto cleanup;
+
+		res = PARAM_SET_setParseOptions(conf, "{inst-id}{msg-id}", PST_PRSCMD_HAS_NO_FLAG | PST_PRSCMD_NO_TYPOS);
+		if (res != PST_OK) goto cleanup;
+
+		PARAM_SET_setHelpText(conf, "apply-remote-conf", NULL, "Obtain and apply additional configuration data from service server.");
 	}
 
 	res = PARAM_SET_addControl(conf, "{c}{C}", isFormatOk_int, isContentOk_uint, NULL, extract_int);
 	if (res != PST_OK) goto cleanup;
 
+	PARAM_SET_setHelpText(conf, "c", "<int>", "Set network transfer timeout, after successful connect, in seconds.");
+	PARAM_SET_setHelpText(conf, "C", "<int>", "Set network connect timeout in seconds (is not supported with TCP client).");
 
 	res = KT_OK;
 
@@ -169,6 +220,16 @@ static int conf_fromFile(PARAM_SET *set, const char *fname, const char *source, 
 
 	if (fname == NULL || set == NULL) {
 		res = KT_INVALID_ARGUMENT;
+		goto cleanup;
+	}
+
+	if (!SMART_FILE_doFileExist(fname)) {
+		res = KT_IO_ERROR;
+		goto cleanup;
+	}
+
+	if (!SMART_FILE_isReadAccess(fname)) {
+		res = KT_NO_PRIVILEGES;
 		goto cleanup;
 	}
 
@@ -267,7 +328,7 @@ char *CONF_errorsToString(PARAM_SET *set, const char *prefix, char *buf, size_t 
 	}
 
 	if (PARAM_SET_isTypoFailure(set)) {
-			PARAM_SET_typosToString(set, PST_TOSTR_DOUBLE_HYPHEN, prefix, tmp, sizeof(tmp));
+			PARAM_SET_typosToString(set, prefix, tmp, sizeof(tmp));
 			count += KSI_snprintf(buf + count, buf_len - count, "%s", tmp);
 	}
 
