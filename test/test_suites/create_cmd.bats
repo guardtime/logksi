@@ -140,12 +140,6 @@ run src/logksi create test/out/dummy_cmd --blk-size 4294967295 --seed test/resou
 	[[ "$output" =~ (It is not possible to use blk-size).*(4294967295).*(as tree level).*(8).*(results tree with).*(256).*(leafs) ]]
 }
 
-@test "create CMD test: try to use blk-size larger than provided by --apply-remote-conf" {
-	run src/logksi create test/out/dummy_cmd --blk-size 4294967295 --seed test/resource/random/seed_aa -S file://test/resource/server/ok_aggr_conf.tlv --apply-remote-conf
-	[ "$status" -eq 3 ]
-	[[ "$output" =~ (It is not possible to use blk-size).*(4294967295).*(as tree level).*(17).*(results tree with).*(131072).*(leafs) ]]
-}
-
 @test "create CMD test: try to use only one not existing input file"  {
 	run src/logksi create i_do_not_exist do_not_exist2 --blk-size 4 --seed test/resource/random/seed_aa
 	[ "$status" -eq 3 ]
