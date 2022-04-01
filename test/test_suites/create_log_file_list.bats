@@ -1,8 +1,8 @@
 #!/bin/bash
 
-
-
 export KSI_CONF=test/test.cfg
+
+
 # block_count, rec_hash_count, meta_rec_count, ih, oh
 f_summary_of_logfile_short () {
 	 echo "(Summary of logfile:).( . Count of blocks:             $1).( . Count of record hashes:      $2).( . Count of meta-records:       $3).( . Input hash:  $4).( . Output hash: $5)"

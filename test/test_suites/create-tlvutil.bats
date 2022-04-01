@@ -1,5 +1,7 @@
 #!/bin/bash
 
+export KSI_CONF=test/test.cfg
+
 mkdir -p test/out/create_tlv_util
 
 @test "create tlvutil: check hash algorithm, seed (default size) and input hash components" {

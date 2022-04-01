@@ -1,5 +1,7 @@
 #!/bin/bash
 
+export KSI_CONF=test/test.cfg
+
 mkdir -p test/out/urandom
 cp test/resource/logfiles/treehash1 test/out/urandom/logfile_1A
 
