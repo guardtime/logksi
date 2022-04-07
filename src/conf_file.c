@@ -167,7 +167,7 @@ int CONF_initialize_set_functions(PARAM_SET *conf, const char *flags) {
 
 		PARAM_SET_setHelpText(conf, "H", NULL, "Use the given hash algorithm for hashing log records and aggregating the Merkle tree nodes. If not set, the default algorithm is used. Use logksi -h to get the list of supported hash algorithms. If used in combination with --apply-remote-conf, the algorithm parameter provided by the server will be ignored.");
 		PARAM_SET_setHelpText(conf, "S", "<URL>", "Signing service (KSI Aggregator) URL. Supported URL schemes are: http, https, ksi+http, ksi+https and ksi+tcp.");
-		PARAM_SET_setHelpText(conf, "max-lvl", "<int>", "Set the maximum depth (0 - 31) of the Merkle tree. If used in combination with --apply-remote-conf, where service maximum level is provided, the smaller value is applied.");
+		PARAM_SET_setHelpText(conf, "max-lvl", "<int>", "Set the maximum depth (1 - 32) of the Merkle tree. If used in combination with --apply-remote-conf, where service maximum level is provided, the smaller value is applied.");
 		PARAM_SET_setHelpText(conf, "aggr-user", "<user>", "Username for signing service.");
 		PARAM_SET_setHelpText(conf, "aggr-key", "<key>", "HMAC key for signing service.");
 		PARAM_SET_setHelpText(conf, "aggr-hmac-alg", "<alg>", "Hash algorithm to be used for computing HMAC on outgoing messages towards KSI aggregator. If not set, default algorithm is used.");

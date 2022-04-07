@@ -20,7 +20,7 @@
 .SH DESCRIPTION
 Creates a new log signature from given log file \fI<logfile>\fR (or from \fIstdin\fR) by aggregating log records into Merkle tree and signing the root hash value with KSI signature. Aggregation is made using default hash algorithm or it can be specified using option \fB-H\fR. Each aggregation round takes 3 inputs - log file, a random seed (\fB--seed\fR) for masking of log records and optional input hash (see \fB--input-hash\fR and \fB--state\fR) for cryptographic linking of aggrgeation rounds. If \fB--input-hash\fR is omitted zero hash is used instead. Each aggregation round has 2 outputs - root value for signing and output hash for cryptographic linking of aggregation rounds (\fB--output-hash\fR  and \fB--state\fR).
 .LP
-A large log file may be divided into several aggregation rounds producing blocks where each has its own Merkel tree and KSI signature. The size of the expected block can be specified by \fB--max-lvl\fR or \fB--blk-size\fR. Note that the size of the Merkle tree is limited by the KSI service! It is possible to include record hashes (hash of the log line without masking) and/or tree hashes (intermediate hash values from Merkle tree) to log signature file using \fB--keep-record-hashes\fR and/or \fB--keep-tree-hashes\fR accordingly. Keeping optional hash values makes diagnostics more precise but it must be noted that the size of the log signature may grow significantly (log signature from 1M log lines produces log signature in size ~0.03 MB + rec. hashes -> ~35 MB + tree hashes -> ~105 MB)!
+A large log file may be divided into several aggregation rounds producing blocks where each has its own Merkel tree and KSI signature. The size of the expected block can be specified by \fB--max-lvl\fR or/and \fB--blk-size\fR. Note that the size of the Merkle tree is limited by the KSI service! It is possible to include record hashes (hash of the log line without masking) and/or tree hashes (intermediate hash values from Merkle tree) to log signature file using \fB--keep-record-hashes\fR and/or \fB--keep-tree-hashes\fR accordingly. Keeping optional hash values makes diagnostics more precise but it must be noted that the size of the log signature may grow significantly (log signature from 1M log lines produces log signature in size ~0.03 MB + rec. hashes -> ~35 MB + tree hashes -> ~105 MB)!
 .LP
 When at least one log signature file already exists, process is terminated immediately and nothing is done. To force overwriting option \fB--force-overwrite\fR is used. During signing process a temporary file is created and original is not affected until the output file is closed.
 .LP
@@ -60,7 +60,7 @@ Size of the random seed. If not set size of the seed is the size of the output o
 .\"
 .TP
 \fB--max-lvl \fIint\fR
-Set the maximum depth (0 - 31) of the Merkle tree. If used in combination with \fB--apply-remote-conf\fR, where service maximum level is provided, the smaller value is applied.
+Set the maximum depth (1 - 32) of the Merkle tree. If used in combination with \fB--apply-remote-conf\fR, where service maximum level is provided, the smaller value is applied. Maximum count of records (including meta records) in one block is calculated as 2^(max-lvl - 1). Note that one is subtracted from \fB--max-lvl\fR as masking adds extra leaves!
 .\"
 .TP
 \fB--blk-size \fIint\fR
@@ -170,7 +170,7 @@ In the following examples it is assumed that KSI service configuration options (
 To create a log signature (each block can hold 2^8 record hashes including meta record) from log file \fImylog.log\fR and store it into default location at \fImylog.log\fR:
 .LP
 .RS 4
-\fBlogksi create \fImylog.log\fR \fB--max-lvl \fI8\fR
+\fBlogksi create \fImylog.log\fR \fB--max-lvl \fI9\fR
 .RE
 .\"
 .TP 2
@@ -187,7 +187,7 @@ To create several log signatures cryptographically linked to each other from sev
 To create a log signature and bind it to previous and next log signatures \fB--input-hash\fR and \fB--output-hash\fR can be used to read / store hash value for cryptographic linking (also see example \fB5\fR and \fB6\fR). To read the previous hash value from file \fIlast-leaf_1.hash\fR and store the next value to file \fIlast-leaf_2.hash\fR:
 .LP
 .RS 4
-\fBlogksi create \fImylog.log\fR \fB--max-lvl \fI8\fR \fB--input-hash\fR \fIlast-leaf_1.hash\fR \fB--output-hash\fR \fIlast-leaf_2.hash\fR
+\fBlogksi create \fImylog.log\fR \fB--max-lvl \fI9\fR \fB--input-hash\fR \fIlast-leaf_1.hash\fR \fB--output-hash\fR \fIlast-leaf_2.hash\fR
 .RE
 
 .\"
@@ -201,7 +201,7 @@ To create multiple log signatures from log file list and store the signatures to
 "/log/log1 /log/log2 /log/log3"
 .RE
 .LP
-\fBlogksi create \fB--log-file-list\fR \fIlog_file_list\fR \fB--max-lvl \fI8\fR \fB--sig-dir\fR \fI/logsig\fR
+\fBlogksi create \fB--log-file-list\fR \fIlog_file_list\fR \fB--max-lvl \fI9\fR \fB--sig-dir\fR \fI/logsig\fR
 .RE
 .\"
 .TP 2
@@ -211,7 +211,7 @@ To sign a log file \fImylog.log\fR before the log rotation use \fB--state\fR to 
 .RS 4
 # Close the log file and sign with logksi.
 .LP
-\fBlogksi create \fImylog.log\fR \fB--max-lvl \fI8\fR \fB--state\fR
+\fBlogksi create \fImylog.log\fR \fB--max-lvl \fI9\fR \fB--state\fR
 .LP
 # Move mylog.log, mylog.log.logsig to archive.
 .LP
@@ -225,7 +225,7 @@ If something went wrong and state file \fImylog.log.state\fR gets corrupted but 
 .RS 4
 \fBrm\fR \fImylog.log.state\fR
 .LP
-\fBlogksi create \fImylog.log\fR \fB--max-lvl \fI8\fR \fB--input-hash\fR \fI$(logksi verify --ver-int archive/mylog.log1 --output-hash - | tail -n 1)\fR \fB--state\fR
+\fBlogksi create \fImylog.log\fR \fB--max-lvl \fI9\fR \fB--input-hash\fR \fI$(logksi verify --ver-int archive/mylog.log1 --output-hash - | tail -n 1)\fR \fB--state\fR
 .RE
 .SH ENVIRONMENT
 Use the environment variable \fBKSI_CONF\fR to define the default configuration file. See \fBlogksi-conf\fR(5) for more information.

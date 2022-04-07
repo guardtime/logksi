@@ -381,7 +381,7 @@ int isContentOk_tree_level(const char* integer) {
 
 	lvl = strtol(integer, NULL, 10);
 
-	if (lvl < 0 || lvl > 31) return TREE_DEPTH_OUT_OF_RANGE;
+	if (lvl < 1 || lvl > 32) return TREE_DEPTH_OUT_OF_RANGE;
 
 	return PARAM_OK;
 }
@@ -1422,7 +1422,7 @@ const char *getParameterErrorString(int res) {
 		case INTEGER_TOO_SMALL: return "Integer value is too small";
 		case INTEGER_UNSIGNED: return "Integer must be unsigned";
 		case ONLY_REGULAR_FILES: return "Data from stdin not supported";
-		case TREE_DEPTH_OUT_OF_RANGE: return "Tree depth out of range [0 - 31]";
+		case TREE_DEPTH_OUT_OF_RANGE: return "Tree depth out of range [1 - 32]";
 		case UNKNOWN_FUNCTION: return "Unknown function";
 		case FUNCTION_INVALID_ARG_COUNT: return "Invalid function argument count";
 		case FUNCTION_INVALID_ARG_1: return "Argument 1 is invalid";

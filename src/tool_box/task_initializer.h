@@ -44,11 +44,10 @@ enum service_info_priorities {
 	/* Priority of KSI configuration file given with --conf option. */
 	PRIORITY_KSI_CONF_FILE,
 
-	/* Priority for values read from servers conf. */
-	PRIORITY_KSI_CONF_REMOTE,
-
 	/* Priority of values defined on command-line. */
 	PRIORITY_CMD,
+
+	PRIORITY_COUNT
 };
 
 /**
