@@ -63,9 +63,19 @@ mkdir -p test/out/dummy_dir
 }
 
 @test "create CMD test: try to use too large max-lvl"  {
+	run src/logksi create test/out/dummy_cmd --max-lvl 33 --seed test/resource/random/seed_aa
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ (Tree depth out of range).*(max-lvl).*('33') ]]
+
 	run src/logksi create test/out/dummy_cmd --max-lvl 256 --seed test/resource/random/seed_aa
 	[ "$status" -eq 3 ]
 	[[ "$output" =~ (Tree depth out of range).*(max-lvl).*('256') ]]
+}
+
+@test "create CMD test: try to use max-lvl 0"  {
+	run src/logksi create test/out/dummy_cmd --max-lvl 0 --seed test/resource/random/seed_aa
+	[ "$status" -eq 3 ]
+	[[ "$output" =~ (Tree depth out of range).*(max-lvl).*('0') ]]
 }
 
 @test "create CMD test: try to use negative max-lvl"  {
