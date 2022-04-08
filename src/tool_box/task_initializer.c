@@ -568,11 +568,22 @@ cleanup:
 #undef TREE_DEPTH_INVALID
 }
 
+static int is_set_by_name_at_pri(PARAM_SET *set, const char *name, int pri) {
+	int count = 0;
+	int res = PST_UNKNOWN_ERROR;
+	res = PARAM_SET_getValueCount(set, name, NULL, pri, &count);
+	if (res != PST_OK) return 0;
+	return count > 0;
+}
+
 int apply_aggregator_conf(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi) {
 	int res = KT_UNKNOWN_ERROR;
 	KSI_HashAlgorithm remote_algo = KSI_HASHALG_INVALID_VALUE;
 	int remote_max_lvl = -1;
+	int user_max_lvl = -1;
 	char buf[32] = "";
+	int priority = 0;
+	char *dummy = NULL;
 
 	if (set == NULL || err == NULL || ksi == NULL) return KT_INVALID_ARGUMENT;
 
@@ -580,18 +591,31 @@ int apply_aggregator_conf(PARAM_SET *set, ERR_TRCKR *err, KSI_CTX *ksi) {
 	if (res != KT_OK) goto cleanup;
 
 	if (PARAM_SET_isSetByName(set, "dump-conf")) goto cleanup;
-	PST_snprintf(buf, sizeof(buf), "%i", remote_max_lvl);
 
-	res = PARAM_SET_add(set, "max-lvl",
-		buf,
-		"remote-conf", PRIORITY_KSI_CONF_REMOTE);
-	if (res != KT_OK) goto cleanup;
+	res = PARAM_SET_getObj(set, "max-lvl", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, (void*)&user_max_lvl);
+	if (res != KT_OK && res != PST_PARAMETER_EMPTY && res != PST_PARAMETER_VALUE_NOT_FOUND) goto cleanup;
 
-	res = PARAM_SET_add(set, "H",
-		KSI_getHashAlgorithmName(remote_algo),
-		"remote-conf", PRIORITY_KSI_CONF_REMOTE);
-	if (res != KT_OK) goto cleanup;
+	if (user_max_lvl == -1 || user_max_lvl > remote_max_lvl) {
+		PST_snprintf(buf, sizeof(buf), "%i", remote_max_lvl);
+		res = PARAM_SET_add(set, "max-lvl", buf, "remote-conf", PRIORITY_CMD);
+		if (res != KT_OK) goto cleanup;
+	}
 
+	for (priority = PRIORITY_DEFAULT; priority < PRIORITY_COUNT; priority++) {
+		if (is_set_by_name_at_pri(set, "apply-remote-conf", priority)) {
+			if (!is_set_by_name_at_pri(set, "H", priority)) {
+				res = PARAM_SET_add(set, "H", KSI_getHashAlgorithmName(remote_algo), "remote-conf", priority);
+				if (res != KT_OK) goto cleanup;
+			}
+		}
+	}
+
+	/* libparamset bug:
+	   To set some internal magic, affected by inserting new values,
+	   to initial state query some values from the beginning.
+	 */
+	PARAM_SET_getStr(set, "max-lvl", NULL, PST_PRIORITY_NONE, 0, &dummy);
+	PARAM_SET_getStr(set, "H", NULL, PST_PRIORITY_NONE, 0, &dummy);
 
 	res = KT_OK;
 cleanup:

@@ -1,5 +1,10 @@
 Version 1.6
 
+2022-04-01 1.6.XXX
+
+* BUGFIX: Option --max-lvl will ensure that KSI signature created has input hash level not higher than provided.
+* BUGFIX: When --apply-remote-conf is used in combination with --max-lvl, the smaller value is used.
+
 2022-04-01 1.6.752
 
 * FEATURE: New command create to make a log signature from existing log file.
