@@ -1087,11 +1087,12 @@ int logsignature_create(PARAM_SET *set, MULTI_PRINTER* mp, ERR_TRCKR *err, KSI_C
 	res = MERKLE_TREE_reset(blocks->tree, aggrAlgo, NULL, NULL);
 	ERR_CATCH_MSG(err, res, "Error: Could not reset merkle tree object.");
 
+
 	if (PARAM_SET_isSetByName(set, "max-lvl")) {
 		res = PARAM_SET_getObj(set, "max-lvl", NULL, PST_PRIORITY_HIGHEST, PST_INDEX_LAST, (void*)&user_max_lvl);
 		if (res != PST_OK) goto cleanup;
 
-		maxInputs = ((size_t)1 << user_max_lvl);
+		maxInputs = ((size_t)1 << (user_max_lvl - 1));
 	}
 
 	if (PARAM_SET_isSetByName(set, "blk-size")) {
