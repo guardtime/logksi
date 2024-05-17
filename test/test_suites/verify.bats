@@ -40,8 +40,14 @@ export KSI_CONF=test/test.cfg
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 }
 
-@test "verify log_repaired.logsig against key" {
-	run ./src/logksi verify --ver-key test/resource/logs_and_signatures/totally-resigned -ddd
+@test "verify log_repaired.logsig against publication string" {
+	run ./src/logksi verify --ver-pub test/resource/logs_and_signatures/totally-resigned -ddd --pub-str AAAAAA-C4WPEY-AAJNB6-BZYYHL-3CXJSP-F6V4BR-ZRIPP2-AOEWJL-TCDEI6-W72UHO-FFE6XM-BDANC4
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ "Finalizing log signature... ok." ]]
+}
+
+@test "verify using key-based policy" {
+	run ./src/logksi verify --ver-key test/out/log-key-based -ddd
 	[ "$status" -eq 0 ]
 	[[ "$output" =~ "Finalizing log signature... ok." ]]
 }
