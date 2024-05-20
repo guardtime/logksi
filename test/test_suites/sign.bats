@@ -2,6 +2,15 @@
 
 export KSI_CONF=test/test.cfg
 
+@test "create a key-based log signature" {
+	run cp test/resource/logs_and_signatures/totally-unsigned test/out/log-key-based
+	[ "$status" -eq 0 ]
+	run cp test/resource/logs_and_signatures/totally-unsigned.logsig test/out/log-key-based.logsig
+	[ "$status" -eq 0 ]
+	run ./src/logksi sign test/out/log-key-based -d
+	[ "$status" -eq 0 ]
+}
+
 @test "sign already signed signed.logsig, identical backup is not created and original file is not modified" {
 	run cp test/out/signed.logsig test/out/tmp.signed.logsig
 	[ "$status" -eq 0 ]
