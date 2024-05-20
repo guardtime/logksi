@@ -15,7 +15,7 @@ export KSI_CONF=""
 }
 
 @test "trust anchor-based verification: no -P for Calendar Authentication Record" {
-	run src/logksi verify test/resource/logs_and_signatures/totally-resigned -d
+	run src/logksi verify test/out/log-key-based -d
 	[ "$status" -eq 3 ]
 	[[ "$output" =~ "Verifying... failed." ]]
 	[[ "$output" =~ "Error: Verification inconclusive and was stopped." ]]
@@ -23,7 +23,7 @@ export KSI_CONF=""
 }
 
 @test "trust anchor-based verification: no -P for Calendar Authentication Record and --continue-on-fail" {
-	run src/logksi verify test/resource/logs_and_signatures/totally-resigned -d --continue-on-fail
+	run src/logksi verify test/out/log-key-based -d --continue-on-fail
 	[ "$status" -eq 3 ]
 	[[ "$output" =~ "Verifying... failed." ]]
 	[[ "$output" =~ "Error: Verification inconclusive and was stopped." ]]
@@ -107,7 +107,7 @@ export KSI_CONF=""
 }
 
 @test "key-based verification: unknown publications file url and --continue-on-fail" {
-	run src/logksi verify test/resource/logs_and_signatures/totally-resigned -d --ver-key  --continue-on-fail -P http://this-pubfile-url-must-not-exist --cnstr "E=dummy.email@email.com"
+	run src/logksi verify test/out/log-key-based -d --ver-key  --continue-on-fail -P http://this-pubfile-url-must-not-exist --cnstr "E=dummy.email@email.com"
 	[ "$status" -eq 1 ]
 	[[ "$output" =~ "Verifying... failed." ]]
 	[[ "$output" =~ "Error: Verification inconclusive and was stopped." ]]
